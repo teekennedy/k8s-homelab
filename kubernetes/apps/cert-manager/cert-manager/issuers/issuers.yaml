@@ -1,3 +1,4 @@
+---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -11,10 +12,9 @@ spec:
     solvers:
       - dns01:
           cloudflare:
-            email: "${SECRET_CLOUDFLARE_EMAIL}"
-            apiKeySecretRef:
+            apiTokenSecretRef:
               name: cert-manager-secret
-              key: api-key
+              key: api-token
         selector:
           dnsZones:
             - "${SECRET_DOMAIN}"
@@ -32,10 +32,9 @@ spec:
     solvers:
       - dns01:
           cloudflare:
-            email: "${SECRET_CLOUDFLARE_EMAIL}"
-            apiKeySecretRef:
+            apiTokenSecretRef:
               name: cert-manager-secret
-              key: api-key
+              key: api-token
         selector:
           dnsZones:
             - "${SECRET_DOMAIN}"
