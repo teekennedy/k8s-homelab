@@ -32,8 +32,12 @@ k3s_server:
   # Network CIDR to use for service IPs
   service-cidr: "10.43.0.0/16"
   kubelet-arg:
-    # Don't pull /etc/resolv.conf from host
-    - "resolv-conf="
+    # The default /etc/resolv.conf managed by systemd-resolved
+    # points to a caching service on localhost.
+    # Coredns makes requests from localhost,
+    # which leads to an infinite loop of resolving.
+    # Tell kubelet to use the host's resolv.conf that contains the upstream resolvers only.
+    - "resolv-conf=/run/systemd/resolve/resolv.conf"
   kube-controller-manager-arg:
     # Required to monitor kube-controller-manager with kube-prometheus-stack
     - "bind-address=0.0.0.0"
