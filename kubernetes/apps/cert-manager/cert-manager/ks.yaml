@@ -17,7 +17,7 @@ spec:
       namespace: cert-manager
   interval: 30m
   retryInterval: 1m
-  timeout: 3m
+  timeout: 10m
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
 kind: Kustomization
@@ -34,4 +34,4 @@ spec:
     name: home-kubernetes
   interval: 30m
   retryInterval: 1m
-  timeout: 3m
+  timeout: 10m
