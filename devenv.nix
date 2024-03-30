@@ -9,6 +9,7 @@
   packages = [
     pkgs.age
     pkgs.sops
+    pkgs.colmena
   ];
 
   enterShell = ''
