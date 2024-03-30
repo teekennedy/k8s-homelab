@@ -1,61 +1,25 @@
-# Template for deploying k3s backed by Flux
+# Personal Kubernetes Homelab
 
-Highly opinionated template for deploying a single [k3s](https://k3s.io) cluster with [Ansible](https://www.ansible.com) and [Terraform](https://www.terraform.io) backed by [Flux](https://toolkit.fluxcd.io/) and [SOPS](https://toolkit.fluxcd.io/guides/mozilla-sops/).
+This is the repo I use to manage the bare metal k8s cluster I setup at home out of some old laptops that were donated by friends and family.
 
-The purpose here is to showcase how you can deploy an entire Kubernetes cluster and show it off to the world using the [GitOps](https://www.weave.works/blog/what-is-gitops-really) tool [Flux](https://toolkit.fluxcd.io/). When completed, your Git repository will be driving the state of your Kubernetes cluster. In addition with the help of the [Ansible](https://github.com/ansible-collections/community.sops), [Terraform](https://github.com/carlpett/terraform-provider-sops) and [Flux](https://toolkit.fluxcd.io/guides/mozilla-sops/) SOPS integrations you'll be able to commit [Age](https://github.com/FiloSottile/age) encrypted secrets to your public repo.
+I started with [onedr0p's k3s template](https://github.com/onedr0p/flux-cluster-template) and customized accordingly.
 
-## Overview
+## Features
 
-- [Introduction](https://github.com/onedr0p/flux-cluster-template#-introduction)
-- [Prerequisites](https://github.com/onedr0p/flux-cluster-template#-prerequisites)
-- [Repository structure](https://github.com/onedr0p/flux-cluster-template#-repository-structure)
-- [Lets go!](https://github.com/onedr0p/flux-cluster-template#-lets-go)
-- [Post installation](https://github.com/onedr0p/flux-cluster-template#-post-installation)
-- [Troubleshooting](https://github.com/onedr0p/flux-cluster-template#-troubleshooting)
-- [What's next](https://github.com/onedr0p/flux-cluster-template#-whats-next)
-- [Thanks](https://github.com/onedr0p/flux-cluster-template#-thanks)
+- [k3s](https://k3s.io/) as the kubernetes distribution.
+- [Ansible](https://www.ansible.com) for provisioning the nodes.
+- [Terraform](https://www.terraform.io) to bootstrap the Cloudflare domain used for the cluster for DNS and certificate management.
+- [flux](https://toolkit.fluxcd.io/) for GitOps management of the cluster from this repo.
+- [kube-vip](https://kube-vip.io/) as the Load balancer for the Kubernetes control plane nodes.
+- [metallb](https://metallb.universe.tf/) as the Load balancer for Kubernetes services.
+- [cert-manager](https://cert-manager.io/) as an Operator to request SSL certificates and store them as Kubernetes resources.
+- [calico](https://www.tigera.io/project-calico/) as the Container networking interface for inter pod and service networking.
+- [external-dns](https://github.com/kubernetes-sigs/external-dns) to publish DNS records to Cloudflare (and other providers) based on Kubernetes ingresses.
+- [k8s_gateway](https://github.com/ori-edge/k8s_gateway) to provide local DNS to the Kubernetes ingresses.
+- [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) as the Kubernetes ingress controller / HTTP reverse proxy.
+- [local-path-provisioner](https://github.com/rancher/local-path-provisioner) provisions persistent local storage with Kubernetes.
 
-## 👋 Introduction
-
-The following components will be installed in your [k3s](https://k3s.io/) cluster by default. Most are only included to get a minimum viable cluster up and running.
-
-- [flux](https://toolkit.fluxcd.io/) - GitOps operator for managing Kubernetes clusters from a Git repository
-- [kube-vip](https://kube-vip.io/) - Load balancer for the Kubernetes control plane nodes
-- [metallb](https://metallb.universe.tf/) - Load balancer for Kubernetes services
-- [cert-manager](https://cert-manager.io/) - Operator to request SSL certificates and store them as Kubernetes resources
-- [calico](https://www.tigera.io/project-calico/) - Container networking interface for inter pod and service networking
-- [external-dns](https://github.com/kubernetes-sigs/external-dns) - Operator to publish DNS records to Cloudflare (and other providers) based on Kubernetes ingresses
-- [k8s_gateway](https://github.com/ori-edge/k8s_gateway) - DNS resolver that provides local DNS to your Kubernetes ingresses
-- [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) - Kubernetes ingress controller used for a HTTP reverse proxy of Kubernetes ingresses
-- [local-path-provisioner](https://github.com/rancher/local-path-provisioner) - provision persistent local storage with Kubernetes
-
-_Additional applications include [hajimari](https://github.com/toboshii/hajimari), [error-pages](https://github.com/tarampampam/error-pages), [echo-server](https://github.com/Ealenn/Echo-Server), [system-upgrade-controller](https://github.com/rancher/system-upgrade-controller), [reloader](https://github.com/stakater/Reloader), and [kured](https://github.com/weaveworks/kured)_
-
-For provisioning the following tools will be used:
-
-- [Ansible](https://www.ansible.com) - Sets up the operating system and installs k3s
-- [Terraform](https://www.terraform.io) - Provisions an existing Cloudflare domain and certain DNS records to be used with your Kubernetes cluster
-
-## 📝 Prerequisites
-
-**Note:** _This template has not been tested on cloud providers like AWS EC2, Hetzner, Scaleway etc... Those cloud offerings probably have a better way of provsioning a Kubernetes cluster and it's advisable to use those instead of the Ansible playbooks included here. This repository can still be tweaked for the GitOps/Flux portion if there's a cluster working in one those environments._
-
-First and foremost some experience in debugging/troubleshooting problems **and a positive attitude is required** ;)
-
-### 📚 Reading material
-
-- [Organizing Cluster Access Using kubeconfig Files](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/)
-
-### 💻 Systems
-
-- One or more nodes with a fresh install of [Fedora Server 36](https://getfedora.org/en/server/download/) or [Ubuntu 22.04 Server](https://ubuntu.com/download/server).
-  - These nodes can be ARM64/AMD64 bare metal or VMs.
-  - An odd number of control plane nodes, greater than or equal to 3 is required if deploying more than one control plane node.
-- A [Cloudflare](https://www.cloudflare.com/) account with a domain, this will be managed by Terraform and external-dns. You can [register new domains](https://www.cloudflare.com/products/registrar/) directly thru Cloudflare.
-
-📍 It is recommended to have 3 master nodes for a highly available control plane.
-
-## 📂 Repository structure
+## Repository structure
 
 The Git repository contains the following directories under `kubernetes` and are ordered below by how Flux will apply them.
 
@@ -66,55 +30,9 @@ The Git repository contains the following directories under `kubernetes` and are
 └─📁 apps          # Apps deployed into the cluster grouped by namespace
 ```
 
-## 🚀 Lets go
+## Dev Environment Setup
 
-Very first step will be to create a new **public** repository by clicking the big green **Use this template** button on this page.
-
-Clone **your new repo** to you local workstation and `cd` into it.
-
-📍 **All of the below commands** are run on your **local** workstation, **not** on any of your cluster nodes.
-
-### 🔧 Workstation Tools
-
-📍 Install the **most recent version** of the CLI tools below. If you are **having trouble with future steps**, it is very likely you don't have the most recent version of these CLI tools, **!especially sops AND yq!**.
-
-1. Install the following CLI tools on your workstation, if you are **NOT** using [Homebrew](https://brew.sh/) on MacOS or Linux **ignore** steps 4 and 5.
-
-    * Required: [age](https://github.com/FiloSottile/age), [ansible](https://www.ansible.com), [flux](https://toolkit.fluxcd.io/), [weave-gitops](https://docs.gitops.weave.works/docs/installation/weave-gitops/), [go-task](https://github.com/go-task/task), [direnv](https://github.com/direnv/direnv), [ipcalc](http://jodies.de/ipcalc), [jq](https://stedolan.github.io/jq/), [kubectl](https://kubernetes.io/docs/tasks/tools/), [python3](https://www.python.org/downloads/), [pre-commit](https://github.com/pre-commit/pre-commit), [sops v3](https://github.com/mozilla/sops), [terraform](https://www.terraform.io), [yq v4](https://github.com/mikefarah/yq)
-
-    * Recommended: [helm](https://helm.sh/), [kustomize](https://github.com/kubernetes-sigs/kustomize), [stern](https://github.com/stern/stern), [yamllint](https://github.com/adrienverge/yamllint)
-
-2. This guide heavily relies on [go-task](https://github.com/go-task/task) as a framework for setting things up. It is advised to learn and understand the commands it is running under the hood.
-
-3. Install Python 3 using your Linux OS package manager, or Homebrew if using MacOS.
-
-4. [Homebrew] Install [go-task](https://github.com/go-task/task)
-
-    ```sh
-    brew install go-task/tap/go-task
-    ```
-
-5. [Homebrew] Install workstation dependencies
-
-    ```sh
-    task init
-    ```
-
-### ⚠️ pre-commit
-
-It is advisable to install [pre-commit](https://pre-commit.com/) and the pre-commit hooks that come with this repository.
-
-1. Enable Pre-Commit
-
-    ```sh
-    task precommit:init
-    ```
-
-2. Update Pre-Commit, though it will occasionally make mistakes, so verify its results.
-
-    ```sh
-    task precommit:update
-    ```
+TODO devenv + direnv instructions.
 
 ### 🔐 Setting up Age
 
@@ -131,13 +49,6 @@ It is advisable to install [pre-commit](https://pre-commit.com/) and the pre-com
     ```sh
     mkdir -p ~/.config/sops/age
     mv age.agekey ~/.config/sops/age/keys.txt
-    ```
-
-3. Export the `SOPS_AGE_KEY_FILE` variable in your `bashrc`, `zshrc` or `config.fish` and source it, e.g.
-
-    ```sh
-    export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt
-    source ~/.bashrc
     ```
 
 4. Fill out the Age public key in the appropriate variable in configuration section below, **note** the public key should start with `age`...
