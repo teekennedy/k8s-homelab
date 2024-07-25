@@ -1,8 +1,4 @@
-{
-  pkgs,
-  config,
-  ...
-}: {
+{pkgs, ...}: {
   env.SOPS_AGE_KEY_FILE = ~/.config/sops/age/keys.txt;
 
   # https://devenv.sh/packages/
@@ -25,7 +21,7 @@
   pre-commit.hooks = {
     # Nix code formatter
     alejandra.enable = true;
-    # Terraform formatter
+    # Terraform code formatter
     terraform-format.enable = true;
     # YAML linter
     yamllint.enable = true;

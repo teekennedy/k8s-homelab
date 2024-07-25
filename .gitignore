@@ -1,3 +1,5 @@
-# devenv
-.devenv*
-devenv.local.nix
+# https://devenv.sh/
+.devenv
+
+# direnv
+.direnv
