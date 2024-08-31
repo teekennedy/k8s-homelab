@@ -1,5 +1,18 @@
 ---
+keys:
+  # My GPG encryption subkey fingerprint
+  - &user_tkennedy FD5B1635F2218760E010601F4A6E1024D7BBE968
+  # ssh-ed25519 host keys converted to age
+  # `nix-shell -p ssh-to-age --run 'ssh-keyscan <host> | grep ssh-ed25519 | ssh-to-age'`
+  - &host_borg-0 age1nprg5ajaykpx7t2qv3xcn3uftlx0z89grtlsnz6k4sap8uzdcfmsdrcvya
+
 creation_rules:
+  - path_regex: hosts/borg-0/secrets.ya?ml
+    key_groups:
+      - pgp:
+          - *user_tkennedy
+        age:
+          - *host_borg-0
   - path_regex: terraform/.*\.sops\.ya?ml
     key_groups:
       - age:
