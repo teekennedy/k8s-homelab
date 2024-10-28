@@ -81,12 +81,16 @@
   # Enable systemd-resolved
   services.resolved.enable = true;
   # Enable the OpenSSH daemon.
-  services.openssh.enable = true;
+  services.openssh = {
+    enable = true;
+    settings = {
+      PermitRootLogin = "no";
+      PasswordAuthentication = false;
+    };
+  };
 
   # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [
-    22 # ssh
-  ];
+  networking.firewall.allowedTCPPorts = [];
   networking.firewall.allowedUDPPorts = [
     5353 # multicast DNS
   ];
