@@ -46,7 +46,7 @@
           system = "x86_64-linux";
           overlays = [];
         };
-        specialArgs = { inherit inputs; };
+        specialArgs = {inherit inputs;};
       };
 
       defaults = {

@@ -6,5 +6,6 @@
 }: {
   imports = [
     ./sops-nix.nix
+    ./store.nix
   ];
 }
