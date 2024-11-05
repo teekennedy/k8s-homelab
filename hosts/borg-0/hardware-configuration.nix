@@ -9,6 +9,7 @@
   boot.kernelModules = ["kvm-intel"];
   boot.extraModulePackages = [];
   networking.useDHCP = true;
+  networking.useNetworkd = true;
 
   fileSystems."/" = {
     device = "/dev/disk/by-uuid/c5de90e4-5cfb-43a1-aeed-a61c49e52881";
@@ -64,6 +65,7 @@
     extraGroups = ["wheel"]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
       vim
+      kubectl
     ];
   };
   users.users.tkennedy.hashedPasswordFile = config.sops.secrets.tkennedy_hashed_password.path;

@@ -52,6 +52,7 @@
       defaults = {
         imports = [
           ./modules/common
+          ./modules/k3s
         ];
       };
 

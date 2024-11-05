@@ -242,3 +242,11 @@ sops.secrets.my_secret = {
 These secrets will be decrypted under `/run/secrets` (or `/run/secrets-for-users` if the secret is `neededForUsers`).
 You can reference the secret's path from elsewhere in the config using the `.path` attribute,
 e.g. `users.users.my-user.hashedPasswordFile = config.sops.secrets.my-password.path;`.
+
+## Bootstrapping k3s cluster
+
+Start your first k3s server with `services.k3s.clusterInit = true;`. See modules/k3s/k3s.nix for a full example.
+
+Once applied, log into the host and check that k3s is running with `sudo systemctl status k3s.service`. Check the k3s logs for errors as well `sudo journalctl -fu k3s.service`.
+
+In my case k3s was having an issue with adding its own DNS to systemd-resolved, which was due to an unrelated issue with dhcpcd not being able to set DNS servers. I switched to networkd with `networking.useNetworkd = true` and the problem went away.
