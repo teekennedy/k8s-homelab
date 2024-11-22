@@ -10,6 +10,9 @@
   boot.extraModulePackages = [];
   networking.useDHCP = true;
   networking.useNetworkd = true;
+  systemd.network.networks."99-ethernet-default-dhcp".networkConfig = {
+    UseDomains = "yes";
+  };
 
   fileSystems."/" = {
     device = "/dev/disk/by-uuid/c5de90e4-5cfb-43a1-aeed-a61c49e52881";

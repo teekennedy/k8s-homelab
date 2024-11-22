@@ -2,6 +2,7 @@
   description = "teekennedy's homelab";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     systems.url = "github:nix-systems/default";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
@@ -16,6 +17,7 @@
   outputs = {
     self,
     nixpkgs,
+    nixpkgs-master,
     devenv,
     sops-nix,
     systems,
@@ -46,7 +48,13 @@
           system = "x86_64-linux";
           overlays = [];
         };
-        specialArgs = {inherit inputs;};
+        specialArgs = {
+          inherit inputs;
+          nixpkgs-master = import nixpkgs-master {
+            system = "x86_64-linux";
+            overlays = [];
+          };
+        };
       };
 
       defaults = {
@@ -70,9 +78,14 @@
           # Copy the derivation to the target node and initiate the build there
           buildOnTarget = true;
           targetUser = null; # Defaults to $USER
-          targetHost = "borg-0.local";
+          targetHost = "borg-0.lan";
         };
 
+        services.k3s = {
+          role = "server";
+          # Leave true for first node in cluster
+          clusterInit = true;
+        };
         sops.secrets.tkennedy_hashed_password = {
           neededForUsers = true;
         };

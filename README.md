@@ -209,7 +209,9 @@ See the [sops-nix](https://github.com/Mic92/sops-nix) README for more examples a
 
 ```nix
 sops.secrets.my_secret = {
-  # The default format is "yaml" but you can also use "json" or "binary"
+  # The sops file can be overwritten per secret...
+  # sopsFile = ./other-secrets.json;
+  # The format of the sops file. Defaults to "yaml" but you can also use "json" or "binary"
   # format = "yaml"
 
   # Permission modes are in octal representation (same as chmod)
@@ -220,9 +222,6 @@ sops.secrets.my_secret = {
   # Either the group id or group name representation of the secret group
   # It is recommended to get the group name from `config.users.users.<?name>.group` to avoid misconfiguration
   # group = config.users.users.nobody.group;
-
-  # The sops file can be overwritten per secret...
-  # sopsFile = ./other-secrets.json;
 
   # It is possible to restart or reload units when a secret changes or is newly initialized.
   # restartUnits = [ "home-assistant.service" ];

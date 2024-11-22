@@ -2,6 +2,7 @@
   config,
   inputs,
   lib,
+  nixpkgs-master,
   pkgs,
   ...
 }: {
@@ -19,13 +20,21 @@
   ];
 
   services.k3s.enable = true;
-  services.k3s.role = "server";
+  # Use k3s release with graceful shutdown patches from nixpkgs master branch
+  # https://github.com/NixOS/nixpkgs/issues/255783
+  services.k3s.package = nixpkgs-master.pkgs.k3s;
 
   # Enable graceful shutdown
   # https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#graceful-node-shutdown
   # Note that due to a regression in local-path-provisioner, this won't work with k3s versions 1.30.x up to 1.31.2.
   services.k3s.gracefulNodeShutdown.enable = true;
 
-  # Bootstrap cluster
-  services.k3s.clusterInit = true;
+  # file permissions and path for k3s token set to match k3s default
+  # https://docs.k3s.io/cli/token
+  sops.secrets.k3s_token = {
+    mode = "0600";
+    owner = config.users.users.root.name;
+    group = config.users.users.root.group;
+    restartUnits = ["k3s.service"];
+  };
 }
