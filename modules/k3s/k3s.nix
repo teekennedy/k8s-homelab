@@ -37,4 +37,6 @@
     group = config.users.users.root.group;
     restartUnits = ["k3s.service"];
   };
+
+  services.k3s.tokenFile = config.sops.secrets.k3s_token.path;
 }

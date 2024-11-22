@@ -7,6 +7,7 @@
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix";
+    flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
   nixConfig = {
@@ -14,82 +15,110 @@
     extra-substituters = "https://devenv.cachix.org";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    nixpkgs-master,
-    devenv,
-    sops-nix,
-    systems,
-    ...
-  } @ inputs: let
-    forEachSystem = nixpkgs.lib.genAttrs (import systems);
-    inherit (nixpkgs) lib;
-  in {
-    packages = forEachSystem (system: {
-      devenv-up = self.devShells.${system}.default.config.procfileScript;
-    });
+  outputs = inputs @ {flake-parts, ...}:
+    flake-parts.lib.mkFlake {
+      inherit inputs;
+    } {
+      imports = [
+        inputs.devenv.flakeModule
+      ];
+      systems = ["aarch64-darwin" "x86_64-linux"];
+      perSystem = {
+        config,
+        self',
+        inputs',
+        pkgs,
+        lib,
+        system,
+        ...
+      }: {
+        devenv.shells.default = {
+          # env.SOPS_AGE_KEY_FILE = ~/.config/sops/age/keys.txt;
+          env.KUBECONFIG = "${config.devenv.shells.default.env.DEVENV_STATE}/kube/config";
 
-    devShells =
-      forEachSystem
-      (system: let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in {
-        default = devenv.lib.mkShell {
-          inherit inputs pkgs;
-          modules = [(import ./devenv.nix {pkgs = pkgs;})];
-        };
-      });
+          # https://devenv.sh/packages/
+          packages = [
+            pkgs.age
+            pkgs.sops
+            pkgs.colmena
+            pkgs.kubectl
+          ];
 
-    colmena = {
-      meta = {
-        description = "K3s cluster";
-        nixpkgs = import nixpkgs {
-          system = "x86_64-linux";
-          overlays = [];
+          enterShell = ''
+          '';
+
+          # https://devenv.sh/languages/
+          languages.nix.enable = true;
+
+          # https://devenv.sh/scripts/
+          # scripts.hello.exec = "echo hello from $GREET";
+
+          # https://devenv.sh/pre-commit-hooks/
+          pre-commit.hooks = {
+            # Nix code formatter
+            alejandra.enable = true;
+            # Terraform code formatter
+            terraform-format.enable = true;
+            # YAML linter
+            yamllint.enable = true;
+          };
+
+          # https://devenv.sh/processes/
+          # processes.ping.exec = "ping example.com";
         };
-        specialArgs = {
-          inherit inputs;
-          nixpkgs-master = import nixpkgs-master {
-            system = "x86_64-linux";
-            overlays = [];
+      };
+
+      flake = {
+        colmena = {
+          meta = {
+            description = "K3s cluster";
+            nixpkgs = import inputs.nixpkgs {
+              system = "x86_64-linux";
+              overlays = [];
+            };
+            specialArgs = {
+              inherit inputs;
+              nixpkgs-master = import inputs.nixpkgs-master {
+                system = "x86_64-linux";
+                overlays = [];
+              };
+            };
+          };
+
+          defaults = {
+            imports = [
+              ./modules/common
+              ./modules/k3s
+            ];
+          };
+
+          borg-0 = {
+            name,
+            nodes,
+            pkgs,
+            ...
+          }: {
+            imports = [
+              ./hosts/borg-0
+            ];
+            deployment = {
+              tags = [];
+              # Copy the derivation to the target node and initiate the build there
+              buildOnTarget = true;
+              targetUser = null; # Defaults to $USER
+              targetHost = "borg-0.lan";
+            };
+
+            services.k3s = {
+              role = "server";
+              # Leave true for first node in cluster
+              clusterInit = true;
+            };
+            sops.secrets.tkennedy_hashed_password = {
+              neededForUsers = true;
+            };
           };
         };
       };
-
-      defaults = {
-        imports = [
-          ./modules/common
-          ./modules/k3s
-        ];
-      };
-
-      borg-0 = {
-        name,
-        nodes,
-        pkgs,
-        ...
-      }: {
-        imports = [
-          ./hosts/borg-0
-        ];
-        deployment = {
-          tags = [];
-          # Copy the derivation to the target node and initiate the build there
-          buildOnTarget = true;
-          targetUser = null; # Defaults to $USER
-          targetHost = "borg-0.lan";
-        };
-
-        services.k3s = {
-          role = "server";
-          # Leave true for first node in cluster
-          clusterInit = true;
-        };
-        sops.secrets.tkennedy_hashed_password = {
-          neededForUsers = true;
-        };
-      };
     };
-  };
 }

@@ -1,6 +1,7 @@
 ---
 ignore: |
   secrets.yaml
+  *.enc.yaml
 extends: default
 rules:
   truthy:

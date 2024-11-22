@@ -13,6 +13,10 @@ creation_rules:
           - *user_tkennedy
         age:
           - *host_borg-0
+  - path_regex: modules/k3s/kubeconfig.enc.yaml
+    key_groups:
+      - pgp:
+          - *user_tkennedy
   - path_regex: terraform/.*\.sops\.ya?ml
     key_groups:
       - age:

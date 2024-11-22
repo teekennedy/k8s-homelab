@@ -248,4 +248,4 @@ Start your first k3s server with `services.k3s.clusterInit = true;`. See modules
 
 Once applied, log into the host and check that k3s is running with `sudo systemctl status k3s.service`. Check the k3s logs for errors as well `sudo journalctl -fu k3s.service`.
 
-In my case k3s was having an issue with adding its own DNS to systemd-resolved, which was due to an unrelated issue with dhcpcd not being able to set DNS servers. I switched to networkd with `networking.useNetworkd = true` and the problem went away.
+Get the contents of the k3s token and kubernetes config secrets at /var/lib/rancher/k3s/server/token and /etc/rancher/k3s/k3s.yaml respectively, and save them under modules/k3s/kubeconfig.enc.yaml and hosts/<hostname>/secrets.yaml:k3s_token respectively.
