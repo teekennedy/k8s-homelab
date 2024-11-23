@@ -2,7 +2,6 @@
   config,
   inputs,
   lib,
-  nixpkgs-master,
   pkgs,
   ...
 }: {
@@ -20,9 +19,6 @@
   ];
 
   services.k3s.enable = true;
-  # Use k3s release with graceful shutdown patches from nixpkgs master branch
-  # https://github.com/NixOS/nixpkgs/issues/255783
-  services.k3s.package = nixpkgs-master.pkgs.k3s;
 
   # Enable graceful shutdown
   # https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#graceful-node-shutdown

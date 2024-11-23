@@ -32,16 +32,42 @@
         system,
         ...
       }: {
+        _module.args.pkgs = import inputs.nixpkgs {
+          inherit system;
+
+          overlays = [
+            (final: prev: rec {
+              kubernetes-helm = prev.wrapHelm prev.kubernetes-helm {
+                plugins = with prev.kubernetes-helmPlugins; [
+                  helm-secrets
+                  helm-diff
+                  helm-s3
+                  helm-git
+                ];
+              };
+
+              helmfile = prev.helmfile-wrapped.override {
+                inherit (kubernetes-helm) pluginsDir;
+              };
+              # Use k3s release with graceful shutdown patches from nixpkgs master branch
+              # https://github.com/NixOS/nixpkgs/issues/255783
+              k3s = inputs.nixpkgs-master.pkgs.k3s;
+            })
+          ];
+        };
         devenv.shells.default = {
           # env.SOPS_AGE_KEY_FILE = ~/.config/sops/age/keys.txt;
           env.KUBECONFIG = "${config.devenv.shells.default.env.DEVENV_STATE}/kube/config";
 
           # https://devenv.sh/packages/
-          packages = [
-            pkgs.age
-            pkgs.sops
-            pkgs.colmena
-            pkgs.kubectl
+          packages = with pkgs; [
+            age
+            sops
+            colmena
+            kubectl
+            kubernetes-helm
+            helmfile
+            kustomize
           ];
 
           enterShell = ''
@@ -65,6 +91,8 @@
 
           # https://devenv.sh/processes/
           # processes.ping.exec = "ping example.com";
+        };
+        packages = {
         };
       };
 
