@@ -62,12 +62,13 @@
           # https://devenv.sh/packages/
           packages = with pkgs; [
             age
-            sops
             colmena
+            helmfile
             kubectl
             kubernetes-helm
-            helmfile
             kustomize
+            opentofu
+            sops
           ];
 
           enterShell = ''
