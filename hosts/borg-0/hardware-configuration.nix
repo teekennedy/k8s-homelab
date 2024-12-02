@@ -34,6 +34,11 @@
     fsType = "ext4";
   };
 
+  fileSystems."/var/lib/longhorn" = {
+    device = "/dev/disk/by-uuid/44cbda2d-f2ed-401b-bc93-7e2bca18ddea";
+    fsType = "ext4";
+  };
+
   swapDevices = [
     {device = "/dev/disk/by-uuid/6a6335d2-43bd-4229-9b57-a137d64e1053";}
   ];
@@ -69,6 +74,8 @@
     packages = with pkgs; [
       vim
       kubectl
+      tree
+      htop-vim
     ];
   };
   users.users.tkennedy.hashedPasswordFile = config.sops.secrets.tkennedy_hashed_password.path;

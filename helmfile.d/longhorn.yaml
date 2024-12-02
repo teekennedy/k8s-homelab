@@ -52,3 +52,6 @@ releases:
             value:
               - configMapRef:
                   name: longhorn-nixos-path
+          - op: replace
+            path: /spec/ttlSecondsAfterFinished
+            value: 3600
