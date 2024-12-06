@@ -1,6 +1,7 @@
 {
   description = "teekennedy's homelab";
   inputs = {
+    nixos.url = "nixpkgs/nixos-24.11";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     systems.url = "github:nix-systems/default";
@@ -146,6 +147,32 @@
             sops.secrets.tkennedy_hashed_password = {
               neededForUsers = true;
             };
+          };
+        };
+        # build this with
+        # nix build .#nixosConfigurations.bcachefsIso.config.system.build.isoImage
+        # the result will be found under ./result/iso
+        # Host must be on same system as iso.
+        nixosConfigurations = {
+          bcachefsIso = inputs.nixos.lib.nixosSystem {
+            system = "x86_64-linux";
+            modules = [
+              "${inputs.nixos}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel-no-zfs.nix"
+              ({
+                lib,
+                pkgs,
+                ...
+              }: {
+                # TODO make this and hosts/borg-0/hardware-configuration.nix reference the same data for keys.
+                users.users.nixos.openssh.authorizedKeys.keys = [
+                  "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIETquAokxYIU4oPwonsCbUPA09n68mQrMfJwW9q6J19IAAAACnNzaDpnaXRodWI= tkennedy@oxygen.local"
+                  # GPG SSH key
+                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOPQjEqJpz5sOwxeieTNx1UBikeQ43rWnw0oQnjk+Z8z openpgp:0xEC44996F"
+                ];
+                boot.supportedFilesystems = ["bcachefs"];
+                boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_latest;
+              })
+            ];
           };
         };
       };

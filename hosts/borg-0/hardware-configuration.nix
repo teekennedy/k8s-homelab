@@ -72,10 +72,11 @@
     ];
     extraGroups = ["wheel"]; # Enable ‘sudo’ for the user.
     packages = with pkgs; [
-      vim
+      file
+      htop-vim
       kubectl
       tree
-      htop-vim
+      vim
     ];
   };
   users.users.tkennedy.hashedPasswordFile = config.sops.secrets.tkennedy_hashed_password.path;
@@ -85,6 +86,9 @@
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
+    file
+    htop-vim
+    tree
     vim
   ];
 
