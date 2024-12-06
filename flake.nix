@@ -1,6 +1,7 @@
 {
   description = "teekennedy's homelab";
   inputs = {
+    colmena.url = "github:zhaofengli/colmena/main";
     nixos.url = "nixpkgs/nixos-24.11";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
@@ -16,7 +17,11 @@
     extra-substituters = "https://devenv.cachix.org";
   };
 
-  outputs = inputs @ {flake-parts, ...}:
+  outputs = inputs @ {
+    flake-parts,
+    self,
+    ...
+  }:
     flake-parts.lib.mkFlake {
       inherit inputs;
     } {
@@ -53,6 +58,7 @@
               # Use k3s release with graceful shutdown patches from nixpkgs master branch
               # https://github.com/NixOS/nixpkgs/issues/255783
               k3s = inputs.nixpkgs-master.pkgs.k3s;
+              colmena = inputs.colmena.defaultPackage."${system}";
             })
           ];
         };
@@ -99,6 +105,7 @@
       };
 
       flake = {
+        colmenaHive = inputs.colmena.lib.makeHive self.outputs.colmena;
         colmena = {
           meta = {
             description = "K3s cluster";
