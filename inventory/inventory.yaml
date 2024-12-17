@@ -1,0 +1,78 @@
+hosts:
+  ups:
+    hostname: ups
+    mac_address: 00:0c:15:06:28:ab
+    ip_address: 10.69.0.231
+    connected_via: qnap_poe
+    switch_port: 9
+    patch_panel_port: 9
+    vlan: management
+    notes: It SHOULD be on the management vlan but it ain't. The IP is hardcoded in home assistant config under config/packages/ups.yaml.
+  proxmox-router:
+    hostname: proxmox-router
+    mac_address: 24:5e:be:83:d2:0d
+    ip_address: 10.69.0.10
+    switch_port: null
+    dhcp: false
+    notes: Interface is called vmbr0 on host.
+  poe-switch:
+    hostname: poe-switch
+    mac_address: 24:5e:be:83:d2:0d
+    ip_address: unknown
+    dhcp: true
+    vlan: management
+    notes: 2024-12-01 This was on vlan 1 and I switched it to vlan 2. It's supposed to get an IP over dhcp but isn't showing up in opnsense yet.
+  borg-0:
+    hostname: borg-0
+    ip_address: 10.69.8.10
+    dhcp: false
+    vlan: k8s
+    notes: Interface eno1 is static, eno2 is DHCP for debugging purposes
+  borg-1:
+    hostname: borg-1
+    mac_address: 10:dd:b1:de:b8:19
+    ip_address: 10.69.8.11
+    dhcp: false
+    vlan: k8s
+
+# Vlan tags should be created based on the following:
+# - first 3 digits are based on the third octet of subnet, e.g. 100 for 10.69.100.128
+# - last digit based on which /27 the subnet starts at (0 indexed). There are 8 /27s in a /24, so last digit would be 4 for 10.69.100.128
+# See https://www.calculator.net/ip-subnet-calculator.html
+vlans:
+  default:
+    vlan_tag: 1
+    subnet: 10.69.0.0/23
+    switch_ports:
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    notes: This is the vlan tag used when a packet is untagged.
+  management:
+    vlan_tag: 20
+    subnet: 10.69.2.0/24 # 254 usable hosts
+    switch_ports: [17]
+    notes: "should include poe-switch management interface but I don't think that's possible"
+  okta:
+    vlan_tag: 700
+    subnet: 10.69.70.0/26 # 62 usable hosts
+    wifi_networks: ["kennedy🏡"]
+    switch_ports: [17, 19]
+  esp_home:
+    vlan_tag: 1000
+    subnet: 10.69.100.0/25 # 126 usable hosts
+    wifi_networks: ["kennedy_iot"]
+    switch_ports: [17, 19]
+  roombas:
+    vlan_tag: 1004
+    wifi_networks: ["kennedy_iot"]
+    subnet: 10.69.100.128/27 # 30 usable hosts
+    switch_ports: [17, 19]
+  energy_meters:
+    vlan_tag: 1005
+    subnet: 10.69.100.160/27 # 30 usable hosts
+    wifi_networks: ["kennedy_iot"]
+    switch_ports: [17, 19]
+    notes: "includes Xcel net meter and solar panel"
+  k8s:
+    vlan_tag: 800
+    subnet: 10.69.80.0/25 # 126 usable hosts
+    switch_ports: [17]
