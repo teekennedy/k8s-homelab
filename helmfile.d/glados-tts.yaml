@@ -1,0 +1,49 @@
+repositories:
+  - name: incubator
+    url: https://charts.helm.sh/incubator
+releases:
+  - name: glados-tts
+    namespace: glados-tts
+    chart: incubator/raw
+    values:
+      - resources:
+          - apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: glados-tts
+              labels:
+                app: glados-tts
+            spec:
+              replicas: 1
+              # scale down current deployment before upgrading
+              # Added because my poor Atom-based node can't handle two pods at once.
+              strategy:
+                type: Recreate
+              selector:
+                matchLabels:
+                  app: glados-tts
+              template:
+                metadata:
+                  labels:
+                    app: glados-tts
+                spec:
+                  containers:
+                    - name: glados-tts
+                      image: ghcr.io/teekennedy/glados_tts_remote:7c459a5
+                      command:
+                        [
+                          "sh",
+                          "-c",
+                          'echo "The app is running!" && ls && tail -f /dev/null',
+                        ]
+                      ports:
+                        - containerPort: 8124
+                      volumeMounts:
+                        - name: models
+                          mountPath: /my-mounts
+                          readOnly: true
+                  volumes:
+                    - name: models
+                      image:
+                        reference: ghcr.io/teekennedy/glados_tts_remote:models
+                        pullPolicy: IfNotPresent

@@ -2,6 +2,7 @@
 ignore: |
   secrets.yaml
   *.enc.yaml
+  *.sops.yaml
 extends: default
 rules:
   truthy:

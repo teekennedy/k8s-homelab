@@ -3,3 +3,6 @@
 
 # direnv
 .direnv
+
+# result is the output when building live isos
+result

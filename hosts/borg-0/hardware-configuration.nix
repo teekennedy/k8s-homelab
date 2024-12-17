@@ -8,8 +8,17 @@
   boot.initrd.kernelModules = ["dm-snapshot"];
   boot.kernelModules = ["kvm-intel"];
   boot.extraModulePackages = [];
-  networking.useDHCP = true;
   networking.useNetworkd = true;
+  networking.interfaces = let
+    ifaceCfg = {
+      wakeOnLan.enable = false;
+      useDHCP = true;
+    };
+  in {
+    eno1 = ifaceCfg;
+    eno2 = ifaceCfg;
+    enp3s0 = ifaceCfg;
+  };
   systemd.network.networks."99-ethernet-default-dhcp".networkConfig = {
     UseDomains = "yes";
   };
@@ -17,6 +26,7 @@
   fileSystems."/" = {
     device = "/dev/disk/by-uuid/c5de90e4-5cfb-43a1-aeed-a61c49e52881";
     fsType = "ext4";
+    options = ["defaults" "noatime"];
   };
 
   fileSystems."/boot" = {
@@ -56,41 +66,6 @@
 
   # Set your time zone.
   time.timeZone = "America/Denver";
-
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
-
-  # Don't allow user password to be changed interactively
-  users.mutableUsers = false;
-  users.users.tkennedy = {
-    isNormalUser = true;
-    openssh.authorizedKeys.keys = [
-      "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIETquAokxYIU4oPwonsCbUPA09n68mQrMfJwW9q6J19IAAAACnNzaDpnaXRodWI= tkennedy@oxygen.local"
-      # GPG SSH key
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOPQjEqJpz5sOwxeieTNx1UBikeQ43rWnw0oQnjk+Z8z openpgp:0xEC44996F"
-    ];
-    extraGroups = ["wheel"]; # Enable ‘sudo’ for the user.
-    packages = with pkgs; [
-      file
-      htop-vim
-      kubectl
-      tree
-      vim
-    ];
-  };
-  users.users.tkennedy.hashedPasswordFile = config.sops.secrets.tkennedy_hashed_password.path;
-  # Disable sudo prompt for `wheel` users.
-  security.sudo.wheelNeedsPassword = lib.mkDefault false;
-
-  # List packages installed in system profile. To search, run:
-  # $ nix search wget
-  environment.systemPackages = with pkgs; [
-    file
-    htop-vim
-    tree
-    vim
-  ];
 
   # List services that you want to enable:
 

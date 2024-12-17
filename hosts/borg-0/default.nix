@@ -1,10 +1,6 @@
 {pkgs, ...}: {
   imports = [
     ./hardware-configuration.nix
+    ./disable-wol.nix
   ];
-  options = {
-    k3s = {
-      first-host = true;
-    };
-  };
 }

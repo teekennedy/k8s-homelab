@@ -35,4 +35,9 @@
   };
 
   services.k3s.tokenFile = config.sops.secrets.k3s_token.path;
+
+  # Enable image volume feature gate
+  services.k3s.extraKubeletConfig = {
+    featureGates = {ImageVolume = true;};
+  };
 }

@@ -3,6 +3,7 @@
   inputs = {
     colmena.url = "github:zhaofengli/colmena/main";
     nixos.url = "nixpkgs/nixos-24.11";
+    nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     systems.url = "github:nix-systems/default";
@@ -126,6 +127,7 @@
             imports = [
               ./modules/common
               ./modules/k3s
+              ./modules/users
             ];
           };
 
@@ -136,7 +138,9 @@
             ...
           }: {
             imports = [
+              ./hosts/common
               ./hosts/borg-0
+              inputs.nixos-hardware.nixosModules.common-cpu-intel
             ];
             deployment = {
               tags = [];
@@ -158,13 +162,17 @@
         };
         # build this with
         # nix build .#nixosConfigurations.bcachefsIso.config.system.build.isoImage
-        # the result will be found under ./result/iso
-        # Host must be on same system as iso.
+        # the result will be found symlinked to ./result
+        # If host is not the same system as iso system, can use --builders flag, e.g.
+        # --builders 'ssh://borg-0 x86_64-linux' --store $(readlink -f /tmp)/nix
+        # then create a store-fixed symlink based on ./result:
+        # ln -s "$(readlink -f /tmp)/nix/$(readlink result)" result-iso
         nixosConfigurations = {
           bcachefsIso = inputs.nixos.lib.nixosSystem {
             system = "x86_64-linux";
             modules = [
               "${inputs.nixos}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel-no-zfs.nix"
+              ./hosts/common/packages.nix
               ({
                 lib,
                 pkgs,
@@ -176,8 +184,18 @@
                   # GPG SSH key
                   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOPQjEqJpz5sOwxeieTNx1UBikeQ43rWnw0oQnjk+Z8z openpgp:0xEC44996F"
                 ];
+
+                # Enable the OpenSSH daemon.
+                services.openssh = {
+                  enable = true;
+                  settings = {
+                    PermitRootLogin = lib.mkForce "no";
+                    PasswordAuthentication = lib.mkForce false;
+                  };
+                };
                 boot.supportedFilesystems = ["bcachefs"];
                 boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_latest;
+                environment.systemPackages = [pkgs.neovim (pkgs.writeShellScriptBin "setup-partitions" (builtins.readFile ./scripts/setup-partitions))];
               })
             ];
           };

@@ -1,0 +1,63 @@
+set -euxo pipefail
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 root_disk"
+    exit 1
+fi
+ROOT_DISK="$1"
+
+if [ x$UID != x0 ]; then
+    echo "becoming root..."
+    printf -v cmd_str '%q ' "$0" "$@"
+    exec sudo su -c "$cmd_str"
+fi
+
+# Create boot partition first
+parted -a opt --script "${ROOT_DISK}" \
+    mklabel gpt \
+    mkpart primary fat32 0% 512MiB \
+    mkpart primary 512MiB 100% \
+    set 1 esp on \
+    name 1 boot \
+    name 2 root
+
+# sleep to allow kernel to pick up new partitions
+sleep 1
+# Set up boot partition
+mkfs.vfat -F32 /dev/disk/by-partlabel/boot
+
+# Set up root partition and subvolumes
+mkfs.btrfs -f -L root /dev/disk/by-partlabel/root
+mount -t btrfs /dev/disk/by-partlabel/root /mnt
+
+btrfs subvolume create /mnt/root
+btrfs subvolume create /mnt/persist
+btrfs subvolume create /mnt/cache
+
+# add swap as subvolume
+# https://btrfs.readthedocs.io/en/latest/Swapfile.html
+btrfs subvolume create /mnt/swap
+# Create swapfile twice the size of available memory
+btrfs filesystem mkswapfile --size "$(awk '/^MemTotal/ {print $2}' /proc/meminfo)k" --uuid clear /mnt/swap/swapfile
+
+# -r is for readonly
+btrfs subvolume snapshot -r /mnt/root /mnt/root-blank
+
+umount /mnt
+
+# Mount filesystems
+mount -o subvol=root,compress=zstd,discard=async,noatime /dev/disk/by-partlabel/root /mnt/
+
+# Prevent boot partition from being world-readable using umask=0077
+mkdir -p /mnt/boot
+mount -o umask=0077 /dev/disk/by-partlabel/boot /mnt/boot
+
+subvols=(persist cache)
+for subvol in "${subvols[@]}"; do
+    mkdir -p "/mnt/$subvol"
+    mount -o "subvol=$subvol,compress=zstd,discard=async,noatime" /dev/disk/by-partlabel/root "/mnt/$subvol"
+done
+
+mkdir -p /mnt/swap
+mount -o subvol=swap,noatime /dev/disk/by-partlabel/root /mnt/swap
+swapon /mnt/swap/swapfile
