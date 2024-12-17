@@ -4,8 +4,11 @@
     colmena.url = "github:zhaofengli/colmena/main";
     nixos.url = "nixpkgs/nixos-24.11";
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
+    nixos-facter-modules.url = "github:numtide/nixos-facter-modules";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
     systems.url = "github:nix-systems/default";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
@@ -142,6 +145,7 @@
               ./hosts/borg-0
               inputs.nixos-hardware.nixosModules.common-cpu-intel
             ];
+            disko.devices.disk.main.device = "/dev/disk/by-id/ata-NT-256_2242_0006245000370";
             deployment = {
               tags = [];
               # Copy the derivation to the target node and initiate the build there
@@ -160,14 +164,50 @@
             };
           };
         };
-        # build this with
-        # nix build .#nixosConfigurations.bcachefsIso.config.system.build.isoImage
-        # the result will be found symlinked to ./result
-        # If host is not the same system as iso system, can use --builders flag, e.g.
-        # --builders 'ssh://borg-0 x86_64-linux' --store $(readlink -f /tmp)/nix
-        # then create a store-fixed symlink based on ./result:
-        # ln -s "$(readlink -f /tmp)/nix/$(readlink result)" result-iso
         nixosConfigurations = {
+          borg-0 =
+            inputs.nixos.lib.nixosSystem
+            {
+              specialArgs = {
+                inherit inputs;
+                nixpkgs-master = import inputs.nixpkgs-master {
+                  system = "x86_64-linux";
+                  overlays = [];
+                };
+              };
+              modules = [
+                ./hosts/common
+                ./hosts/borg-0
+                inputs.nixos-hardware.nixosModules.common-cpu-intel
+                inputs.nixos-facter-modules.nixosModules.facter
+                inputs.disko.nixosModules.disko
+                {
+                  disko.devices.disk.main.device = "/dev/disk/by-id/ata-NT-256_2242_0006245000370";
+                  facter.reportPath = ./hosts/borg-0/facter.json;
+                  users.users.root.openssh.authorizedKeys.keys = [
+                    "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIETquAokxYIU4oPwonsCbUPA09n68mQrMfJwW9q6J19IAAAACnNzaDpnaXRodWI= tkennedy@oxygen.local"
+                    # GPG SSH key
+                    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOPQjEqJpz5sOwxeieTNx1UBikeQ43rWnw0oQnjk+Z8z openpgp:0xEC44996F"
+                  ];
+                  # TODO add disko.swapFileSize
+                  services.k3s = {
+                    role = "server";
+                    # Leave true for first node in cluster
+                    clusterInit = true;
+                  };
+                  sops.secrets.tkennedy_hashed_password = {
+                    neededForUsers = true;
+                  };
+                }
+              ];
+            };
+          # build this with
+          # nix build .#nixosConfigurations.bcachefsIso.config.system.build.isoImage
+          # the result will be found symlinked to ./result
+          # If host is not the same system as iso system, can use --builders flag, e.g.
+          # --builders 'ssh://borg-0 x86_64-linux' --store $(readlink -f /tmp)/nix
+          # then create a store-fixed symlink based on ./result:
+          # ln -s "$(readlink -f /tmp)/nix/$(readlink result)" result-iso
           bcachefsIso = inputs.nixos.lib.nixosSystem {
             system = "x86_64-linux";
             modules = [
@@ -179,7 +219,7 @@
                 ...
               }: {
                 # TODO make this and hosts/borg-0/hardware-configuration.nix reference the same data for keys.
-                users.users.nixos.openssh.authorizedKeys.keys = [
+                users.users.root.openssh.authorizedKeys.keys = [
                   "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIETquAokxYIU4oPwonsCbUPA09n68mQrMfJwW9q6J19IAAAACnNzaDpnaXRodWI= tkennedy@oxygen.local"
                   # GPG SSH key
                   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOPQjEqJpz5sOwxeieTNx1UBikeQ43rWnw0oQnjk+Z8z openpgp:0xEC44996F"
@@ -189,13 +229,12 @@
                 services.openssh = {
                   enable = true;
                   settings = {
-                    PermitRootLogin = lib.mkForce "no";
                     PasswordAuthentication = lib.mkForce false;
                   };
                 };
                 boot.supportedFilesystems = ["bcachefs"];
                 boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_latest;
-                environment.systemPackages = [pkgs.neovim (pkgs.writeShellScriptBin "setup-partitions" (builtins.readFile ./scripts/setup-partitions))];
+                environment.systemPackages = [pkgs.neovim pkgs.nixos-facter (pkgs.writeShellScriptBin "setup-partitions" (builtins.readFile ./scripts/setup-partitions))];
               })
             ];
           };

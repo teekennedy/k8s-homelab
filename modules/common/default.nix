@@ -7,5 +7,6 @@
   imports = [
     ./sops-nix.nix
     ./store.nix
+    ./disko.nix
   ];
 }

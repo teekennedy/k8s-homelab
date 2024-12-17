@@ -23,36 +23,6 @@
     UseDomains = "yes";
   };
 
-  fileSystems."/" = {
-    device = "/dev/disk/by-uuid/c5de90e4-5cfb-43a1-aeed-a61c49e52881";
-    fsType = "ext4";
-    options = ["defaults" "noatime"];
-  };
-
-  fileSystems."/boot" = {
-    device = "/dev/disk/by-uuid/CE2A-C751";
-    fsType = "vfat";
-  };
-
-  fileSystems."/nix" = {
-    device = "/dev/disk/by-uuid/b79a1fc6-9b6b-46ee-8d4f-f2d86e62058a";
-    fsType = "ext4";
-  };
-
-  fileSystems."/home" = {
-    device = "/dev/disk/by-uuid/c4bf9cdc-d3ce-4f42-b0ed-dabb5c00a767";
-    fsType = "ext4";
-  };
-
-  fileSystems."/var/lib/longhorn" = {
-    device = "/dev/disk/by-uuid/44cbda2d-f2ed-401b-bc93-7e2bca18ddea";
-    fsType = "ext4";
-  };
-
-  swapDevices = [
-    {device = "/dev/disk/by-uuid/6a6335d2-43bd-4229-9b57-a137d64e1053";}
-  ];
-
   # copied from configuration.nix
   nix.settings.experimental-features = ["nix-command" "flakes"];
 
@@ -75,16 +45,13 @@
   services.openssh = {
     enable = true;
     settings = {
-      PermitRootLogin = "no";
       PasswordAuthentication = false;
     };
   };
 
   # Open ports in the firewall.
   networking.firewall.allowedTCPPorts = [];
-  networking.firewall.allowedUDPPorts = [
-    5353 # multicast DNS
-  ];
+  networking.firewall.allowedUDPPorts = [];
 
   system.stateVersion = "23.11"; # Did you read the comment?
 }
