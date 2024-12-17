@@ -6,7 +6,7 @@ keys:
   - &oxygen_age age1ux6jahdtqlrcf3q5n0050vm2sr5qh66m388nfaamct6s643cspdqz8c40f
   # ssh-ed25519 host keys converted to age
   # `nix-shell -p ssh-to-age --run 'ssh-keyscan <host> | grep ssh-ed25519 | ssh-to-age'`
-  - &host_borg-0 age1nprg5ajaykpx7t2qv3xcn3uftlx0z89grtlsnz6k4sap8uzdcfmsdrcvya
+  - &host_borg-0 age134rsuzlwf7fqzl3zluzjmheez6y4x5mmakfsejpjenr6qy3st3rs3rd5l9
 
 creation_rules:
   - path_regex: hosts/borg-0/secrets.ya?ml
