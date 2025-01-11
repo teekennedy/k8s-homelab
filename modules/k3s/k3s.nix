@@ -36,8 +36,13 @@
 
   services.k3s.tokenFile = config.sops.secrets.k3s_token.path;
 
-  # Enable image volume feature gate
-  services.k3s.extraKubeletConfig = {
-    featureGates = {ImageVolume = true;};
+  sops.secrets.kubeconfig = lib.mkIf (builtins.pathExists ./kubeconfig.enc.yaml) {
+    sopsFile = ./kubeconfig.enc.yaml;
+    mode = "0600";
+    owner = config.users.users.root.name;
+    group = config.users.users.root.group;
+    restartUnits = ["k3s.service"];
+    key = "";
+    path = "/etc/rancher/k3s/k3s.yaml";
   };
 }

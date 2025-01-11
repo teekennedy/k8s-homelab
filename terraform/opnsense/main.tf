@@ -36,5 +36,13 @@ resource "opnsense_interfaces_vlan" "vlan0_2" {
   tag         = 20
   priority    = 1        # background, lowest
   parent      = "vtnet5" # LAN
-  device      = "vlan0.2"
+  device      = "vlan0.20"
+}
+
+resource "opnsense_interfaces_vlan" "vlan0_1006" {
+  description = "RainMachine vlan"
+  tag         = 1006
+  priority    = 1        # background, lowest
+  parent      = "vtnet5" # LAN
+  device      = "vlan0.1006"
 }

@@ -19,6 +19,8 @@ creation_rules:
     key_groups:
       - pgp:
           - *user_tkennedy
+        age:
+          - *host_borg-0
   - path_regex: terraform/.*\.sops\.ya?ml
     key_groups:
       - age:

@@ -7,6 +7,17 @@ releases:
     chart: incubator/raw
     values:
       - resources:
+          - apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: glados-tts-models-pvc
+            spec:
+              storageClassName: longhorn-rc1
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
           - apiVersion: apps/v1
             kind: Deployment
             metadata:
@@ -27,23 +38,28 @@ releases:
                   labels:
                     app: glados-tts
                 spec:
+                  initContainers:
+                    - name: model-downloader
+                      image: "pcloud/gdown"
+                      command:
+                        [
+                          "/bin/sh",
+                          "-c",
+                          "if ! ls -1 /models/emb; then gdown https://drive.google.com/uc?id=1nEpr51IEdmCd3IJaPXykhk1oYgpcy1Qn -O /tmp/models.zip; unzip /tmp/models.zip -o -d /models; fi",
+                        ]
+                      volumeMounts:
+                        - name: models
+                          mountPath: /models
                   containers:
                     - name: glados-tts
                       image: ghcr.io/teekennedy/glados_tts_remote:7c459a5
-                      command:
-                        [
-                          "sh",
-                          "-c",
-                          'echo "The app is running!" && ls && tail -f /dev/null',
-                        ]
                       ports:
                         - containerPort: 8124
                       volumeMounts:
                         - name: models
-                          mountPath: /my-mounts
+                          mountPath: /app/models
                           readOnly: true
                   volumes:
                     - name: models
-                      image:
-                        reference: ghcr.io/teekennedy/glados_tts_remote:models
-                        pullPolicy: IfNotPresent
+                      persistentVolumeClaim:
+                        claimName: glados-tts-models-pvc

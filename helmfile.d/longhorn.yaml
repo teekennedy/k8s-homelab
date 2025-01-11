@@ -1,11 +1,19 @@
 repositories:
   - name: longhorn
     url: https://charts.longhorn.io
+  - name: kyverno
+    url: https://kyverno.github.io/kyverno
   - name: incubator
     url: https://charts.helm.sh/incubator
 releases:
+  - name: kyverno
+    namespace: kyverno
+    chart: kyverno/kyverno
+    version: 3.3.4
   - name: longhorn-nixos
     namespace: longhorn-system
+    needs:
+      - kyverno/kyverno
     chart: incubator/raw
     values:
       - resources:
@@ -16,42 +24,68 @@ releases:
               namespace: longhorn-system
             data:
               PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin
+          - apiVersion: kyverno.io/v1
+            kind: ClusterPolicy
+            metadata:
+              name: add-host-path-to-longhorn
+              annotations:
+                policies.kyverno.io/title: Add Environment Variables from ConfigMap
+                policies.kyverno.io/subject: Pod
+                policies.kyverno.io/category: Other
+                policies.kyverno.io/description: >-
+                  Longhorn invokes executables on the host system, and needs
+                  to be aware of the host systems PATH. This modifies all
+                  deployments such that the PATH is explicitly set to support
+                  NixOS based systems.
+            spec:
+              rules:
+                - name: add-env-vars
+                  match:
+                    resources:
+                      kinds:
+                        - Pod
+                      namespaces:
+                        - longhorn-system
+                  mutate:
+                    patchStrategicMerge:
+                      spec:
+                        initContainers:
+                          - (name): "*"
+                            envFrom:
+                              - configMapRef:
+                                  name: longhorn-nixos-path
+                        containers:
+                          - (name): "*"
+                            envFrom:
+                              - configMapRef:
+                                  name: longhorn-nixos-path
   - name: longhorn
     namespace: longhorn-system
     chart: longhorn/longhorn
     version: 1.7.2
     needs:
       - longhorn-nixos
-    jsonPatches:
-      - target:
-          kind: DaemonSet
-          name: longhorn-manager
-          namespace: longhorn-system
-        patch:
-          - op: add
-            path: /spec/template/spec/containers/0/envFrom
-            value:
-              - configMapRef:
-                  name: longhorn-nixos-path
-      - target:
-          kind: Deployment
-          name: longhorn-driver-deployer
-          namespace: longhorn-system
-        patch:
-          - op: add
-            path: /spec/template/spec/containers/0/envFrom
-            value:
-              - configMapRef:
-                  name: longhorn-nixos-path
-      - target:
-          kind: Job
-          namespace: longhorn-system
-        patch:
-          - op: add
-            path: /spec/template/spec/containers/0/envFrom
-            value:
-              - configMapRef:
-                  name: longhorn-nixos-path
-          - op: replace
-            path: /spec/ttlSecondsAfterFinished
-            value: 3600
+    set:
+      - name: defaultSettings.allowCollectingLonghornUsageMetrics
+        value: false
+      - name: defaultSettings.defaultDataLocality
+        value: best-effort
+  - name: longhorn-storage-classes
+    namespace: longhorn-system
+    chart: incubator/raw
+    needs:
+      - longhorn
+    disableValidationOnInstall: true
+    values:
+      - resources:
+          - kind: StorageClass
+            apiVersion: storage.k8s.io/v1
+            metadata:
+              name: longhorn-rc1
+            provisioner: driver.longhorn.io
+            allowVolumeExpansion: true
+            parameters:
+              numberOfReplicas: "1"
+              # staleReplicaTimeout: "2880" # 48 hours in minutes
+              # fromBackup: ""
+              # fsType: "ext4"

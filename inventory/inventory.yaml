@@ -21,24 +21,48 @@ hosts:
     ip_address: unknown
     dhcp: true
     vlan: management
-    notes: 2024-12-01 This was on vlan 1 and I switched it to vlan 2. It's supposed to get an IP over dhcp but isn't showing up in opnsense yet.
+    notes: |
+      2024-12-31 Management interface is back on vlan1. Tried multiple times to access after switching to vlan 20 but no dice.
+      2024-12-01 This was on vlan 1 and I switched it to vlan 2. It's supposed to get an IP over dhcp but isn't showing up in opnsense yet.
   borg-0:
     hostname: borg-0
+    switch_port: 15
+    mac_addresses:
+      - 00:01:c0:33:30:fc # eno1 or enp0s29f1
     ip_address: 10.69.8.10
     dhcp: false
     vlan: k8s
     notes: Interface eno1 is static, eno2 is DHCP for debugging purposes
   borg-1:
     hostname: borg-1
+    switch_port: 13
     mac_address: 10:dd:b1:de:b8:19
     ip_address: 10.69.8.11
     dhcp: false
     vlan: k8s
+  borg-2:
+    hostname: borg-2
+    switch_port: 11
+    mac_address: 10:dd:b1:de:b8:19
+    ip_address: 10.69.8.11
+    dhcp: false
+    vlan: k8s
+  RainMachine:
+    hostname:
+    mac_address:
+    ip_address: unknown
+    dhcp: true
+    vlan: rain_machine
+  wash-machine-energy-mon:
+    hostname: wash-machine-energy-mon
+    mac_address: 34:98:7a:ec:0d:43
+    ip_address: 10.69.100.20
+    vlan: esphome
 
 # Vlan tags should be created based on the following:
 # - first 3 digits are based on the third octet of subnet, e.g. 100 for 10.69.100.128
 # - last digit based on which /27 the subnet starts at (0 indexed). There are 8 /27s in a /24, so last digit would be 4 for 10.69.100.128
-# See https://www.calculator.net/ip-subnet-calculator.html
+# Example list of subnets for 10.69.100.x: https://www.calculator.net/ip-subnet-calculator.html?cclass=any&csubnet=27&cip=10.69.100.0&ctype=ipv4&x=Calculate
 vlans:
   default:
     vlan_tag: 1
@@ -56,7 +80,7 @@ vlans:
     subnet: 10.69.70.0/26 # 62 usable hosts
     wifi_networks: ["kennedy🏡"]
     switch_ports: [17, 19]
-  esp_home:
+  esphome:
     vlan_tag: 1000
     subnet: 10.69.100.0/25 # 126 usable hosts
     wifi_networks: ["kennedy_iot"]
@@ -72,7 +96,17 @@ vlans:
     wifi_networks: ["kennedy_iot"]
     switch_ports: [17, 19]
     notes: "includes Xcel net meter and solar panel"
+  rain_machine:
+    vlan_tag: 1006
+    subnet: 10.69.100.192/27 # 30 usable hosts
+    wifi_networks: ["kennedy_iot"]
+    switch_ports: [17, 19]
+    notes: "vlan jail for single host"
   k8s:
     vlan_tag: 800
     subnet: 10.69.80.0/25 # 126 usable hosts
-    switch_ports: [17]
+    switch_ports: [11, 13, 15, 17]
+  unifi_protect:
+    vlan_tag: 1010
+    subnet: 10.69.101.0/25 # 126 usable hosts
+    switch_ports: [10, 16, 17, 19]
