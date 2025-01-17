@@ -10,14 +10,29 @@
   boot.extraModulePackages = [];
   networking.useNetworkd = true;
   networking.interfaces = let
-    ifaceCfg = {
+    common = {
       wakeOnLan.enable = false;
-      useDHCP = true;
     };
   in {
-    eno1 = ifaceCfg;
-    eno2 = ifaceCfg;
-    enp3s0 = ifaceCfg;
+    # eno1
+    enp0s29f1 =
+      common
+      // {
+        ipv4.addresses = [
+          {
+            address = "10.69.80.10";
+            prefixLength = 25;
+          }
+        ];
+      };
+    # eno2
+    enp0s29f2 =
+      common
+      // {
+        useDHCP = true;
+      };
+    enp2s0 = common;
+    enp3s0 = common;
   };
   systemd.network.networks."99-ethernet-default-dhcp".networkConfig = {
     UseDomains = "yes";

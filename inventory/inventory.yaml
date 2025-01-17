@@ -29,7 +29,10 @@ hosts:
     switch_port: 15
     mac_addresses:
       - 00:01:c0:33:30:fc # eno1 or enp0s29f1
-    ip_address: 10.69.8.10
+      - 00:01:c0:33:30:fd # eno2 or enp0s29f2
+      - 00:01:c0:33:37:1b # enp2s0
+      - 00:01:c0:33:37:1c # enp3s0
+    ip_address: 10.69.80.10
     dhcp: false
     vlan: k8s
     notes: Interface eno1 is static, eno2 is DHCP for debugging purposes
@@ -37,14 +40,14 @@ hosts:
     hostname: borg-1
     switch_port: 13
     mac_address: 10:dd:b1:de:b8:19
-    ip_address: 10.69.8.11
+    ip_address: 10.69.80.11
     dhcp: false
     vlan: k8s
   borg-2:
     hostname: borg-2
     switch_port: 11
-    mac_address: 10:dd:b1:de:b8:19
-    ip_address: 10.69.8.11
+    mac_address: "unknown"
+    ip_address: 10.69.80.12
     dhcp: false
     vlan: k8s
   RainMachine:

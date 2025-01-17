@@ -2,7 +2,6 @@
   description = "teekennedy's homelab";
   inputs = {
     colmena.url = "github:zhaofengli/colmena/main";
-    nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     nixos-facter-modules.url = "github:numtide/nixos-facter-modules";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
@@ -142,7 +141,6 @@
             imports = [
               ./hosts/common
               ./hosts/borg-0
-              inputs.nixos-hardware.nixosModules.common-cpu-intel
               inputs.nixos-facter-modules.nixosModules.facter
               inputs.disko.nixosModules.disko
             ];
@@ -155,6 +153,9 @@
             };
             disko.devices.disk.main.device = "/dev/disk/by-id/ata-NT-256_2242_0006245000370";
             disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
+            # swapFileSize set to half of ram
+            # TODO use facter.hardware.memory[model == "Main Memory"].resources[type == "phys_mem"].range / 2
+            disko.swapFileSize = "8G";
 
             facter.reportPath = let
               facterPath = ./hosts/borg-0/facter.json;
@@ -162,19 +163,11 @@
               if builtins.pathExists facterPath
               then facterPath
               else throw "Have you forgotten to run nixos-anywhere with `--generate-hardware-config nixos-facter ${facterPath}`?";
-            users.users.root.openssh.authorizedKeys.keys = [
-              "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIETquAokxYIU4oPwonsCbUPA09n68mQrMfJwW9q6J19IAAAACnNzaDpnaXRodWI= tkennedy@oxygen.local"
-              # GPG SSH key
-              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOPQjEqJpz5sOwxeieTNx1UBikeQ43rWnw0oQnjk+Z8z openpgp:0xEC44996F"
-            ];
-            # TODO add disko.swapFileSize
+
             services.k3s = {
               role = "server";
               # Leave true for first node in cluster
               clusterInit = true;
-            };
-            sops.secrets.tkennedy_hashed_password = {
-              neededForUsers = true;
             };
           };
         };
@@ -196,12 +189,14 @@
                 ./modules/common
                 ./modules/k3s
                 ./modules/users
-                inputs.nixos-hardware.nixosModules.common-cpu-intel
                 inputs.nixos-facter-modules.nixosModules.facter
                 inputs.disko.nixosModules.disko
                 {
                   disko.devices.disk.main.device = "/dev/disk/by-id/ata-NT-256_2242_0006245000370";
                   disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
+                  # swapFileSize set to half of ram
+                  # TODO use facter.hardware.memory[model == "Main Memory"].resources[type == "phys_mem"].range / 2
+                  disko.swapFileSize = "8G";
 
                   facter.reportPath = let
                     facterPath = ./hosts/borg-0/facter.json;
@@ -209,19 +204,11 @@
                     if builtins.pathExists facterPath
                     then facterPath
                     else throw "Have you forgotten to run nixos-anywhere with `--generate-hardware-config nixos-facter ${facterPath}`?";
-                  users.users.root.openssh.authorizedKeys.keys = [
-                    "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIETquAokxYIU4oPwonsCbUPA09n68mQrMfJwW9q6J19IAAAACnNzaDpnaXRodWI= tkennedy@oxygen.local"
-                    # GPG SSH key
-                    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOPQjEqJpz5sOwxeieTNx1UBikeQ43rWnw0oQnjk+Z8z openpgp:0xEC44996F"
-                  ];
-                  # TODO add disko.swapFileSize
+
                   services.k3s = {
                     role = "server";
                     # Leave true for first node in cluster
                     clusterInit = true;
-                  };
-                  sops.secrets.tkennedy_hashed_password = {
-                    neededForUsers = true;
                   };
                 }
               ];
@@ -236,7 +223,7 @@
           bcachefsIso = inputs.nixpkgs.lib.nixosSystem {
             system = "x86_64-linux";
             modules = [
-              "${inputs.nixos}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel-no-zfs.nix"
+              "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel-no-zfs.nix"
               ./hosts/common/packages.nix
               ({
                 lib,
@@ -259,7 +246,6 @@
                 };
                 boot.supportedFilesystems = ["bcachefs"];
                 boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_latest;
-                environment.systemPackages = [pkgs.neovim pkgs.nixos-facter (pkgs.writeShellScriptBin "setup-partitions" (builtins.readFile ./scripts/setup-partitions))];
               })
             ];
           };

@@ -12,6 +12,11 @@
   # Add wheel group to nix trusted users
   nix.trustedUsers = ["root" "@wheel"];
 
+  # Password is unique per host with secret stored in hosts/<host>/secrets.yaml
+  sops.secrets.tkennedy_hashed_password = {
+    neededForUsers = true;
+  };
+
   # tkennedy user
   users.users.tkennedy = {
     isNormalUser = true;
@@ -28,7 +33,6 @@
       tree
       vim
     ];
-    # Password is unique per host with secret stored in hosts/<host>/secrets.yaml
     hashedPasswordFile = config.sops.secrets.tkennedy_hashed_password.path;
   };
 }

@@ -105,6 +105,15 @@ These secrets will be decrypted under `/run/secrets` (or `/run/secrets-for-users
 You can reference the secret's path from elsewhere in the config using the `.path` attribute,
 e.g. `users.users.my-user.hashedPasswordFile = config.sops.secrets.my-password.path;`.
 
+## Setting up a new host
+
+To setup a new host, create the following config:
+
+- ed25519 host ssh key
+  - save private key to hosts/<hostname>/secrets.yaml under `ssh_host_private_key`
+  - save public key in host configuration (TODO)
+  - convert ssh key to age with `nix-shell -p ssh-to-age --run 'ssh-keyscan <host> | grep ssh-ed25519 | ssh-to-age'` and save the public age key to .sops.yaml under `keys`.
+
 ## Bootstrapping k3s cluster
 
 Start your first k3s server with `services.k3s.clusterInit = true;`. See modules/k3s/k3s.nix for a full example.

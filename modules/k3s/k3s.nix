@@ -16,6 +16,7 @@
   environment.systemPackages = with pkgs; [
     k3s
     kubectl
+    etcd # having etcdctl is helpful when you need to manage the cluster
   ];
 
   services.k3s.enable = true;

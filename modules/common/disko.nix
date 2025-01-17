@@ -79,6 +79,8 @@
                         };
                       };
                     };
+                    # Create a snapshot of the empty root subvolume
+                    postCreateHook = "btrfs subvolume snapshot -r /mnt/root /mnt/root-blank";
 
                     mountpoint = "/partition-root";
                     swap = {
