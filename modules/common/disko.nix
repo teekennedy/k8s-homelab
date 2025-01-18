@@ -13,10 +13,25 @@
   ];
   options = {
     disko.swapFileSize = lib.mkOption {
-      description = "Size of the swapfile. Must include one of K,M,G,T,P as unit.";
+      description = "Size of the swapfile. Must include one of K,M,G,T,P as unit. Defaults to half of the available memory.";
       example = "200M";
       type = lib.types.strMatching "[0-9]+[KMGTP]?";
-      default = "8G";
+      default = let
+        halfMemMb =
+          (
+            builtins.head (builtins.filter
+              (elem: elem.type == "phys_mem")
+              (builtins.head (builtins.filter
+                (elem: elem.model == "Main Memory")
+                config.facter.report.hardware.memory))
+              .resources)
+          )
+          .range
+          / 2
+          / 1024
+          / 1024;
+      in
+        (builtins.toString halfMemMb) + "M";
     };
     disko.longhornDevice = lib.mkOption {
       description = "Device to use for the longhorn volume. Use `udevadm info <disk> | grep disk/by-id` to get the device's stable identifier.";
