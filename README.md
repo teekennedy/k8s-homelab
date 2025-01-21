@@ -4,19 +4,16 @@ This is the repo I use to manage the bare metal k8s cluster I setup at home out 
 
 # Setup
 
+## MacOS Specific
+
+MacOS cannot natively build packages for
+
 ## Bootstrapping Secrets
 
 This repo uses [sops-nix](https://github.com/Mic92/sops-nix) to manage sensitive data. There are many ways to encrypt secrets in sops, and many existing guides for setting up and managing those keys, so I won't repeat them here.
 For a more in depth guide, refer to [MuSigma's guide](https://musigma.blog/2021/05/09/gpg-ssh-ed25519.html) or [drduh's guide](https://github.com/drduh/YubiKey-Guide?tab=readme-ov-file#prepare-gnupg)
 
 I'm using a Yubikey-backed ed25519 GPG key to encrypt secrets on my development machine, and each host's SSH key to decrypt them on deployment.
-
-### Bootstrapping the host keys
-
-For each host managed by colmena, we're going to use its ssh key to decrypt secrets.
-Sops does not support ssh directly, so the keys are converted to age keys:
-
-`nix-shell -p ssh-to-age --run 'ssh-keyscan <host> | grep ssh-ed25519 | ssh-to-age'`
 
 ### Sops-nix setup
 
@@ -40,6 +37,29 @@ creation_rules:
       age:
       - *host_<host>
 ```
+
+## Bootstrapping a host
+
+### Build installer
+
+This repo's flake includes a customized installer that starts openssh and allows root login with the public keys added to ./modules/users/authorized_keys/.
+
+Run `nix build .#nixosConfigurations.installIso.config.system.build.isoImage` to build the installer iso. The resulting package will by symlinked to ./result.
+
+Write the image to some installation media and use it to boot the target machine.
+
+### Perform initial installation
+
+For each host, we're going to use its ssh key to decrypt secrets.
+Sops does not support ssh directly, so the keys are converted to age keys.
+
+I created a script to generate a new SSH key for a host encrypt it with sops, and save it under `./hosts/<host>/secrets.yaml`.
+
+```bash
+bootstrap-host <hostname> --target-host root@<installer-ip-or-hostname>
+```
+
+Note that you'll
 
 ### Adding secrets
 
@@ -113,6 +133,9 @@ To setup a new host, create the following config:
   - save private key to hosts/<hostname>/secrets.yaml under `ssh_host_private_key`
   - save public key in host configuration (TODO)
   - convert ssh key to age with `nix-shell -p ssh-to-age --run 'ssh-keyscan <host> | grep ssh-ed25519 | ssh-to-age'` and save the public age key to .sops.yaml under `keys`.
+- create a nixos installer image and boot the host into it
+- create facter configuration:
+  - `nix run github:nix-community/nixos-anywhere -- --flake .#nixosConfigurations.borg-0 --generate-hardware-config nixos-facter ./hosts/borg-0/facter.json --target-host root@borg-0 --ssh-option "IdentityAgent=/Users/tkennedy/.gnupg/S.gpg-agent.ssh"`
 
 ## Bootstrapping k3s cluster
 

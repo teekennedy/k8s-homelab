@@ -28,14 +28,15 @@
 
   # file permissions and path for k3s token set to match k3s default
   # https://docs.k3s.io/cli/token
-  sops.secrets.k3s_token = {
+  sops.secrets.k3s_token = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) {
+    sopsFile = ./secrets.enc.yaml;
     mode = "0600";
     owner = config.users.users.root.name;
     group = config.users.users.root.group;
     restartUnits = ["k3s.service"];
   };
 
-  services.k3s.tokenFile = config.sops.secrets.k3s_token.path;
+  services.k3s.tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
 
   sops.secrets.kubeconfig = lib.mkIf (builtins.pathExists ./kubeconfig.enc.yaml) {
     sopsFile = ./kubeconfig.enc.yaml;

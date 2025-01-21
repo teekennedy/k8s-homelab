@@ -74,18 +74,25 @@
                         mountpoint = "/";
                         mountOptions = ["compress=zstd" "noatime" "discard=async"];
                       };
-                      # Subvolume name is the same as the mountpoint
                       "/home" = {
                         mountOptions = ["compress=zstd" "noatime" "discard=async"];
                         mountpoint = "/home";
                       };
-                      # Sub(sub)volume doesn't need a mountpoint as its parent is mounted
-                      "/home/user" = {};
-                      # Parent is not mounted so the mountpoint must be set
                       "/nix" = {
                         mountOptions = ["compress=zstd" "noatime" "discard=async"];
                         mountpoint = "/nix";
                       };
+                      # Persistent is for data I want to persist and backup
+                      "/persistent" = {
+                        mountOptions = ["compress=zstd" "noatime" "discard=async"];
+                        mountpoint = "/persistent";
+                      };
+                      # Cache is for data I want to persist between reboots but not backup
+                      "/cache" = {
+                        mountOptions = ["compress=zstd" "noatime" "discard=async"];
+                        mountpoint = "/cache";
+                      };
+
                       # Subvolume for the swapfile
                       "/swap" = {
                         mountpoint = "/.swapvol";
@@ -94,15 +101,19 @@
                         };
                       };
                     };
-                    # Create a snapshot of the empty root subvolume
-                    postCreateHook = "btrfs subvolume snapshot -r /mnt/root /mnt/root-blank";
-
                     mountpoint = "/partition-root";
                     swap = {
                       swapfile = {
                         size = config.disko.swapFileSize;
                       };
                     };
+                    # Create a snapshot of the empty root subvolume
+                    postCreateHook = ''
+                      MNTPOINT=$(mktemp -d)
+                      mount "/dev/disk/by-partlabel/disk-main-root" "$MNTPOINT" -o subvol=/
+                      trap 'umount $MNTPOINT; rm -rf $MNTPOINT' EXIT
+                      btrfs subvolume snapshot -r $MNTPOINT/root $MNTPOINT/root-blank
+                    '';
                   };
                 };
               };
