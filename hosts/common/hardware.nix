@@ -31,5 +31,12 @@
       PasswordAuthentication = false;
       PermitRootLogin = "no";
     };
+    # Don't generate host RSA key
+    hostKeys = [
+      {
+        path = "/etc/ssh/ssh_host_ed25519_key";
+        type = "ed25519";
+      }
+    ];
   };
 }

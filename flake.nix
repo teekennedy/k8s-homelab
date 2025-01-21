@@ -11,6 +11,10 @@
     impermanence.url = "github:nix-community/impermanence";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
+    devenv-root = {
+      url = "file+file:///dev/null";
+      flake = false;
+    };
     sops-nix.url = "github:Mic92/sops-nix";
     flake-parts.url = "github:hercules-ci/flake-parts";
   };
@@ -65,6 +69,10 @@
           ];
         };
         devenv.shells.default = {
+          devenv.root = let
+            devenvRootFileContent = builtins.readFile inputs.devenv-root.outPath;
+          in
+            pkgs.lib.mkIf (devenvRootFileContent != "") devenvRootFileContent;
           # disable containers to make `nix flake check` pass.
           # https://github.com/cachix/devenv/issues/760
           containers = lib.mkForce {};
@@ -114,14 +122,15 @@
       };
 
       flake = {
-        deploy.nodes.borg-0.profiles.system = flake-parts.withSystem "x86_64-linux" (
-          ctx @ {pkgs}: {
-            user = "tkennedy";
-            path = pkgs.deploy-rs.lib.activate.nixos self.nixosConfigurations.borg-0;
-            # enable magic rollback and other checks
-            checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) pkgs.deploy-rs.lib;
-          }
-        );
+        deploy.nodes.borg-0 = {
+          hostname = "borg-0";
+          profiles.system = {
+            user = "root";
+            path = inputs.deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.borg-0;
+          };
+        };
+        # enable magic rollback and other checks
+        checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
         nixosConfigurations = let
           borgSystem = host:
             inputs.nixpkgs.lib.nixosSystem {

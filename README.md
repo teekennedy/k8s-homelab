@@ -129,13 +129,23 @@ e.g. `users.users.my-user.hashedPasswordFile = config.sops.secrets.my-password.p
 
 To setup a new host, create the following config:
 
-- ed25519 host ssh key
+- Generate ed25519 ssh key for the host:
+  - `ssh-keygen -t ed25519 -C "root@$hostname" -f "$(pwd)/ssh_host_ed25519_key"`
   - save private key to hosts/<hostname>/secrets.yaml under `ssh_host_private_key`
-  - save public key in host configuration (TODO)
-  - convert ssh key to age with `nix-shell -p ssh-to-age --run 'ssh-keyscan <host> | grep ssh-ed25519 | ssh-to-age'` and save the public age key to .sops.yaml under `keys`.
-- create a nixos installer image and boot the host into it
-- create facter configuration:
-  - `nix run github:nix-community/nixos-anywhere -- --flake .#nixosConfigurations.borg-0 --generate-hardware-config nixos-facter ./hosts/borg-0/facter.json --target-host root@borg-0 --ssh-option "IdentityAgent=/Users/tkennedy/.gnupg/S.gpg-agent.ssh"`
+  - save public key to hosts/<hostname>/secrets.yaml under `ssh_host_public_key`
+  - convert ssh key to age with `nix-shell -p ssh-to-age --run 'ssh-to-age -i ./ssh_host_ed25519_key'` and save the public age key to .sops.yaml under `keys`.
+- build the nixos installer image:
+  - `nix build .#nixosConfigurations.installIso.config.system.build.isoImage`
+- write the installer image to a drive and boot the machine from it
+- generate and save facter configuration:
+  - `nixos-anywhere -- --flake .#nixosConfigurations.borg-0 --generate-hardware-config nixos-facter ./hosts/borg-0/facter.json --target-host root@borg-0 --ssh-option "IdentityAgent=/Users/tkennedy/.gnupg/S.gpg-agent.ssh"`
+- bootstrap the host:
+  - `bootstrap-host borg-0 -- --target-host root@<ip_addr>`
+- confirm you're able to login as your default user via SSH `ssh borg-0`
+
+## Deploying updates
+
+Use deploy-rs: `deploy -- .#borg-0 --override-input devenv-root "file+file://"<(printf %s "$PWD")`
 
 ## Bootstrapping k3s cluster
 
