@@ -148,6 +148,22 @@
                 disko.longhornDevice = "/dev/disk/by-id/usb-ADATA_SX_8200PNP_012345678906-0:0";
                 system.stateVersion = "25.05";
 
+                systemd.network.networks."10-lan" = {
+                  matchConfig.Name = "ens9";
+                  networkConfig = {
+                    Address = "10.69.80.11/25";
+                    Gateway = ["10.69.80.1"];
+                    DNS = ["10.69.80.1"];
+                  };
+                };
+                # turn off wifi
+                systemd.network.networks."11-disable-wireless" = {
+                  matchConfig.Type = "wlan";
+                  linkConfig.Unmanaged = "yes";
+                };
+                # Don't sleep when laptop is closed
+                services.logind.lidSwitch = "ignore";
+
                 services.k3s = {
                   role = "server";
                 };

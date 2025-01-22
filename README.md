@@ -134,6 +134,7 @@ To setup a new host, create the following config:
   - save private key to hosts/<hostname>/secrets.yaml under `ssh_host_private_key`
   - save public key to hosts/<hostname>/secrets.yaml under `ssh_host_public_key`
   - convert ssh key to age with `nix-shell -p ssh-to-age --run 'ssh-to-age -i ./ssh_host_ed25519_key'` and save the public age key to .sops.yaml under `keys`.
+  - run `sops updatekeys` against all current encrypted files to add the new key.
 - build the nixos installer image:
   - `nix build .#nixosConfigurations.installIso.config.system.build.isoImage`
 - write the installer image to a drive and boot the machine from it
