@@ -138,7 +138,9 @@ To setup a new host, create the following config:
   - `nix build .#nixosConfigurations.installIso.config.system.build.isoImage`
 - write the installer image to a drive and boot the machine from it
 - generate and save facter configuration:
-  - `nixos-anywhere -- --flake .#nixosConfigurations.borg-0 --generate-hardware-config nixos-facter ./hosts/borg-0/facter.json --target-host root@borg-0 --ssh-option "IdentityAgent=/Users/tkennedy/.gnupg/S.gpg-agent.ssh"`
+  - `nixos-anywhere -- --flake .#nixosConfigurations.borg-0 --generate-hardware-config nixos-facter ./hosts/borg-0/facter.json --target-host root@borg-0`
+- Set `disko.devices.disk.main.device` to the filesystem root device, and optionally `disko.longhornDevice` to the device used for k8s longhorn.
+  - Make sure to use persistent device names from `/dev/disk/by-id`. Check the generated facter.json for available device names.
 - bootstrap the host:
   - `bootstrap-host borg-0 -- --target-host root@<ip_addr>`
 - confirm you're able to login as your default user via SSH `ssh borg-0`

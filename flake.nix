@@ -121,59 +121,12 @@
         };
       };
 
-      flake = {
-        deploy.nodes.borg-0 = {
-          hostname = "borg-0";
-          profiles.system = {
-            user = "root";
-            path = inputs.deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.borg-0;
-          };
-        };
-        # enable magic rollback and other checks
-        checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
-        nixosConfigurations = let
-          borgSystem = host:
-            inputs.nixpkgs.lib.nixosSystem {
-              system = host.system;
-              specialArgs = {
-                inherit inputs;
-                nixpkgs-master = import inputs.nixpkgs-master {
-                  system = host.system;
-                  overlays = [];
-                };
-              };
-              modules =
-                [
-                  ./hosts/common
-                  (./hosts + "/${host.hostname}")
-                  ./modules/common
-                  ./modules/users/defaultUser.nix
-                  inputs.nixos-facter-modules.nixosModules.facter
-                  {
-                    defaultUsername = "tkennedy";
-                    networking.hostName = host.hostname;
-                    facter.reportPath = let
-                      facterPath = ./hosts + "/${host.hostname}" + /facter.json;
-                    in
-                      if builtins.pathExists facterPath
-                      then facterPath
-                      else throw "Have you forgotten to run nixos-anywhere with `--generate-hardware-config nixos-facter ${facterPath}`?";
-                    sops.defaultSopsFile = let
-                      defaultSopsPath = ./hosts + "/${host.hostname}" + /secrets.yaml;
-                    in
-                      if builtins.pathExists defaultSopsPath
-                      then defaultSopsPath
-                      else throw "Host ${host.hostname} missing secrets at ${defaultSopsPath}. See README for how to create.";
-                  }
-                ]
-                ++ host.modules;
-            };
-        in {
-          borg-0 = borgSystem {
+      flake = let
+        borgHosts = [
+          {
             hostname = "borg-0";
             system = "x86_64-linux";
             modules = [
-              ./modules/k3s
               ({config, ...}: {
                 disko.devices.disk.main.device = "/dev/disk/by-id/ata-NT-256_2242_0006245000370";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
@@ -185,15 +138,14 @@
                 };
               })
             ];
-          };
-          borg-1 = borgSystem {
+          }
+          {
             hostname = "borg-1";
             system = "x86_64-linux";
             modules = [
-              # ./modules/k3s
               {
                 disko.devices.disk.main.device = "/dev/disk/by-id/nvme-Aura_Pro_X2_OW23012314C43991F";
-                disko.longhornDevice = null;
+                disko.longhornDevice = "/dev/disk/by-id/usb-ADATA_SX_8200PNP_012345678906-0:0";
                 system.stateVersion = "25.05";
 
                 services.k3s = {
@@ -201,39 +153,99 @@
                 };
               }
             ];
-          };
-          # build this with
-          # nix build .#nixosConfigurations.installIso.config.system.build.isoImage
-          # the resulting image will be found symlinked to ./result
-          # If host is not the same system as iso system, can use --builders flag, e.g.
-          # --builders 'ssh://borg-0 x86_64-linux' --store $(readlink -f /tmp)/nix
-          # then create a store-fixed symlink based on ./result:
-          # ln -s "$(readlink -f /tmp)/nix/$(readlink result)" result-iso
-          installIso = inputs.nixpkgs.lib.nixosSystem {
-            system = "x86_64-linux";
-            modules = [
-              "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel-no-zfs.nix"
-              ({
-                lib,
-                pkgs,
-                config,
-                ...
-              }: {
-                users.users.root.openssh.authorizedKeys.keyFiles = builtins.map (s: ./modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./modules/users/authorized_keys));
-                networking.hostName = "nixos-installer";
-                # Enable the OpenSSH daemon.
-                services.openssh = {
-                  enable = true;
-                  settings = {
-                    PasswordAuthentication = lib.mkForce false;
-                    PermitRootLogin = "prohibit-password"; # default setting, but good to be explicit
+          }
+        ];
+      in {
+        # enable magic rollback and other checks
+        checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
+        deploy.nodes = builtins.listToAttrs (builtins.map (host: {
+            name = host.hostname;
+            value = {
+              hostname = host.hostname;
+              profiles.system = {
+                user = "root";
+                path = inputs.deploy-rs.lib.${host.system}.activate.nixos self.nixosConfigurations.${host.hostname};
+              };
+            };
+          })
+          borgHosts);
+        nixosConfigurations =
+          (builtins.listToAttrs (builtins.map (host: {
+              name = host.hostname;
+              value = inputs.nixpkgs.lib.nixosSystem {
+                system = host.system;
+                specialArgs = {
+                  inherit inputs;
+                  nixpkgs-master = import inputs.nixpkgs-master {
+                    system = host.system;
+                    overlays = [];
                   };
                 };
-                boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_latest;
-              })
-            ];
+                modules =
+                  [
+                    ./hosts/common
+                    (./hosts + "/${host.hostname}")
+                    ./modules/common
+                    ./modules/k3s
+                    ./modules/users/defaultUser.nix
+                    inputs.nixos-facter-modules.nixosModules.facter
+                    {
+                      defaultUsername = "tkennedy";
+                      networking.hostName = host.hostname;
+                      facter.reportPath = let
+                        facterPath = ./hosts + "/${host.hostname}" + /facter.json;
+                      in
+                        if builtins.pathExists facterPath
+                        then facterPath
+                        else throw "Have you forgotten to run nixos-anywhere with `--generate-hardware-config nixos-facter ${facterPath}`?";
+                      sops.defaultSopsFile = let
+                        defaultSopsPath = ./hosts + "/${host.hostname}" + /secrets.yaml;
+                      in
+                        if builtins.pathExists defaultSopsPath
+                        then defaultSopsPath
+                        else throw "Host ${host.hostname} missing secrets at ${defaultSopsPath}. See README for how to create.";
+                    }
+                  ]
+                  ++ host.modules;
+              };
+            })
+            borgHosts))
+          // {
+            # build this with
+            # nix build .#nixosConfigurations.installIso.config.system.build.isoImage
+            # the resulting image will be found symlinked to ./result
+            # If host is not the same system as iso system, can use --builders flag, e.g.
+            # --builders 'ssh://borg-0 x86_64-linux' --store $(readlink -f /tmp)/nix
+            # then create a store-fixed symlink based on ./result:
+            # ln -s "$(readlink -f /tmp)/nix/$(readlink result)" result-iso
+            installIso = inputs.nixpkgs.lib.nixosSystem {
+              system = "x86_64-linux";
+              modules = [
+                "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel-no-zfs.nix"
+                ({
+                  lib,
+                  pkgs,
+                  config,
+                  ...
+                }: {
+                  users.users.root.openssh.authorizedKeys.keyFiles = builtins.map (s: ./modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./modules/users/authorized_keys));
+                  networking.hostName = "nixos-installer";
+                  environment.systemPackages = [
+                    pkgs.nixos-facter
+                  ];
+                  # Enable the OpenSSH daemon.
+                  services.openssh = {
+                    enable = true;
+                    settings = {
+                      PasswordAuthentication = lib.mkForce false;
+                      PermitRootLogin = "prohibit-password"; # default setting, but good to be explicit
+                    };
+                  };
+                  boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_latest;
+                })
+              ];
+            };
           };
-        };
       };
     };
 }

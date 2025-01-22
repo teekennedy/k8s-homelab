@@ -1308,7 +1308,7 @@
           "srbds",
           "mmio_unknown"
         ],
-        "bogo": 4589.83,
+        "bogo": 4589.68,
         "cache": 6144,
         "units": 16,
         "physical_id": 0,
@@ -1328,7 +1328,7 @@
     ],
     "disk": [
       {
-        "index": 39,
+        "index": 40,
         "attached_to": 32,
         "class_list": [
           "disk",
@@ -1419,7 +1419,7 @@
         ]
       },
       {
-        "index": 40,
+        "index": 41,
         "attached_to": 37,
         "class_list": [
           "disk",
@@ -1433,7 +1433,7 @@
           "value": 132
         },
         "slot": {
-          "bus": 0,
+          "bus": 2,
           "number": 0
         },
         "base_class": {
@@ -1463,14 +1463,14 @@
         },
         "serial": "000000000820",
         "model": "APPLE SD Card Reader",
-        "sysfs_id": "/class/block/sda",
-        "sysfs_bus_id": "0:0:0:0",
-        "sysfs_device_link": "/devices/pci0000:00/0000:00:14.0/usb2/2-4/2-4:1.0/host0/target0:0:0/0:0:0:0",
-        "unix_device_name": "/dev/sda",
+        "sysfs_id": "/class/block/sdb",
+        "sysfs_bus_id": "2:0:0:0",
+        "sysfs_device_link": "/devices/pci0000:00/0000:00:14.0/usb2/2-4/2-4:1.0/host2/target2:0:0/2:0:0:0",
+        "unix_device_name": "/dev/sdb",
         "unix_device_number": {
           "type": 98,
           "major": 8,
-          "minor": 0,
+          "minor": 16,
           "range": 16
         },
         "unix_device_names": [
@@ -1478,13 +1478,13 @@
           "/dev/disk/by-id/usb-APPLE_SD_Card_Reader_000000000820-0:0",
           "/dev/disk/by-path/pci-0000:00:14.0-usb-0:4:1.0-scsi-0:0:0:0",
           "/dev/disk/by-path/pci-0000:00:14.0-usbv3-0:4:1.0-scsi-0:0:0:0",
-          "/dev/sda"
+          "/dev/sdb"
         ],
-        "unix_device_name2": "/dev/sg0",
+        "unix_device_name2": "/dev/sg1",
         "unix_device_number2": {
           "type": 99,
           "major": 21,
-          "minor": 0,
+          "minor": 1,
           "range": 1
         },
         "resources": [
@@ -1508,6 +1508,208 @@
           "usb_storage"
         ],
         "module_alias": "usb:v05ACp8406d0820dc00dsc00dp00ic08isc06ip50in00"
+      },
+      {
+        "index": 42,
+        "attached_to": 37,
+        "class_list": [
+          "disk",
+          "usb",
+          "scsi",
+          "block_device"
+        ],
+        "bus_type": {
+          "hex": "0084",
+          "name": "SCSI",
+          "value": 132
+        },
+        "slot": {
+          "bus": 0,
+          "number": 0
+        },
+        "base_class": {
+          "hex": "0106",
+          "name": "Mass Storage Device",
+          "value": 262
+        },
+        "sub_class": {
+          "hex": "0000",
+          "name": "Disk",
+          "value": 0
+        },
+        "vendor": {
+          "hex": "090c",
+          "name": "Samsung",
+          "value": 2316
+        },
+        "device": {
+          "hex": "1000",
+          "name": "Type-C",
+          "value": 4096
+        },
+        "revision": {
+          "hex": "0000",
+          "name": "1100",
+          "value": 0
+        },
+        "serial": "AA00000000000489",
+        "model": "Samsung Type-C",
+        "sysfs_id": "/class/block/sdc",
+        "sysfs_bus_id": "0:0:0:0",
+        "sysfs_device_link": "/devices/pci0000:00/0000:00:14.0/usb1/1-5/1-5:1.0/host0/target0:0:0/0:0:0:0",
+        "unix_device_name": "/dev/sdc",
+        "unix_device_number": {
+          "type": 98,
+          "major": 8,
+          "minor": 32,
+          "range": 16
+        },
+        "unix_device_names": [
+          "/dev/disk/by-diskseq/13",
+          "/dev/disk/by-id/usb-Samsung_Type-C_0373322100001640-0:0",
+          "/dev/disk/by-path/pci-0000:00:14.0-usb-0:5:1.0-scsi-0:0:0:0",
+          "/dev/disk/by-path/pci-0000:00:14.0-usbv2-0:5:1.0-scsi-0:0:0:0",
+          "/dev/sdc"
+        ],
+        "unix_device_name2": "/dev/sg2",
+        "unix_device_number2": {
+          "type": 99,
+          "major": 21,
+          "minor": 2,
+          "range": 1
+        },
+        "resources": [
+          {
+            "type": "baud",
+            "speed": 480000000,
+            "bits": 0,
+            "stop_bits": 0,
+            "parity": 0,
+            "handshake": 0
+          },
+          {
+            "type": "disk_geo",
+            "cylinders": 61188,
+            "heads": 64,
+            "sectors": 32,
+            "size": 0,
+            "geo_type": "logical"
+          },
+          {
+            "type": "size",
+            "unit": "sectors",
+            "value_1": 125313283,
+            "value_2": 512
+          }
+        ],
+        "driver": "usb-storage",
+        "driver_module": "usb_storage",
+        "drivers": [
+          "sd",
+          "usb-storage"
+        ],
+        "driver_modules": [
+          "sd_mod",
+          "usb_storage"
+        ],
+        "module_alias": "usb:v090Cp1000d1100dc00dsc00dp00ic08isc06ip50in00"
+      },
+      {
+        "index": 43,
+        "attached_to": 37,
+        "class_list": [
+          "disk",
+          "usb",
+          "scsi",
+          "block_device"
+        ],
+        "bus_type": {
+          "hex": "0084",
+          "name": "SCSI",
+          "value": 132
+        },
+        "slot": {
+          "bus": 1,
+          "number": 0
+        },
+        "base_class": {
+          "hex": "0106",
+          "name": "Mass Storage Device",
+          "value": 262
+        },
+        "sub_class": {
+          "hex": "0000",
+          "name": "Disk",
+          "value": 0
+        },
+        "vendor": {
+          "hex": "0bda",
+          "name": "ADATA SX",
+          "value": 3034
+        },
+        "device": {
+          "hex": "9210",
+          "name": "8200PNP",
+          "value": 37392
+        },
+        "revision": {
+          "hex": "0000",
+          "name": "T36A",
+          "value": 0
+        },
+        "serial": "0000000000000000",
+        "model": "ADATA SX 8200PNP",
+        "sysfs_id": "/class/block/sda",
+        "sysfs_bus_id": "1:0:0:0",
+        "sysfs_device_link": "/devices/pci0000:00/0000:00:14.0/usb2/2-1/2-1:1.0/host1/target1:0:0/1:0:0:0",
+        "unix_device_name": "/dev/sda",
+        "unix_device_number": {
+          "type": 98,
+          "major": 8,
+          "minor": 0,
+          "range": 16
+        },
+        "unix_device_names": [
+          "/dev/disk/by-diskseq/10",
+          "/dev/disk/by-id/usb-ADATA_SX_8200PNP_012345678906-0:0",
+          "/dev/disk/by-path/pci-0000:00:14.0-usb-0:1:1.0-scsi-0:0:0:0",
+          "/dev/disk/by-path/pci-0000:00:14.0-usbv3-0:1:1.0-scsi-0:0:0:0",
+          "/dev/sda"
+        ],
+        "unix_device_name2": "/dev/sg0",
+        "unix_device_number2": {
+          "type": 99,
+          "major": 21,
+          "minor": 0,
+          "range": 1
+        },
+        "resources": [
+          {
+            "type": "disk_geo",
+            "cylinders": 249038,
+            "heads": 255,
+            "sectors": 63,
+            "size": 0,
+            "geo_type": "logical"
+          },
+          {
+            "type": "size",
+            "unit": "sectors",
+            "value_1": 4000797360,
+            "value_2": 512
+          }
+        ],
+        "driver": "uas",
+        "driver_module": "uas",
+        "drivers": [
+          "sd",
+          "uas"
+        ],
+        "driver_modules": [
+          "sd_mod",
+          "uas"
+        ],
+        "module_alias": "usb:v0BDAp9210d3000dc00dsc00dp00ic08isc06ip62in00"
       }
     ],
     "graphics_card": [
@@ -1575,6 +1777,12 @@
             "access": "read_write"
           },
           {
+            "type": "irq",
+            "base": 72,
+            "triggered": 0,
+            "enabled": true
+          },
+          {
             "type": "mem",
             "base": 2147483648,
             "range": 268435456,
@@ -1609,18 +1817,26 @@
         ],
         "detail": {
           "function": 0,
-          "command": 1027,
+          "command": 1031,
           "header_type": 0,
           "secondary_bus": 0,
-          "irq": 0,
+          "irq": 72,
           "prog_if": 0
         },
+        "driver": "nouveau",
+        "driver_module": "nouveau",
+        "drivers": [
+          "nouveau"
+        ],
+        "driver_modules": [
+          "nouveau"
+        ],
         "module_alias": "pci:v000010DEd00000FE9sv0000106Bsd00000130bc03sc00i00"
       }
     ],
     "hub": [
       {
-        "index": 46,
+        "index": 50,
         "attached_to": 37,
         "class_list": [
           "usb",
@@ -1703,8 +1919,8 @@
         "module_alias": "usb:v1D6Bp0002d0612dc09dsc00dp01ic09isc00ip00in00"
       },
       {
-        "index": 48,
-        "attached_to": 46,
+        "index": 52,
+        "attached_to": 50,
         "class_list": [
           "usb",
           "hub"
@@ -1785,7 +2001,7 @@
         "module_alias": "usb:v0A5Cp4500d0100dc09dsc00dp00ic09isc00ip00in00"
       },
       {
-        "index": 51,
+        "index": 55,
         "attached_to": 37,
         "class_list": [
           "usb",
@@ -1860,8 +2076,8 @@
     ],
     "keyboard": [
       {
-        "index": 47,
-        "attached_to": 46,
+        "index": 51,
+        "attached_to": 50,
         "class_list": [
           "keyboard",
           "usb"
@@ -1991,7 +2207,7 @@
           {
             "type": "mem",
             "base": 0,
-            "range": 16677392384,
+            "range": 16677113856,
             "enabled": true,
             "access": "read_write",
             "prefetch": "unknown"
@@ -2003,10 +2219,89 @@
         ]
       }
     ],
+    "monitor": [
+      {
+        "index": 39,
+        "attached_to": 21,
+        "class_list": [
+          "monitor"
+        ],
+        "base_class": {
+          "hex": "0100",
+          "name": "Monitor",
+          "value": 256
+        },
+        "sub_class": {
+          "hex": "0002",
+          "name": "LCD Monitor",
+          "value": 2
+        },
+        "vendor": {
+          "hex": "0610",
+          "name": "Apple",
+          "value": 1552
+        },
+        "device": {
+          "hex": "a022",
+          "name": "Color LCD",
+          "value": 40994
+        },
+        "serial": "0",
+        "model": "Apple Color LCD",
+        "resources": [
+          {
+            "type": "monitor",
+            "width": 2880,
+            "height": 1800,
+            "vertical_frequency": 60,
+            "interlaced": false
+          },
+          {
+            "type": "size",
+            "unit": "mm",
+            "value_1": 331,
+            "value_2": 207
+          }
+        ],
+        "detail": {
+          "manufacture_year": 2013,
+          "manufacture_week": 4,
+          "vertical_sync": {
+            "min": 0,
+            "max": 0
+          },
+          "horizontal_sync": {
+            "min": 0,
+            "max": 0
+          },
+          "horizontal_sync_timings": {
+            "disp": 2880,
+            "sync_start": 2928,
+            "sync_end": 2960,
+            "total": 3040
+          },
+          "vertical_sync_timings": {
+            "disp": 1800,
+            "sync_start": 1803,
+            "sync_end": 1809,
+            "total": 1852
+          },
+          "clock": 337750,
+          "width": 2880,
+          "height": 1800,
+          "width_millimetres": 331,
+          "height_millimetres": 207,
+          "horizontal_flag": 45,
+          "vertical_flag": 43,
+          "vendor": "",
+          "name": "Color LCD"
+        }
+      }
+    ],
     "mouse": [
       {
-        "index": 45,
-        "attached_to": 46,
+        "index": 49,
+        "attached_to": 50,
         "class_list": [
           "mouse",
           "usb"
@@ -2126,7 +2421,7 @@
         "module_alias": "usb:v05ACp0262d0225dc00dsc00dp00ic03isc01ip02in02"
       },
       {
-        "index": 54,
+        "index": 59,
         "attached_to": 0,
         "bus_type": {
           "hex": "0086",
@@ -2153,9 +2448,9 @@
           "name": "Apple_Internal_Keyboard___Trackpad",
           "value": 610
         },
-        "sysfs_id": "/devices/pci0000:00/0000:00:14.0/usb1/1-12/1-12:1.2/input/input3",
+        "sysfs_id": "/devices/pci0000:00/0000:00:14.0/usb1/1-12/1-12:1.2/input/input8",
         "unix_device_names": [
-          "/dev/input/event3",
+          "/dev/input/event8",
           "/dev/input/ + handler"
         ]
       }
@@ -2364,7 +2659,7 @@
     ],
     "network_interface": [
       {
-        "index": 52,
+        "index": 57,
         "attached_to": 0,
         "class_list": [
           "network_interface"
@@ -2387,7 +2682,7 @@
         ]
       },
       {
-        "index": 53,
+        "index": 58,
         "attached_to": 18,
         "class_list": [
           "network_interface"
@@ -2572,7 +2867,7 @@
         "resources": [
           {
             "type": "irq",
-            "base": 52,
+            "base": 68,
             "triggered": 0,
             "enabled": true
           },
@@ -2590,7 +2885,7 @@
           "command": 1030,
           "header_type": 0,
           "secondary_bus": 0,
-          "irq": 52,
+          "irq": 68,
           "prog_if": 0
         },
         "driver": "mei_me",
@@ -2833,7 +3128,7 @@
         "resources": [
           {
             "type": "irq",
-            "base": 55,
+            "base": 71,
             "triggered": 0,
             "enabled": true
           },
@@ -2851,7 +3146,7 @@
           "command": 1030,
           "header_type": 0,
           "secondary_bus": 0,
-          "irq": 55,
+          "irq": 71,
           "prog_if": 0
         },
         "driver": "snd_hda_intel",
@@ -3043,8 +3338,8 @@
     },
     "usb": [
       {
-        "index": 42,
-        "attached_to": 46,
+        "index": 45,
+        "attached_to": 50,
         "class_list": [
           "usb",
           "unknown"
@@ -3134,8 +3429,8 @@
         "module_alias": "usb:v05ACp0262d0225dc00dsc00dp00ic03isc00ip00in01"
       },
       {
-        "index": 43,
-        "attached_to": 48,
+        "index": 47,
+        "attached_to": 52,
         "class_list": [
           "usb",
           "unknown"
@@ -3217,8 +3512,8 @@
         "module_alias": "usb:v05ACp8289d0150dcFFdsc01dp01icFEisc01ip01in03"
       },
       {
-        "index": 44,
-        "attached_to": 48,
+        "index": 48,
+        "attached_to": 52,
         "class_list": [
           "usb",
           "unknown"
@@ -3308,8 +3603,8 @@
         "module_alias": "usb:v05ACp8289d0150dcFFdsc01dp01icE0isc01ip01in01"
       },
       {
-        "index": 49,
-        "attached_to": 48,
+        "index": 53,
+        "attached_to": 52,
         "class_list": [
           "usb",
           "unknown"
@@ -3399,8 +3694,8 @@
         "module_alias": "usb:v05ACp8289d0150dcFFdsc01dp01icFFiscFFipFFin02"
       },
       {
-        "index": 50,
-        "attached_to": 48,
+        "index": 54,
+        "attached_to": 52,
         "class_list": [
           "usb",
           "unknown"
