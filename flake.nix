@@ -175,7 +175,7 @@
         ];
       in {
         # enable magic rollback and other checks
-        # checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
+        checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
         deploy.nodes = builtins.listToAttrs (builtins.map (host: {
             name = host.hostname;
             value = {
