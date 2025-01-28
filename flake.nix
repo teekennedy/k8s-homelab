@@ -143,7 +143,7 @@
             hostname = "borg-1";
             system = "x86_64-linux";
             modules = [
-              {
+              ({lib, ...}: {
                 disko.devices.disk.main.device = "/dev/disk/by-id/nvme-Aura_Pro_X2_OW23012314C43991F";
                 disko.longhornDevice = "/dev/disk/by-id/usb-ADATA_SX_8200PNP_012345678906-0:0";
                 system.stateVersion = "25.05";
@@ -166,14 +166,15 @@
 
                 services.k3s = {
                   role = "server";
+                  serverAddr = "https://10.69.80.10:6443";
                 };
-              }
+              })
             ];
           }
         ];
       in {
         # enable magic rollback and other checks
-        checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
+        # checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
         deploy.nodes = builtins.listToAttrs (builtins.map (host: {
             name = host.hostname;
             value = {

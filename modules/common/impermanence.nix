@@ -42,6 +42,8 @@
       # Records association between user/group names and ids.
       # Without this directory, backups could have wrong uid/gid.
       "/var/lib/nixos"
+      # k3s sqlite datastore
+      "/var/lib/rancher/k3s/server/db"
     ];
     files = [
       # machine-id used by systemd
@@ -58,6 +60,10 @@
   environment.persistence."/cache" = {
     hideMounts = true;
     directories = [
+      # containerd default metadata dir
+      "/var/lib/containerd"
+      # k3s data dir
+      "/var/lib/rancher/k3s"
       # logs
       "/var/log"
       # core dumps

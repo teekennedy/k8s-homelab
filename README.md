@@ -156,7 +156,9 @@ Start your first k3s server with `services.k3s.clusterInit = true;`. See modules
 
 Once applied, log into the host and check that k3s is running with `sudo systemctl status k3s.service`. Check the k3s logs for errors as well `sudo journalctl -fu k3s.service`.
 
-Get the contents of the k3s token and kubernetes config secrets at /var/lib/rancher/k3s/server/token and /etc/rancher/k3s/k3s.yaml respectively, and save them under modules/k3s/kubeconfig.enc.yaml and hosts/<hostname>/secrets.yaml:k3s_token respectively.
+Run the helper script from the scripts directory to fetch all certificates, keys and tokens and write them encrypted with sops to ./modules/k3s/secrets.enc.yaml
+
+Also copy /etc/rancher/k3s/k3s.yaml from the first node and place it in ./.devenv/state/kube/config in this repo (will be gitignored). You'll need to replace `server:` with the server's actual address (not 127.0.0.1).
 
 # Deployment
 

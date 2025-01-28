@@ -36,6 +36,7 @@
         kubectl
         tree
         neovim
+        lnav # logfile navigator
       ];
     };
   };

@@ -61,7 +61,7 @@ generate_secrets_yaml() {
   # shellcheck disable=SC2034
   pubkey="$(cat "$host_ssh_key_path.pub")" privkey="$(cat "$host_ssh_key_path")" agekey="$(ssh-to-age -i "$host_ssh_key_path.pub")" hashed_password=$(mkpasswd --method=SHA-512 "$password")
 
-  yq --null-input --in-place '.keys += [stdenv(agekey) | . anchor = "host_" + stdenv(hostname)]' .sops.yaml
+  yq --null-input --inplace '.keys += [stdenv(agekey) | . anchor = "host_" + stdenv(hostname)]' .sops.yaml
   yq --null-input '.ssh_host_public_key = stdenv(pubkey) | ssh_host_private_key = stdenv(privkey) | .default_user_hashed_password = stdenv(hashed_password)' >"$temp/secrets.yaml"
   sops encrypt --output "$secrets_yaml_path" "$temp/secrets.yaml"
 }

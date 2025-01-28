@@ -19,32 +19,93 @@
     etcd # having etcdctl is helpful when you need to manage the cluster
   ];
 
-  services.k3s.enable = true;
+  services.k3s = {
+    enable = lib.mkDefault true;
+    # enable secrets encryption
+    # This _must_ be enabled when cluster is first initialized. It cannot be enabled later.
+    # https://docs.k3s.io/cli/secrets-encrypt
+    extraFlags = ["--secrets-encryption"];
+  };
 
   # Enable graceful shutdown
   # https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#graceful-node-shutdown
   # Note that due to a regression in local-path-provisioner, this won't work with k3s versions 1.30.x up to 1.31.2.
   services.k3s.gracefulNodeShutdown.enable = true;
 
-  # file permissions and path for k3s token set to match k3s default
-  # https://docs.k3s.io/cli/token
-  sops.secrets.k3s_token = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) {
-    sopsFile = ./secrets.enc.yaml;
-    mode = "0600";
-    owner = config.users.users.root.name;
-    group = config.users.users.root.group;
-    restartUnits = ["k3s.service"];
-  };
-
-  services.k3s.tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
-
-  sops.secrets.kubeconfig = lib.mkIf (builtins.pathExists ./kubeconfig.enc.yaml) {
-    sopsFile = ./kubeconfig.enc.yaml;
-    mode = "0600";
-    owner = config.users.users.root.name;
-    group = config.users.users.root.group;
-    restartUnits = ["k3s.service"];
-    key = "";
-    path = "/etc/rancher/k3s/k3s.yaml";
-  };
+  # Setup secrets
+  sops.secrets = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) (let
+    sopsConfig = {
+      sopsFile = ./secrets.enc.yaml;
+      mode = "0600";
+      owner = config.users.users.root.name;
+      group = config.users.users.root.group;
+    };
+  in {
+    # file permissions and path for k3s token set to match k3s default
+    # https://docs.k3s.io/cli/token
+    k3s_token =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/token";
+      };
+    server_ca_crt =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/server-ca.crt";
+      };
+    server_ca_key =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/server-ca.key";
+      };
+    client_ca_crt =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/client-ca.crt";
+        mode = "0644";
+      };
+    client_ca_key =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/client-ca.key";
+      };
+    request_header_ca_crt =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/request-header-ca.crt";
+        mode = "0644";
+      };
+    request_header_ca_key =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/request-header-ca.key";
+      };
+    etcd_peer_ca_crt =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/etcd/peer-ca.crt";
+        mode = "0644";
+      };
+    etcd_peer_ca_key =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/etcd/peer-ca.key";
+      };
+    etcd_server_ca_crt =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/etcd/server-ca.crt";
+        mode = "0644";
+      };
+    etcd_server_ca_key =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/etcd/server-ca.key";
+      };
+    service_key =
+      sopsConfig
+      // {
+        path = "/var/lib/rancher/k3s/server/tls/service.key";
+      };
+  });
 }
