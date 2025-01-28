@@ -16,6 +16,7 @@
       flake = false;
     };
     sops-nix.url = "github:Mic92/sops-nix";
+    sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
@@ -209,6 +210,8 @@
                     {
                       defaultUsername = "tkennedy";
                       networking.hostName = host.hostname;
+                      # Pin nixpkgs to flake input
+                      nix.registry.nixpkgs.flake = inputs.nixpkgs;
                       facter.reportPath = let
                         facterPath = ./hosts + "/${host.hostname}" + /facter.json;
                       in
@@ -247,6 +250,8 @@
                 }: {
                   users.users.root.openssh.authorizedKeys.keyFiles = builtins.map (s: ./modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./modules/users/authorized_keys));
                   networking.hostName = "nixos-installer";
+                  # Pin nixpkgs to flake input
+                  nix.registry.nixpkgs.flake = inputs.nixpkgs;
                   environment.systemPackages = [
                     pkgs.nixos-facter
                   ];
@@ -258,7 +263,6 @@
                       PermitRootLogin = "prohibit-password"; # default setting, but good to be explicit
                     };
                   };
-                  boot.kernelPackages = lib.mkOverride 0 pkgs.linuxPackages_latest;
                 })
               ];
             };
