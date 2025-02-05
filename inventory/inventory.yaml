@@ -61,6 +61,17 @@ hosts:
     mac_address: 34:98:7a:ec:0d:43
     ip_address: 10.69.100.20
     vlan: esphome
+  home-theater-energy-meter:
+    # yes, the missing 'r' is purposeful. Hit hostname 24 character limit.
+    hostname: home-theater-energy-mete
+    mac_address: 34:98:7a:ec:0d:37
+    ip_address: 10.69.100.21
+    vlan: esphome
+  gaming-pc-energy-meter:
+    hostname: gaming-pc-energy-meter
+    mac_address: 34:98:7a:ec:0c:8c
+    ip_address: 10.69.100.22
+    vlan: esphome
 
 # Vlan tags should be created based on the following:
 # - first 3 digits are based on the third octet of subnet, e.g. 100 for 10.69.100.128
