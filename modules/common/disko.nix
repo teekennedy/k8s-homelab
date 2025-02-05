@@ -34,8 +34,9 @@
         (builtins.toString halfMemMb) + "M";
     };
     disko.longhornDevice = lib.mkOption {
-      description = "Device to use for the longhorn volume. Use `udevadm info <disk> | grep disk/by-id` to get the device's stable identifier.";
+      description = "Optional device to use for the longhorn volume. Use `udevadm info <disk> | grep disk/by-id` to get the device's stable identifier.";
       example = "/dev/disk/by-id/xxxxx";
+      default = "";
       type = lib.types.str;
     };
   };
@@ -120,7 +121,7 @@
             };
           };
         }
-        // lib.optionalAttrs (builtins.hasAttr "longhornDevice" config.disko) {
+        // lib.optionalAttrs (builtins.stringLength config.disko.longhornDevice > 0) {
           longhorn = {
             type = "disk";
             device = config.disko.longhornDevice;

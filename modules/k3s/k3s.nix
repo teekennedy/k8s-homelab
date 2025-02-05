@@ -25,6 +25,7 @@
     # This _must_ be enabled when cluster is first initialized. It cannot be enabled later.
     # https://docs.k3s.io/cli/secrets-encrypt
     extraFlags = ["--secrets-encryption"];
+    tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
   };
 
   # Enable graceful shutdown

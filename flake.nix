@@ -93,7 +93,7 @@
             sops
             (writeShellApplication {
               name = "bootstrap-host";
-              runtimeInputs = [yq-go sops];
+              runtimeInputs = [yq-go sops ssh-to-age mkpasswd];
               text = builtins.readFile ./scripts/bootstrap-host.sh;
             })
           ];
@@ -157,15 +157,38 @@
                     DNS = ["10.69.80.1"];
                   };
                 };
-                # turn off wifi
-                systemd.network.networks."11-disable-wireless" = {
-                  matchConfig.Type = "wlan";
-                  linkConfig.Unmanaged = "yes";
-                };
                 # Don't sleep when laptop is closed
                 services.logind.lidSwitch = "ignore";
 
                 services.k3s = {
+                  enable = false;
+                  role = "server";
+                  serverAddr = "https://10.69.80.10:6443";
+                };
+              })
+            ];
+          }
+          {
+            hostname = "borg-2";
+            system = "x86_64-linux";
+            modules = [
+              ({lib, ...}: {
+                disko.devices.disk.main.device = "/dev/disk/by-id/nvme-WD_BLACK_SN770_1TB_23011J801757";
+                disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FFD004T_TPBF2404020050100710";
+                system.stateVersion = "25.05";
+                hardware.cpu.intel.updateMicrocode = true;
+
+                systemd.network.networks."10-lan" = {
+                  matchConfig.Name = "enp3s0f0np0";
+                  networkConfig = {
+                    Address = "10.69.80.12/25";
+                    Gateway = ["10.69.80.1"];
+                    DNS = ["10.69.80.1"];
+                  };
+                };
+
+                services.k3s = {
+                  enable = false;
                   role = "server";
                   serverAddr = "https://10.69.80.10:6443";
                 };
@@ -241,7 +264,11 @@
             installIso = inputs.nixpkgs.lib.nixosSystem {
               system = "x86_64-linux";
               modules = [
-                "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel-no-zfs.nix"
+                # The zfs kernel module 2.3.0 is incompatible with kernel 6.13 or higher
+                # https://github.com/NixOS/nixpkgs/blob/799ba5bffed04ced7067a91798353d360788b30d/pkgs/os-specific/linux/zfs/2_3.nix
+                # Falling back to "old" kernel 6.12.12 for now
+                "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
+                # "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel.nix"
                 ({
                   lib,
                   pkgs,

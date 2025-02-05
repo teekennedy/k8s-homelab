@@ -14,6 +14,10 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+  -v | --verbose)
+    set -x
+    shift
+    ;;
   --)
     shift
     break
@@ -52,22 +56,23 @@ host_ssh_key_path="$temp/persistent/etc/ssh/ssh_host_ed25519_key"
 # Generate host secrets.yaml if it doesn't exist
 generate_secrets_yaml() {
   local pubkey privkey agekey hashed_password
-  ssh-keygen -t ed25519 -C "$hostname" -f "$host_ssh_key_path"
+  ssh-keygen -t ed25519 -C "$hostname" -N '' -f "$host_ssh_key_path"
 
   echo -n "Password for $hostname:"
   read -rs password
   echo
 
-  # shellcheck disable=SC2034
-  pubkey="$(cat "$host_ssh_key_path.pub")" privkey="$(cat "$host_ssh_key_path")" agekey="$(ssh-to-age -i "$host_ssh_key_path.pub")" hashed_password=$(mkpasswd --method=SHA-512 "$password")
+  pubkey="$(cat "$host_ssh_key_path.pub")" privkey="$(cat "$host_ssh_key_path")" agekey="$(ssh-to-age -i "$host_ssh_key_path.pub")" hashed_password=$(mkpasswd --method=SHA-512 "$password") host_anchor="host_$hostname"
+  export pubkey privkey agekey hashed_password host_anchor
 
-  yq --null-input --inplace '.keys += [stdenv(agekey) | . anchor = "host_" + stdenv(hostname)]' .sops.yaml
-  yq --null-input '.ssh_host_public_key = stdenv(pubkey) | ssh_host_private_key = stdenv(privkey) | .default_user_hashed_password = stdenv(hashed_password)' >"$temp/secrets.yaml"
-  sops encrypt --output "$secrets_yaml_path" "$temp/secrets.yaml"
+  yq --inplace '.keys += [strenv(agekey) | . anchor = strenv(host_anchor)]' .sops.yaml
+  yq --null-input '.ssh_host_public_key = strenv(pubkey) | .ssh_host_private_key = strenv(privkey) | .default_user_hashed_password = strenv(hashed_password)' >"$secrets_yaml_path"
+  sops encrypt --in-place "$secrets_yaml_path"
 }
 
-# Create the directory where sops-nix expects to find the host keys
+# Create directories
 install -d -m755 "$(dirname "$host_ssh_key_path")"
+mkdir -p "$(dirname "$secrets_yaml_path")"
 
 # Generate or read ssh key for host
 if [ -e "$secrets_yaml_path" ]; then

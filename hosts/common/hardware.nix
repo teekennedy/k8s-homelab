@@ -9,6 +9,13 @@
   systemd.network.networks."99-ethernet-default-dhcp".networkConfig = {
     UseDomains = "yes";
   };
+  # turn off wifi
+  systemd.network.networks."11-disable-wireless" = {
+    matchConfig.Type = "wlan";
+    linkConfig.Unmanaged = "yes";
+  };
+  # disable bluetooth
+  boot.blacklistedKernelModules = ["btusb"];
   nix.settings.experimental-features = ["nix-command" "flakes"];
   # Add wheel group to nix trusted users
   nix.settings.trusted-users = ["root" "@wheel"];

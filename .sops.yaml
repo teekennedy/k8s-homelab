@@ -8,6 +8,7 @@ keys:
   # `nix-shell -p ssh-to-age --run 'ssh-keyscan <host> | grep ssh-ed25519 | ssh-to-age'`
   - &host_borg-0 age134rsuzlwf7fqzl3zluzjmheez6y4x5mmakfsejpjenr6qy3st3rs3rd5l9
   - &host_borg-1 age1sytxxylgnjkdev2qjds6zdwn6ynt73tn4u7lvg27cjdwj97lj4xs75ycyf
+  - &host_borg-2 age12uwv74ykhvs45aftm8d4v03ry44jdkt93nmslhktc2u4fq7j7yyqg5zdph
 
 creation_rules:
   - path_regex: hosts/borg-0/secrets\.yaml
@@ -24,6 +25,13 @@ creation_rules:
         age:
           - *oxygen_age
           - *host_borg-1
+  - path_regex: hosts/borg-2/secrets\.yaml
+    key_groups:
+      - pgp:
+          - *user_tkennedy
+        age:
+          - *oxygen_age
+          - *host_borg-2
   - path_regex: modules/k3s/.*\.enc\.yaml
     key_groups:
       - pgp:
@@ -32,6 +40,7 @@ creation_rules:
           - *oxygen_age
           - *host_borg-0
           - *host_borg-1
+          - *host_borg-2
   - path_regex: terraform/.*\.sops\.ya?ml
     key_groups:
       - age:
