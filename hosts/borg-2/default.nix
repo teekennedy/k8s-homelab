@@ -1,5 +1,5 @@
 {...}: {
   imports = [
-    ./zpool-tank.nix
+    ./zfs-storage.nix
   ];
 }

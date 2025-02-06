@@ -1,4 +1,4 @@
-# Disko configuration for raidz2 pool
+# Disko configuration for raidz2 storage pool
 {
   # ZFS requires that networking.hostId be set
   # Generated using: head -c4 /dev/urandom | od -A none -t x4
@@ -15,7 +15,7 @@
               size = "100%";
               content = {
                 type = "zfs";
-                pool = "tank";
+                pool = "storage";
               };
             };
           };
@@ -31,7 +31,7 @@
               size = "100%";
               content = {
                 type = "zfs";
-                pool = "tank";
+                pool = "storage";
               };
             };
           };
@@ -47,7 +47,7 @@
               size = "100%";
               content = {
                 type = "zfs";
-                pool = "tank";
+                pool = "storage";
               };
             };
           };
@@ -63,7 +63,7 @@
               size = "100%";
               content = {
                 type = "zfs";
-                pool = "tank";
+                pool = "storage";
               };
             };
           };
@@ -79,7 +79,7 @@
               size = "100%";
               content = {
                 type = "zfs";
-                pool = "tank";
+                pool = "storage";
               };
             };
           };
@@ -95,7 +95,7 @@
               size = "100%";
               content = {
                 type = "zfs";
-                pool = "tank";
+                pool = "storage";
               };
             };
           };
@@ -103,7 +103,7 @@
       };
     };
     zpool = {
-      tank = {
+      storage = {
         type = "zpool";
         mode = "raidz2";
         rootFsOptions = {
@@ -117,24 +117,23 @@
           xattr = "sa";
         };
 
-        mountpoint = "/data";
-
         datasets = {
           backup = {
             type = "zfs_fs";
-            mountpoint = "/data/backup";
           };
           nas = {
             type = "zfs_fs";
-            mountpoint = "/data/nas";
           };
         };
-        # Without mountpoint = legacy,
+        # Without zfs optoin mountpoint = legacy,
         # both zfs and systemd try to mount the pool during startup.
         # The legacy option tells zfs not to mount automatically.
         # https://github.com/nix-community/disko/issues/581
+        mountpoint = "/storage";
         rootFsOptions.mountpoint = "legacy";
+        datasets.nas.mountpoint = "/storage/nas";
         datasets.nas.options.mountpoint = "legacy";
+        datasets.backup.mountpoint = "/storage/backup";
         datasets.backup.options.mountpoint = "legacy";
       };
     };
