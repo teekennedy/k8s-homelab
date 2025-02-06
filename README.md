@@ -160,6 +160,10 @@ Run the helper script from the scripts directory to fetch all certificates, keys
 
 Also copy /etc/rancher/k3s/k3s.yaml from the first node and place it in ./.devenv/state/kube/config in this repo (will be gitignored). You'll need to replace `server:` with the server's actual address (not 127.0.0.1).
 
+### Longhorn
+
+Run `helmfile apply --skip-diff-on-install -f helmfile.d/longhorn.yaml` to install lonhorn and kyverno.
+
 # Deployment
 
 From the project root directory, run `colmena apply --experimental-flake-eval`.
