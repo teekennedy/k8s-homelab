@@ -63,3 +63,31 @@ releases:
                     - name: models
                       persistentVolumeClaim:
                         claimName: glados-tts-models-pvc
+          - apiVersion: v1
+            kind: Service
+            metadata:
+              name: glados-tts-service
+              namespace: glados-tts
+            spec:
+              selector:
+                app: glados-tts
+              ports:
+                - protocol: TCP
+                  port: 8124
+                  targetPort: 8124
+          - apiVersion: traefik.io/v1alpha1
+            kind: IngressRoute
+            metadata:
+              name: glados-tts-ingress
+              namespace: glados-tts
+            spec:
+              entryPoints:
+                - web
+                - websecure
+              routes:
+                - kind: Rule
+                  match: Host(`glados-tts.msng.to`)
+                  services:
+                    - kind: Service
+                      name: glados-tts-service
+                      port: 8124
