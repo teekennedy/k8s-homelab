@@ -1,6 +1,10 @@
 cloudflare_email: ENC[AES256_GCM,data:iJN+YKZ3hC00NjuCFbD0cABvG2NNhkPfOg==,iv:fQB+2dHQH7uE5c9086p97V3UTvexA0L99lixrP6Wkis=,tag:NRPRQTZPg/AGmkFudwEe5A==,type:str]
-cloudflare_api_token: ENC[AES256_GCM,data:ut3pmFE7j1GXkHpau+FuyOSh5lRru+CGfqTNOmja4my5YO9x8R1+3g==,iv:zlzwoJSjruCVKrubLcMAan38efmRJkfXrs9hJfeIhG4=,tag:qS674fOOLq2VdVthnLVbTQ==,type:str]
+cloudflare_api_key: ENC[AES256_GCM,data:GzX07I5cgSwOWXF/b77NXFHjLHitVUxqpurHg/mC8C1EyierMw==,iv:mnNfjnNYnbUH90qSTOA3lMSYdSzQq78optIPfB6mjn4=,tag:RZYRRFRofRGxmg5M9wfQ5Q==,type:str]
+cloudflare_account_id: ENC[AES256_GCM,data:8viJxxkIUPN0KOAaaLOqxmk6pFUt46cHsJ6Avzkty6I=,iv:XveTcEp2tB0B8M9AZbK5/KiE4wikPdJ+Fo/BbEOxkaY=,tag:9rgruYAmqMtK1v9JAHGFDg==,type:str]
 cloudflare_domain: ENC[AES256_GCM,data:Ej9oDNhKgw==,iv:t18ZaXzGFvZpNRYP1ubC9siCv3hMM2kn35DCNiOkKfg=,tag:0oa2o25teikaj5xEFNKGSA==,type:str]
+ntfy:
+    url: ENC[AES256_GCM,data:TqmlbAvTmsbdcgrDQTWP,iv:sMkAt2rXIrnTAx04OIbprFpWi20tGu3gyzQSTtjr0P4=,tag:uK+QMjKD9h0NilJu9xJsiQ==,type:str]
+    topic: ENC[AES256_GCM,data:GqR7FYo1jbcvoGp9ggPqbg==,iv:58WySHO4oaXxH0i+Vkovf7lokz79V8X2JuWksftzEjw=,tag:+vhsplaf7XWcR8q6n7Nl2Q==,type:str]
 sops:
     kms: []
     gcp_kms: []
@@ -16,8 +20,8 @@ sops:
             cTNoWVM3ZEJBWEE4R01GcGxIQlR5WlkKuCetV8JZ9kk2heP504+m3V+xmqqgU65C
             X8lRgHS/BeTOWxMEcqQDfWlc8Gzm2+hqPSh0EaIuSzhdWGG8XXCh0w==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2023-02-18T21:11:36Z"
-    mac: ENC[AES256_GCM,data:KuLlwHdYHFHEdRsOETfITuyFSfBa8m+zUCdETzErw4TrZH/TsctvBosE5wc1f7Mf1ma2lAh3rQieu3t1DZ6qgxHPz568HKveilWcquAARoaDD+xmtBjtK6depVw12Ml+32utqx7kvf3CTSJ2vDopeAXPzhqUeaJKsgNDVsvwVHQ=,iv:j/jW+n/pmSPfyEkb8v67PzPF6/mn3ZwNh0zCiCFAsvg=,tag:1dxjNoF9Mm+G+dSQU0asuA==,type:str]
+    lastmodified: "2025-02-09T05:39:32Z"
+    mac: ENC[AES256_GCM,data:lqTlg328bxZqMihRevUNbMA052bfl7p3UlhrbBZmqrJhaJjeKSfFgOh+5+GSG7hD7MPv1H4cUxigK1O4ACvO/Ld22ONOaJN0TX2H++rvwI2If4qjSqWn8/LnMoTmqJ/iD0c5WfP5IY0effPQUUTQ7N0guIbtFJGQfp1OkXSJckM=,iv:8T3IM60t9DetbaiCwxHor8xJXs3iCO72C+zM1w4IS5Q=,tag:mFkMq9B7z75C+5aO/forRA==,type:str]
     pgp:
         - created_at: "2024-12-02T02:33:51Z"
           enc: |-
@@ -31,4 +35,4 @@ sops:
             -----END PGP MESSAGE-----
           fp: FD5B1635F2218760E010601F4A6E1024D7BBE968
     unencrypted_suffix: _unencrypted
-    version: 3.7.3
+    version: 3.9.4

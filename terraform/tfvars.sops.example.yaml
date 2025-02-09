@@ -1,0 +1,21 @@
+# https://dash.cloudflare.com/profile
+cloudflare_email: "myaccount@example.com"
+# https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids
+cloudflare_account_id: "asdflkjaseflakjes"
+# https://dash.cloudflare.com/profile/api-tokens
+cloudflare_api_key: "asdflkjaseflakjes"
+
+ntfy:
+  # https://ntfy.sh or your own instance
+  url: "https://ntfy.sh"
+  # Your topic name
+  topic: "DqevQdcoKsUU"
+
+extra_secrets: {
+# Ex:
+# my-app-creds:
+#   namespace: my-app
+#   data:
+#     username: "alice"
+#     password: "asdfkjasdfakjse"
+}

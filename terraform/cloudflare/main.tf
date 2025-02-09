@@ -1,93 +1,90 @@
-terraform {
-  required_version = "~> 1.8"
-
-  required_providers {
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "~> 3.34"
-    }
-    http = {
-      source  = "hashicorp/http"
-      version = "~> 3.2"
-    }
-    sops = {
-      source  = "carlpett/sops"
-      version = "~> 0.7"
-    }
-  }
+data "cloudflare_zone" "zone" {
+  name = var.cloudflare_domain
 }
 
-data "sops_file" "cloudflare_secrets" {
-  source_file = "secret.sops.yaml"
+data "cloudflare_api_token_permission_groups" "all" {}
+
+resource "random_password" "tunnel_secret" {
+  length  = 64
+  special = false
 }
 
-provider "cloudflare" {
-  api_token = data.sops_file.cloudflare_secrets.data["cloudflare_api_token"]
+resource "cloudflare_zero_trust_tunnel_cloudflared" "homelab" {
+  account_id = var.cloudflare_account_id
+  name       = "homelab"
+  secret     = random_password.tunnel_secret.result
 }
 
-data "cloudflare_zones" "domain" {
-  filter {
-    name = data.sops_file.cloudflare_secrets.data["cloudflare_domain"]
-  }
-}
-
-resource "cloudflare_zone_settings_override" "cloudflare_settings" {
-  zone_id = lookup(data.cloudflare_zones.domain.zones[0], "id")
-  settings {
-    ssl                      = "strict"
-    always_use_https         = "on"
-    min_tls_version          = "1.2"
-    opportunistic_encryption = "on"
-    tls_1_3                  = "zrt"
-    automatic_https_rewrites = "on"
-    universal_ssl            = "on"
-    browser_check            = "on"
-    challenge_ttl            = 1800
-    privacy_pass             = "on"
-    security_level           = "medium"
-    brotli                   = "on"
-    minify {
-      css  = "on"
-      js   = "on"
-      html = "on"
-    }
-    rocket_loader       = "on"
-    always_online       = "off"
-    development_mode    = "off"
-    http3               = "on"
-    zero_rtt            = "on"
-    ipv6                = "on"
-    websockets          = "on"
-    opportunistic_onion = "on"
-    pseudo_ipv4         = "off"
-    ip_geolocation      = "on"
-    email_obfuscation   = "on"
-    server_side_exclude = "on"
-    hotlink_protection  = "off"
-    security_header {
-      enabled = false
-    }
-  }
-}
-
-data "http" "ipv4" {
-  url = "http://ipv4.icanhazip.com"
-}
-
-resource "cloudflare_record" "ipv4" {
-  name    = "ipv4"
-  zone_id = lookup(data.cloudflare_zones.domain.zones[0], "id")
-  value   = chomp(data.http.ipv4.response_body)
-  proxied = true
-  type    = "A"
-  ttl     = 1
-}
-
-resource "cloudflare_record" "root" {
-  name    = data.sops_file.cloudflare_secrets.data["cloudflare_domain"]
-  zone_id = lookup(data.cloudflare_zones.domain.zones[0], "id")
-  value   = "ipv4.${data.sops_file.cloudflare_secrets.data["cloudflare_domain"]}"
-  proxied = true
+# Not proxied, not accessible. Just a record for auto-created CNAMEs by external-dns.
+resource "cloudflare_record" "tunnel" {
+  zone_id = data.cloudflare_zone.zone.id
   type    = "CNAME"
-  ttl     = 1
+  name    = "homelab-tunnel"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
+  proxied = false
+  ttl     = 1 # Auto
+}
+
+module "cloudflared_credentials_secret" {
+  source    = "../k8s-secret"
+  name      = "cloudflared-credentials"
+  namespace = "cloudflared"
+
+  data = {
+    "credentials.json" = jsonencode({
+      AccountTag   = var.cloudflare_account_id
+      TunnelName   = cloudflare_zero_trust_tunnel_cloudflared.homelab.name
+      TunnelID     = cloudflare_zero_trust_tunnel_cloudflared.homelab.id
+      TunnelSecret = random_password.tunnel_secret.result
+    })
+  }
+}
+
+resource "cloudflare_api_token" "external_dns" {
+  name = "homelab_external_dns"
+
+  policy {
+    permission_groups = [
+      data.cloudflare_api_token_permission_groups.all.zone["Zone Read"],
+      data.cloudflare_api_token_permission_groups.all.zone["DNS Write"]
+    ]
+    resources = {
+      "com.cloudflare.api.account.zone.*" = "*"
+    }
+  }
+}
+
+module "external_dns_secret" {
+  source    = "../k8s-secret"
+  name      = "cloudflare-api-token"
+  namespace = "external-dns"
+
+  data = {
+    "value" = cloudflare_api_token.external_dns.value
+  }
+}
+
+resource "cloudflare_api_token" "cert_manager" {
+  name = "homelab_cert_manager"
+
+  policy {
+    permission_groups = [
+      data.cloudflare_api_token_permission_groups.all.zone["Zone Read"],
+      data.cloudflare_api_token_permission_groups.all.zone["DNS Write"]
+    ]
+    resources = {
+      "com.cloudflare.api.account.zone.*" = "*"
+    }
+  }
+}
+
+module "cloudflare_api_token_secret" {
+  source    = "../k8s-secret"
+  name      = "cloudflare-api-token"
+  namespace = "cert-manager"
+
+
+  data = {
+    "api-token" = cloudflare_api_token.cert_manager.value
+  }
 }
