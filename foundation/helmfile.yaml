@@ -1,0 +1,8 @@
+helmfiles:
+  - '*/helmfile.yaml'
+helmDefaults:
+  diffArgs:
+    # Disable validation when diffing templates. Useful when you have CRDs and custom resources in the same release.
+    - "--disable-validation"
+    # Suppress secrets in diff output
+    - "--suppress-secrets"

@@ -1,0 +1,4 @@
+releases:
+  - name: kube-prometheus-stack
+    chart: .
+    disableValidationOnInstall: true

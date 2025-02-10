@@ -15,6 +15,9 @@ releases:
     needs:
       - kyverno/kyverno
     chart: incubator/raw
+    # On install, helm cannot produce a diff because it tries to render resources based on CRDs that don't exist yet.
+    # Disable diff validation during install
+    disableValidationOnInstall: false
     values:
       - resources:
           - apiVersion: v1

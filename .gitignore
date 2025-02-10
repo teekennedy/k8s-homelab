@@ -6,3 +6,6 @@
 
 # result is the output when building live isos
 result
+
+# locally generated helm charts
+*.tgz

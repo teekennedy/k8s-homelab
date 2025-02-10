@@ -1,0 +1,7 @@
+releases:
+  - name: argocd
+    namespace: argocd
+    chart: .
+    disableValidationOnInstall: true
+    values:
+      - ./values-seed.yaml
