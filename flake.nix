@@ -83,6 +83,7 @@
           # https://devenv.sh/packages/
           packages = with pkgs; [
             age
+            argocd
             deploy-rs
             helmfile
             kubectl

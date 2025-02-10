@@ -16,13 +16,19 @@ argocd-apps:
       generators:
         - git:
             repoURL: &repoURL https://github.com/teekennedy/k8s-homelab
-            revision: &revision master
+            revision: &revision main
             directories:
-              - path: system/*
-              - path: platform/*
-              - path: apps/*
+              - path: foundation/*
+              # - path: platform/*
+              # - path: apps/*
       template:
+        metadata:
+          name: '{{path.basename}}'
         spec:
+          project: default
           source:
             repoURL: *repoURL
             targetRevision: *revision
+          destination:
+            name: in-cluster
+            namespace: '{{path.basename}}'

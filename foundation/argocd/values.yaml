@@ -30,7 +30,7 @@ argocd-apps:
       generators:
         - git:
             repoURL: &repoURL http://gitea-http.gitea:3000/ops/homelab
-            revision: &revision master
+            revision: &revision main
             directories:
               - path: foundation/*
               # - path: platform/*
