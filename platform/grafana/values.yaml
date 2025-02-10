@@ -1,0 +1,32 @@
+grafana:
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - &host grafana.msng.to
+    tls:
+      - secretName: grafana-general-tls
+        hosts:
+          - *host
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: monitoring-system
+    datasources:
+      enabled: true
+      searchNamespace: monitoring-system
+  envFromSecret: grafana-secrets
+  grafana.ini:
+    server:
+      root_url: https://grafana.msng.to
+    auth.generic_oauth:
+      enabled: true
+      allow_sign_up: true
+      name: Dex
+      client_id: grafana-sso
+      client_secret: $__env{GRAFANA_SSO_CLIENT_SECRET}
+      scopes: openid profile email groups
+      auth_url: https://dex.msng.to/auth
+      token_url: https://dex.msng.to/token
+      api_url: https://dex.msng.to/userinfo

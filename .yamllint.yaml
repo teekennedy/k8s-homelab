@@ -3,7 +3,8 @@ ignore: |
   secrets.yaml
   *.enc.yaml
   *.sops.yaml
-  foundation/*/templates/*.yaml
+  foundation/**/templates/**/*.yaml
+  platform/**/templates/**/*.yaml
 extends: default
 rules:
   truthy:
