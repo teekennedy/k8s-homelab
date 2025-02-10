@@ -29,7 +29,8 @@ argocd-apps:
       namespace: argocd
       generators:
         - git:
-            repoURL: &repoURL http://gitea-http.gitea:3000/ops/homelab
+            # repoURL: &repoURL http://gitea-http.gitea:3000/ops/homelab
+            repoURL: &repoURL https://github.com/teekennedy/k8s-homelab
             revision: &revision main
             directories:
               - path: foundation/*
@@ -61,9 +62,3 @@ argocd-apps:
               - CreateNamespace=true
               - ApplyOutOfSyncOnly=true
               - ServerSideApply=true
-            managedNamespaceMetadata:
-              annotations:
-                # Enable privileged VolSync movers by default for all namespaces
-                # TODO this may be refactored in the future for finer granularity
-                # See also https://volsync.readthedocs.io/en/stable/usage/permissionmodel.html
-                volsync.backube/privileged-movers: "true"
