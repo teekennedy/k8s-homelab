@@ -73,6 +73,16 @@ releases:
         value: false
       - name: defaultSettings.defaultDataLocality
         value: best-effort
+    values:
+      - ingress:
+          enabled: true
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt-prod
+          host: longhorn.msng.to
+          path: /
+          pathType: Prefix
+          tls: true
+          tlsSecret: longhorn-tls-certificate
   - name: longhorn-storage-classes
     namespace: longhorn-system
     chart: incubator/raw
