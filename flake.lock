@@ -240,6 +240,23 @@
         "type": "github"
       }
     },
+    "lenovo_sa120_fanspeed": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1,
+        "narHash": "sha256-Olj8rvpZd800CBN8uWvDlim45kRB7OKjcAejsyRI/wE=",
+        "path": "modules/packages/lenovo_sa120_fanspeed",
+        "type": "path"
+      },
+      "original": {
+        "path": "modules/packages/lenovo_sa120_fanspeed",
+        "type": "path"
+      }
+    },
     "libgit2": {
       "flake": false,
       "locked": {
@@ -388,6 +405,7 @@
         "disko": "disko",
         "flake-parts": "flake-parts_2",
         "impermanence": "impermanence",
+        "lenovo_sa120_fanspeed": "lenovo_sa120_fanspeed",
         "nixos-facter-modules": "nixos-facter-modules",
         "nixpkgs": "nixpkgs_3",
         "nixpkgs-master": "nixpkgs-master",

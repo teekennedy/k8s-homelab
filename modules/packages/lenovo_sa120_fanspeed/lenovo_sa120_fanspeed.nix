@@ -1,8 +1,6 @@
 {
-  buildEnv,
   fetchFromGitHub,
   python3Packages,
-  sg3_utils,
   writers,
 }: let
   src = fetchFromGitHub {
@@ -13,14 +11,8 @@
   };
   script = builtins.readFile (src + "/fancontrol.py");
 in
-  buildEnv {
-    name = "lenovo-sa120-fanspeed-utility-env";
-    paths = [
-      sg3_utils
-      (writers.writePython3Bin "lenovo-sa120-fanspeed-utility" {
-          # don't run flake8 on source
-          doCheck = false;
-        }
-        script)
-    ];
+  writers.writePython3Bin "lenovo-sa120-fanspeed" {
+    # don't run flake8 on source
+    doCheck = false;
   }
+  script

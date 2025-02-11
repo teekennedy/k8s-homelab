@@ -11,7 +11,15 @@
   }: let
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
+    lenovo-sa120-fanspeed = pkgs.callPackage ./lenovo_sa120_fanspeed.nix {};
   in {
-    packages.x86_64-linux.default = pkgs.callPackage ./lenovo_sa120_fanspeed.nix {};
+    packages.${system}.lenovo-sa120-fanspeed = lenovo-sa120-fanspeed;
+    devShells.${system}.default = pkgs.mkShell {
+      name = "lenovo-sa120-fanspeed-shell";
+      buildInputs = [
+        pkgs.sg3_utils
+        lenovo-sa120-fanspeed
+      ];
+    };
   };
 }

@@ -11,6 +11,8 @@
     impermanence.url = "github:nix-community/impermanence";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
+    lenovo_sa120_fanspeed.url = "path:modules/packages/lenovo_sa120_fanspeed";
+    lenovo_sa120_fanspeed.inputs.nixpkgs.follows = "nixpkgs";
     devenv-root = {
       url = "file+file:///dev/null";
       flake = false;
@@ -195,6 +197,9 @@
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FFD004T_TPBF2404020050100710";
                 system.stateVersion = "25.05";
                 hardware.cpu.intel.updateMicrocode = true;
+                environment.systemPackages = [
+                  (inputs.lenovo_sa120_fanspeed.packages.x86_64-linux.default)
+                ];
 
                 systemd.network.networks."10-lan" = {
                   matchConfig.Name = "enp3s0f0np0";
