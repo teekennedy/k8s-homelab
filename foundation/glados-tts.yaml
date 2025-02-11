@@ -81,18 +81,21 @@ releases:
               name: glados-tts
               namespace: glados-tts
               annotations:
-                traefik.ingress.kubernetes.io/router.entrypoints: websecure
+                # traefik.ingress.kubernetes.io/router.entrypoints: websecure
+                cert-manager.io/cluster-issuer: letsencrypt-prod
             spec:
               rules:
                 - host: glados-tts.msng.to
                   http:
                     paths:
                       - path: /
-                        pathType: Exact
+                        pathType: Prefix
                         backend:
                           service:
                             name: glados-tts-service
                             port:
                               number: 8124
               tls:
-                - secretName: msng-to-tls
+                - hosts:
+                    - glados-tts.msng.to
+                  secretName: glados-tts-tls

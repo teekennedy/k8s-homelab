@@ -97,6 +97,23 @@
               runtimeInputs = [yq-go sops ssh-to-age mkpasswd];
               text = builtins.readFile ./scripts/bootstrap-host.sh;
             })
+            (pkgs.stdenv.mkDerivation {
+              name = "hacks";
+              propagatedBuildInputs = [
+                (python312.withPackages (pythonPackages:
+                  with pythonPackages; [
+                    jinja2
+                    kubernetes
+                    mkdocs-material
+                    netaddr
+                    pexpect
+                    rich
+                    kanidm
+                  ]))
+              ];
+              dontUnpack = true;
+              installPhase = "install -Dm755 ${./scripts/hacks} $out/bin/hacks";
+            })
           ];
 
           enterShell = ''
