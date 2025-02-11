@@ -20,6 +20,10 @@
     etcd # having etcdctl is helpful when you need to manage the cluster
   ];
 
+  # Increase the inotify user instance limit.
+  # The default of 128 can cause pods to fail.
+  boot.kernel.sysctl."fs.inotify.max_user_instances" = 8192;
+
   services.k3s = {
     enable = lib.mkDefault true;
     # enable secrets encryption
