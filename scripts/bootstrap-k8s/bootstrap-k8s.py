@@ -10,7 +10,6 @@ import json
 import json
 import pexpect
 import requests
-import kanidm
 import subprocess
 import sys
 

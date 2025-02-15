@@ -4,6 +4,7 @@
     btop
     tree
     neovim
+    git
   ];
   hardware.enableAllFirmware = true;
   nixpkgs.config.allowUnfree = true;
