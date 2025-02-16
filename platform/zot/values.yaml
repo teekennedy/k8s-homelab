@@ -1,6 +1,8 @@
 zot:
   ingress:
     enabled: true
+    # If left unset, this defaults to "nginx" which is maddening
+    className: traefik
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
     hosts:
