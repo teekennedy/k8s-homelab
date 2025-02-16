@@ -4,6 +4,11 @@ module "cloudflare" {
   cloudflare_email      = local.cloudflare_email
   cloudflare_api_key    = local.cloudflare_api_key
   cloudflare_account_id = local.cloudflare_account_id
+  k8s_hosts = {
+    "borg-0" = { ipv4 = "10.69.80.10" }
+    "borg-1" = { ipv4 = "10.69.80.11" }
+    "borg-2" = { ipv4 = "10.69.80.12" }
+  }
 }
 
 module "ntfy" {

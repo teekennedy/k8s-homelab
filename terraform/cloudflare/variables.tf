@@ -18,3 +18,11 @@ variable "cloudflare_account_id" {
   type        = string
   description = "Cloudflare account ID. https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids"
 }
+
+variable "k8s_hosts" {
+  type = map(object({
+    ipv4 = string,
+  }))
+  description = "Mapping of k8s hosts to IP addresses. Only IPv4 supported for now."
+  default     = {}
+}

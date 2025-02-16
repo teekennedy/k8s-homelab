@@ -25,6 +25,17 @@ resource "cloudflare_record" "tunnel" {
   ttl     = 1 # Auto
 }
 
+# static, internal only DNS records for borg hosts
+resource "cloudflare_record" "k8s_host_ipv4" {
+  for_each = var.k8s_hosts
+  zone_id  = data.cloudflare_zone.zone.id
+  type     = "A"
+  name     = each.key
+  content  = each.value.ipv4
+  proxied  = false
+  ttl      = 1 # Auto
+}
+
 module "cloudflared_credentials_secret" {
   source    = "../k8s-secret"
   name      = "cloudflared-credentials"
