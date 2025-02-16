@@ -6,8 +6,15 @@
   ...
 }: {
   networking.useNetworkd = true;
-  systemd.network.networks."99-ethernet-default-dhcp".networkConfig = {
-    UseDomains = "yes";
+  systemd.network.networks."10-ethernet-static" = {
+    matchConfig = {
+      Type = "ether";
+      Kind = "!*"; # exclude all "special" network devices, e.g. tunnel, bridge, virtual.
+    };
+    # networkConfig = {
+    #   UseDomains = "yes";
+    #   Domains = "msng.to";
+    # };
   };
   # turn off wifi
   systemd.network.networks."11-disable-wireless" = {

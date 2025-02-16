@@ -135,6 +135,11 @@
                 disko.devices.disk.main.device = "/dev/disk/by-id/ata-NT-256_2242_0006245000370";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
                 system.stateVersion = "25.05";
+                systemd.network.networks."10-ethernet-static".networkConfig = {
+                  Address = "10.69.80.10/25";
+                  Gateway = ["10.69.80.1"];
+                  DNS = ["10.69.80.1"];
+                };
                 services.k3s = {
                   role = "server";
                   # Leave true for first node in cluster
@@ -152,13 +157,10 @@
                 disko.longhornDevice = "/dev/disk/by-id/usb-ADATA_SX_8200PNP_012345678906-0:0";
                 system.stateVersion = "25.05";
 
-                systemd.network.networks."10-lan" = {
-                  matchConfig.Name = "ens9";
-                  networkConfig = {
-                    Address = "10.69.80.11/25";
-                    Gateway = ["10.69.80.1"];
-                    DNS = ["10.69.80.1"];
-                  };
+                systemd.network.networks."10-ethernet-static".networkConfig = {
+                  Address = "10.69.80.11/25";
+                  Gateway = ["10.69.80.1"];
+                  DNS = ["10.69.80.1"];
                 };
                 # Don't sleep when laptop is closed
                 services.logind.lidSwitch = "ignore";
@@ -179,19 +181,15 @@
                 disko.devices.disk.main.device = "/dev/disk/by-id/nvme-WD_BLACK_SN770_1TB_23011J801757";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FFD004T_TPBF2404020050100710";
                 system.stateVersion = "25.05";
+                systemd.network.networks."10-ethernet-static".networkConfig = {
+                  Address = "10.69.80.12/25";
+                  Gateway = ["10.69.80.1"];
+                  DNS = ["10.69.80.1"];
+                };
                 hardware.cpu.intel.updateMicrocode = true;
                 environment.systemPackages = [
                   (inputs.lenovo_sa120_fanspeed.packages.x86_64-linux.default)
                 ];
-
-                systemd.network.networks."10-lan" = {
-                  matchConfig.Name = "enp3s0f0np0";
-                  networkConfig = {
-                    Address = "10.69.80.12/25";
-                    Gateway = ["10.69.80.1"];
-                    DNS = ["10.69.80.1"];
-                  };
-                };
 
                 services.k3s = {
                   enable = true;

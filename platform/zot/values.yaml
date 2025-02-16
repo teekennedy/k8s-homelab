@@ -3,8 +3,6 @@ zot:
     enabled: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-      # nginx.ingress.kubernetes.io/proxy-body-size: "0"
-    # className: nginx
     hosts:
       - host: &host registry.msng.to
         paths:
