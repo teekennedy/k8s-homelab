@@ -11,6 +11,7 @@ organizations:
       - name: Owners
         members:
           - renovate
+          - tkennedy
 repositories:
   - name: k8s-homelab
     owner: ops
