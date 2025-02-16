@@ -43,23 +43,34 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	gitea_host := os.Getenv("GITEA_HOST")
-	gitea_user := os.Getenv("GITEA_USER")
-	gitea_password := os.Getenv("GITEA_PASSWORD")
+	giteaHost := os.Getenv("GITEA_HOST")
+	giteaUser := os.Getenv("GITEA_USER")
+	giteaPassword := os.Getenv("GITEA_PASSWORD")
 
-	options := (gitea.SetBasicAuth(gitea_user, gitea_password))
-	client, err := gitea.NewClient(gitea_host, options)
+	options := (gitea.SetBasicAuth(giteaUser, giteaPassword))
+	client, err := gitea.NewClient(giteaHost, options)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, org := range config.Organizations {
-		_, _, err = client.CreateOrg(gitea.CreateOrgOption{
-			Name:        org.Name,
-			Description: org.Description,
-		})
+		var currOrg *gitea.Organization
+		currOrg, _, err = client.GetOrg(org.Name)
 		if err != nil {
-			log.Printf("Create organization %s: %v", org.Name, err)
+			_, _, err = client.CreateOrg(gitea.CreateOrgOption{
+				Name:        org.Name,
+				Description: org.Description,
+			})
+			if err != nil {
+				log.Printf("Create organization %s: %v", org.Name, err)
+			}
+		} else if currOrg.Description != org.Description {
+			_, err = client.EditOrg(org.Name, gitea.EditOrgOption{
+				Description: org.Description,
+			})
+			if err != nil {
+				log.Printf("Edit organization %s: %v", org.Name, err)
+			}
 		}
 	}
 
