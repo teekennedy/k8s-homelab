@@ -14,6 +14,7 @@ import subprocess
 import sys
 
 from rich.console import Console
+from rich import inspect
 from kubernetes import client, config
 from kubernetes.stream import stream
 
@@ -208,6 +209,7 @@ def setup_kanidm_oauth_app(name: str, redirect_uri: str) -> None:
     )
 
 def main() -> None:
+    import pdb; pdb.set_trace()
     with Console().status("Completing the remaining sorcery"):
         gitea_access_tokens = [
             {
@@ -221,10 +223,12 @@ def main() -> None:
                 ]
             }
         ]
+        inspect(gitea_access_tokens)
 
         gitea_oauth_apps = [
             {'name': 'woodpecker', 'redirect_uri': f"https://{client.NetworkingV1Api().read_namespaced_ingress('woodpecker-server', 'woodpecker').spec.rules[0].host}/authorize"},
         ]
+        inspect(gitea_oauth_apps)
 
         kanidm_groups = [
             # TODO better group management

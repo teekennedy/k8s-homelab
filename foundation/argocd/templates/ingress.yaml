@@ -14,12 +14,13 @@ spec:
         - name: argocd-server
           port: 80
     - kind: Rule
-      match: Host(`argocd.msng.to`) && Header(`Content-Type`, `application/grpc`)
+      # k3s is using Traefik 2.x which has `Headers` func.
+      # Change to `Header` if/when upgrading to Traefik 3.x
+      # https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3-details/#router-rule-matchers
+      match: Host(`argocd.msng.to`) && Headers(`Content-Type`, `application/grpc`)
       priority: 11
       services:
         - name: argocd-server
           port: 80
           scheme: h2c
-  tls:
-    certResolver: default
 
