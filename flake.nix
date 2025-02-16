@@ -138,7 +138,6 @@
                 systemd.network.networks."10-ethernet-static".networkConfig = {
                   Address = "10.69.80.10/25";
                   Gateway = ["10.69.80.1"];
-                  DNS = ["10.69.80.1"];
                 };
                 services.k3s = {
                   role = "server";
@@ -160,7 +159,6 @@
                 systemd.network.networks."10-ethernet-static".networkConfig = {
                   Address = "10.69.80.11/25";
                   Gateway = ["10.69.80.1"];
-                  DNS = ["10.69.80.1"];
                 };
                 # Don't sleep when laptop is closed
                 services.logind.lidSwitch = "ignore";
@@ -184,7 +182,6 @@
                 systemd.network.networks."10-ethernet-static".networkConfig = {
                   Address = "10.69.80.12/25";
                   Gateway = ["10.69.80.1"];
-                  DNS = ["10.69.80.1"];
                 };
                 hardware.cpu.intel.updateMicrocode = true;
                 environment.systemPackages = [

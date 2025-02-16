@@ -9,6 +9,7 @@
     6443 # k3s: required so that pods can reach the API server (running on port 6443 by default)
     2379 # k3s, etcd clients: required if using a "High Availability Embedded etcd" configuration
     2380 # k3s, etcd peers: required if using a "High Availability Embedded etcd" configuration
+    9100 # prometheus node exporter
     10250 # Kubelet metrics
   ];
   networking.firewall.allowedUDPPorts = [
@@ -26,10 +27,15 @@
 
   services.k3s = {
     enable = lib.mkDefault true;
-    # enable secrets encryption
-    # This _must_ be enabled when cluster is first initialized. It cannot be enabled later.
-    # https://docs.k3s.io/cli/secrets-encrypt
-    extraFlags = ["--secrets-encryption"];
+    extraFlags = [
+      # enable secrets encryption
+      # This _must_ be enabled when cluster is first initialized. It cannot be enabled later.
+      # https://docs.k3s.io/cli/secrets-encrypt
+      "--secrets-encryption"
+      # Tell k3s to use systemd-resolved's generated resolv.conf file
+      "--resolv-conf"
+      "/run/systemd/resolve/resolv.conf"
+    ];
     tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
   };
 
