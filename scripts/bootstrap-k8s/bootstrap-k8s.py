@@ -114,6 +114,10 @@ def setup_gitea_oauth_app(name: str, redirect_uri: str) -> None:
             print(resp.content)
             sys.exit(1)
 
+def subprocess_run(cli_args, *args, **kwargs):
+    print(f"Running #{cli_args.join(" ")}")
+    return subprocess.run(cli_args, *args, **kwargs)
+
 def setup_gitea_auth_with_dex():
     gitea_pod = client.CoreV1Api().list_namespaced_pod(namespace='gitea', label_selector='app=gitea').items[0].metadata.name
     client_secret = base64.b64decode(
@@ -164,14 +168,14 @@ def kanidm_login(accounts: list[str]) -> None:
         cli_login.read()
 
 def setup_kanidm_group(name: str) -> None:
-    subprocess.run(
+    subprocess_run(
         ["kanidm", "group", "create", "--url", f"https://{kanidm_host}", "--name", "idm_admin", name],
         capture_output=True,
     )
 
 def setup_kanidm_oauth_app(name: str, redirect_uri: str) -> None:
     try:
-        subprocess.run(
+        subprocess_run(
             ["kanidm", "system", "oauth2", "create", "--url", f"https://{kanidm_host}", "--name", "idm_admin", name, name, redirect_uri],
             capture_output=True,
             check=True,
@@ -180,20 +184,20 @@ def setup_kanidm_oauth_app(name: str, redirect_uri: str) -> None:
         return
 
     # TODO https://github.com/dexidp/dex/pull/3188
-    subprocess.run(
+    subprocess_run(
         ["kanidm", "system", "oauth2", "warning-insecure-client-disable-pkce", "--url", f"https://{kanidm_host}", "--name", "idm_admin", name],
         capture_output=True,
         check=True,
     )
 
-    subprocess.run(
+    subprocess_run(
         # TODO better group management
         ["kanidm", "system", "oauth2", "create-scope-map", "--url", f"https://{kanidm_host}", "--name", "idm_admin", name, "editor", "openid", "profile", "email", "groups"],
         capture_output=True,
         check=True,
     )
 
-    client_secret = json.loads(subprocess.run(
+    client_secret = json.loads(subprocess_run(
         ["kanidm", "system", "oauth2", "show-basic-secret", "--url", f"https://{kanidm_host}", "--name", "idm_admin", "--output", "json", name],
         capture_output=True,
         check=True,
@@ -209,7 +213,6 @@ def setup_kanidm_oauth_app(name: str, redirect_uri: str) -> None:
     )
 
 def main() -> None:
-    import pdb; pdb.set_trace()
     with Console().status("Completing the remaining sorcery"):
         gitea_access_tokens = [
             {
