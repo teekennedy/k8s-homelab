@@ -14,10 +14,6 @@
       Type = "ether";
       Kind = "!*"; # exclude all "special" network devices, e.g. tunnel, bridge, virtual.
     };
-    # networkConfig = {
-    #   UseDomains = "yes";
-    #   Domains = "msng.to";
-    # };
   };
   # turn off wifi
   systemd.network.networks."11-disable-wireless" = {
