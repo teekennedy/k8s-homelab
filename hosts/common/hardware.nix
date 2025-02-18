@@ -8,7 +8,7 @@
   networking.useNetworkd = true;
   # sets static nameservers directly in /etc/systemd/resolved.conf.
   # This avoids having duplicate entries gathered from network devices.
-  networking.nameservers = ["10.69.0.1"];
+  networking.nameservers = ["10.69.80.1"];
   systemd.network.networks."10-ethernet-static" = {
     matchConfig = {
       Type = "ether";

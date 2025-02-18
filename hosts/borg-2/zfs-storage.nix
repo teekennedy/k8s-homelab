@@ -125,7 +125,7 @@
             type = "zfs_fs";
           };
         };
-        # Without zfs optoin mountpoint = legacy,
+        # Without zfs option mountpoint = legacy,
         # both zfs and systemd try to mount the pool during startup.
         # The legacy option tells zfs not to mount automatically.
         # https://github.com/nix-community/disko/issues/581

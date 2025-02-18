@@ -1,10 +1,12 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    file
     btop
-    tree
-    neovim
+    dig
+    file
     git
+    jq
+    neovim
+    tree
   ];
   hardware.enableAllFirmware = true;
   nixpkgs.config.allowUnfree = true;

@@ -45,6 +45,10 @@
       # k3s sqlite datastore
       "/var/lib/rancher/k3s/server/db"
     ];
+    # File permissions don't need to be configured directly.
+    # If the file's parent directory doesn't match the default directory perms above,
+    # that can be configured.
+    # See https://github.com/nix-community/impermanence?tab=readme-ov-file#nixos
     files = [
       # machine-id used by systemd
       "/etc/machine-id"
