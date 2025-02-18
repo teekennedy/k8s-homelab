@@ -44,6 +44,8 @@
       "/var/lib/nixos"
       # k3s sqlite datastore
       "/var/lib/rancher/k3s/server/db"
+      # kerberos data
+      "/var/lib/krb5kdc"
     ];
     # File permissions don't need to be configured directly.
     # If the file's parent directory doesn't match the default directory perms above,
@@ -55,6 +57,8 @@
       # ssh host keys
       "/etc/ssh/ssh_host_ed25519_key"
       "/etc/ssh/ssh_host_ed25519_key.pub"
+      # kerberos keytab(le) file
+      "/etc/krb5.keytab"
     ];
   };
 
