@@ -1,0 +1,2 @@
+# purposely left empty
+# defaults: https://github.com/kubernetes-csi/csi-driver-smb/blob/master/charts/v1.17.0/csi-driver-smb/values.yaml

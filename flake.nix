@@ -175,6 +175,7 @@
             hostname = "borg-2";
             system = "x86_64-linux";
             modules = [
+              ./modules/samba/server.nix
               ({lib, ...}: {
                 disko.devices.disk.main.device = "/dev/disk/by-id/nvme-WD_BLACK_SN770_1TB_23011J801757";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FFD004T_TPBF2404020050100710";
