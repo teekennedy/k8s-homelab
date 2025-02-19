@@ -24,18 +24,31 @@
         writable = "yes";
         # public = no is the default, but it's good to be explicit
         public = "no";
-        "valid users" = "smb-k8s";
+        "valid users" = "@smb-k8s";
       };
     };
   };
   # Create samba users and groups
   users = {
-    users.smb-k8s = {
-      description = "Samba user for k8s volume storage";
-      isSystemUser = true;
-      uid = 1208;
-      group = config.users.groups.smb-k8s.name;
-    };
+    users =
+      {
+        smb-k8s = {
+          description = "Samba mount user for k8s volume storage";
+          isSystemUser = true;
+          uid = 1200;
+          group = config.users.groups.smb-k8s.name;
+        };
+      }
+      // (builtins.listToAttrs (builtins.map (i: {
+          name = "smb-k8s-${toString i}";
+          value = {
+            description = "Samba user ${toString i} for k8s volume storage";
+            isSystemUser = true;
+            uid = 1208 + i;
+            group = config.users.groups.smb-k8s.name;
+          };
+        })
+        [0 1 2 3 4 5 6 7]));
     groups.smb-k8s = {
       gid = 1208;
     };

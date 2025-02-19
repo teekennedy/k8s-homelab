@@ -44,10 +44,10 @@ echo "You will be asked for the same password three times"
 ssh "$ssh_url" sudo smbpasswd -a smb-k8s
 
 echo "Setting up namespace and secret"
-kubectl create namespace csi-provisioner-smb
+kubectl create namespace csi-driver-smb
 
 # Read Password
 echo -n Password for smb-k8s:
 read -rs password
 echo
-kubectl -n csi-provisioner-smb create secret generic smbcreds --from-literal=username=smb-k8s "--from-literal=password=$password"
+kubectl -n csi-driver-smb create secret generic smbcreds --from-literal=username=smb-k8s "--from-literal=password=$password"

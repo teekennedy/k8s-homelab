@@ -42,7 +42,7 @@ argocd-apps:
             directories:
               - path: foundation/*
               - path: platform/*
-              # - path: apps/*
+              - path: apps/*
       template:
         metadata:
           name: '{{path.basename}}'
