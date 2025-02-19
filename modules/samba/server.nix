@@ -30,27 +30,16 @@
   };
   # Create samba users and groups
   users = {
-    users =
-      {
-        smb-k8s = {
-          description = "Samba mount user for k8s volume storage";
-          isSystemUser = true;
-          uid = 1200;
-          group = config.users.groups.smb-k8s.name;
-        };
-      }
-      // (builtins.listToAttrs (builtins.map (i: {
-          name = "smb-k8s-${toString i}";
-          value = {
-            description = "Samba user ${toString i} for k8s volume storage";
-            isSystemUser = true;
-            uid = 1208 + i;
-            group = config.users.groups.smb-k8s.name;
-          };
-        })
-        [0 1 2 3 4 5 6 7]));
+    users = {
+      smb-k8s = {
+        description = "Samba mount user for k8s volume storage";
+        isSystemUser = true;
+        uid = 1200;
+        group = config.users.groups.smb-k8s.name;
+      };
+    };
     groups.smb-k8s = {
-      gid = 1208;
+      gid = 1200;
     };
   };
   # open the ports used for netbios-less samba share

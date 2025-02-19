@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/refs/heads/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+# yaml-language-server: $schema= https://raw.githubusercontent.com/bjw-s/helm-charts/refs/heads/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
 app-template:
   defaultPodOptions:
     automountServiceAccountToken: false
@@ -11,19 +11,6 @@ app-template:
         dnsConfig:
           nameservers:
             - 127.0.0.1
-      initContainers:
-        # Containers were not working with ipv6 enabled so..
-        ipv6-disabler:
-          args:
-            - -w
-            - net.ipv6.conf.all.disable_ipv6=1
-          command:
-            - /bin/sysctl
-          image:
-            repository: docker.io/busybox
-            tag: "1.37"
-          securityContext:
-            privileged: true
       containers:
         jellyfin:
           image:
@@ -31,8 +18,8 @@ app-template:
             tag: 10.10.6
           env:
             TZ: America/Denver
-            PUID: '1208'
-            PGID: "1208"
+            PUID: '1200'
+            PGID: "1200"
         # https://docs.linuxserver.io/images/docker-qbittorrent/
         qbittorrent:
           image:
@@ -40,16 +27,16 @@ app-template:
             tag: 5.0.3-r0-ls380
           env:
             TZ: America/Denver
-            PUID: "1209"
-            PGID: "1208"
+            PUID: "1200"
+            PGID: "1200"
         gluetun:
           image:
             repository: docker.io/qmcgaw/gluetun
             tag: v3.40.0
           env:
             TZ: America/Denver
-            PUID: "1210"
-            PGID: "1208"
+            PUID: "1200"
+            PGID: "1200"
             VPN_SERVICE_PROVIDER: protonvpn
             # create secret with kubectl -n jellyfin create secret generic gluetun --from-literal=WIREGUARD_PRIVATE_KEY=$(pbpaste)
             # Wireguard not working with port forwarding for now
@@ -94,8 +81,8 @@ app-template:
             tag: 5.18.4.9674-ls260
           env:
             TZ: America/Denver
-            PUID: "1212"
-            PGID: "1208"
+            PUID: "1200"
+            PGID: "1200"
         # https://docs.linuxserver.io/images/docker-sonarr/
         sonarr:
           image:
@@ -103,16 +90,16 @@ app-template:
             tag: 4.0.13.2932-ls271
           env:
             TZ: America/Denver
-            PUID: "1213"
-            PGID: "1208"
+            PUID: "1200"
+            PGID: "1200"
         jellyseerr:
           image:
             repository: docker.io/fallenbagel/jellyseerr
             tag: 2.3.0
           env:
             TZ: America/Denver
-            PUID: "1214"
-            PGID: "1208"
+            PUID: "1200"
+            PGID: "1200"
   service:
     main:
       controller: main

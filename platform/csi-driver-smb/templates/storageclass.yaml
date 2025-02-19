@@ -15,8 +15,9 @@ parameters:
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 mountOptions:
-  # - uid=1208 # force uid and gid in case we're mounting a windows fileshare
-  # - gid=1208
+   # uid/gid that owns all files or directories on the mount when the server doesn't provide ownership information
+  - uid=1200
+  - gid=1200
   - mfsymlinks # use text-based symlinks
   - cache=strict
   - noserverino  # required to prevent data corruption
