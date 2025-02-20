@@ -208,7 +208,7 @@ app-template:
     config:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
-      size: 500Mi
+      size: 5Gi
       advancedMounts:
         main:
           jellyfin:
