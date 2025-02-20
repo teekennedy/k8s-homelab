@@ -1,3 +1,15 @@
+# Create this secret manually - argocd is clobbering it
+# ---
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: configarr
+#   namespace: {{ .Release.Namespace }}
+# type: Opaque
+# stringData:
+#   secrets.yml: |
+#     SONARR_API_KEY: "your-sonarr-api-key-here"
+#     RADARR_API_KEY: "your-radarr-api-key-here"
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -17,6 +29,9 @@ spec:
               image: ghcr.io/raydak-labs/configarr:1.12.1
               imagePullPolicy: IfNotPresent
               tty: true # for color support
+              env:
+                - name: LOG_STACKTRACE
+                  value: "true"
               volumeMounts:
                 - mountPath: /app/repos # Cache repositories
                   name: config
@@ -40,17 +55,6 @@ spec:
           restartPolicy: Never
 ---
 apiVersion: v1
-kind: Secret
-metadata:
-  name: configarr
-  namespace: {{ .Release.Namespace }}
-type: Opaque
-stringData:
-  secrets.yml: |
-    SONARR_API_KEY: "your-sonarr-api-key-here"
-    RADARR_API_KEY: "your-radarr-api-key-here"
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: configarr
@@ -70,7 +74,7 @@ data:
     # Sonarr Configuration
     sonarr:
       shows:
-        base_url: http://localhost:8989 # Sonarr instance URL
+        base_url: http://jellyfin:8989 # Sonarr instance URL
         api_key: !secret SONARR_API_KEY # Reference to API key in secrets.yml
 
         quality_definition:
@@ -89,7 +93,7 @@ data:
     # Radarr Configuration
     radarr:
       movies: # Instance name (can be any unique identifier)
-        base_url: http://localhost:7878 # Radarr instance URL
+        base_url: http://jellyfin:7878 # Radarr instance URL
         api_key: !secret RADARR_API_KEY # Reference to API key in secrets.yml
 
         quality_definition:
