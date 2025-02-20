@@ -186,7 +186,7 @@ app-template:
     data:
       accessMode: ReadWriteMany
       type: persistentVolumeClaim
-      size: 10Ti
+      size: 50Ti
       storageClass: smb
       advancedMounts:
         main:

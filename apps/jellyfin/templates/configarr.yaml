@@ -113,7 +113,7 @@ data:
         # https://github.com/TRaSH-Guides/Guides/tree/master/docs/json/sonarr/cf
         custom_formats:
           - trash_ids:
-              - 32b367365729d530ca1c124a0b180c64
+              - 32b367365729d530ca1c124a0b180c64 # Bad Dual Groups
             assign_scores_to:
               - name: WEB-1080p
               - name: WEB-1080p (Flexible)
@@ -153,6 +153,14 @@ data:
             source: TRASH
           - template: fd161a61e3ab826d3a22d53f935696dd # remux web 2160p
             source: TRASH
+
+        custom_formats:
+          - trash_ids:
+              - b6832f586342ef70d9c128d40c07b872 # Bad Dual Groups
+            assign_scores_to:
+              - name: Remux + WEB 1080p
+              - name: Remux + WEB 2160p
+              - name: HD Bluray + WEB
 
     # experimental support: check https://configarr.rayak.de/docs/configuration/experimental-support
     whisparr: {}
