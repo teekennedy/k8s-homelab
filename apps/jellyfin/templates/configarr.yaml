@@ -17,7 +17,7 @@ metadata:
   name: configarr
   namespace: {{ .Release.Namespace }}
 spec:
-  schedule: "0 * * * *" # Runs every hour
+  schedule: "0 */8 * * *" # Runs every 8 hours
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
   jobTemplate:
@@ -74,26 +74,58 @@ data:
     # Sonarr Configuration
     sonarr:
       shows:
-        base_url: http://jellyfin:8989 # Sonarr instance URL
+        base_url: http://jellyfin-main:8989 # Sonarr instance URL
         api_key: !secret SONARR_API_KEY # Reference to API key in secrets.yml
 
         quality_definition:
           type: series # Quality definition type for Sonarr
 
-        include: # Template includes
-          # WEB-1080p (recyclarr template)
-          - template: sonarr-quality-definition-series
-          - template: sonarr-v4-quality-profile-web-1080p
-          - template: sonarr-v4-custom-formats-web-1080p
+        # delete_unmanaged_custom_formats:
+        #   enabled: true
+        #   ignore: # optional
+        #     - some-cf
 
-          # WEB-2160p
-          - template: sonarr-v4-quality-profile-web-2160p
-          - template: sonarr-v4-custom-formats-web-2160p
+        # Media Naming Configuration
+        # https://github.com/TRaSH-Guides/Guides/blob/master/docs/json/sonarr/naming/sonarr-naming.json
+        media_naming:
+          series: jellyfin-tvdb
+          season: default
+          episodes:
+            rename: true
+            standard: default
+            daily: default
+            anime: default
+
+        include: # Template includes
+          # Quality Profiles
+          # https://github.com/TRaSH-Guides/Guides/tree/master/docs/json/sonarr/quality-profiles
+          - template: 72dae194fc92bf828f32cde7744e51a1 # Web 1080p
+            source: TRASH
+          - template: 9d142234e45d6143785ac55f5a9e8dc9 # Web 1080p alternative (what I'd call "flexible")
+            source: TRASH
+
+        # Delete everything not managed by configarr
+        delete_unmanaged_custom_formats:
+          enabled: true
+          # ignore: # optional
+          #   - some-cf
+
+        # https://github.com/TRaSH-Guides/Guides/tree/master/docs/json/sonarr/cf
+        custom_formats:
+          - trash_ids:
+              - 32b367365729d530ca1c124a0b180c64
+            assign_scores_to:
+              - name: WEB-1080p
+              - name: WEB-1080p (Flexible)
+
+        renameQualityProfiles:
+          - from: WEB-1080p (Alternative)
+            to: WEB-1080p (Flexible)
 
     # Radarr Configuration
     radarr:
       movies: # Instance name (can be any unique identifier)
-        base_url: http://jellyfin:7878 # Radarr instance URL
+        base_url: http://jellyfin-main:7878 # Radarr instance URL
         api_key: !secret RADARR_API_KEY # Reference to API key in secrets.yml
 
         quality_definition:

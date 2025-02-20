@@ -4,13 +4,6 @@ app-template:
     automountServiceAccountToken: false
   controllers:
     main:
-      pod:
-        securityContext:
-          fsGroupChangePolicy: "OnRootMismatch"
-        dnsPolicy: "None"
-        dnsConfig:
-          nameservers:
-            - 127.0.0.1
       containers:
         jellyfin:
           image:
@@ -20,6 +13,46 @@ app-template:
             TZ: America/Denver
             PUID: '1200'
             PGID: "1200"
+        # https://docs.linuxserver.io/images/docker-prowlarr/
+        prowlarr:
+          image:
+            repository: lscr.io/linuxserver/prowlarr
+            tag: 1.30.2.4939-ls105
+          env:
+            TZ: America/Denver
+        # https://docs.linuxserver.io/images/docker-radarr/
+        radarr:
+          image:
+            repository: lscr.io/linuxserver/radarr
+            tag: 5.18.4.9674-ls260
+          env:
+            TZ: America/Denver
+            PUID: "1200"
+            PGID: "1200"
+        # https://docs.linuxserver.io/images/docker-sonarr/
+        sonarr:
+          image:
+            repository: lscr.io/linuxserver/sonarr
+            tag: 4.0.13.2932-ls271
+          env:
+            TZ: America/Denver
+            PUID: "1200"
+            PGID: "1200"
+        jellyseerr:
+          image:
+            repository: docker.io/fallenbagel/jellyseerr
+            tag: 2.3.0
+          env:
+            TZ: America/Denver
+            PUID: "1200"
+            PGID: "1200"
+    downloader:
+      pod:
+        dnsPolicy: "None"
+        dnsConfig:
+          nameservers:
+            - 127.0.0.1
+      containers:
         # https://docs.linuxserver.io/images/docker-qbittorrent/
         qbittorrent:
           image:
@@ -67,48 +100,12 @@ app-template:
             capabilities:
               add:
                 - NET_ADMIN
-        # https://docs.linuxserver.io/images/docker-prowlarr/
-        prowlarr:
-          image:
-            repository: lscr.io/linuxserver/prowlarr
-            tag: 1.30.2.4939-ls105
-          env:
-            TZ: America/Denver
-        # https://docs.linuxserver.io/images/docker-radarr/
-        radarr:
-          image:
-            repository: lscr.io/linuxserver/radarr
-            tag: 5.18.4.9674-ls260
-          env:
-            TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
-        # https://docs.linuxserver.io/images/docker-sonarr/
-        sonarr:
-          image:
-            repository: lscr.io/linuxserver/sonarr
-            tag: 4.0.13.2932-ls271
-          env:
-            TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
-        jellyseerr:
-          image:
-            repository: docker.io/fallenbagel/jellyseerr
-            tag: 2.3.0
-          env:
-            TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
   service:
     main:
       controller: main
       ports:
         http:
           port: 8096
-          protocol: HTTP
-        qbittorrent:
-          port: 8080
           protocol: HTTP
         prowlarr:
           port: 9696
@@ -121,6 +118,12 @@ app-template:
           protocol: HTTP
         jellyseerr:
           port: 5055
+          protocol: HTTP
+    downloader:
+      controller: downloader
+      ports:
+        qbittorrent:
+          port: 8080
           protocol: HTTP
   ingress:
     main:
@@ -140,7 +143,7 @@ app-template:
             - path: /
               pathType: Prefix
               service:
-                identifier: main
+                identifier: downloader
                 port: qbittorrent
         - host: &prowlarrHost prowlarr.msng.to
           paths:
@@ -192,9 +195,6 @@ app-template:
               subPath: movies
             - path: /media/shows
               subPath: shows
-          qbittorrent:
-            - path: /downloads
-              subPath: qbittorrent/downloads
           radarr:
             - path: /downloads/complete
               subPath: qbittorrent/downloads/complete
@@ -205,6 +205,10 @@ app-template:
               subPath: qbittorrent/downloads/complete
             - path: /shows
               subPath: shows
+        downloader:
+          qbittorrent:
+            - path: /downloads
+              subPath: qbittorrent/downloads
     config:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -214,9 +218,6 @@ app-template:
           jellyfin:
             - path: /config
               subPath: jellyfin/config
-          qbittorrent:
-            - path: /config
-              subPath: qbittorrent/config
           prowlarr:
             - path: /config
               subPath: prowlarr/config
@@ -229,3 +230,7 @@ app-template:
           jellyseerr:
             - path: /app/config
               subPath: jellyseerr/config
+        downloader:
+          qbittorrent:
+            - path: /config
+              subPath: qbittorrent/config
