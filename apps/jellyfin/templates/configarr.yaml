@@ -17,12 +17,9 @@ spec:
               image: ghcr.io/raydak-labs/configarr:1.12.1
               imagePullPolicy: IfNotPresent
               tty: true # for color support
-              envFrom:
-                - configMapRef:
-                    name: common-deployment-environment
               volumeMounts:
                 - mountPath: /app/repos # Cache repositories
-                  name: app-data
+                  name: config
                   subPath: configarr-repos
                 - name: config-volume # Mount specific config
                   mountPath: /app/config/config.yml
@@ -31,9 +28,9 @@ spec:
                   mountPath: /app/config/secrets.yml # Mount secrets
                   subPath: secrets.yml
           volumes:
-            - name: app-data
+            - name: config
               persistentVolumeClaim:
-                claimName: media-app-data
+                claimName: "{{ .Release.Name }}-config"
             - name: config-volume
               configMap:
                 name: configarr
