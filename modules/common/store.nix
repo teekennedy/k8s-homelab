@@ -1,10 +1,5 @@
 # Nix store related options
-{
-  config,
-  inputs,
-  lib,
-  ...
-}: {
+{...}: {
   nix.gc = {
     automatic = true;
     dates = "weekly";

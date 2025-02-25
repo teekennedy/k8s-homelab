@@ -1,10 +1,5 @@
 # Settings normally found in hardware-configuration.nix that are common between hosts.
-{
-  config,
-  pkgs,
-  lib,
-  ...
-}: {
+{...}: {
   networking.useNetworkd = true;
   # sets static nameservers directly in /etc/systemd/resolved.conf.
   # This avoids having duplicate entries gathered from network devices.

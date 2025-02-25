@@ -1,9 +1,4 @@
-{
-  config,
-  inputs,
-  pkgs,
-  ...
-}: {
+{...}: {
   imports = [
     ./disko.nix
     ./impermanence.nix

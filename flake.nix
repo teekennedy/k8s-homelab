@@ -41,8 +41,6 @@
       systems = ["aarch64-darwin" "x86_64-linux"];
       perSystem = {
         config,
-        self',
-        inputs',
         pkgs,
         lib,
         system,
@@ -52,7 +50,7 @@
           inherit system;
 
           overlays = [
-            (final: prev: rec {
+            (_: prev: rec {
               kubernetes-helm = prev.wrapHelm prev.kubernetes-helm {
                 plugins = with prev.kubernetes-helmPlugins; [
                   helm-secrets
@@ -113,7 +111,15 @@
           # https://devenv.sh/pre-commit-hooks/
           pre-commit.hooks = {
             # Nix code formatter
-            alejandra.enable = true;
+            alejandra = {
+              enable = true;
+              after = ["deadnix"];
+            };
+            # Removes nix dead code
+            deadnix = {
+              enable = true;
+              args = ["--edit"];
+            };
             # Terraform code formatter
             terraform-format.enable = true;
             # YAML linter
@@ -131,7 +137,7 @@
             hostname = "borg-0";
             system = "x86_64-linux";
             modules = [
-              ({config, ...}: {
+              ({...}: {
                 disko.devices.disk.main.device = "/dev/disk/by-id/ata-NT-256_2242_0006245000370";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
                 system.stateVersion = "25.05";
@@ -151,7 +157,7 @@
             hostname = "borg-1";
             system = "x86_64-linux";
             modules = [
-              ({lib, ...}: {
+              ({...}: {
                 disko.devices.disk.main.device = "/dev/disk/by-id/nvme-Aura_Pro_X2_OW23012314C43991F";
                 disko.longhornDevice = "/dev/disk/by-id/usb-ADATA_SX_8200PNP_012345678906-0:0";
                 system.stateVersion = "25.05";
@@ -176,7 +182,7 @@
             system = "x86_64-linux";
             modules = [
               ./modules/samba/server.nix
-              ({lib, ...}: {
+              ({...}: {
                 disko.devices.disk.main.device = "/dev/disk/by-id/nvme-WD_BLACK_SN770_1TB_23011J801757";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FFD004T_TPBF2404020050100710";
                 system.stateVersion = "25.05";
@@ -200,7 +206,7 @@
         ];
       in {
         # enable magic rollback and other checks
-        checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
+        checks = builtins.mapAttrs (_: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
         deploy.nodes = builtins.listToAttrs (builtins.map (host: {
             name = host.hostname;
             value = {
@@ -274,7 +280,6 @@
                 ({
                   lib,
                   pkgs,
-                  config,
                   ...
                 }: {
                   users.users.root.openssh.authorizedKeys.keyFiles = builtins.map (s: ./modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./modules/users/authorized_keys));

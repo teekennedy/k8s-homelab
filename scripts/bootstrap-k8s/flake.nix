@@ -10,14 +10,7 @@
     flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [];
       systems = ["x86_64-linux" "aarch64-linux"];
-      perSystem = {
-        config,
-        self',
-        inputs',
-        pkgs,
-        system,
-        ...
-      }: let
+      perSystem = {pkgs, ...}: let
         bootstrap-k8s-script = pkgs.stdenv.mkDerivation {
           name = "bootstrap-k8s";
           propagatedBuildInputs = [

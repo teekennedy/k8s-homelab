@@ -6,6 +6,7 @@
     git
     jq
     neovim
+    smartmontools
     tree
   ];
   hardware.enableAllFirmware = true;

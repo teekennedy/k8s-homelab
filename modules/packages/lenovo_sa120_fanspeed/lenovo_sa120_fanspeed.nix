@@ -1,6 +1,5 @@
 {
   fetchFromGitHub,
-  python3Packages,
   writers,
 }: let
   src = fetchFromGitHub {
