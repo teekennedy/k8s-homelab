@@ -4,7 +4,6 @@ app-template:
     automountServiceAccountToken: false
   controllers:
     main:
-      replicas: 0
       containers:
         jellyfin:
           image:
@@ -48,7 +47,6 @@ app-template:
             PUID: "1200"
             PGID: "1200"
     downloader:
-      replicas: 0
       pod:
         dnsPolicy: "None"
         dnsConfig:
