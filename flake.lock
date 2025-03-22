@@ -247,14 +247,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-Olj8rvpZd800CBN8uWvDlim45kRB7OKjcAejsyRI/wE=",
-        "path": "modules/packages/lenovo_sa120_fanspeed",
-        "type": "path"
+        "dir": "modules/packages/lenovo_sa120_fanspeed",
+        "dirtyRev": "e3fc9e132f588167132fd987c52eaf0c8c5fc0a7-dirty",
+        "dirtyShortRev": "e3fc9e1-dirty",
+        "lastModified": 1742601853,
+        "narHash": "sha256-sqnLF6d/wzkYUG/bE7ZX5osCh3BdLyDMJHhMOQL5gkE=",
+        "type": "git",
+        "url": "file:."
       },
       "original": {
-        "path": "modules/packages/lenovo_sa120_fanspeed",
-        "type": "path"
+        "dir": "modules/packages/lenovo_sa120_fanspeed",
+        "type": "git",
+        "url": "file:."
       }
     },
     "libgit2": {
@@ -308,15 +312,15 @@
     },
     "nixos-facter-modules": {
       "locked": {
-        "lastModified": 1736931726,
-        "narHash": "sha256-aY55yiifyo1XPPpbpH0kWlV1g2dNGBlx6622b7OK8ks=",
-        "owner": "numtide",
+        "lastModified": 1738752252,
+        "narHash": "sha256-/nA3tDdp/2g0FBy8966ppC2WDoyXtUWaHkZWL+N3ZKc=",
+        "owner": "nix-community",
         "repo": "nixos-facter-modules",
-        "rev": "fa11d87b61b2163efbb9aed7b7a5ae0299e5ab9c",
+        "rev": "60f8b8f3f99667de6a493a44375e5506bf0c48b1",
         "type": "github"
       },
       "original": {
-        "owner": "numtide",
+        "owner": "nix-community",
         "repo": "nixos-facter-modules",
         "type": "github"
       }

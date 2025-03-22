@@ -3,7 +3,7 @@
   inputs = {
     deploy-rs.url = "github:serokell/deploy-rs";
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
-    nixos-facter-modules.url = "github:numtide/nixos-facter-modules";
+    nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     disko.url = "github:nix-community/disko";
@@ -11,7 +11,7 @@
     impermanence.url = "github:nix-community/impermanence";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
-    lenovo_sa120_fanspeed.url = "path:modules/packages/lenovo_sa120_fanspeed";
+    lenovo_sa120_fanspeed.url = "git+file:.?dir=modules/packages/lenovo_sa120_fanspeed";
     lenovo_sa120_fanspeed.inputs.nixpkgs.follows = "nixpkgs";
     devenv-root = {
       url = "file+file:///dev/null";
