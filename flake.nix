@@ -5,7 +5,7 @@
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
+    nixpkgs-etcd-server.url = "github:dtomvan/nixpkgs/8c3af1b67166056d33dece63f595fc947b7c82a4";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence";
@@ -63,9 +63,9 @@
               helmfile = prev.helmfile-wrapped.override {
                 inherit (kubernetes-helm) pluginsDir;
               };
-              # Use k3s release with graceful shutdown patches from nixpkgs master branch
-              # https://github.com/NixOS/nixpkgs/issues/255783
-              k3s = inputs.nixpkgs-master.pkgs.k3s;
+              # etcd 3.5.16 is broken on nixpkgs-unstable due to flaky tests
+              # Overlay with feature branch from in-progress PR that fixes it https://github.com/NixOS/nixpkgs/pull/390981
+              etcd = (import inputs.nixpkgs-etcd-server {inherit system;}).etcd;
             })
           ];
         };
@@ -227,10 +227,6 @@
                 system = host.system;
                 specialArgs = {
                   inherit inputs;
-                  nixpkgs-master = import inputs.nixpkgs-master {
-                    system = host.system;
-                    overlays = [];
-                  };
                 };
                 modules =
                   [
@@ -242,6 +238,13 @@
                     inputs.nixos-facter-modules.nixosModules.facter
                     {
                       defaultUsername = "tkennedy";
+                      nixpkgs.overlays = [
+                        (_: _: rec {
+                          # etcd 3.5.16 is broken on nixpkgs-unstable due to flaky tests
+                          # Overlay with feature branch from in-progress PR that fixes it https://github.com/NixOS/nixpkgs/pull/390981
+                          etcd = (import inputs.nixpkgs-etcd-server {system = host.system;}).etcd;
+                        })
+                      ];
                       networking.hostName = host.hostname;
                       # Pin nixpkgs to flake input
                       nix.registry.nixpkgs.flake = inputs.nixpkgs;

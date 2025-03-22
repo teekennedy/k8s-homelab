@@ -72,7 +72,7 @@
       tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
     };
 
-    environment.etc."/etc/rancher/k3s/registries.yaml" = {
+    environment.etc."rancher/k3s/registries.yaml" = {
       text = config.services.k3s.embeddedRegistry.config;
       enable = config.services.k3s.embeddedRegistry.enable;
     };
