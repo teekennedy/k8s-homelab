@@ -66,8 +66,10 @@
     directories = [
       # containerd default metadata dir
       "/var/lib/containerd"
-      # k3s data dir
+      # k3s data dirs
       "/var/lib/rancher/k3s"
+      "/var/lib/cni"
+      "/var/lib/kubelet"
       # logs
       "/var/log"
       # core dumps

@@ -11,7 +11,7 @@
     impermanence.url = "github:nix-community/impermanence";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
-    lenovo_sa120_fanspeed.url = "git+file:.?dir=modules/packages/lenovo_sa120_fanspeed";
+    lenovo_sa120_fanspeed.url = "git+file:./?dir=modules/packages/lenovo_sa120_fanspeed";
     lenovo_sa120_fanspeed.inputs.nixpkgs.follows = "nixpkgs";
     devenv-root = {
       url = "file+file:///dev/null";
@@ -86,6 +86,7 @@
             argocd
             deploy-rs
             helmfile
+            k9s
             kubectl
             kubernetes-helm
             kustomize

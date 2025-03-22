@@ -56,22 +56,47 @@ hosts:
     ip_address: unknown
     dhcp: true
     vlan: rain_machine
+  replicator:
+    hostname: ""
+    mac_address: 50:41:1c:fb:7b:86
+    ip_address: unknown
+    dhcp: true
+    vlan: 3d-printer
+  solar-inverter:
+    hostname: envoy
+    mac_address: 28:ec:9a:7c:7a:1c
+    ip_address: 10.69.100.166
+    dhcp: true
+    vlan: xcel
+    notes: DHCP reserved IP. Firewall settings can be found here https://support.enphase.com/s/article/How-do-I-set-up-the-Envoy-if-there-is-a-firewall
   wash-machine-energy-mon:
     hostname: wash-machine-energy-mon
     mac_address: 34:98:7a:ec:0d:43
     ip_address: 10.69.100.20
     vlan: esphome
   home-theater-energy-meter:
-    # yes, the missing 'r' is purposeful. Hit hostname 24 character limit.
     hostname: home-theater-energy-mete
     mac_address: 34:98:7a:ec:0d:37
     ip_address: 10.69.100.21
     vlan: esphome
+    notes: yes, the missing 'r' in the hostname is purposeful. Hit hostname 24 character limit.
   gaming-pc-energy-meter:
     hostname: gaming-pc-energy-meter
     mac_address: 34:98:7a:ec:0c:8c
     ip_address: 10.69.100.22
     vlan: esphome
+  replicator-smart-plug:
+    hostname: replicator-smart-plug
+    mac_address: cc:8d:a2:50:ec:00
+    ip_address: 10.69.100.23
+    vlan: esphome
+  xcel-energy-meter:
+    hostname: ""
+    mac_address: b4:23:30:25:39:79
+    ip_address: 10.69.100.165
+    dhcp: true
+    vlan: xcel
+    notes: DHCP reserved IP
 
 # Vlan tags should be created based on the following:
 # - first 3 digits are based on the third octet of subnet, e.g. 100 for 10.69.100.128
@@ -99,12 +124,13 @@ vlans:
     subnet: 10.69.100.0/25 # 126 usable hosts
     wifi_networks: ["kennedy_iot"]
     switch_ports: [17, 19]
+    notes: "DHCP range from 10.69.100.15 to 10.69.100.19"
   roombas:
     vlan_tag: 1004
     wifi_networks: ["kennedy_iot"]
     subnet: 10.69.100.128/27 # 30 usable hosts
     switch_ports: [17, 19]
-  energy_meters:
+  xcel:
     vlan_tag: 1005
     subnet: 10.69.100.160/27 # 30 usable hosts
     wifi_networks: ["kennedy_iot"]

@@ -248,17 +248,17 @@
       },
       "locked": {
         "dir": "modules/packages/lenovo_sa120_fanspeed",
-        "dirtyRev": "e3fc9e132f588167132fd987c52eaf0c8c5fc0a7-dirty",
-        "dirtyShortRev": "e3fc9e1-dirty",
-        "lastModified": 1742601853,
-        "narHash": "sha256-sqnLF6d/wzkYUG/bE7ZX5osCh3BdLyDMJHhMOQL5gkE=",
+        "dirtyRev": "655eef08d37ed651cb7323826e1668a6e153d1c0-dirty",
+        "dirtyShortRev": "655eef0-dirty",
+        "lastModified": 1742629350,
+        "narHash": "sha256-gfifcH66m0WGlQd/zHXcLPS1+rQxjEHqq4MW7i46B7U=",
         "type": "git",
-        "url": "file:."
+        "url": "file:./"
       },
       "original": {
         "dir": "modules/packages/lenovo_sa120_fanspeed",
         "type": "git",
-        "url": "file:."
+        "url": "file:./"
       }
     },
     "libgit2": {
