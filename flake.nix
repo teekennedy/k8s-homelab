@@ -88,6 +88,7 @@
             helmfile
             k9s
             kubectl
+            kubetail
             kubernetes-helm
             kustomize
             nixos-anywhere
