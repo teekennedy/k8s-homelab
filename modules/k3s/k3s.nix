@@ -24,6 +24,9 @@
     # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
     networking.firewall.allowedTCPPorts = lib.mkMerge [
       [
+        # K3s's ingress controller (Traefik)
+        80
+        443
         # k3s embedded registry mirror and kubernetes API server
         6443
         # k3s, etcd clients: required if using a "High Availability Embedded etcd" configuration

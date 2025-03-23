@@ -172,7 +172,6 @@
                 services.logind.lidSwitch = "ignore";
 
                 services.k3s = {
-                  enable = true;
                   role = "server";
                   serverAddr = "https://10.69.80.10:6443";
                 };
@@ -198,7 +197,6 @@
                 ];
 
                 services.k3s = {
-                  enable = true;
                   role = "server";
                   serverAddr = "https://10.69.80.10:6443";
                 };
