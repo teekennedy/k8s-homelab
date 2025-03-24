@@ -29,6 +29,8 @@
     };
   };
   # Create samba users and groups
+  sops.secrets.smb_k8s_hashed_password.neededForUsers = true;
+
   users = {
     users = {
       smb-k8s = {
@@ -36,6 +38,7 @@
         isSystemUser = true;
         uid = 1200;
         group = config.users.groups.smb-k8s.name;
+        hashedPasswordFile = config.sops.secrets.smb_k8s_hashed_password.path;
       };
     };
     groups.smb-k8s = {
