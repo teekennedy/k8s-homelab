@@ -49,7 +49,7 @@
     environment.systemPackages = with pkgs; [
       k3s
       kubectl
-      etcd # having etcdctl is helpful when you need to manage the cluster
+      etcd.etcdctl # having etcdctl is helpful when you need to manage the cluster
     ];
 
     # Increase the inotify user instance limit.

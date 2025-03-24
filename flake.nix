@@ -5,7 +5,7 @@
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-etcd-server.url = "github:dtomvan/nixpkgs/8c3af1b67166056d33dece63f595fc947b7c82a4";
+    nixpkgs-k3s.url = "github:teekennedy/nixpkgs/nixpkgs-unstable";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence";
@@ -238,9 +238,11 @@
                       defaultUsername = "tkennedy";
                       nixpkgs.overlays = [
                         (_: _: rec {
-                          # etcd 3.5.16 is broken on nixpkgs-unstable due to flaky tests
-                          # Overlay with feature branch from in-progress PR that fixes it https://github.com/NixOS/nixpkgs/pull/390981
-                          etcd = (import inputs.nixpkgs-etcd-server {system = host.system;}).etcd;
+                          # My k3s is crashlooping due to containerd panicking
+                          # https://github.com/k3s-io/k3s/issues/11973
+                          # The maintainer needs people to test whether v1.32.3-rc4+k3s1 fixes it
+                          # https://github.com/k3s-io/k3s/issues/11973#issuecomment-2744514524
+                          k3s = (import inputs.nixpkgs-k3s {system = host.system;}).k3s;
                         })
                       ];
                       networking.hostName = host.hostname;

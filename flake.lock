@@ -341,19 +341,19 @@
         "type": "github"
       }
     },
-    "nixpkgs-etcd-server": {
+    "nixpkgs-k3s": {
       "locked": {
-        "lastModified": 1742309430,
-        "narHash": "sha256-McmxX+4J4Xj7TdzOdleI3vheNfuRqI4Pj2cRR/8qeXk=",
-        "owner": "dtomvan",
+        "lastModified": 1742767566,
+        "narHash": "sha256-wM7vfJNAyHQ+Yf0LgZNNgZ8g027+i0X2eSLxEQLhCQY=",
+        "owner": "teekennedy",
         "repo": "nixpkgs",
-        "rev": "8c3af1b67166056d33dece63f595fc947b7c82a4",
+        "rev": "7281c6acec8b79d3967a9ce174c81be85fc135bf",
         "type": "github"
       },
       "original": {
-        "owner": "dtomvan",
+        "owner": "teekennedy",
+        "ref": "nixpkgs-unstable",
         "repo": "nixpkgs",
-        "rev": "8c3af1b67166056d33dece63f595fc947b7c82a4",
         "type": "github"
       }
     },
@@ -415,7 +415,7 @@
         "lenovo_sa120_fanspeed": "lenovo_sa120_fanspeed",
         "nixos-facter-modules": "nixos-facter-modules",
         "nixpkgs": "nixpkgs_3",
-        "nixpkgs-etcd-server": "nixpkgs-etcd-server",
+        "nixpkgs-k3s": "nixpkgs-k3s",
         "sops-nix": "sops-nix"
       }
     },
