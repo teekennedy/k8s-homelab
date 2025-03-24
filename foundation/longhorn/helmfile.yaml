@@ -65,7 +65,7 @@ releases:
   - name: longhorn
     namespace: longhorn-system
     chart: longhorn/longhorn
-    version: 1.7.2
+    version: 1.7.3
     needs:
       - longhorn-nixos
     set:
