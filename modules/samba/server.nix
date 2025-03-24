@@ -28,9 +28,8 @@
       };
     };
   };
-  # Create samba users and groups
-  sops.secrets.smb_k8s_hashed_password.neededForUsers = true;
 
+  # Create samba users and groups
   users = {
     users = {
       smb-k8s = {
@@ -38,13 +37,27 @@
         isSystemUser = true;
         uid = 1200;
         group = config.users.groups.smb-k8s.name;
-        hashedPasswordFile = config.sops.secrets.smb_k8s_hashed_password.path;
       };
     };
     groups.smb-k8s = {
       gid = 1200;
     };
   };
+
+  # Cache the samba data dir
+  environment.persistence."/cache".directories = [
+    "/var/lib/samba"
+  ];
+
+  # Provision the password file for smbusers as a secret
+  # Generate this file by running `sudo smbpasswd -a smb-k8s`.
+  sops.secrets.smbpasswd_file = {
+    mode = "0600";
+    owner = config.users.users.root.name;
+    group = config.users.users.root.group;
+    path = "/var/lib/samba/private/passdb.tdb";
+  };
+
   # open the ports used for netbios-less samba share
   networking.firewall.allowedTCPPorts = [445];
 }
