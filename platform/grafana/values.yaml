@@ -22,10 +22,11 @@ grafana:
       root_url: https://grafana.msng.to
     auth.generic_oauth:
       enabled: true
-      allow_sign_up: false
+      # Allows OAuth users without existing grafana accounts to login
+      allow_sign_up: true
       # Bypass login selection screen
       auto_login: true
-      name: Login with SSO
+      name: SSO
       client_id: grafana-sso
       client_secret: $__env{GRAFANA_SSO_CLIENT_SECRET}
       scopes: openid profile email groups offline_access
