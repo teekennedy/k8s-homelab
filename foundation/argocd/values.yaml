@@ -31,6 +31,8 @@ argo-cd:
     metrics: *metrics
   redis:
     metrics: *metrics
+
+# https://github.com/argoproj/argo-helm/blob/main/charts/argocd-apps/values.yaml
 argocd-apps:
   applicationsets:
     root:
@@ -41,6 +43,8 @@ argocd-apps:
             revision: &revision main
             directories:
               - path: foundation/*
+              - path: foundation/longhorn
+                exclude: true
               - path: platform/*
               - path: apps/*
       template:
