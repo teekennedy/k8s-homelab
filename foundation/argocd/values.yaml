@@ -13,6 +13,7 @@ argo-cd:
       resource.customizations.ignoreResourceUpdates.all: |
         jsonPointers:
           - /status
+          - /spec/revisionHistoryLimit
   server:
     ingress:
       enabled: true
