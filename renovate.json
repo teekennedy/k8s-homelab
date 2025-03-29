@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "security:openssf-scorecard"],
+  "extends": ["config:recommended", "security:openssf-scorecard", "group:allNonMajor"],
   "bumpVersion": "patch",
   "nix": {
     "enabled": true
