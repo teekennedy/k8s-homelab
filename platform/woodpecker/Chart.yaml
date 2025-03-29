@@ -1,7 +1,7 @@
 apiVersion: v2
 name: woodpecker
-version: 0.0.0
+version: 0.0.1
 dependencies:
   - name: woodpecker
-    version: 1.5.1
+    version: 1.6.2
     repository: https://woodpecker-ci.org

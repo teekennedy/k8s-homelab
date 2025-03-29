@@ -12,11 +12,11 @@ terraform {
     }
     sops = {
       source  = "carlpett/sops"
-      version = "~> 1.1.1"
+      version = "~> 1.2.0"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.35.1"
+      version = "~> 2.36.0"
     }
   }
 }
