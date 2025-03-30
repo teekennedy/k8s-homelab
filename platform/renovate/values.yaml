@@ -10,3 +10,5 @@ renovate:
         "autodiscover": true
       }
   existingSecret: renovate-secret
+  env:
+    LOG_LEVEL: debug
