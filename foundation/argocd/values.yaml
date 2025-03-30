@@ -5,9 +5,11 @@ argo-cd:
       - name: TZ
         value: America/Denver
   configs:
+    # argocd-cmd-params-cm configmap
     params:
       server.insecure: true
       controller.diff.server.side: true
+    # argocd-cm configmap
     cm:
       resource.ignoreResourceUpdatesEnabled: true
       resource.customizations.ignoreResourceUpdates.all: |
