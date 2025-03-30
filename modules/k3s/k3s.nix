@@ -75,10 +75,10 @@
       tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
     };
 
-    environment.etc."rancher/k3s/registries.yaml" = {
-      text = config.services.k3s.embeddedRegistry.config;
-      enable = config.services.k3s.embeddedRegistry.enable;
-    };
+    # environment.etc."rancher/k3s/registries.yaml" = {
+    #   text = lib.mkIf config.services.k3s.embeddedRegistry.config;
+    #   enable = config.services.k3s.embeddedRegistry.enable;
+    # };
 
     # Enable graceful shutdown
     # https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#graceful-node-shutdown
@@ -159,6 +159,11 @@
         sopsConfig
         // {
           path = "/var/lib/rancher/k3s/server/tls/service.key";
+        };
+      registries_yaml =
+        sopsConfig
+        // {
+          path = "/etc/rancher/k3s/registries.yaml";
         };
     });
   };
