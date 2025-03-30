@@ -12,6 +12,8 @@ gitea:
       - secretName: gitea-tls-certificate
         hosts:
           - *host
+  persistence:
+    accessModes: ["ReadWriteMany"]
   gitea:
     admin:
       existingSecret: gitea-admin-secret
