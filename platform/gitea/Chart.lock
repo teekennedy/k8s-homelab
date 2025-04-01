@@ -3,4 +3,4 @@ dependencies:
   repository: https://dl.gitea.io/charts/
   version: 11.0.1
 digest: sha256:d647ab343edb9127a0b1148702d3cfaf8a2fd6d0b18eaf2798f0e2893249232d
-generated: "2025-03-30T03:43:49.635972582Z"
+generated: "2025-04-01T12:46:02.433896-06:00"
