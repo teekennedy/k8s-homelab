@@ -1,1 +1,5 @@
-{}
+{...}: {
+  imports = [
+    ../common/laptop.nix
+  ];
+}

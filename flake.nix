@@ -168,8 +168,6 @@
                   Address = "10.69.80.11/25";
                   Gateway = ["10.69.80.1"];
                 };
-                # Don't sleep when laptop is closed
-                services.logind.lidSwitch = "ignore";
 
                 services.k3s = {
                   role = "server";
