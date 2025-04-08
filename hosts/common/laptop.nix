@@ -4,7 +4,7 @@
 
   systemd.services = {
     "laptop-screen-powersave" = {
-      description = "Automatically turn off laptop screen when not in use";
+      description = "Turn off laptop screen when not in use";
       after = ["multi-user.target"];
       wantedBy = ["multi-user.target"];
       serviceConfig = {

@@ -5,7 +5,6 @@
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs-k3s.url = "github:teekennedy/nixpkgs/nixpkgs-unstable";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence";
@@ -63,9 +62,6 @@
               helmfile = prev.helmfile-wrapped.override {
                 inherit (kubernetes-helm) pluginsDir;
               };
-              # etcd 3.5.16 is broken on nixpkgs-unstable due to flaky tests
-              # Overlay with feature branch from in-progress PR that fixes it https://github.com/NixOS/nixpkgs/pull/390981
-              etcd = (import inputs.nixpkgs-etcd-server {inherit system;}).etcd;
             })
           ];
         };
@@ -234,15 +230,6 @@
                     inputs.nixos-facter-modules.nixosModules.facter
                     {
                       defaultUsername = "tkennedy";
-                      nixpkgs.overlays = [
-                        (_: _: rec {
-                          # My k3s is crashlooping due to containerd panicking
-                          # https://github.com/k3s-io/k3s/issues/11973
-                          # The maintainer needs people to test whether v1.32.3-rc4+k3s1 fixes it
-                          # https://github.com/k3s-io/k3s/issues/11973#issuecomment-2744514524
-                          k3s = (import inputs.nixpkgs-k3s {system = host.system;}).k3s;
-                        })
-                      ];
                       networking.hostName = host.hostname;
                       # Pin nixpkgs to flake input
                       nix.registry.nixpkgs.flake = inputs.nixpkgs;

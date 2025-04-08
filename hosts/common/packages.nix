@@ -1,13 +1,15 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    btop
     dig
     file
     git
     jq
     neovim
-    smartmontools
     tree
+    # diagnostic tools
+    btop
+    pciutils # for lspci
+    smartmontools
   ];
   hardware.enableAllFirmware = true;
   nixpkgs.config.allowUnfree = true;
