@@ -13,7 +13,7 @@ argo-cd:
     cm:
       resource.ignoreResourceUpdatesEnabled: true
       # When PVCs are migrated manually they have explicit storageClassName and volumeName
-      resource.customizations.ignoreDifferences.v1_PersistentVolumeClaim: |
+      resource.customizations.ignoreDifferences.core_PersistentVolumeClaim: |
         jqPathExpressions:
         - .spec.volumeName
         - .spec.storageClassName
