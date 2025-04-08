@@ -1,0 +1,13 @@
+longhorn:
+  defaultSettings:
+    allowCollectingLonghornUsageMetrics: false
+    defaultDataLocality: best-effort
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    host: longhorn.msng.to
+    path: /
+    pathType: Prefix
+    tls: true
+    tlsSecret: longhorn-tls-certificate

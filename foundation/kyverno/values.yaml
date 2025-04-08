@@ -1,0 +1,6 @@
+kyverno:
+  config:
+    resourceFiltersIncludeNamespaces:
+      - longhorn-system
+  grafana:
+    enabled: true
