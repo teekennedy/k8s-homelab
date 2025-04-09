@@ -18,6 +18,13 @@ kube-prometheus-stack:
         - secretName: grafana-general-tls
           hosts:
             - *host
+    additionalDataSources:
+      - access: proxy
+        isDefault: false
+        name: loki
+        orgId: 1
+        type: loki
+        url: http://monitoring-system-loki:3100
     sidecar:
       dashboards:
         enabled: true
