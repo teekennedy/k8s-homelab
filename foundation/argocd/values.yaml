@@ -12,11 +12,6 @@ argo-cd:
     # argocd-cm configmap
     cm:
       resource.ignoreResourceUpdatesEnabled: true
-      # When PVCs are migrated manually they have explicit storageClassName and volumeName
-      resource.customizations.ignoreDifferences.core_PersistentVolumeClaim: |
-        jqPathExpressions:
-        - .spec.volumeName
-        - .spec.storageClassName
       resource.customizations.ignoreResourceUpdates.all: |
         jsonPointers:
           - /status
@@ -66,6 +61,12 @@ argocd-apps:
             repoURL: *repoURL
             path: '{{path}}'
             targetRevision: *revision
+          # When PVCs are migrated manually they have explicit storageClassName and volumeName
+          ignoreDifferences:
+            - jsonPointers:
+                - /spec/volumeName
+                - /spec/storageClassName
+              kind: PersistentVolumeClaim
           syncPolicy:
             automated:
               prune: true
