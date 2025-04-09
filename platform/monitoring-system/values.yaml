@@ -18,6 +18,12 @@ kube-prometheus-stack:
         - secretName: grafana-general-tls
           hosts:
             - *host
+    persistence:
+      accessModes:
+        - ReadWriteOnce
+      enabled: true
+      size: 10Gi
+      type: pvc
     additionalDataSources:
       - access: proxy
         isDefault: false
