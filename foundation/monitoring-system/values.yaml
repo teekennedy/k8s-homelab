@@ -1,14 +1,13 @@
+loki-stack:
+  loki:
+    isDefault: false
+
 kube-prometheus-stack:
   ## Using default values from https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
   ##
   grafana:
     enabled: true
-    forceDeployDatasources: true
-    forceDeployDashboards: true
-    additionalDataSources:
-      - name: Loki
-        type: loki
-        url: http://loki.loki:3100
+    defaultDashboardsTimezone: America/Denver
 
   ## Configuration for alertmanager
   ## ref: https://prometheus.io/docs/alerting/alertmanager/
