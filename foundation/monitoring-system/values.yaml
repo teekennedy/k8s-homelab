@@ -13,7 +13,7 @@ kube-prometheus-stack:
   ## Configuration for alertmanager
   ## ref: https://prometheus.io/docs/alerting/alertmanager/
   ##
-  alertmanager:
+  # alertmanager:
 
   ## Labels to apply to all resources
   ##
