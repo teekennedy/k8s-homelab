@@ -1,7 +1,3 @@
-loki-stack:
-  loki:
-    isDefault: false
-
 kube-prometheus-stack:
   ## Using default values from https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
   ##
@@ -24,13 +20,6 @@ kube-prometheus-stack:
       enabled: true
       size: 10Gi
       type: pvc
-    additionalDataSources:
-      - access: proxy
-        isDefault: false
-        name: loki
-        orgId: 1
-        type: loki
-        url: http://monitoring-system-loki:3100
     sidecar:
       dashboards:
         enabled: true
