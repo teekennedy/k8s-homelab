@@ -1,15 +1,15 @@
+# This service monitor matches all kyverno services that specify a metrics port.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: kyverno-svc
+  name: kyverno-metrics
 spec:
   namespaceSelector:
     matchNames:
       - kyverno
   selector:
     matchLabels:
-      app.kubernetes.io/component: admission-controller
       app.kubernetes.io/instance: kyverno
       app.kubernetes.io/part-of: kyverno
   endpoints:
