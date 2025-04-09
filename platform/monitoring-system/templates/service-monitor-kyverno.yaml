@@ -4,6 +4,9 @@ kind: ServiceMonitor
 metadata:
   name: kyverno-svc
 spec:
+  namespaceSelector:
+    matchNames:
+      - kyverno
   selector:
     matchLabels:
       app.kubernetes.io/component: admission-controller
