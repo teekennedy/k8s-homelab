@@ -3,7 +3,7 @@ apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
   name: add-nixos-path-to-longhorn-pods
-  namespace: kyverno
+  namespace: {{ .Release.Namespace }}
   annotations:
     policies.kyverno.io/title: Add NixOS Path to Longhorn Pods
     policies.kyverno.io/subject: Pod
