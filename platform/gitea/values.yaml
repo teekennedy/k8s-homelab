@@ -1,4 +1,6 @@
 gitea:
+  image:
+    tag: "1.23.7"
   ingress:
     enabled: true
     annotations:
@@ -29,10 +31,6 @@ gitea:
         LANDING_PAGE: explore
         ROOT_URL: https://git.msng.to
         OFFLINE_MODE: true
-        # PR descriptions produced by renovatebot often include escaped brackets \[\] in changelogs.
-        # Gitea incorrectly parses these as math, so I'm disabling it for now.
-        # https://github.com/go-gitea/gitea/issues/27645
-        GITEA__markdown__ENABLE_MATH: false
       repository:
         DISABLED_REPO_UNITS: repo.wiki,repo.projects,repo.packages
         DISABLE_STARS: true

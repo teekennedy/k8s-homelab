@@ -2,6 +2,16 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", "security:openssf-scorecard", "group:allNonMajor"],
   "bumpVersion": "patch",
+  "customManagers": [
+    {
+      "description": "Automatically update helm chart app version",
+      "customType": "regex",
+      "fileMatch": ["(^|/)Chart\\.yaml$"],
+      "matchStrings": [
+        "# renovate datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) extractVersion=(?<extractVersion>\\S+)\\nappVersion:\\s?(?<currentValue>\\S+)\\n"
+      ]
+    }
+  ],
   "nix": {
     "enabled": true
   }
