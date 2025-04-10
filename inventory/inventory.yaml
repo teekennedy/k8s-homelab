@@ -90,6 +90,11 @@ hosts:
     mac_address: cc:8d:a2:50:ec:00
     ip_address: 10.69.100.23
     vlan: esphome
+  home-assistant-voice-09947a:
+    hostname: "home-assistant-voice-09947a"
+    mac_address: 20:f8:3b:09:94:7a
+    ip_address: 10.69.100.24
+    vlan: esphome
   xcel-energy-meter:
     hostname: ""
     mac_address: b4:23:30:25:39:79
