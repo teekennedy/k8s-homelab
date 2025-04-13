@@ -13,6 +13,17 @@ app-template:
             TZ: America/Denver
             PUID: '1200'
             PGID: "1200"
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1Gi
+              gpu.intel.com/i915: "1"
+            limits:
+              cpu: 3500m
+              memory: 6Gi
+              gpu.intel.com/i915: "1"
+    arrs:
+      containers:
         # https://docs.linuxserver.io/images/docker-prowlarr/
         prowlarr:
           image:
@@ -107,6 +118,9 @@ app-template:
         http:
           port: 8096
           protocol: HTTP
+    arrs:
+      controller: arrs
+      ports:
         prowlarr:
           port: 9696
           protocol: HTTP
@@ -150,28 +164,28 @@ app-template:
             - path: /
               pathType: Prefix
               service:
-                identifier: main
+                identifier: arrs
                 port: prowlarr
         - host: &radarrHost radarr.msng.to
           paths:
             - path: /
               pathType: Prefix
               service:
-                identifier: main
+                identifier: arrs
                 port: radarr
         - host: &sonarrHost sonarr.msng.to
           paths:
             - path: /
               pathType: Prefix
               service:
-                identifier: main
+                identifier: arrs
                 port: sonarr
         - host: &jellyseerrHost jellyseerr.msng.to
           paths:
             - path: /
               pathType: Prefix
               service:
-                identifier: main
+                identifier: arrs
                 port: jellyseerr
       tls:
         - secretName: jellyfin-tls-certificate
@@ -195,6 +209,7 @@ app-template:
               subPath: movies
             - path: /media/shows
               subPath: shows
+        arrs:
           radarr:
             - path: /downloads/complete
               subPath: qbittorrent/downloads/complete
@@ -218,6 +233,7 @@ app-template:
           jellyfin:
             - path: /config
               subPath: jellyfin/config
+        arrs:
           prowlarr:
             - path: /config
               subPath: prowlarr/config

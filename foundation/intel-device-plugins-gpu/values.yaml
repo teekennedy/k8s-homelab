@@ -1,0 +1,3 @@
+intel-device-plugins-operator:
+  nodeSelector:
+    intel.feature.node.kubernetes.io/gpu: 'true'

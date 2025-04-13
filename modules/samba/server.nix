@@ -44,19 +44,30 @@
     };
   };
 
-  # Cache the samba data dir
+  # Cache the samba data dirs
   environment.persistence."/cache".directories = [
     "/var/lib/samba"
+    "/var/lock/samba"
   ];
 
   # Provision the password file for smbusers as a secret
   # Generate this file by running `sudo smbpasswd -a smb-k8s`.
-  sops.secrets.smbpasswd_file = {
-    mode = "0600";
-    owner = config.users.users.root.name;
-    group = config.users.users.root.group;
-    path = "/var/lib/samba/private/passdb.tdb";
-  };
+  # TODO there's more files that need to be provisioned for this to work.
+  # Here's the list of files that get created / modified when you run `smbpasswd -a <user>`:
+  # - /var/lib/samba/account_policy.tdb
+  # - /var/lib/samba/group_mapping.ldb
+  # - /var/lib/samba/group_mapping.tdb
+  # - /var/lib/samba/private/passdb.tdb
+  # - /var/lib/samba/private/secrets.tdb
+  # - /var/lib/samba/winbindd_idmap.tdb
+  # - /var/lock/samba/gencache.tdb
+  # - /var/lock/samba/mutex.tdb
+  # sops.secrets.smbpasswd_file = {
+  #   mode = "0600";
+  #   owner = config.users.users.root.name;
+  #   group = config.users.users.root.group;
+  #   path = "/var/lib/samba/private/passdb.tdb";
+  # };
 
   # open the ports used for netbios-less samba share
   networking.firewall.allowedTCPPorts = [445];
