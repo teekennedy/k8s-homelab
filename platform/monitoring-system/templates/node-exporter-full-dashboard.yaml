@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    grafana_dashboard: "1"
+  name: monitoring-system-node-exporter-full-dashboard
+  namespace: {{ .Release.Namespace }}
+data:
+  argocd.json: |
+    {{- .Files.Get "dashboards/node-exporter-full.json" | nindent 4 }}
