@@ -41,7 +41,7 @@ spec:
               mountPath: /models
       containers:
         - name: glados-tts
-          image: ghcr.io/teekennedy/glados_tts_remote:7c459a5
+          image: ghcr.io/teekennedy/glados_tts_remote:67742ce
           ports:
             - containerPort: 8124
           volumeMounts:
