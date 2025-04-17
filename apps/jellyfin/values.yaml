@@ -1,9 +1,390 @@
 # yaml-language-server: $schema= https://raw.githubusercontent.com/bjw-s/helm-charts/refs/heads/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+# Docs: https://bjw-s.github.io/helm-charts/docs/app-template/
 app-template:
   defaultPodOptions:
     automountServiceAccountToken: false
   controllers:
     main:
+      pod:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              # Match Intel UHD 7xx series and Iris Xe graphics or better.
+              # Device ID can be found here: https://dgpu-docs.intel.com/devices/hardware-table.html#gpus-with-supported-drivers
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-0bd5.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-0bda.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-1024.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4626.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4628.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-462a.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4680.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4682.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4688.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-468a.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-468b.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4690.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4692.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4693.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46a0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46a1.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46a2.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46a3.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46a6.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46a8.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46aa.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46b0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46b1.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46b2.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46b3.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46c0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46c1.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46c2.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46c3.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46d0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46d1.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46d2.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46d3.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-46d4.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4905.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4907.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4908.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4909.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4c8a.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4c8b.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4c90.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-4c9a.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-5690.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-5691.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-5692.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-5693.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-5694.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-5696.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-5697.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56a0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56a1.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56a2.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56a5.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56a6.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56b0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56b1.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56b2.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56b3.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56ba.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56bb.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56bc.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56bd.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56c0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-56c1.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-6420.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-64a0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-64b0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-7d40.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-7d41.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-7d45.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-7d51.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-7d55.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-7d67.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-7dd5.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a721.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a780.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a781.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a782.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a783.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a788.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a789.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a78a.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a78b.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a7a0.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a7a1.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a7a8.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a7a9.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a7aa.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a7ab.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a7ac.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-a7ad.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-e20b.present
+                      operator: In
+                      values: ["true"]
+                - matchExpressions:
+                    - key: gpu.intel.com/device-id.0300-e20c.present
+                      operator: In
+                      values: ["true"]
+
       containers:
         jellyfin:
           image:
@@ -13,6 +394,31 @@ app-template:
             TZ: America/Denver
             PUID: '1200'
             PGID: "1200"
+          probes:
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /health
+                  port: 8096
+                failureThreshold: 5
+                initialDelaySeconds: 0
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /health
+                  port: 8096
+                failureThreshold: 3
+                initialDelaySeconds: 0
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
           resources:
             requests:
               cpu: 1000m
