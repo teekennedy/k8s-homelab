@@ -6,5 +6,5 @@ metadata:
   name: monitoring-system-node-exporter-full-dashboard
   namespace: {{ .Release.Namespace }}
 data:
-  argocd.json: |
+  node-exporter-full.json: |
     {{- .Files.Get "dashboards/node-exporter-full.json" | nindent 4 }}
