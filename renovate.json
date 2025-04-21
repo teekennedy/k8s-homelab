@@ -14,5 +14,12 @@
   ],
   "nix": {
     "enabled": true
-  }
+  },
+  "packageRules": [
+    {
+      "description": "Minor / patch updates to v0 packages can contain breaking changes and should be excluded from grouped PRs.",
+      "extends": ["group:allNonMajor"],
+      "matchCurrentVersion": "!/^0/"
+    }
+  ]
 }
