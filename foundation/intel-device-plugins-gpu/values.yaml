@@ -1,3 +1,4 @@
+# Source: https://github.com/intel/helm-charts/tree/main/charts/gpu-device-plugin
 intel-device-plugins-operator:
   nodeSelector:
     intel.feature.node.kubernetes.io/gpu: 'true'
