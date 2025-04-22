@@ -2837,11 +2837,11 @@ kube-prometheus-stack:
 
       ## How long to retain metrics
       ##
-      retention: 10d
+      retention: 30d
 
       ## Maximum size of metrics
       ##
-      retentionSize: ""
+      retentionSize: "40GB"
 
       ## Allow out-of-order/out-of-bounds samples ingested into Prometheus for a specified duration
       ## See https://prometheus.io/docs/prometheus/latest/configuration/configuration/#tsdb
@@ -2942,17 +2942,13 @@ kube-prometheus-stack:
       ## Prometheus StorageSpec for persistent data
       ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/platform/storage.md
       ##
-      storageSpec: {}
-      ## Using PersistentVolumeClaim
-      ##
-      #  volumeClaimTemplate:
-      #    spec:
-      #      storageClassName: gluster
-      #      accessModes: ["ReadWriteOnce"]
-      #      resources:
-      #        requests:
-      #          storage: 50Gi
-      #    selector: {}
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 50Gi
 
       ## Using tmpfs volume
       ##
