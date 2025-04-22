@@ -1,3 +1,4 @@
+# https://github.com/longhorn/charts/blob/v1.8.x/charts/longhorn/values.yaml
 longhorn:
   defaultSettings:
     allowCollectingLonghornUsageMetrics: false
@@ -11,3 +12,6 @@ longhorn:
     pathType: Prefix
     tls: true
     tlsSecret: longhorn-tls-certificate
+  metrics:
+    serviceMonitor:
+      enabled: true
