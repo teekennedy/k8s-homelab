@@ -428,6 +428,24 @@ app-template:
               cpu: 3500m
               memory: 6Gi
               gpu.intel.com/i915: "1"
+        jellyseerr:
+          image:
+            repository: docker.io/fallenbagel/jellyseerr
+            tag: 2.5.2
+          env:
+            TZ: America/Denver
+            PUID: "1200"
+            PGID: "1200"
+          resources:
+            # observed resource usage:
+            #   cpu: 2m average, 45m max
+            #   mem: ~275Mi min, 331Mi max
+            requests:
+              cpu: 500m
+              memory: 400Mi
+            limits:
+              cpu: 1000m
+              memory: 800Mi
     arrs:
       containers:
         # https://docs.linuxserver.io/images/docker-prowlarr/
