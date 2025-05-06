@@ -428,14 +428,6 @@ app-template:
               cpu: 3500m
               memory: 6Gi
               gpu.intel.com/i915: "1"
-        jellyseerr:
-          image:
-            repository: docker.io/fallenbagel/jellyseerr
-            tag: 2.5.2
-          env:
-            TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
     arrs:
       containers:
         # https://docs.linuxserver.io/images/docker-prowlarr/
@@ -459,6 +451,14 @@ app-template:
           image:
             repository: lscr.io/linuxserver/sonarr
             tag: 4.0.13.2932-ls271
+          env:
+            TZ: America/Denver
+            PUID: "1200"
+            PGID: "1200"
+        jellyseerr:
+          image:
+            repository: docker.io/fallenbagel/jellyseerr
+            tag: 2.5.2
           env:
             TZ: America/Denver
             PUID: "1200"
@@ -524,9 +524,6 @@ app-template:
         http:
           port: 8096
           protocol: HTTP
-        jellyseerr:
-          port: 5055
-          protocol: HTTP
     arrs:
       controller: arrs
       ports:
@@ -538,6 +535,9 @@ app-template:
           protocol: HTTP
         sonarr:
           port: 8989
+          protocol: HTTP
+        jellyseerr:
+          port: 5055
           protocol: HTTP
     downloader:
       controller: downloader
@@ -591,7 +591,7 @@ app-template:
             - path: /
               pathType: Prefix
               service:
-                identifier: main
+                identifier: arrs
                 port: jellyseerr
       tls:
         - secretName: jellyfin-tls-certificate
@@ -639,9 +639,6 @@ app-template:
           jellyfin:
             - path: /config
               subPath: jellyfin/config
-          jellyseerr:
-            - path: /app/config
-              subPath: jellyseerr/config
         arrs:
           prowlarr:
             - path: /config
@@ -652,6 +649,9 @@ app-template:
           sonarr:
             - path: /config
               subPath: sonarr/config
+          jellyseerr:
+            - path: /app/config
+              subPath: jellyseerr/config
         downloader:
           qbittorrent:
             - path: /config
