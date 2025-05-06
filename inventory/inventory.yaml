@@ -95,6 +95,12 @@ hosts:
     mac_address: 20:f8:3b:09:94:7a
     ip_address: 10.69.100.24
     vlan: esphome
+  ratgdov25i-87d184:
+    hostname: "ratgdov25i-87d184"
+    mac_address: d8:bc:38:87:d1:84
+    ip_address: 10.69.100.25
+    vlan: esphome
+    notes: GDO for Garage Door Opener
   xcel-energy-meter:
     hostname: ""
     mac_address: b4:23:30:25:39:79
