@@ -452,14 +452,14 @@ app-template:
         prowlarr:
           image:
             repository: lscr.io/linuxserver/prowlarr
-            tag: 1.30.2.4939-ls105
+            tag: 1.35.1.5034-ls116
           env:
             TZ: America/Denver
         # https://docs.linuxserver.io/images/docker-radarr/
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 5.18.4.9674-ls260
+            tag: 5.22.4.9896-ls273
           env:
             TZ: America/Denver
             PUID: "1200"
@@ -468,7 +468,7 @@ app-template:
         sonarr:
           image:
             repository: lscr.io/linuxserver/sonarr
-            tag: 4.0.13.2932-ls271
+            tag: 4.0.14.2939-ls281
           env:
             TZ: America/Denver
             PUID: "1200"

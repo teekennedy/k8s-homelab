@@ -2,7 +2,7 @@ module git.msng.to/teekennedy/k8s-homelab/platform/secret-generator
 
 go 1.24.0
 
-toolchain go1.24.2
+toolchain go1.24.3
 
 require (
 	github.com/sethvargo/go-password v0.3.1
