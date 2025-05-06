@@ -20,6 +20,10 @@
       "description": "Minor / patch updates to v0 packages can contain breaking changes and should be excluded from grouped PRs.",
       "extends": ["group:allNonMajor"],
       "matchCurrentVersion": "!/^0/"
+    },
+    {
+      "packagePatterns": ["^(gh|ls)cr.io\\/linuxserver\\/"],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-ls(?<revision>\\d+)$"
     }
   ]
 }
