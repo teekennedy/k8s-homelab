@@ -1,11 +1,17 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: secret-generator-{{ include (print $.Template.BasePath "/secret-generator/configmap.yaml") . | sha256sum | trunc 7 }}
+  name: &jobName secret-generator-{{ include (print $.Template.BasePath "/secret-generator/configmap.yaml") . | sha256sum | trunc 7 }}
   namespace: {{ .Release.Namespace }}
 spec:
   backoffLimit: 3
+  selector:
+    matchLabels:
+      app: *jobName
   template:
+    metadata:
+      labels:
+        app: *jobName
     spec:
       restartPolicy: Never
       containers:
