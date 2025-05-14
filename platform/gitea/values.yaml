@@ -23,6 +23,7 @@ gitea:
     pgpool:
       image:
         tag: 4.5.2-debian-12-r1
+      resourcesPreset: small
   gitea:
     admin:
       existingSecret: gitea-admin-secret
