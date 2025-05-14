@@ -11,7 +11,7 @@
       ${pkgs.powertop}/bin/powertop --auto-tune
 
       # Set CPU scaling governor to powersave mode
-      echo powersave | tee compgen -G /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      echo powersave | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 
       # For intel processors that support hardware P-states, specify the energy performance preference
       # https://docs.kernel.org/admin-guide/pm/intel_epb.html
