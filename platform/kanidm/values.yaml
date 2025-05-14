@@ -19,9 +19,9 @@ app-template:
       enabled: true
       data:
         server.toml: |
+          version = "2"
           bindaddress = "[::]:443"
           ldapbindaddress = "[::]:636"
-          trust_x_forward_for = true
           db_path = "/data/kanidm.db"
           tls_chain = "/data/ca.crt"
           tls_key = "/data/tls.key"
