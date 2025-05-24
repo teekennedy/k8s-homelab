@@ -83,6 +83,7 @@
             deploy-rs
             helmfile
             k9s
+            kubecolor
             kubectl
             kubetail
             kubernetes-helm
