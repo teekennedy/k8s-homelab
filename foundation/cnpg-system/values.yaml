@@ -1,0 +1,6 @@
+# https://github.com/cloudnative-pg/charts/tree/main/charts/cloudnative-pg
+# yaml-language-server: $schema=https://raw.githubusercontent.com/cloudnative-pg/charts/refs/heads/main/charts/cloudnative-pg/values.schema.json
+cnpg:
+  podMonitorEnabled: true
+  grafanaDashboard:
+    create: true

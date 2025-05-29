@@ -1,0 +1,9 @@
+dependencies:
+- name: kubernetes-secret-generator
+  repository: https://helm.mittwald.de
+  version: 3.4.1
+- name: reflector
+  repository: https://emberstack.github.io/helm-charts
+  version: 9.1.7
+digest: sha256:c02c516b7b65139f57d9df4d31e6d2a6d843b30f896dc037f518b9e7b64f7a07
+generated: "2025-05-24T01:22:37.669654-06:00"

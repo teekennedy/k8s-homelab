@@ -1,0 +1,42 @@
+# https://github.com/mittwald/kubernetes-secret-generator/blob/master/deploy/helm-chart/kubernetes-secret-generator/values.yaml
+kubernetes-secret-generator:
+  securityContext:
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+  # Namespace(s) that are watched for secret generation
+  # Accepts a comma-separated list of namespaces: ns1,ns2
+  # If set to "", all namespaces will be watched
+  # Accessing secrets in namespaces other than the deployed one requires permissions via a cluster role (on by default)
+  watchNamespace: ""
+
+  # RBAC parameteres
+  # https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+  rbac:
+    # Enables creation of rbac resources
+    create: true
+    # The cluster role allows access to all namespaces in the cluster.
+    # Set to false to restrict access to the deployed namespace only.
+    # ClusterRole is deployed by Default
+    clusterRole: true
+
+# https://github.com/emberstack/kubernetes-reflector/blob/main/src/helm/reflector/values.yaml
+reflector:
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi

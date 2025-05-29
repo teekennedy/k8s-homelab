@@ -1,0 +1,11 @@
+apiVersion: v2
+name: secret-system
+version: 0.0.1
+appVersion: "3.4.0"
+dependencies:
+  - name: kubernetes-secret-generator
+    version: "3.4.1"
+    repository: https://helm.mittwald.de
+  - name: reflector
+    version: "9.1.7"
+    repository: https://emberstack.github.io/helm-charts

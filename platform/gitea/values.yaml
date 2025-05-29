@@ -1,10 +1,16 @@
+psql:
+  clusterName: gitea-psql
+  image: ghcr.io/cloudnative-pg/postgresql:17.5-standard-bookworm
+
 gitea:
   image:
     tag: "1.23.7"
+    rootless: true
   ingress:
     enabled: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
+      helm.sh/hook: post-install,post-upgrade
     hosts:
       - host: &host git.msng.to
         paths:
@@ -17,35 +23,77 @@ gitea:
   persistence:
     accessModes: ["ReadWriteMany"]
   postgresql-ha:
-    postgresql:
-      image:
-        tag: 16.3.0-debian-12-r11
-      resourcesPreset: small
-    pgpool:
-      image:
-        tag: 4.5.2-debian-12-r1
-      resourcesPreset: medium
+    enabled: false
+  postgresql:
+    enabled: false
+
   gitea:
     admin:
       existingSecret: gitea-admin-secret
+    additionalConfigFromEnvs:
+      - name: GITEA__DATABASE__HOST
+        valueFrom:
+          secretKeyRef:
+            name: gitea-psql-app
+            key: host
+      - name: GITEA__DATABASE__NAME
+        valueFrom:
+          secretKeyRef:
+            name: gitea-psql-app
+            key: dbname
+      - name: GITEA__DATABASE__USER
+        valueFrom:
+          secretKeyRef:
+            name: gitea-psql-app
+            key: username
+      - name: GITEA__DATABASE__PASSWD
+        valueFrom:
+          secretKeyRef:
+            name: gitea-psql-app
+            key: password
     config:
       server:
         LANDING_PAGE: explore
         ROOT_URL: https://git.msng.to
         OFFLINE_MODE: true
+      database:
+        DB_TYPE: postgres
       repository:
         DISABLED_REPO_UNITS: repo.wiki,repo.projects,repo.packages
         DISABLE_STARS: true
         DEFAULT_BRANCH: main
-      # TODO it's not reading the username from Dex correctly for now, related issues:
-      # https://github.com/go-gitea/gitea/issues/25725
-      # https://github.com/go-gitea/gitea/issues/24957
-      # oauth2_client:
-      #   ENABLE_AUTO_REGISTRATION: true
-      #   USERNAME: userid
       service.explore:
         DISABLE_USERS_PAGE: true
       actions:
         ENABLED: false
       webhook:
         ALLOWED_HOST_LIST: private
+
+gitea-resources:
+  users:
+    - name: renovate
+      fullName: Renovate
+      email: bot@renovateapp.com
+      secretName: renovate-gitea-user
+      secretNamespace: renovate
+      accessTokens:
+        - name: renovate
+          scopes:
+            - write:repository
+            - read:user
+            - write:issue
+            - read:organization
+            - read:misc
+  organizations:
+    - name: ops
+      description: Operations
+      teams:
+        - name: Owners
+          members:
+            - renovate
+            - tkennedy
+  repositories:
+    - name: k8s-homelab
+      owner: ops
+      description: my bare-metal k8s homelab
+      private: false

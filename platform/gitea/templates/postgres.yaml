@@ -1,0 +1,33 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.psql.clusterName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  instances: 2
+  imageName: {{ .Values.psql.image }}
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 10Gi
+    # Use single replica storageclass to avoid write amplification with multiple instances.
+    storageClass: longhorn-rc1
+  enableSuperuserAccess: true
+  postgresql:
+    # postgresql configuration options (postgresql.conf)
+    parameters:
+      max_connections: "300"
+      shared_buffers: 512MB
+  monitoring:
+    enablePodMonitor: true
+  # Disable pod disruption budget so that the cluster can be shut down
+  enablePDB: false
+  resources:
+    requests:
+      memory: "512Mi"
+    limits:
+      memory: "2Gi"
+  bootstrap:
+    initdb:
+      database: gitea
+      owner: gitea
