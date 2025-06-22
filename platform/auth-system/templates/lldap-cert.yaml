@@ -1,0 +1,26 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/cert-manager.io/certificate_v1.json
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: lldap-msng-to
+  namespace: {{ .Release.Namespace }}
+spec:
+  # The secret name to store the signed certificate
+  secretName: lldap-msng-to-cert
+  # Common Name
+  commonName: lldap.msng.to
+  # DNS SAN
+  dnsNames: []
+  # IP Address SAN
+  # ipAddresses:
+  #   - "127.0.0.1"
+  # Duration of the certificate
+  duration: 24h
+  # Renew 8 hours before the certificate expiration
+  renewBefore: 8h
+  # The reference to the step issuer
+  issuerRef:
+    group: certmanager.step.sm
+    kind: StepIssuer
+    name: step-issuer

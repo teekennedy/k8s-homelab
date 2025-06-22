@@ -8,12 +8,17 @@
   outputs = {nixpkgs, ...}: let
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
-    lenovo-sa120-fanspeed = pkgs.callPackage ./lenovo_sa120_fanspeed.nix {};
+
+    lenovo-sa120-fanspeed = pkgs.callPackage ./lenovo_sa120_fanspeed.nix {
+      python3 = pkgs.python3;
+      makeWrapper = pkgs.makeWrapper;
+      sg3_utils = pkgs.sg3_utils;
+    };
   in {
     packages.${system}.default = lenovo-sa120-fanspeed;
+
     devShells.${system}.default = pkgs.mkShell {
-      name = "lenovo-sa120-fanspeed-shell";
-      buildInputs = [
+      packages = [
         pkgs.sg3_utils
         lenovo-sa120-fanspeed
       ];

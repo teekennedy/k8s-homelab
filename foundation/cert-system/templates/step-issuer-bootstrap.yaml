@@ -1,0 +1,86 @@
+# Automatic bootstrap of step-issuer as a post install job
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: step-issuer-bootstrap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: step-issuer-bootstrap
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+spec:
+  template:
+    metadata:
+      name: step-issuer-bootstrap
+    spec:
+      serviceAccountName: step-issuer-bootstrap
+      restartPolicy: OnFailure
+      containers:
+        - name: step-bootstrap
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              echo "Fetching and encoding CA root certificate..."
+              CA_ROOT_B64=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.data['root_ca\.crt']}" configmap/step-ca-certs | base64 | tr -d '\n')
+
+              echo "Fetching provisioner KID..."
+              CA_PROVISIONER_KID=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.data['ca\.json']}" configmap/step-ca-config | jq -r .authority.provisioners[0].key.kid)
+
+              echo "Applying StepIssuer CR..."
+              cat <<EOF | kubectl apply -f -
+              apiVersion: certmanager.step.sm/v1beta1
+              kind: StepIssuer
+              metadata:
+                name: step-issuer
+                namespace: {{ .Release.Namespace }}
+              spec:
+                url: {{ index .Values "step-certificates" "fullnameOverride" }}.{{ .Release.Namespace }}.svc.cluster.local
+                caBundle: "$CA_ROOT_B64"
+                provisioner:
+                  name: {{ index .Values "step-certificates" "ca" "provisioner" "name" }}
+                  kid: "$CA_PROVISIONER_KID"
+                  passwordRef:
+                    name: step-ca-provisioner-password
+                    key: password
+              EOF
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: step-issuer-bootstrap
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: step-issuer-bootstrap
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["certmanager.step.sm"]
+    resources: ["stepissuers"]
+    verbs: ["create", "get", "list", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: step-issuer-bootstrap
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: step-issuer-bootstrap
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: step-issuer-bootstrap
+    namespace: {{ .Release.Namespace }}
+

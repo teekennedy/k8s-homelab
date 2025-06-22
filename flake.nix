@@ -62,6 +62,15 @@
               helmfile = prev.helmfile-wrapped.override {
                 inherit (kubernetes-helm) pluginsDir;
               };
+              vectorcode = prev.vectorcode.overridePythonAttrs rec {
+                version = "0.6.13";
+                src = prev.fetchFromGitHub {
+                  owner = "Davidyz";
+                  repo = "VectorCode";
+                  tag = version;
+                  hash = "sha256-ok6n0gW6Ahqr7vdoJ2Mj6Kz72mTmSbxIO3bG82T7QQI=";
+                };
+              };
             })
           ];
         };
@@ -96,6 +105,7 @@
               runtimeInputs = [yq-go sops ssh-to-age mkpasswd];
               text = builtins.readFile ./scripts/bootstrap-host.sh;
             })
+            vectorcode
           ];
 
           enterShell = ''
@@ -108,7 +118,7 @@
           # scripts.hello.exec = "echo hello from $GREET";
 
           # https://devenv.sh/pre-commit-hooks/
-          pre-commit.hooks = {
+          git-hooks.hooks = {
             # Nix code formatter
             alejandra = {
               enable = true;

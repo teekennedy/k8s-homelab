@@ -1,5 +1,0 @@
-releases:
-  - name: cert-manager
-    namespace: cert-manager
-    chart: .
-    disableValidationOnInstall: true

@@ -25,6 +25,7 @@ argo-cd:
       enabled: true
       serviceMonitor:
         enabled: true
+  # TODO integrate with authelia
   dex:
     enabled: false
   controller:

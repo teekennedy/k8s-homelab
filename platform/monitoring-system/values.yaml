@@ -29,8 +29,9 @@ kube-prometheus-stack:
     grafana.ini:
       server:
         root_url: https://grafana.msng.to
+      # TODO integrate with Authelia
       auth.generic_oauth:
-        enabled: true
+        enabled: false
         # Allows OAuth users without existing grafana accounts to login
         # allow_sign_up: true
         # Bypass login selection screen

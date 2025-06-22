@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/cert-manager.io/certificate_v1.json
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-msng-to
+  # namespace must match traefik's
+  namespace: kube-system
+spec:
+  secretName: msng-to-tls
+  dnsNames:
+    - "msng.to"
+    - "*.msng.to"
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer

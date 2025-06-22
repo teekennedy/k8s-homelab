@@ -1,0 +1,96 @@
+# Default values for spoolman.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-4.0.1/charts/library/common/values.schema.json
+# Docs: https://bjw-s-labs.github.io/helm-charts/docs/app-template/
+app-template:
+  service:
+    spoolman:
+      controller: spoolman
+      ports:
+        http:
+          port: &httpPort 8000
+
+  controllers:
+    spoolman:
+      strategy: Recreate
+      containers:
+        spoolman:
+          image:
+            repository: ghcr.io/donkie/spoolman
+            tag: "0.22.1"
+            pullPolicy: IfNotPresent
+          env:
+            TZ: America/Denver
+            PUID: &UID 1000
+            PGID: &GID 1000
+            # Backups managed through k8s
+            SPOOLMAN_AUTOMATIC_BACKUP: "FALSE"
+          command:
+            - uvicorn
+            - spoolman.main:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          probes:
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /health
+                  port: *httpPort
+                failureThreshold: 5
+                initialDelaySeconds: 0
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /health
+                  port: *httpPort
+                failureThreshold: 3
+                initialDelaySeconds: 0
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+  defaultPodOptions:
+    automountServiceAccountToken: false
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: *UID
+      runAsGroup: *GID
+      fsGroup: *GID
+      fsGroupChangePolicy: OnRootMismatch
+
+  ingress:
+    spoolman:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - host: &spoolmanHost spoolman.msng.to
+          paths:
+            - path: /
+              pathType: Prefix
+              service:
+                identifier: spoolman
+                port: http
+      tls:
+        - secretName: spoolman-tls-certificate
+          hosts:
+            - *spoolmanHost
+
+  persistence:
+    data:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      size: 100Mi
+      globalMounts:
+        - path: /home/app/.local/share/spoolman

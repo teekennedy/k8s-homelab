@@ -1,6 +1,8 @@
 {
   fetchFromGitHub,
-  writers,
+  python3,
+  makeWrapper,
+  sg3_utils,
 }: let
   src = fetchFromGitHub {
     owner = "AndrewX192";
@@ -8,10 +10,20 @@
     rev = "f0fcd405d400dcee14c02cd1a2cd59a099e98c75";
     hash = "sha256-XDgwLzr6dV0ylkdp2Zw5VubIoqfaUEcOcRjnjFK5AbY=";
   };
-  script = builtins.readFile (src + "/fancontrol.py");
 in
-  writers.writePython3Bin "lenovo-sa120-fanspeed" {
-    # don't run flake8 on source
-    doCheck = false;
+  pkgs.stdenv.mkDerivation {
+    pname = "lenovo-sa120-fanspeed";
+    version = "unstable";
+
+    src = src;
+    dontUnpack = true;
+
+    buildInputs = [makeWrapper];
+    installPhase = ''
+      mkdir -p $out/bin
+      install -m755 ${src}/fancontrol.py $out/bin/lenovo-sa120-fanspeed
+      wrapProgram $out/bin/lenovo-sa120-fanspeed \
+        --prefix PATH : ${sg3_utils}/bin \
+        --prefix PATH : ${python3}/bin
+    '';
   }
-  script

@@ -1,0 +1,46 @@
+cert-manager:
+  installCRDs: true
+  prometheus:
+    enabled: true
+    servicemonitor:
+      enabled: true
+
+# https://github.com/smallstep/helm-charts/tree/master/step-certificates
+step-certificates:
+  image:
+    # https://hub.docker.com/_/busybox
+    initContainerRepository: busybox:1.37.0
+    repository: cr.step.sm/smallstep/step-ca
+    tag: "0.28.3"
+  # Override the full name used in CA dns name and url
+  # Defaults to <Release.Name>-<Chart.Name>
+  fullnameOverride: step-ca
+  ca:
+    name: Missing Token Internal K8s CA
+    # dns name will be <fullName>.<namespace>.svc.cluster.local
+  existingSecrets: {}
+  # Decrease the database PVC size from the default 10Gi.
+  # I have a hard time believing it needs that much space.
+  db:
+    size: 1Gi
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: &stepCAHostname ca.msng.to
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - hosts:
+          - *stepCAHostname
+        secretName: ca-tls
+
+# https://github.com/smallstep/helm-charts/tree/master/step-issuer
+step-issuer:
+  image:
+    repository: cr.step.sm/smallstep/step-issuer
+    tag: "0.9.8"
+  stepIssuer:
+    caUrl: https://sca.cert-system.svc.cluster.local

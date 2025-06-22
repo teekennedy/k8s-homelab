@@ -7,7 +7,7 @@ resource "terraform_data" "create_namespace" {
       if [ "$count" -eq "0" ]; then
         kubectl create namespace ${var.namespace}
       else
-        echo '${var.namespace} already exists' >&3
+        echo 'namespace "${var.namespace}" already exists' >&2
       fi
     EOF
   }

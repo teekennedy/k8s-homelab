@@ -69,11 +69,20 @@ hosts:
     dhcp: true
     vlan: xcel
     notes: DHCP reserved IP. Firewall settings can be found here https://support.enphase.com/s/article/How-do-I-set-up-the-Envoy-if-there-is-a-firewall
-  wash-machine-energy-mon:
-    hostname: wash-machine-energy-mon
+  breaker-panel:
+    hostname: span-gateway
+    switch_port: 6
+    mac_address: 00:14:2d:6f:f4:76
+    ip_address: 10.69.0.179
+    dhcp: true
+    vlan: default
+    notes: Temporarily on default vlan while it's being setup.
+  replicator-energy-meter:
+    hostname: replicator-energy-meter
     mac_address: 34:98:7a:ec:0d:43
     ip_address: 10.69.100.20
     vlan: esphome
+    notes: Previously was Washing Machine Energy Monitor.
   home-theater-energy-meter:
     hostname: home-theater-energy-mete
     mac_address: 34:98:7a:ec:0d:37
@@ -85,11 +94,12 @@ hosts:
     mac_address: 34:98:7a:ec:0c:8c
     ip_address: 10.69.100.22
     vlan: esphome
-  replicator-smart-plug:
-    hostname: replicator-smart-plug
+  string-light-smart-plug:
+    hostname: string-light-smart-plug
     mac_address: cc:8d:a2:50:ec:00
     ip_address: 10.69.100.23
     vlan: esphome
+    notes: Previously was Replicator Smart Plug
   home-assistant-voice-09947a:
     hostname: "home-assistant-voice-09947a"
     mac_address: 20:f8:3b:09:94:7a

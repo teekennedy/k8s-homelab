@@ -3,6 +3,13 @@
   # ZFS requires that networking.hostId be set
   # Generated using: head -c4 /dev/urandom | od -A none -t x4
   networking.hostId = "1f58744a";
+  # enable monthly scrub
+  services.zfs.autoScrub = {
+    enable = true;
+    interval = "monthly";
+    randomizedDelaySec = "1h";
+    pools = ["storage"];
+  };
   disko.devices = {
     disk = {
       nas-a = {

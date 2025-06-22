@@ -1,0 +1,10 @@
+repositories:
+  - name: cert-manager
+    url: https://charts.jetstack.io
+  - name: step-certificates
+    url: https://smallstep.github.io/helm-charts
+releases:
+  - name: cert-system
+    namespace: cert-system
+    chart: .
+    disableValidationOnInstall: true

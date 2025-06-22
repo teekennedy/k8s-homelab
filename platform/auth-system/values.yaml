@@ -1,0 +1,193 @@
+# source https://github.com/authelia/chartrepo/tree/master/charts/authelia
+authelia:
+  rbac:
+    enabled: true
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefikCRD:
+      enabled: true
+      tls:
+        options:
+          nameOverride: 'authelia-tls-options'
+          sniStrict: true
+
+  configMap:
+    # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
+    authentication_backend:
+      # Password reset through authelia works normally.
+      password_reset:
+        disable: false
+      # How often authelia should check if there is a user update in LDAP
+      refresh_interval: 1m
+      ldap:
+        enabled: true
+        implementation: lldap
+        address: ldaps://lldap.msng.to:6360
+        # Set base dn that you configured in LLDAP
+        base_dn: dc=msng,dc=to
+        # TODO add bind_user
+        # The username and password of the bind user.
+        # "bind_user" should be the username you created for authentication with the "lldap_strict_readonly" permission. It is not recommended to use an actual admin account here.
+        # If you are configuring Authelia to change user passwords, then the account used here needs the "lldap_password_manager" permission instead.
+        user: uid=bind_user,ou=people,dc=msng,dc=to
+        # Password can also be set using a secret: https://www.authelia.com/configuration/methods/secrets/
+        password:
+          secret_name: lldap-authelia-bind-user
+          path: 'authentication.ldap.password.txt'
+
+        # Configure TLS for LDAPS
+        tls:
+          skip_verify: false
+          minimum_version: TLS1.2
+
+        # Allow sign in with either username or email
+        users_filter: "(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=person))"
+
+    ntp:
+      # effectively disables ntp, relying on the system time of the host instead
+      disable_startup_check: true
+    storage:
+      postgres:
+        enabled: true
+        # TODO deploy with cloudnative-pg
+        deploy: false
+    notifier:
+      # TODO setup SMTP creds
+      smtp:
+        enabled: true
+    session:
+      cookies:
+        - domain: 'msng.to'
+          authelia_url: 'https://auth.msng.to'
+          default_redirection_url: 'https://msng.to'
+      redis:
+        enabled: true
+        deploy: true
+        # use secret for redis password auth
+        enabledSecret: true
+        high_availability:
+          # enable redis sentinel for high availability
+          enabled: true
+          # use secret for redis sentinel password auth
+          enabledSecret: true
+    # TODO setup metrics
+    telemetry:
+      metrics:
+        enabled: false
+
+  pod:
+    kind: Deployment
+    replicas: 2
+    env:
+      - name: TZ
+        value: America/Denver
+    resources:
+      limits:
+        cpu: '4.00'
+        memory: '500Mi'
+      requests:
+        cpu: '0.25'
+        memory: '125Mi'
+
+  networkPolicy:
+    enabled: true
+
+  secret:
+    additionalSecrets:
+      lldap-authelia-bind-user: {}
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-4.0.1/charts/library/common/values.schema.json
+# Docs: https://bjw-s-labs.github.io/helm-charts/docs/app-template/
+# TODO postgresql cluster setup and configuration
+# TODO TLS secret generation
+# TODO use secret-generator to generate all other authelia secrets (see authelia pod env variables that point to /secrets/internal in rendered helm templates.)
+app-template:
+  controllers:
+    lldap:
+      strategy: Recreate
+      containers:
+        lldap:
+          image:
+            repository: ghcr.io/lldap/lldap
+            # TODO make sure renovatebot can update this
+            tag: "2025-05-19-alpine-rootless"
+            pullPolicy: IfNotPresent
+          env:
+            TZ: America/Denver
+            LLDAP_LDAPS_OPTIONS__ENABLED: "true"
+            LLDAP_LDAPS_OPTIONS__CERT_FILE: /path/to/certfile.crt # TODO
+            LLDAP_LDAPS_OPTIONS__KEY_FILE: /path/to/certfile.crt # TODO
+            UID: &UID 1000
+            GID: &GID 1000
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          probes:
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                exec:
+                  command:
+                    - /app/lldap
+                    - healthcheck
+                    - --config-file
+                    - /data/lldap_config.toml
+                initialDelaySeconds: 5
+                periodSeconds: 5
+            readiness:
+              enabled: true
+              type: TCP
+              spec:
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                timeoutSeconds: 1
+                failureThreshold: 3
+  defaultPodOptions:
+    automountServiceAccountToken: false
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: *UID
+      runAsGroup: *GID
+      fsGroup: *GID
+      fsGroupChangePolicy: OnRootMismatch
+
+  service:
+    lldap:
+      controller: lldap
+      ports:
+        http:
+          port: 17170
+        ldaps:
+          port: 6360
+          protocol: TCP
+          appProtocol: ldaps
+
+  ingress:
+    lldap:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        - host: &lldapHost lldap.msng.to
+          paths:
+            - path: /
+              pathType: Prefix
+              service:
+                identifier: lldap
+                port: http
+      tls:
+        - secretName: lldap-tls-certificate
+          hosts:
+            - *lldapHost
+
+  persistence:
+    lldap-data:
+      accessMode: ReadWriteMany
+      type: persistentVolumeClaim
+      size: 100Mi
+      globalMounts:
+        - path: /data

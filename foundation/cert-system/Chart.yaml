@@ -1,0 +1,13 @@
+apiVersion: v2
+name: cert-system
+version: 0.0.2
+dependencies:
+  - name: cert-manager
+    version: v1.17.2
+    repository: https://charts.jetstack.io
+  - name: step-certificates
+    version: "1.28.3"
+    repository: https://smallstep.github.io/helm-charts
+  - name: step-issuer
+    version: "1.9.8"
+    repository: https://smallstep.github.io/helm-charts

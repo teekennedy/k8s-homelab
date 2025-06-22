@@ -1,3 +1,41 @@
+variable "ses_mx_records" {
+  type = list(object({
+    name     = string
+    type     = string
+    priority = optional(number)
+    value    = string
+  }))
+  default = []
+}
+
+variable "ses_txt_records" {
+  type = list(object({
+    name  = string
+    type  = string
+    value = string
+  }))
+  default = []
+}
+
+resource "cloudflare_record" "ses_mx" {
+  for_each = { for rec in var.ses_mx_records : "${rec.name}_${rec.type}" => rec }
+  zone_id  = data.cloudflare_zone.zone.id
+  name     = each.value.name
+  type     = each.value.type
+  content  = each.value.value
+  priority = lookup(each.value, "priority", null)
+  proxied  = false
+}
+
+resource "cloudflare_record" "ses_txt" {
+  for_each = { for rec in var.ses_txt_records : "${rec.name}_${rec.value}" => rec }
+  zone_id  = data.cloudflare_zone.zone.id
+  name     = each.value.name
+  type     = each.value.type
+  content  = each.value.value
+  proxied  = false
+}
+
 data "cloudflare_zone" "zone" {
   name = var.cloudflare_domain
 }
@@ -92,7 +130,7 @@ resource "cloudflare_api_token" "cert_manager" {
 module "cloudflare_api_token_secret" {
   source    = "../k8s-secret"
   name      = "cloudflare-api-token"
-  namespace = "cert-manager"
+  namespace = "cert-system"
 
 
   data = {

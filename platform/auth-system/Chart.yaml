@@ -1,0 +1,10 @@
+apiVersion: v2
+name: authelia
+version: 0.0.1
+dependencies:
+  - name: authelia
+    version: 0.10.4
+    repository: https://charts.authelia.com
+  - name: app-template
+    version: 4.0.1
+    repository: https://bjw-s-labs.github.io/helm-charts
