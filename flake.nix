@@ -10,7 +10,7 @@
     impermanence.url = "github:nix-community/impermanence";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
-    lenovo_sa120_fanspeed.url = "git+file:./?dir=modules/packages/lenovo_sa120_fanspeed";
+    lenovo_sa120_fanspeed.url = "./modules/packages/lenovo_sa120_fanspeed";
     lenovo_sa120_fanspeed.inputs.nixpkgs.follows = "nixpkgs";
     devenv-root = {
       url = "file+file:///dev/null";
@@ -105,7 +105,6 @@
               runtimeInputs = [yq-go sops ssh-to-age mkpasswd];
               text = builtins.readFile ./scripts/bootstrap-host.sh;
             })
-            vectorcode
           ];
 
           enterShell = ''
@@ -179,6 +178,10 @@
                 services.k3s = {
                   role = "server";
                   serverAddr = "https://10.69.80.10:6443";
+                  extraFlags = [
+                    "--node-label"
+                    "generic-cdi-plugin/nvidia=enabled"
+                  ];
                 };
               })
             ];

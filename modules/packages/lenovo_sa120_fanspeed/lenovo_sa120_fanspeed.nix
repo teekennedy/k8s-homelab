@@ -3,6 +3,7 @@
   python3,
   makeWrapper,
   sg3_utils,
+  pkgs,
 }: let
   src = fetchFromGitHub {
     owner = "AndrewX192";

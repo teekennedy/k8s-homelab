@@ -15,7 +15,7 @@
 
       # For intel processors that support hardware P-states, specify the energy performance preference
       # https://docs.kernel.org/admin-guide/pm/intel_epb.html
-      if ls /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference >/dev/null; then
+      if ls /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference 2>/dev/null; then
         echo power | tee /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference
       fi
     '';

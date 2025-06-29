@@ -6,18 +6,9 @@
 }: {
   options = {
     services.k3s.embeddedRegistry.enable = lib.mkOption {
-      description = "Whether to enable the k3s embedded registry mirror. https://docs.k3s.io/installation/registry-mirror";
+      description = "Whether to enable the k3s embedded registry mirror. Configured via the registries_yaml secret in secrets.enc.yaml.  https://docs.k3s.io/installation/registry-mirror";
       default = true;
       type = lib.types.bool;
-    };
-    services.k3s.embeddedRegistry.config = lib.mkOption {
-      description = "Contents of the registry configuration yaml file. https://docs.k3s.io/installation/private-registry#registries-configuration-file";
-      default = ''
-        # enable distributed mirroring of all registries
-        mirrors:
-          "*":
-      '';
-      type = lib.types.str;
     };
   };
   config = {
@@ -43,9 +34,6 @@
         5001
       ])
     ];
-    networking.firewall.allowedUDPPorts = [
-      8472 # k3s, required for flannel VXLAN, the default flannel backend
-    ];
     environment.systemPackages = with pkgs; [
       k3s
       kubectl
@@ -64,6 +52,9 @@
           # This _must_ be enabled when cluster is first initialized. It cannot be enabled later.
           # https://docs.k3s.io/cli/secrets-encrypt
           "--secrets-encryption"
+          # Route pod subnets through node IPs using layer 2 routing.
+          # Better performance and fewer dependencies than default vxlan backend
+          "--flannel-backend=host-gw"
           # Tell k3s to use systemd-resolved's generated resolv.conf file
           "--resolv-conf"
           "/run/systemd/resolve/resolv.conf"
@@ -74,11 +65,6 @@
       ];
       tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
     };
-
-    # environment.etc."rancher/k3s/registries.yaml" = {
-    #   text = lib.mkIf config.services.k3s.embeddedRegistry.config;
-    #   enable = config.services.k3s.embeddedRegistry.enable;
-    # };
 
     # Enable graceful shutdown
     # https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#graceful-node-shutdown

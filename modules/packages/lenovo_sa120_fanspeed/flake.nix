@@ -13,6 +13,7 @@
       python3 = pkgs.python3;
       makeWrapper = pkgs.makeWrapper;
       sg3_utils = pkgs.sg3_utils;
+      pkgs = pkgs;
     };
   in {
     packages.${system}.default = lenovo-sa120-fanspeed;
