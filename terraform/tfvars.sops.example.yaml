@@ -4,6 +4,8 @@ cloudflare_email: "myaccount@example.com"
 cloudflare_account_id: "asdflkjaseflakjes"
 # https://dash.cloudflare.com/profile/api-tokens
 cloudflare_api_key: "asdflkjaseflakjes"
+# PGP key reference for the smtp IAM user
+pgp_key: "keybase:tkennedy"
 
 ntfy:
   # https://ntfy.sh or your own instance

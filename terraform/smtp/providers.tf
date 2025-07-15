@@ -6,6 +6,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.52"
+    }
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.3.5"
+    }
   }
 }
 
@@ -13,4 +21,9 @@ provider "aws" {
   default_tags {
     tags = {}
   }
+}
+
+provider "cloudflare" {
+  email   = var.cloudflare_email
+  api_key = var.cloudflare_api_key
 }

@@ -4,8 +4,6 @@ module "cloudflare" {
   cloudflare_email      = local.cloudflare_email
   cloudflare_api_key    = local.cloudflare_api_key
   cloudflare_account_id = local.cloudflare_account_id
-  ses_mx_records        = module.smtp.ses_mx_records
-  ses_txt_records       = module.smtp.ses_txt_records
   k8s_hosts = {
     "borg-0" = { ipv4 = "10.69.80.10" }
     "borg-1" = { ipv4 = "10.69.80.11" }
@@ -14,18 +12,21 @@ module "cloudflare" {
 }
 
 module "smtp" {
-  source   = "./smtp"
-  domain   = local.cloudflare_domain
-  username = join("-", [replace(local.cloudflare_domain, ".", "-"), "smtp-user"])
+  source             = "./smtp"
+  domain             = local.cloudflare_domain
+  username           = join("-", [replace(local.cloudflare_domain, ".", "-"), "smtp-user"])
+  cloudflare_api_key = local.cloudflare_api_key
+  cloudflare_email   = local.cloudflare_email
+  pgp_key            = local.pgp_key
 }
 
 module "smtp_secret" {
   source    = "./k8s-secret"
-  name      = "smtp"
+  name      = "smtp-creds"
   namespace = "auth-system"
   data = {
-    "smtp_access_key_id"     = module.smtp.smtp_access_key_id
-    "smtp_secret_access_key" = module.smtp.smtp_secret_access_key
+    username = module.smtp.smtp_access_key_id
+    password = module.smtp.smtp_secret_access_key
   }
 }
 

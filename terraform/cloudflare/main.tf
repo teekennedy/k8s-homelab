@@ -17,25 +17,6 @@ variable "ses_txt_records" {
   default = []
 }
 
-resource "cloudflare_record" "ses_mx" {
-  for_each = { for rec in var.ses_mx_records : "${rec.name}_${rec.type}" => rec }
-  zone_id  = data.cloudflare_zone.zone.id
-  name     = each.value.name
-  type     = each.value.type
-  content  = each.value.value
-  priority = lookup(each.value, "priority", null)
-  proxied  = false
-}
-
-resource "cloudflare_record" "ses_txt" {
-  for_each = { for rec in var.ses_txt_records : "${rec.name}_${rec.value}" => rec }
-  zone_id  = data.cloudflare_zone.zone.id
-  name     = each.value.name
-  type     = each.value.type
-  content  = each.value.value
-  proxied  = false
-}
-
 data "cloudflare_zone" "zone" {
   name = var.cloudflare_domain
 }

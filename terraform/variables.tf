@@ -22,3 +22,9 @@ variable "cloudflare_account_id" {
   description = "Cloudflare account ID. https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids"
   default     = ""
 }
+
+variable "pgp_key" {
+  type        = string
+  description = "PGP key reference for the smtp IAM user"
+  default     = ""
+}

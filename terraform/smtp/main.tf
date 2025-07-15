@@ -14,8 +14,17 @@ resource "aws_iam_policy" "send_mail" {
 
 data "aws_iam_policy_document" "send_mail" {
   statement {
+    sid       = "AllowSendMail"
     actions   = ["ses:SendRawEmail"]
-    resources = [local.ses_identity_arn]
+    resources = ["arn:${data.aws_partition.this.partition}:ses:${local.region}:${local.account_id}:identity/*"]
+
+    condition {
+      test     = "StringLike"
+      variable = "ses:FromAddress"
+      values = [
+        "*@${var.domain}"
+      ]
+    }
   }
 }
 
@@ -37,46 +46,45 @@ resource "aws_ses_domain_identity_verification" "this" {
 }
 
 resource "aws_iam_access_key" "smtp" {
-  user = aws_iam_user.mail.name
+  user    = aws_iam_user.mail.name
+  pgp_key = var.pgp_key
 }
 
-output "ses_mx_records" {
-  value = [
-    {
-      name     = aws_ses_domain_mail_from.this.mail_from_domain
-      type     = "MX"
-      priority = 10
-      value    = "feedback-smtp.${local.region}.amazonses.com"
-    }
+resource "cloudflare_record" "ses" {
+  for_each = { for rec in local.ses_dns_records : rec.id => rec }
+  zone_id  = data.cloudflare_zone.zone.id
+  name     = each.value.name
+  type     = each.value.type
+  content  = each.value.content
+  priority = try(each.value.priority, null) # MX records require a priority field
+  proxied  = false
+}
+
+resource "cloudflare_record" "ses_dkim" {
+  # The documentation for this resource shows hardcoding count to 3
+  count   = 3
+  zone_id = data.cloudflare_zone.zone.id
+  name    = "${aws_ses_domain_dkim.this.dkim_tokens[count.index]}._domainkey.${var.domain}"
+  type    = "CNAME"
+  content = "${aws_ses_domain_dkim.this.dkim_tokens[count.index]}.dkim.amazonses.com"
+  proxied = false
+}
+data "external" "smtp_secret_access_key" {
+  query = {
+    enc_secret = aws_iam_access_key.smtp.encrypted_ses_smtp_password_v4
+  }
+
+  program = [
+    "sh",
+    "-c",
+    (<<-EOF
+      echo '${aws_iam_access_key.smtp.encrypted_ses_smtp_password_v4}' \
+        | base64 -d \
+	      | gpg --decrypt \
+	      | jq -R '{value: .}'
+      EOF
+    ),
   ]
-  sensitive = false
-}
-
-output "ses_txt_records" {
-  value = flatten([
-    [
-      {
-        name  = aws_ses_domain_identity.this.domain
-        type  = "TXT"
-        value = aws_ses_domain_identity.this.verification_token
-      }
-    ],
-    [
-      for k, v in aws_ses_domain_dkim.this.dkim_tokens : {
-        name  = "${v}._domainkey.${var.domain}"
-        type  = "CNAME"
-        value = "${v}.dkim.amazonses.com"
-      }
-    ],
-    [
-      {
-        name  = aws_ses_domain_mail_from.this.mail_from_domain
-        type  = "TXT"
-        value = "v=spf1 include:amazonses.com ~all"
-      }
-    ]
-  ])
-  sensitive = false
 }
 
 output "smtp_access_key_id" {
@@ -85,7 +93,7 @@ output "smtp_access_key_id" {
 }
 
 output "smtp_secret_access_key" {
-  value     = aws_iam_access_key.smtp.secret
+  value     = data.external.smtp_secret_access_key.result.value
   sensitive = true
 }
 
