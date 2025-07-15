@@ -47,6 +47,7 @@ type User struct {
 	SecretName      string        `yaml:"secretName"`
 	SecretNamespace string        `yaml:"secretNamespace"`
 	AccessTokens    []AccessToken `yaml:"accessTokens"`
+	Admin           bool          `yaml:"admin"`
 }
 
 type Config struct {
@@ -212,6 +213,7 @@ func main() {
 					Email:              &user.Email,
 					FullName:           &user.FullName,
 					Password:           password,
+					Admin:              &user.Admin,
 					MustChangePassword: &mustChangePassword,
 				})
 				if err != nil {

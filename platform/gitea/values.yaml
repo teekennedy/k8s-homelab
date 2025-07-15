@@ -20,12 +20,13 @@ gitea:
       - secretName: gitea-tls-certificate
         hosts:
           - *host
-  persistence:
-    accessModes: ["ReadWriteMany"]
   postgresql-ha:
     enabled: false
   postgresql:
     enabled: false
+
+  strategy:
+    type: Recreate
 
   gitea:
     admin:
@@ -84,6 +85,12 @@ gitea-resources:
             - write:issue
             - read:organization
             - read:misc
+    - name: tkennedy
+      fullName: Terrance Kennedy
+      email: terrance@missingtoken.net
+      secretName: tkennedy-gitea-user
+      secretNamespace: gitea
+      admin: true
   organizations:
     - name: ops
       description: Operations
