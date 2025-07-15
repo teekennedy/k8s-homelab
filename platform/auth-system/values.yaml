@@ -144,12 +144,10 @@ authelia:
     existingSecret: authelia-secrets
     additionalSecrets:
       lldap-authelia-bind-user:
-        path: postgres
         items:
           - key: password
             path: password.txt
       authelia-psql-app:
-        path: postgres
         items:
           - key: password
             path: password.txt
