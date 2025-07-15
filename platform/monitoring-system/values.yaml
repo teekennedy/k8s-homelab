@@ -35,7 +35,7 @@ kube-prometheus-stack:
         # Allows OAuth users without existing grafana accounts to login
         # allow_sign_up: true
         # Bypass login selection screen
-        auto_login: true
+        # auto_login: true
         name: SSO
         client_id: grafana-sso
         client_secret: $__env{GRAFANA_SSO_CLIENT_SECRET}
@@ -760,10 +760,10 @@ kube-prometheus-stack:
 
     ## If your etcd is not deployed as a pod, specify IPs it can be found on
     ##
-    endpoints: []
-    # - 10.141.4.22
-    # - 10.141.4.23
-    # - 10.141.4.24
+    endpoints:
+      - 10.69.80.10
+      - 10.69.80.11
+      - 10.69.80.12
 
     ## Etcd service. If using kubeEtcd.endpoints only the port and targetPort are used
     ##
