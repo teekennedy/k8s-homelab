@@ -42,5 +42,8 @@ step-issuer:
   image:
     repository: cr.step.sm/smallstep/step-issuer
     tag: "0.9.8"
-  stepIssuer:
-    caUrl: https://sca.cert-system.svc.cluster.local
+  # For the cert-manager approver
+  certManager:
+    serviceAccount:
+      name: cert-system-cert-manager
+      namespace: cert-system
