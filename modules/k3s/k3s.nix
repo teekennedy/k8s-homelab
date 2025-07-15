@@ -24,6 +24,8 @@
         2379
         # k3s, etcd peers: required if using a "High Availability Embedded etcd" configuration
         2380
+        # k3s etcd metrics: if using flag --etcd-expose-metrics=true
+        2381
         # prometheus node exporter
         9100
         # Kubelet metrics
@@ -58,6 +60,8 @@
           # Tell k3s to use systemd-resolved's generated resolv.conf file
           "--resolv-conf"
           "/run/systemd/resolve/resolv.conf"
+          # Enable embedded etcd metrics endpoint
+          "--etcd-expose-metrics=true"
         ]
         (lib.mkIf (config.services.k3s.embeddedRegistry.enable) [
           "--embedded-registry"
@@ -66,10 +70,35 @@
       tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
     };
 
+    systemd.services.k3s-packaged-components-customization = lib.mkIf config.services.k3s.clusterInit {
+      serviceConfig.Type = "oneshot";
+      wantedBy = ["k3s.service"];
+      after = ["k3s.service"];
+      script = ''
+        cat << EOF > /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+        apiVersion: helm.cattle.io/v1
+        kind: HelmChartConfig
+        metadata:
+          name: traefik
+          namespace: kube-system
+        spec:
+          valuesContent: |-
+            experimental:
+              kubernetesGateway:
+                enabled: true
+            providers:
+              kubernetesGateway:
+                enabled: true
+        EOF
+      '';
+    };
+
     # Enable graceful shutdown
     # https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#graceful-node-shutdown
     # Note that due to a regression in local-path-provisioner, this won't work with k3s versions 1.30.x up to 1.31.2.
     services.k3s.gracefulNodeShutdown.enable = true;
+    services.k3s.gracefulNodeShutdown.shutdownGracePeriodCriticalPods = "60s";
+    services.k3s.gracefulNodeShutdown.shutdownGracePeriod = "120s";
 
     # Setup secrets
     sops.secrets = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) (let
