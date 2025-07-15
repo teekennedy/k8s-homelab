@@ -1,0 +1,144 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: lldap-bootstrap
+  namespace: "{{ .Release.Namespace }}"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: lldap-bootstrap
+  namespace: "{{ .Release.Namespace }}"
+  # Next annotations are required if the job managed by Argo CD,
+  # so Argo CD can relaunch the job on every app sync action
+  annotations: 
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    helm.sh/hook: post-install,post-upgrade
+spec:
+  template:
+    spec:
+      serviceAccountName: lldap-bootstrap
+      restartPolicy: OnFailure
+      containers:
+        - name: lldap-bootstrap
+          # TODO make sure renovatebot can update this
+          # Root is needed to install kubectl
+          image: ghcr.io/lldap/lldap:2025-05-19-alpine
+
+          command:
+            - /bootstrap/bootstrap.sh
+
+          env:
+            # TODO make this rootless after ensuring dependencies are already installed
+            # - name: UID
+            #   value: "1000"
+            # - name: GID
+            #   value: "1000"
+            - name: LLDAP_URL
+              value: https://lldap.msng.to
+
+            - name: LLDAP_ADMIN_USERNAME
+              valueFrom: { secretKeyRef: { name: lldap-admin-user, key: lldap-ldap-user } }
+
+            - name: LLDAP_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: lldap-admin-user, key: lldap-ldap-user-pass } }
+
+            # env vars for bootstrap.sh
+            - name: USER_CONFIGS_DIR
+              value: /bootstrap/user-configs
+            - name: GROUP_CONFIGS_DIR
+              value: /bootstrap/group-configs
+            - name: USER_SCHEMAS_DIR
+              value: /bootstrap/user-schemas
+            - name: GROUP_SCHEMAS_DIR
+              value: /bootstrap/group-schemas
+            - name: DO_CLEANUP
+              value: "true"
+
+          volumeMounts:
+            - name: bootstrap
+              mountPath: /bootstrap/bootstrap.sh
+              readOnly: true
+              subPath: bootstrap.sh
+
+            - name: user-configs
+              mountPath: /bootstrap/user-configs
+              readOnly: true
+
+            - name: group-configs
+              mountPath: /bootstrap/group-configs
+              readOnly: true
+      volumes:
+        - name: bootstrap
+          configMap:
+            name: lldap-bootstrap-script
+            defaultMode: 0555
+            items:
+              - key: bootstrap.sh
+                path: bootstrap.sh
+
+        - name: user-configs
+          configMap:
+            name: lldap-bootstrap-user-configs
+
+        - name: group-configs
+          configMap:
+            name: lldap-bootstrap-group-configs
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: lldap-bootstrap
+  namespace: "{{ .Release.Namespace }}"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: lldap-bootstrap
+  namespace: "{{ .Release.Namespace }}"
+subjects:
+  - kind: ServiceAccount
+    name: lldap-bootstrap
+    namespace: "{{ .Release.Namespace }}"
+roleRef:
+  kind: Role
+  name: lldap-bootstrap
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "lldap-bootstrap-script"
+  namespace: "{{ .Release.Namespace }}"
+data:
+  bootstrap.sh: |-
+    {{- $.Files.Get "files/lldap-bootstrap/bootstrap.sh" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "lldap-bootstrap-user-configs"
+  namespace: "{{ .Release.Namespace }}"
+data:
+{{- range $path, $_ :=  .Files.Glob  "files/lldap-bootstrap/user-configs/*.json" }}
+  {{ $path | base }}: |-
+    {{- $.Files.Get $path | nindent 4 }}
+{{ end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "lldap-bootstrap-group-configs"
+  namespace: "{{ .Release.Namespace }}"
+data:
+{{- range $path, $_ :=  .Files.Glob  "files/lldap-bootstrap/group-configs/*.json" }}
+  {{ $path | base }}: |-
+    {{- $.Files.Get $path | nindent 4 }}
+{{ end }}

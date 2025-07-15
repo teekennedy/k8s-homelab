@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://github.com/datreeio/CRDs-catalog/raw/refs/heads/main/postgresql.cnpg.io/cluster_v1.json
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: authelia-psql
+  namespace: {{ .Release.Namespace }}
+spec:
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.5-standard-bookworm
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 5Gi
+    # Use single replica storageclass to avoid write amplification with multiple instances.
+    storageClass: longhorn-rc1
+  enableSuperuserAccess: true
+  postgresql:
+    # postgresql configuration options (postgresql.conf)
+    parameters:
+      max_connections: "300"
+      shared_buffers: 512MB
+  monitoring:
+    enablePodMonitor: true
+  # Disable pod disruption budget so that the cluster can be shut down
+  enablePDB: false
+  resources:
+    requests:
+      memory: "512Mi"
+    limits:
+      memory: "2Gi"
+  bootstrap:
+    initdb:
+      database: {{ .Values.authelia.configMap.storage.postgres.database }}
+      owner: {{ .Values.authelia.configMap.storage.postgres.username }}

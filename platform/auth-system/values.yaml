@@ -1,4 +1,5 @@
 # source https://github.com/authelia/chartrepo/tree/master/charts/authelia
+# yaml-language-server: $schema=https://raw.githubusercontent.com/authelia/chartrepo/refs/heads/master/charts/authelia/values.schema.json
 authelia:
   rbac:
     enabled: true
@@ -6,13 +7,16 @@ authelia:
     enabled: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefikCRD:
+      external-dns.alpha.kubernetes.io/hostname: authelia.msng.to
+    tls:
+      enabled: true # TODO switch back to true
+      # Secret name defaults to 'authelia-tls'
+      # secret: 'authelia-tls'
+    gatewayAPI:
       enabled: true
-      tls:
-        options:
-          nameOverride: 'authelia-tls-options'
-          sniStrict: true
-
+    traefikCRD:
+      enabled: false
+      disableIngressRoute: true
   configMap:
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
     authentication_backend:
@@ -24,22 +28,22 @@ authelia:
       ldap:
         enabled: true
         implementation: lldap
-        address: ldaps://lldap.msng.to:6360
+        address: ldaps://lldap.auth-system.svc.cluster.local:6360
         # Set base dn that you configured in LLDAP
         base_dn: dc=msng,dc=to
-        # TODO add bind_user
         # The username and password of the bind user.
-        # "bind_user" should be the username you created for authentication with the "lldap_strict_readonly" permission. It is not recommended to use an actual admin account here.
+        # "authelia_bind_user" should be the username you created for authentication with the "lldap_strict_readonly" permission. It is not recommended to use an actual admin account here.
         # If you are configuring Authelia to change user passwords, then the account used here needs the "lldap_password_manager" permission instead.
-        user: uid=bind_user,ou=people,dc=msng,dc=to
+        user: uid=authelia_bind_user,ou=people,dc=msng,dc=to
+        additional_users_dn: ou=people
         # Password can also be set using a secret: https://www.authelia.com/configuration/methods/secrets/
         password:
           secret_name: lldap-authelia-bind-user
-          path: 'authentication.ldap.password.txt'
+          path: 'password.txt'
 
         # Configure TLS for LDAPS
         tls:
-          skip_verify: false
+          skip_verify: true # TODO !! YOU MUST CHANGE THIS
           minimum_version: TLS1.2
 
         # Allow sign in with either username or email
@@ -51,27 +55,61 @@ authelia:
     storage:
       postgres:
         enabled: true
-        # TODO deploy with cloudnative-pg
         deploy: false
+        # Address hostname and port can be found under the <cluster-name>-app secret
+        address: tcp://authelia-psql-rw:5432
+        password:
+          secret_name: authelia-psql-app
+          path: password.txt
     notifier:
-      # TODO setup SMTP creds
       smtp:
         enabled: true
+        address: smtp://email-smtp.us-west-1.amazonaws.com:587
+
+        # @schema
+        # required: false
+        # @schema
+        # -- The sender is used to construct both the SMTP command MAIL FROM and to add the FROM header. This address must
+        # be in RFC5322 format.
+        sender: 'Authelia <authelia@msng.to>'
+
+        # @schema
+        # required: false
+        # @schema
+        # -- HELO/EHLO Identifier. Some SMTP Servers may reject the default of localhost.
+        identifier: msng.to
+
+        # @schema
+        # required: false
+        # @schema
+        # -- Subject configuration of the emails sent.
+        # {title} is replaced by the text from the notifier
+        subject: '[auth] {title}'
+
+        # @schema
+        # required: false
+        # @schema
+        # -- This address is used during the startup check to verify the email configuration is correct.
+        # It's not important what it is except if your email server only allows local delivery.
+        startup_check_address: 'terrance@missingtoken.net'
+
+        password:
+          # @schema
+          # required: false
+          # @schema
+          # -- The secret name. The ~ name is special as it is the secret we generate either automatically or via the
+          # secret_value option below.
+          secret_name: smtp-creds
+
+          # -- The path to the secret. If it has a '/' prefix it's assumed to be an absolute path within the pod. Otherwise
+          # it uses the format '{mountPath}/{secret_name}/{path}' where '{mountPath}' refers to the 'secret.mountPath'
+          # value, '{secret_name}' is the secret_name above, and '{path}' is this value.
+          path: 'notifier.smtp.password.txt'
     session:
       cookies:
         - domain: 'msng.to'
-          authelia_url: 'https://auth.msng.to'
+          subdomain: authelia
           default_redirection_url: 'https://msng.to'
-      redis:
-        enabled: true
-        deploy: true
-        # use secret for redis password auth
-        enabledSecret: true
-        high_availability:
-          # enable redis sentinel for high availability
-          enabled: true
-          # use secret for redis sentinel password auth
-          enabledSecret: true
     # TODO setup metrics
     telemetry:
       metrics:
@@ -83,6 +121,13 @@ authelia:
     env:
       - name: TZ
         value: America/Denver
+      # - name: AUTHELIA_LOG_LEVEL
+      #   value: debug
+      - name: AUTHELIA_NOTIFIER_SMTP_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: smtp-creds
+            key: username
     resources:
       limits:
         cpu: '4.00'
@@ -95,17 +140,31 @@ authelia:
     enabled: true
 
   secret:
+    # Generate our own secrets for authelia
+    existingSecret: authelia-secrets
     additionalSecrets:
-      lldap-authelia-bind-user: {}
+      lldap-authelia-bind-user:
+        path: postgres
+        items:
+          - key: password
+            path: password.txt
+      authelia-psql-app:
+        path: postgres
+        items:
+          - key: password
+            path: password.txt
+      smtp-creds:
+        items:
+          - key: password
+            path: 'notifier.smtp.password.txt'
+
 
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-4.0.1/charts/library/common/values.schema.json
 # Docs: https://bjw-s-labs.github.io/helm-charts/docs/app-template/
-# TODO postgresql cluster setup and configuration
-# TODO TLS secret generation
-# TODO use secret-generator to generate all other authelia secrets (see authelia pod env variables that point to /secrets/internal in rendered helm templates.)
 app-template:
   controllers:
     lldap:
+      suffix: lldap
       strategy: Recreate
       containers:
         lldap:
@@ -115,10 +174,27 @@ app-template:
             tag: "2025-05-19-alpine-rootless"
             pullPolicy: IfNotPresent
           env:
+            # debugging
+            # LLDAP_VERBOSE: "true"
             TZ: America/Denver
+            LLDAP_LDAP_BASE_DN: dc=msng,dc=to
             LLDAP_LDAPS_OPTIONS__ENABLED: "true"
-            LLDAP_LDAPS_OPTIONS__CERT_FILE: /path/to/certfile.crt # TODO
-            LLDAP_LDAPS_OPTIONS__KEY_FILE: /path/to/certfile.crt # TODO
+            LLDAP_LDAPS_OPTIONS__CERT_FILE: /certs/ldaps/tls.crt
+            LLDAP_LDAPS_OPTIONS__KEY_FILE: /certs/ldaps/tls.key
+            LLDAP_JWT_SECRET:
+              secretKeyRef:
+                name: lldap-admin-user
+                key: lldap-jwt-secret
+            LLDAP_KEY_SEED:
+              secretKeyRef:
+                name: lldap-admin-user
+                key: lldap-key-seed
+            # LLDAP_KEY_FILE is set to an empty string to silence a warning about using key seed to generate key file
+            LLDAP_KEY_FILE: ""
+            LLDAP_LDAP_USER_PASS:
+              secretKeyRef:
+                name: lldap-admin-user
+                key: lldap-ldap-user-pass
             UID: &UID 1000
             GID: &GID 1000
           securityContext:
@@ -157,6 +233,7 @@ app-template:
 
   service:
     lldap:
+      forceRename: lldap
       controller: lldap
       ports:
         http:
@@ -168,6 +245,7 @@ app-template:
 
   ingress:
     lldap:
+      forceRename: lldap
       enabled: true
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
@@ -180,7 +258,7 @@ app-template:
                 identifier: lldap
                 port: http
       tls:
-        - secretName: lldap-tls-certificate
+        - secretName: lldap-https-tls-certificate
           hosts:
             - *lldapHost
 
@@ -191,3 +269,8 @@ app-template:
       size: 100Mi
       globalMounts:
         - path: /data
+    lldap-tls:
+      type: secret
+      name: lldap-ldaps-tls-certificate
+      globalMounts:
+        - path: /certs/ldaps

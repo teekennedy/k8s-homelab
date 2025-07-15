@@ -1,0 +1,9 @@
+{
+  "id": "authelia_bind_user",
+  "email": "authelia@msng.to",
+  "displayName": "Authelia",
+  "passwordRef": "lldap-authelia-bind-user:password",
+  "groups": [
+    "lldap_password_manager"
+  ]
+}

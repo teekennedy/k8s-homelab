@@ -3,15 +3,17 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: lldap-msng-to
+  name: lldap-ldaps-tls-certificate
   namespace: {{ .Release.Namespace }}
 spec:
   # The secret name to store the signed certificate
-  secretName: lldap-msng-to-cert
+  secretName: lldap-ldaps-tls-certificate
   # Common Name
   commonName: lldap.msng.to
   # DNS SAN
-  dnsNames: []
+  dnsNames: [
+    lldap.auth-system.svc.cluster.local
+  ]
   # IP Address SAN
   # ipAddresses:
   #   - "127.0.0.1"
@@ -22,5 +24,5 @@ spec:
   # The reference to the step issuer
   issuerRef:
     group: certmanager.step.sm
-    kind: StepIssuer
+    kind: StepClusterIssuer
     name: step-issuer

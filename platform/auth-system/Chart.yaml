@@ -3,7 +3,7 @@ name: authelia
 version: 0.0.1
 dependencies:
   - name: authelia
-    version: 0.10.4
+    version: 0.10.38
     repository: https://charts.authelia.com
   - name: app-template
     version: 4.0.1
