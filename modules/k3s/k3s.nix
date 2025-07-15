@@ -28,8 +28,14 @@
         2381
         # prometheus node exporter
         9100
+        # Kube proxy metrics
+        10249
         # Kubelet metrics
         10250
+        # Kube controller manager metrics
+        10257
+        # Kube scheduler metrics
+        10259
       ]
       (lib.mkIf config.services.k3s.embeddedRegistry.enable [
         # k3s embedded registry mirror
@@ -60,8 +66,17 @@
           # Tell k3s to use systemd-resolved's generated resolv.conf file
           "--resolv-conf"
           "/run/systemd/resolve/resolv.conf"
-          # Enable embedded etcd metrics endpoint
+          # Enable etcd metrics endpoint
           "--etcd-expose-metrics=true"
+          # Enable the kube-controller metrics endpoint
+          "--kube-controller-manager-arg"
+          "bind-address=0.0.0.0"
+          # Enable the kube-proxy metrics endpoint
+          "--kube-proxy-arg"
+          "metrics-bind-address=0.0.0.0"
+          # Enable the kube-scheduler metrics endpoint
+          "kube-scheduler-arg"
+          "bind-address=0.0.0.0"
         ]
         (lib.mkIf (config.services.k3s.embeddedRegistry.enable) [
           "--embedded-registry"
