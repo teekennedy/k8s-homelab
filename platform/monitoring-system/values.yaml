@@ -196,3 +196,13 @@ kube-prometheus-stack:
       ## Maximum size of metrics
       ##
       retentionSize: "40GB"
+
+  prometheus:
+    ingress:
+      enabled: true
+      pathType: Prefix
+      hosts:
+        - &host prometheus.msng.to
+      tls:
+        - hosts:
+            - *host
