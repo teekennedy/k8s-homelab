@@ -135,6 +135,14 @@ kube-prometheus-stack:
       port: 2381
       targetPort: 2381
 
+    serviceMonitor:
+      jobLabel: kube-etcd
+      metricRelabelings:
+        # Remove duplicate labels provided by k3s
+        - action: keep
+          sourceLabels: ["__name__"]
+          regex: "etcd_(.+)"
+
   ## Component scraping kube scheduler
   ##
   kubeScheduler:
