@@ -3,8 +3,22 @@
 app-template:
   defaultPodOptions:
     automountServiceAccountToken: false
+    # securityContext:
+    #   fsGroup: &gid 1200
+    #   fsGroupChangePolicy: "OnRootMismatch"
   controllers:
+    debug:
+      containers:
+        jellyfin-debug:
+          image:
+            repository: busybox
+            tag: 1.37.0
+          command:
+            - sleep
+            - infinity
+
     main:
+      replicas: 0
       pod:
         affinity:
           nodeAffinity:
@@ -385,13 +399,6 @@ app-template:
                       operator: In
                       values: ["true"]
       containers:
-        # jellyfin-debug:
-        #   image:
-        #     repository: busybox
-        #     tag: 1.37.0
-        #   command:
-        #     - sleep
-        #     - infinity
         jellyfin:
           image:
             repository: docker.io/jellyfin/jellyfin
@@ -456,6 +463,7 @@ app-template:
               cpu: 1000m
               memory: 800Mi
     arrs:
+      replicas: 0
       containers:
         # https://docs.linuxserver.io/images/docker-prowlarr/
         prowlarr:
@@ -491,6 +499,7 @@ app-template:
             PUID: "1200"
             PGID: "1200"
     downloader:
+      replicas: 0
       pod:
         dnsPolicy: "None"
         dnsConfig:
@@ -662,9 +671,10 @@ app-template:
       type: persistentVolumeClaim
       size: 20Gi
       advancedMounts:
+        debug:
+          jellyfin-debug:
+            - path: /config
         main:
-          # jellyfin-debug:
-          #   - path: /config
           jellyfin:
             - path: /config
               subPath: jellyfin/config
