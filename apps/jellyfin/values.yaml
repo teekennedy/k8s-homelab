@@ -384,12 +384,22 @@ app-template:
                     - key: gpu.intel.com/device-id.0300-e20c.present
                       operator: In
                       values: ["true"]
-
+      initContainers:
+        jellyfin-debug:
+          image:
+            repository: busybox
+            tag: 1.37.0
+          command:
+            - sleep
+            - infinity
       containers:
         jellyfin:
           image:
             repository: docker.io/jellyfin/jellyfin
             tag: 10.10.7
+          command:
+            - sleep
+            - infinity
           env:
             TZ: America/Denver
             PUID: '1200'
@@ -654,6 +664,8 @@ app-template:
       size: 20Gi
       advancedMounts:
         main:
+          jellyfin-debug:
+            - path: /config
           jellyfin:
             - path: /config
               subPath: jellyfin/config
