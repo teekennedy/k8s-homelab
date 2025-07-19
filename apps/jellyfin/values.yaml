@@ -384,7 +384,7 @@ app-template:
                     - key: gpu.intel.com/device-id.0300-e20c.present
                       operator: In
                       values: ["true"]
-      initContainers:
+      containers:
         jellyfin-debug:
           image:
             repository: busybox
@@ -392,7 +392,6 @@ app-template:
           command:
             - sleep
             - infinity
-      containers:
         jellyfin:
           image:
             repository: docker.io/jellyfin/jellyfin
@@ -404,31 +403,31 @@ app-template:
             TZ: America/Denver
             PUID: '1200'
             PGID: "1200"
-          probes:
-            liveness:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /health
-                  port: 8096
-                failureThreshold: 5
-                initialDelaySeconds: 0
-                periodSeconds: 10
-                successThreshold: 1
-                timeoutSeconds: 1
-            readiness:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /health
-                  port: 8096
-                failureThreshold: 3
-                initialDelaySeconds: 0
-                periodSeconds: 10
-                successThreshold: 1
-                timeoutSeconds: 1
+          # probes:
+          #   liveness:
+          #     enabled: true
+          #     custom: true
+          #     spec:
+          #       httpGet:
+          #         path: /health
+          #         port: 8096
+          #       failureThreshold: 5
+          #       initialDelaySeconds: 0
+          #       periodSeconds: 10
+          #       successThreshold: 1
+          #       timeoutSeconds: 1
+          #   readiness:
+          #     enabled: true
+          #     custom: true
+          #     spec:
+          #       httpGet:
+          #         path: /health
+          #         port: 8096
+          #       failureThreshold: 3
+          #       initialDelaySeconds: 0
+          #       periodSeconds: 10
+          #       successThreshold: 1
+          #       timeoutSeconds: 1
           resources:
             requests:
               cpu: 1000m
