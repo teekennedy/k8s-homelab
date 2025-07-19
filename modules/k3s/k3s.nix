@@ -98,9 +98,6 @@
           namespace: kube-system
         spec:
           valuesContent: |-
-            experimental:
-              kubernetesGateway:
-                enabled: true
             providers:
               kubernetesGateway:
                 enabled: true
