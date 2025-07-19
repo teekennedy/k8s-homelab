@@ -75,7 +75,7 @@
           "--kube-proxy-arg"
           "metrics-bind-address=0.0.0.0"
           # Enable the kube-scheduler metrics endpoint
-          "kube-scheduler-arg"
+          "--kube-scheduler-arg"
           "bind-address=0.0.0.0"
         ]
         (lib.mkIf (config.services.k3s.embeddedRegistry.enable) [

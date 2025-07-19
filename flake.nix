@@ -105,6 +105,29 @@
               runtimeInputs = [yq-go sops ssh-to-age mkpasswd];
               text = builtins.readFile ./scripts/bootstrap-host.sh;
             })
+            (writeShellApplication {
+              name = "deploy-diff";
+              runtimeInputs = [deploy-rs];
+              text = ''
+                if [ $# -gt 1 ]; then
+                  host=$2
+                else
+                  host=$1
+                fi
+                set -eou pipefail
+
+                mkfifo wait.fifo
+                trap 'rm wait.fifo' EXIT
+
+                deploy --debug-logs --skip-checks --dry-activate -- ".#$1" --override-input devenv-root "file+file://"<(printf %s "$DEVENV_ROOT") 2>&1 \
+                  | tee >(grep -v DEBUG) >(grep 'activate-rs --debug-logs activate' | \
+                      sed -e 's/^.*activate-rs --debug-logs activate \(.*\) --profile-user.*$/\1/' | \
+                      xargs -I% bash -xc "ssh $host 'nix run nixpkgs#nvd -- --color=always diff /run/current-system %'" ; echo >wait.fifo) \
+                  >/dev/null
+
+                read -r <wait.fifo
+              '';
+            })
           ];
 
           enterShell = ''

@@ -42,7 +42,7 @@
       # Records association between user/group names and ids.
       # Without this directory, backups could have wrong uid/gid.
       "/var/lib/nixos"
-      # k3s sqlite datastore
+      # k3s datastore (sqlite / etcd)
       "/var/lib/rancher/k3s/server/db"
     ];
     # File permissions don't need to be configured directly.
