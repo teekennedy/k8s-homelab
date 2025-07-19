@@ -385,13 +385,13 @@ app-template:
                       operator: In
                       values: ["true"]
       containers:
-        jellyfin-debug:
-          image:
-            repository: busybox
-            tag: 1.37.0
-          command:
-            - sleep
-            - infinity
+        # jellyfin-debug:
+        #   image:
+        #     repository: busybox
+        #     tag: 1.37.0
+        #   command:
+        #     - sleep
+        #     - infinity
         jellyfin:
           image:
             repository: docker.io/jellyfin/jellyfin
@@ -403,31 +403,31 @@ app-template:
             TZ: America/Denver
             PUID: '1200'
             PGID: "1200"
-          # probes:
-          #   liveness:
-          #     enabled: true
-          #     custom: true
-          #     spec:
-          #       httpGet:
-          #         path: /health
-          #         port: 8096
-          #       failureThreshold: 5
-          #       initialDelaySeconds: 0
-          #       periodSeconds: 10
-          #       successThreshold: 1
-          #       timeoutSeconds: 1
-          #   readiness:
-          #     enabled: true
-          #     custom: true
-          #     spec:
-          #       httpGet:
-          #         path: /health
-          #         port: 8096
-          #       failureThreshold: 3
-          #       initialDelaySeconds: 0
-          #       periodSeconds: 10
-          #       successThreshold: 1
-          #       timeoutSeconds: 1
+          probes:
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /health
+                  port: 8096
+                failureThreshold: 5
+                initialDelaySeconds: 0
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /health
+                  port: 8096
+                failureThreshold: 3
+                initialDelaySeconds: 0
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
           resources:
             requests:
               cpu: 1000m
@@ -663,8 +663,8 @@ app-template:
       size: 20Gi
       advancedMounts:
         main:
-          jellyfin-debug:
-            - path: /config
+          # jellyfin-debug:
+          #   - path: /config
           jellyfin:
             - path: /config
               subPath: jellyfin/config
