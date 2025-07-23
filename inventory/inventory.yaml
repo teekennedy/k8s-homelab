@@ -128,7 +128,7 @@ vlans:
     vlan_tag: 1
     subnet: 10.69.0.0/23
     switch_ports:
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+      [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     notes: This is the vlan tag used when a packet is untagged.
   management:
     vlan_tag: 20
@@ -140,6 +140,10 @@ vlans:
     subnet: 10.69.70.0/26 # 62 usable hosts
     wifi_networks: ["kennedy🏡"]
     switch_ports: [17, 19]
+  k8s:
+    vlan_tag: 800
+    subnet: 10.69.80.0/25 # 126 usable hosts
+    switch_ports: [11, 13, 15, 17]
   esphome:
     vlan_tag: 1000
     subnet: 10.69.100.0/25 # 126 usable hosts
@@ -163,11 +167,12 @@ vlans:
     wifi_networks: ["kennedy_iot"]
     switch_ports: [17, 19]
     notes: "vlan jail for single host"
-  k8s:
-    vlan_tag: 800
-    subnet: 10.69.80.0/25 # 126 usable hosts
-    switch_ports: [11, 13, 15, 17]
   unifi_protect:
     vlan_tag: 1010
     subnet: 10.69.101.0/25 # 126 usable hosts
     switch_ports: [10, 16, 17, 19]
+  wan:
+    vlan_tag: 2000
+    subnet: Dynamic (DHCP)
+    switch_ports: [1, 17, 20]
+    notes: Temporary (?) wan vlan to help with switching from OPNSense to Unifi

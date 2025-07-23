@@ -403,13 +403,11 @@ app-template:
           image:
             repository: docker.io/jellyfin/jellyfin
             tag: 10.10.7
-          command:
-            - sleep
-            - infinity
           env:
             TZ: America/Denver
-            PUID: '1200'
-            PGID: "1200"
+            JELLYFIN_DATA_DIR: "/data"
+            JELLYFIN_CACHE_DIR: "/data/cache"
+            JELLYFIN_CONFIG_DIR: "/data/config"
           probes:
             liveness:
               enabled: true
@@ -666,28 +664,17 @@ app-template:
           qbittorrent:
             - path: /downloads
               subPath: qbittorrent/downloads
-    jellyfin-cache:
+    jellyfin-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
-      size: 20Gi
+      size: 100Gi
       advancedMounts:
         debug:
           jellyfin-debug:
-            - path: /jellyfin-cache
+            - path: /jellyfin-data
         main:
           jellyfin:
-            - path: /cache
-    jellyfin-config:
-      accessMode: ReadWriteOnce
-      type: persistentVolumeClaim
-      size: 100Mi
-      advancedMounts:
-        debug:
-          jellyfin-debug:
-            - path: /jellyfin-config
-        main:
-          jellyfin:
-            - path: /config
+            - path: /data
     config:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
