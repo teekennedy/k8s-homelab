@@ -3,11 +3,6 @@
 app-template:
   defaultPodOptions:
     automountServiceAccountToken: false
-    securityContext:
-      fsGroup: &gid 1200
-      fsGroupChangePolicy: "OnRootMismatch"
-      runAsUser: 1200
-      runAsGroup: *gid
   controllers:
     debug:
       replicas: 0
@@ -403,6 +398,11 @@ app-template:
                       values: ["true"]
       containers:
         jellyfin:
+          securityContext:
+            fsGroup: &gid 1200
+            fsGroupChangePolicy: "OnRootMismatch"
+            runAsUser: 1200
+            runAsGroup: *gid
           image:
             repository: ghcr.io/jellyfin/jellyfin
             tag: 10.10.7
@@ -447,6 +447,12 @@ app-template:
               gpu.intel.com/i915: "1"
     jellyseerr:
       replicas: 1
+      defaultContainerOptions:
+        securityContext:
+          fsGroup: *gid
+          fsGroupChangePolicy: "OnRootMismatch"
+          runAsUser: 1200
+          runAsGroup: *gid
       containers:
         jellyseerr:
           image:
@@ -480,6 +486,12 @@ app-template:
                 timeoutSeconds: 3
     arrs:
       replicas: 1
+      defaultContainerOptions:
+        securityContext:
+          fsGroup: *gid
+          fsGroupChangePolicy: "OnRootMismatch"
+          runAsUser: 1200
+          runAsGroup: *gid
       containers:
         # https://docs.linuxserver.io/images/docker-prowlarr/
         prowlarr:
@@ -512,6 +524,11 @@ app-template:
       containers:
         # https://docs.linuxserver.io/images/docker-qbittorrent/
         qbittorrent:
+          securityContext:
+            fsGroup: *gid
+            fsGroupChangePolicy: "OnRootMismatch"
+            runAsUser: 1200
+            runAsGroup: *gid
           image:
             repository: lscr.io/linuxserver/qbittorrent
             tag: 5.0.3-r0-ls380
