@@ -529,6 +529,8 @@ app-template:
             tag: 5.0.3-r0-ls380
           env:
             TZ: America/Denver
+            PUID: "1200"
+            PGID: "1200"
         gluetun:
           image:
             repository: docker.io/qmcgaw/gluetun
