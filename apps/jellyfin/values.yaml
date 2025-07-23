@@ -3,11 +3,14 @@
 app-template:
   defaultPodOptions:
     automountServiceAccountToken: false
-    # securityContext:
-    #   fsGroup: &gid 1200
-    #   fsGroupChangePolicy: "OnRootMismatch"
+    securityContext:
+      fsGroup: &gid 1200
+      fsGroupChangePolicy: "OnRootMismatch"
+      runAsUser: 1200
+      runAsGroup: *gid
   controllers:
     debug:
+      replicas: 0
       containers:
         jellyfin-debug:
           image:
@@ -20,11 +23,6 @@ app-template:
     main:
       replicas: 1
       pod:
-        securityContext:
-          fsGroup: &gid 1200
-          fsGroupChangePolicy: "OnRootMismatch"
-          runAsUser: 1200
-          runAsGroup: *gid
         affinity:
           nodeAffinity:
             requiredDuringSchedulingIgnoredDuringExecution:
@@ -448,7 +446,7 @@ app-template:
               memory: 6Gi
               gpu.intel.com/i915: "1"
     jellyseerr:
-      replicas: 0
+      replicas: 1
       containers:
         jellyseerr:
           image:
@@ -456,8 +454,6 @@ app-template:
             tag: 2.5.2
           env:
             TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
           resources:
             # observed resource usage:
             #   cpu: 2m average, 45m max
@@ -483,7 +479,7 @@ app-template:
                 successThreshold: 1
                 timeoutSeconds: 3
     arrs:
-      replicas: 0
+      replicas: 1
       containers:
         # https://docs.linuxserver.io/images/docker-prowlarr/
         prowlarr:
@@ -499,8 +495,6 @@ app-template:
             tag: 5.22.4.9896-ls274
           env:
             TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
         # https://docs.linuxserver.io/images/docker-sonarr/
         sonarr:
           image:
@@ -508,10 +502,8 @@ app-template:
             tag: 4.0.14.2939-ls282
           env:
             TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
     downloader:
-      replicas: 0
+      replicas: 1
       pod:
         dnsPolicy: "None"
         dnsConfig:
@@ -525,16 +517,12 @@ app-template:
             tag: 5.0.3-r0-ls380
           env:
             TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
         gluetun:
           image:
             repository: docker.io/qmcgaw/gluetun
             tag: v3.40.0
           env:
             TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
             VPN_SERVICE_PROVIDER: protonvpn
             # create secret with kubectl -n jellyfin create secret generic gluetun --from-literal=WIREGUARD_PRIVATE_KEY=$(pbpaste)
             # Wireguard not working with port forwarding for now
@@ -681,6 +669,7 @@ app-template:
     jellyfin-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
+      # As of 2025-07-22 this was using 5.4GB
       size: 100Gi
       storageClass: longhorn
       advancedMounts:
@@ -707,9 +696,6 @@ app-template:
         arrs:
           prowlarr:
             - path: /config
-        debug:
-          jellyfin-debug:
-            - path: /prowlarr-data
     radarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -720,9 +706,6 @@ app-template:
         arrs:
           radarr:
             - path: /config
-        debug:
-          jellyfin-debug:
-            - path: /radarr-data
     sonarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -733,9 +716,6 @@ app-template:
         arrs:
           sonarr:
             - path: /config
-        debug:
-          jellyfin-debug:
-            - path: /sonarr-data
     qbittorrent-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -746,9 +726,6 @@ app-template:
         downloader:
           qbittorrent:
             - path: /config
-        debug:
-          jellyfin-debug:
-            - path: /qbittorrent-data
     config:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
