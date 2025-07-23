@@ -18,7 +18,7 @@ app-template:
             - infinity
 
     main:
-      replicas: 0
+      replicas: 1
       pod:
         affinity:
           nodeAffinity:
@@ -463,6 +463,20 @@ app-template:
             limits:
               cpu: 1000m
               memory: 800Mi
+          # https://docs.jellyseerr.dev/getting-started/docker
+          probes:
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /api/v1/status
+                  port: 5055
+                failureThreshold: 3
+                initialDelaySeconds: 20
+                periodSeconds: 15
+                successThreshold: 1
+                timeoutSeconds: 3
     arrs:
       replicas: 0
       containers:
@@ -673,12 +687,57 @@ app-template:
       # As of 2025-07-22 this was using 7.4MB
       size: 1Gi
       advancedMounts:
-        debug:
-          jellyfin-debug:
-            - path: /jellyfin-data
         jellyseerr:
           jellyseerr:
             - path: /app/config
+    prowlarr-data:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      # As of 2025-07-22 this was using 105MB
+      size: 1Gi
+      advancedMounts:
+        arrs:
+          prowlarr:
+            - path: /config
+        debug:
+          jellyfin-debug:
+            - path: /prowlarr-data
+    radarr-data:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      # As of 2025-07-22 this was using 266MB
+      size: 5Gi
+      advancedMounts:
+        arrs:
+          radarr:
+            - path: /config
+        debug:
+          jellyfin-debug:
+            - path: /radarr-data
+    sonarr-data:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      # As of 2025-07-22 this was using 317MB
+      size: 5Gi
+      advancedMounts:
+        arrs:
+          sonarr:
+            - path: /config
+        debug:
+          jellyfin-debug:
+            - path: /sonarr-data
+    qbittorrent-data:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      # As of 2025-07-22 this was using 151MB
+      size: 1Gi
+      advancedMounts:
+        downloader:
+          qbittorrent:
+            - path: /config
+        debug:
+          jellyfin-debug:
+            - path: /qbittorrent-data
     config:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -687,17 +746,3 @@ app-template:
         debug:
           jellyfin-debug:
             - path: /config
-        arrs:
-          prowlarr:
-            - path: /config
-              subPath: prowlarr/config
-          radarr:
-            - path: /config
-              subPath: radarr/config
-          sonarr:
-            - path: /config
-              subPath: sonarr/config
-        downloader:
-          qbittorrent:
-            - path: /config
-              subPath: qbittorrent/config
