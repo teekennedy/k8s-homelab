@@ -666,6 +666,28 @@ app-template:
           qbittorrent:
             - path: /downloads
               subPath: qbittorrent/downloads
+    jellyfin-cache:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      size: 20Gi
+      advancedMounts:
+        debug:
+          jellyfin-debug:
+            - path: /jellyfin-cache
+        main:
+          jellyfin:
+            - path: /cache
+    jellyfin-config:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      size: 100Mi
+      advancedMounts:
+        debug:
+          jellyfin-debug:
+            - path: /jellyfin-config
+        main:
+          jellyfin:
+            - path: /config
     config:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -674,10 +696,6 @@ app-template:
         debug:
           jellyfin-debug:
             - path: /config
-        main:
-          jellyfin:
-            - path: /config
-              subPath: jellyfin/config
         arrs:
           prowlarr:
             - path: /config
