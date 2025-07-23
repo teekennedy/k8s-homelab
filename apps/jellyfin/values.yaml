@@ -11,8 +11,8 @@ app-template:
       containers:
         jellyfin-debug:
           image:
-            repository: busybox
-            tag: 1.37.0
+            repository: alpine
+            tag: latest
           command:
             - sleep
             - infinity
@@ -401,7 +401,7 @@ app-template:
       containers:
         jellyfin:
           image:
-            repository: docker.io/jellyfin/jellyfin
+            repository: ghcr.io/jellyfin/jellyfin
             tag: 10.10.7
           env:
             TZ: America/Denver
@@ -442,6 +442,9 @@ app-template:
               cpu: 3500m
               memory: 6Gi
               gpu.intel.com/i915: "1"
+    jellyseerr:
+      replicas: 0
+      containers:
         jellyseerr:
           image:
             repository: docker.io/fallenbagel/jellyseerr
@@ -484,14 +487,6 @@ app-template:
           image:
             repository: lscr.io/linuxserver/sonarr
             tag: 4.0.14.2939-ls282
-          env:
-            TZ: America/Denver
-            PUID: "1200"
-            PGID: "1200"
-        jellyseerr:
-          image:
-            repository: docker.io/fallenbagel/jellyseerr
-            tag: 2.5.2
           env:
             TZ: America/Denver
             PUID: "1200"
@@ -669,12 +664,21 @@ app-template:
       type: persistentVolumeClaim
       size: 100Gi
       advancedMounts:
-        debug:
-          jellyfin-debug:
-            - path: /jellyfin-data
         main:
           jellyfin:
             - path: /data
+    jellyseerr-data:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      # As of 2025-07-22 this was using 7.4MB
+      size: 1Gi
+      advancedMounts:
+        debug:
+          jellyfin-debug:
+            - path: /jellyfin-data
+        jellyseerr:
+          jellyseerr:
+            - path: /app/config
     config:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -693,9 +697,6 @@ app-template:
           sonarr:
             - path: /config
               subPath: sonarr/config
-          jellyseerr:
-            - path: /app/config
-              subPath: jellyseerr/config
         downloader:
           qbittorrent:
             - path: /config
