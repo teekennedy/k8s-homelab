@@ -18,6 +18,11 @@ app-template:
     main:
       replicas: 1
       pod:
+        securityContext:
+          fsGroup: &gid 1200
+          fsGroupChangePolicy: "OnRootMismatch"
+          runAsUser: 1200
+          runAsGroup: *gid
         affinity:
           nodeAffinity:
             requiredDuringSchedulingIgnoredDuringExecution:
@@ -398,11 +403,6 @@ app-template:
                       values: ["true"]
       containers:
         jellyfin:
-          securityContext:
-            fsGroup: &gid 1200
-            fsGroupChangePolicy: "OnRootMismatch"
-            runAsUser: 1200
-            runAsGroup: *gid
           image:
             repository: ghcr.io/jellyfin/jellyfin
             tag: 10.10.7
@@ -447,7 +447,7 @@ app-template:
               gpu.intel.com/i915: "1"
     jellyseerr:
       replicas: 1
-      defaultContainerOptions:
+      pod:
         securityContext:
           fsGroup: *gid
           fsGroupChangePolicy: "OnRootMismatch"
@@ -486,7 +486,7 @@ app-template:
                 timeoutSeconds: 3
     arrs:
       replicas: 1
-      defaultContainerOptions:
+      pod:
         securityContext:
           fsGroup: *gid
           fsGroupChangePolicy: "OnRootMismatch"
@@ -524,11 +524,6 @@ app-template:
       containers:
         # https://docs.linuxserver.io/images/docker-qbittorrent/
         qbittorrent:
-          securityContext:
-            fsGroup: *gid
-            fsGroupChangePolicy: "OnRootMismatch"
-            runAsUser: 1200
-            runAsGroup: *gid
           image:
             repository: lscr.io/linuxserver/qbittorrent
             tag: 5.0.3-r0-ls380
