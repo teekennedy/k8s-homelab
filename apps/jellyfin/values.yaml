@@ -457,7 +457,7 @@ app-template:
         jellyseerr:
           image:
             repository: docker.io/fallenbagel/jellyseerr
-            tag: 2.5.2
+            tag: 2.7.2
           env:
             TZ: America/Denver
           resources:
@@ -497,21 +497,21 @@ app-template:
         prowlarr:
           image:
             repository: lscr.io/linuxserver/prowlarr
-            tag: 1.35.1.5034-ls117
+            tag: 1.37.0.5076-ls123
           env:
             TZ: America/Denver
         # https://docs.linuxserver.io/images/docker-radarr/
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 5.22.4.9896-ls274
+            tag: 5.26.2.10099-ls279
           env:
             TZ: America/Denver
         # https://docs.linuxserver.io/images/docker-sonarr/
         sonarr:
           image:
             repository: lscr.io/linuxserver/sonarr
-            tag: 4.0.14.2939-ls282
+            tag: 4.0.15.2941-ls288
           env:
             TZ: America/Denver
     downloader:
