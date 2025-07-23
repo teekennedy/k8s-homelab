@@ -20,6 +20,11 @@ app-template:
     main:
       replicas: 1
       pod:
+        securityContext:
+          fsGroup: &gid 1200
+          fsGroupChangePolicy: "OnRootMismatch"
+          runAsUser: 1200
+          runAsGroup: *gid
         affinity:
           nodeAffinity:
             requiredDuringSchedulingIgnoredDuringExecution:
@@ -417,7 +422,7 @@ app-template:
                   path: /health
                   port: 8096
                 failureThreshold: 5
-                initialDelaySeconds: 0
+                initialDelaySeconds: 30
                 periodSeconds: 10
                 successThreshold: 1
                 timeoutSeconds: 1
@@ -429,7 +434,7 @@ app-template:
                   path: /health
                   port: 8096
                 failureThreshold: 3
-                initialDelaySeconds: 0
+                initialDelaySeconds: 30
                 periodSeconds: 10
                 successThreshold: 1
                 timeoutSeconds: 1
@@ -677,6 +682,7 @@ app-template:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
       size: 100Gi
+      storageClass: longhorn
       advancedMounts:
         main:
           jellyfin:
@@ -686,6 +692,7 @@ app-template:
       type: persistentVolumeClaim
       # As of 2025-07-22 this was using 7.4MB
       size: 1Gi
+      storageClass: longhorn
       advancedMounts:
         jellyseerr:
           jellyseerr:
@@ -695,6 +702,7 @@ app-template:
       type: persistentVolumeClaim
       # As of 2025-07-22 this was using 105MB
       size: 1Gi
+      storageClass: longhorn
       advancedMounts:
         arrs:
           prowlarr:
@@ -707,6 +715,7 @@ app-template:
       type: persistentVolumeClaim
       # As of 2025-07-22 this was using 266MB
       size: 5Gi
+      storageClass: longhorn
       advancedMounts:
         arrs:
           radarr:
@@ -719,6 +728,7 @@ app-template:
       type: persistentVolumeClaim
       # As of 2025-07-22 this was using 317MB
       size: 5Gi
+      storageClass: longhorn
       advancedMounts:
         arrs:
           sonarr:
@@ -731,6 +741,7 @@ app-template:
       type: persistentVolumeClaim
       # As of 2025-07-22 this was using 151MB
       size: 1Gi
+      storageClass: longhorn
       advancedMounts:
         downloader:
           qbittorrent:
@@ -742,6 +753,7 @@ app-template:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
       size: 20Gi
+      storageClass: longhorn
       advancedMounts:
         debug:
           jellyfin-debug:
