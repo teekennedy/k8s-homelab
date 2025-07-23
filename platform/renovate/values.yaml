@@ -9,6 +9,16 @@ renovate:
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
         "autodiscover": true
       }
-  existingSecret: renovate-secret
   env:
     LOG_LEVEL: debug
+  envList:
+    - name: RENOVATE_GITHUB_COM_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: renovate-secret
+          key: RENOVATE_GITHUB_COM_TOKEN
+    - name: RENOVATE_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: renovate-gitea-user
+          key: token
