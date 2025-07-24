@@ -19,6 +19,7 @@ authelia:
     traefikCRD:
       enabled: true
       disableIngressRoute: false
+      entryPoints: ["web"]
   configMap:
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
     authentication_backend:
