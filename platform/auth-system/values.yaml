@@ -124,8 +124,8 @@ authelia:
     env:
       - name: TZ
         value: America/Denver
-      # - name: AUTHELIA_LOG_LEVEL
-      #   value: debug
+      - name: AUTHELIA_LOG_LEVEL
+        value: debug
       - name: AUTHELIA_NOTIFIER_SMTP_USERNAME
         valueFrom:
           secretKeyRef:

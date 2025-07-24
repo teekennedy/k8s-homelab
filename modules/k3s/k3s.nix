@@ -108,7 +108,7 @@
               checkNewVersion: false
               sendAnonymousUsage: false
             # These settings are for Traefik helm prior to v36.3.0
-            globalArguments: {}
+            globalArguments: []
         EOF
       '';
     };
