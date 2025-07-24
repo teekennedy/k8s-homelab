@@ -1,7 +1,7 @@
 apiVersion: v2
 name: renovate
-version: 0.0.7
+version: 0.0.8
 dependencies:
   - name: renovate
-    version: 40.62.1
+    version: 41.43.0
     repository: https://docs.renovatebot.com/helm-charts
