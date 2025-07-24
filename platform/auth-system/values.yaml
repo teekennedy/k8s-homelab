@@ -21,6 +21,7 @@ authelia:
       disableIngressRoute: true
       entryPoints: ["websecure"]
   configMap:
+    theme: auto
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
     authentication_backend:
       # Password reset through authelia works normally.
