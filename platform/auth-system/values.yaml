@@ -11,14 +11,9 @@ authelia:
       enabled: true
       # Secret name defaults to 'authelia-tls'
       # secret: 'authelia-tls'
-    gatewayAPI:
-      parentRefs:
-        - name: traefik-gateway
-          namespace: kube-system
-          sectionName: web
     traefikCRD:
       enabled: true
-      disableIngressRoute: true
+      disableIngressRoute: false
       entryPoints: ["websecure"]
   configMap:
     theme: auto
