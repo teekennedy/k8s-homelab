@@ -14,11 +14,11 @@ authelia:
     gatewayAPI:
       parentRefs:
         - name: traefik-gateway
-          namespace: kube-system # TODO this doesn't do anything right now
+          namespace: kube-system
           sectionName: web
     traefikCRD:
-      enabled: true
-      disableIngressRoute: false
+      enabled: false
+      disableIngressRoute: true
       entryPoints: ["web"]
   configMap:
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
