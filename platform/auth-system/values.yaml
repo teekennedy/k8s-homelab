@@ -7,22 +7,18 @@ authelia:
     enabled: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-      external-dns.alpha.kubernetes.io/hostname: authelia.msng.to
     tls:
       enabled: true
       # Secret name defaults to 'authelia-tls'
       # secret: 'authelia-tls'
     gatewayAPI:
-      enabled: true
       parentRefs:
         - name: traefik-gateway
-          # namespace: kube-system # TODO this doesn't do anything right now
+          namespace: kube-system # TODO this doesn't do anything right now
           sectionName: web
     traefikCRD:
       enabled: false
       disableIngressRoute: true
-  service:
-    port: 9091
   configMap:
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
     authentication_backend:
