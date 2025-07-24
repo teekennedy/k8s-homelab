@@ -17,7 +17,7 @@ authelia:
           namespace: kube-system # TODO this doesn't do anything right now
           sectionName: web
     traefikCRD:
-      enabled: false
+      enabled: true
       disableIngressRoute: true
   configMap:
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
