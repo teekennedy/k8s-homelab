@@ -644,7 +644,7 @@ app-template:
             - path: /
               pathType: Prefix
               service:
-                identifier: arrs
+                identifier: jellyseerr
                 port: jellyseerr
       tls:
         - secretName: jellyfin-tls-certificate
