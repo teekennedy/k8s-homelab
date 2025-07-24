@@ -25,7 +25,7 @@ spec:
             - /bin/bash
             - -c
             - |
-              set -exuo pipefail
+              set -euo pipefail
 
               echo "Fetching and encoding CA root certificate..."
               CA_ROOT_B64=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.data['root_ca\.crt']}" configmap/step-ca-certs | base64 | tr -d '\n')
