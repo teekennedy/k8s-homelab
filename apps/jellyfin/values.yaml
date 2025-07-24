@@ -574,6 +574,12 @@ app-template:
         http:
           port: 8096
           protocol: HTTP
+    jellyseerr:
+      controller: jellyseerr
+      ports:
+        jellyseerr:
+          port: 5055
+          protocol: HTTP
     arrs:
       controller: arrs
       ports:
@@ -585,9 +591,6 @@ app-template:
           protocol: HTTP
         sonarr:
           port: 8989
-          protocol: HTTP
-        jellyseerr:
-          port: 5055
           protocol: HTTP
     downloader:
       controller: downloader
