@@ -21,6 +21,8 @@ authelia:
     traefikCRD:
       enabled: false
       disableIngressRoute: true
+  service:
+    port: 9091
   configMap:
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
     authentication_backend:
@@ -139,9 +141,6 @@ authelia:
       requests:
         cpu: '0.25'
         memory: '125Mi'
-
-  networkPolicy:
-    enabled: true
 
   secret:
     # Generate our own secrets for authelia
