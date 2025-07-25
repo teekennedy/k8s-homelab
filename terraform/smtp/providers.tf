@@ -8,7 +8,7 @@ terraform {
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 4.52"
+      version = "~> 5.7"
     }
     external = {
       source  = "hashicorp/external"
@@ -21,9 +21,4 @@ provider "aws" {
   default_tags {
     tags = {}
   }
-}
-
-provider "cloudflare" {
-  email   = var.cloudflare_email
-  api_key = var.cloudflare_api_key
 }

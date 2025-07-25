@@ -4,7 +4,7 @@ terraform {
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 4.52"
+      version = "~> 5.7"
     }
     http = {
       source  = "hashicorp/http"
@@ -23,4 +23,9 @@ terraform {
 
 provider "kubernetes" {
   config_path = "../.devenv/state/kube/config"
+}
+
+provider "cloudflare" {
+  email   = local.cloudflare_email
+  api_key = local.cloudflare_api_key
 }

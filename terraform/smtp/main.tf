@@ -50,24 +50,26 @@ resource "aws_iam_access_key" "smtp" {
   pgp_key = var.pgp_key
 }
 
-resource "cloudflare_record" "ses" {
+resource "cloudflare_dns_record" "ses" {
   for_each = { for rec in local.ses_dns_records : rec.id => rec }
-  zone_id  = data.cloudflare_zone.zone.id
+  zone_id  = data.cloudflare_zones.zone.result[0].id
   name     = each.value.name
   type     = each.value.type
   content  = each.value.content
   priority = try(each.value.priority, null) # MX records require a priority field
   proxied  = false
+  ttl      = 1 # Auto
 }
 
-resource "cloudflare_record" "ses_dkim" {
+resource "cloudflare_dns_record" "ses_dkim" {
   # The documentation for this resource shows hardcoding count to 3
   count   = 3
-  zone_id = data.cloudflare_zone.zone.id
+  zone_id = data.cloudflare_zones.zone.result[0].id
   name    = "${aws_ses_domain_dkim.this.dkim_tokens[count.index]}._domainkey.${var.domain}"
   type    = "CNAME"
   content = "${aws_ses_domain_dkim.this.dkim_tokens[count.index]}.dkim.amazonses.com"
   proxied = false
+  ttl     = 1 # Auto
 }
 data "external" "smtp_secret_access_key" {
   query = {

@@ -1,27 +1,10 @@
-variable "ses_mx_records" {
-  type = list(object({
-    name     = string
-    type     = string
-    priority = optional(number)
-    value    = string
-  }))
-  default = []
-}
-
-variable "ses_txt_records" {
-  type = list(object({
-    name  = string
-    type  = string
-    value = string
-  }))
-  default = []
-}
-
-data "cloudflare_zone" "zone" {
+data "cloudflare_zones" "zone" {
   name = var.cloudflare_domain
 }
 
-data "cloudflare_api_token_permission_groups" "all" {}
+data "cloudflare_api_token_permission_groups_list" "all" {
+  scope = "com.cloudflare.api.account.zone"
+}
 
 resource "random_password" "tunnel_secret" {
   length  = 64
@@ -29,14 +12,14 @@ resource "random_password" "tunnel_secret" {
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared" "homelab" {
-  account_id = var.cloudflare_account_id
-  name       = "homelab"
-  secret     = random_password.tunnel_secret.result
+  account_id    = var.cloudflare_account_id
+  name          = "homelab"
+  tunnel_secret = random_password.tunnel_secret.result
 }
 
 # Not proxied, not accessible. Just a record for auto-created CNAMEs by external-dns.
-resource "cloudflare_record" "tunnel" {
-  zone_id = data.cloudflare_zone.zone.id
+resource "cloudflare_dns_record" "tunnel" {
+  zone_id = data.cloudflare_zones.zone.result[0].id
   type    = "CNAME"
   name    = "homelab-tunnel"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
@@ -45,9 +28,9 @@ resource "cloudflare_record" "tunnel" {
 }
 
 # static, internal only DNS records for borg hosts
-resource "cloudflare_record" "k8s_host_ipv4" {
+resource "cloudflare_dns_record" "k8s_host_ipv4" {
   for_each = var.k8s_hosts
-  zone_id  = data.cloudflare_zone.zone.id
+  zone_id  = data.cloudflare_zones.zone.result[0].id
   type     = "A"
   name     = each.key
   content  = each.value.ipv4
@@ -73,15 +56,13 @@ module "cloudflared_credentials_secret" {
 resource "cloudflare_api_token" "external_dns" {
   name = "homelab_external_dns"
 
-  policy {
-    permission_groups = [
-      data.cloudflare_api_token_permission_groups.all.zone["Zone Read"],
-      data.cloudflare_api_token_permission_groups.all.zone["DNS Write"]
-    ]
+  policies = [{
+    effect            = "allow"
+    permission_groups = local.dns_edit_permission_groups
     resources = {
       "com.cloudflare.api.account.zone.*" = "*"
     }
-  }
+  }]
 }
 
 module "external_dns_secret" {
@@ -97,15 +78,13 @@ module "external_dns_secret" {
 resource "cloudflare_api_token" "cert_manager" {
   name = "homelab_cert_manager"
 
-  policy {
-    permission_groups = [
-      data.cloudflare_api_token_permission_groups.all.zone["Zone Read"],
-      data.cloudflare_api_token_permission_groups.all.zone["DNS Write"]
-    ]
+  policies = [{
+    effect            = "allow"
+    permission_groups = local.dns_edit_permission_groups
     resources = {
       "com.cloudflare.api.account.zone.*" = "*"
     }
-  }
+  }]
 }
 
 module "cloudflare_api_token_secret" {
