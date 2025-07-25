@@ -1,12 +1,18 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "security:openssf-scorecard", "group:allNonMajor"],
+  "extends": [
+    "config:recommended",
+    "security:openssf-scorecard",
+    "group:allNonMajor"
+  ],
   "bumpVersion": "patch",
   "customManagers": [
     {
       "description": "Automatically update helm chart app version",
       "customType": "regex",
-      "fileMatch": ["(^|/)Chart\\.yaml$"],
+      "managerFilePatterns": [
+        "/(^|/)Chart\\.yaml$/"
+      ],
       "matchStrings": [
         "# renovate datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) extractVersion=(?<extractVersion>\\S+)\\nappVersion:\\s?(?<currentValue>\\S+)\\n"
       ]
@@ -18,12 +24,16 @@
   "packageRules": [
     {
       "description": "Minor / patch updates to v0 packages can contain breaking changes and should be excluded from grouped PRs.",
-      "extends": ["group:allNonMajor"],
+      "extends": [
+        "group:allNonMajor"
+      ],
       "matchCurrentVersion": "!/^0/"
     },
     {
-      "packagePatterns": ["^(gh|ls)cr.io\\/linuxserver\\/"],
-      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-ls(?<revision>\\d+)$"
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-ls(?<revision>\\d+)$",
+      "matchPackageNames": [
+        "/^(gh|ls)cr.io\\/linuxserver\\//"
+      ]
     }
   ]
 }
