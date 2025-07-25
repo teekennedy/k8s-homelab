@@ -83,7 +83,7 @@ authelia:
         # @schema
         # -- Subject configuration of the emails sent.
         # {title} is replaced by the text from the notifier
-        subject: '[auth] {title}'
+        subject: '[msng.to] {title}'
 
         # @schema
         # required: false
