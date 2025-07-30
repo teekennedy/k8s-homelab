@@ -165,7 +165,7 @@ app-template:
           image:
             repository: ghcr.io/lldap/lldap
             # TODO make sure renovatebot can update this
-            tag: "2025-07-22-alpine-rootless"
+            tag: "2025-07-29-alpine-rootless"
             pullPolicy: IfNotPresent
           env:
             # debugging
