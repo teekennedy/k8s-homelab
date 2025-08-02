@@ -21,6 +21,7 @@ kube-prometheus-stack:
           hosts:
             - *host
     persistence:
+      storageClassName: longhorn
       accessModes:
         - ReadWriteOnce
       enabled: true
