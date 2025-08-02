@@ -55,9 +55,7 @@ kube-prometheus-stack:
   ## Install Prometheus Operator CRDs
   ##
   crds:
-    # Temporarily disabled because ArgoCD cannot apply them:
-    # error when patching "/dev/shm/3249582713": CustomResourceDefinition.apiextensions.k8s.io "prometheusagents.monitoring.coreos.com" is invalid: metadata.annotations: Too long: may not be more than 262144 bytes
-    enabled: false
+    enabled: true
     ## The CRD upgrade job mitigates the limitation of helm not being able to upgrade CRDs.
     ## The job will apply the CRDs to the cluster before the operator is deployed, using helm hooks.
     ## It deploy a corresponding clusterrole, clusterrolebinding and serviceaccount to apply the CRDs.
