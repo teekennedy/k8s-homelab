@@ -11,6 +11,10 @@ argo-cd:
       controller.diff.server.side: true
     # argocd-cm configmap
     cm:
+      # ArgoCD's default annotation tracking stores a large amount of data in annotations for large resources.
+      # This can cause sync errors when the maximum annotation size is exceeded.
+      # Use labels instead of annotations for resource tracking.
+      application.resourceTrackingMethod: label
       resource.ignoreResourceUpdatesEnabled: true
       resource.customizations.ignoreResourceUpdates.all: |
         jsonPointers:
