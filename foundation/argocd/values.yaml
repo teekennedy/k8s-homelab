@@ -83,6 +83,11 @@ argocd-apps:
               jsonPointers:
                 - /data
             - kind: Secret
+              namespace: gitea
+              name: gitea-admin-secret
+              jsonPointers:
+                - /data
+            - kind: Secret
               namespace: monitoring-system
               name: monitoring-system-grafana
               jsonPointers:
