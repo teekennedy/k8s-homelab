@@ -73,8 +73,18 @@ argocd-apps:
                 - /spec/volumeName
                 - /spec/storageClassName
             - kind: Secret
+              namespace: auth-system
+              name: lldap-authelia-bind-user
+              jsonPointers:
+                - /data
+            - kind: Secret
+              namespace: auth-system
+              name: authelia-secrets
+              jsonPointers:
+                - /data
+            - kind: Secret
               namespace: monitoring-system
-              name: hubble-server-certs
+              name: monitoring-system-grafana
               jsonPointers:
                 - /data
             - kind: Secret
