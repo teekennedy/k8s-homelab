@@ -19,7 +19,7 @@
   ],
   "packageRules": [
     {
-      "groupName": "all non-major dependencies (exclude 0.x.y)",
+      "groupName": "all non-major dependencies (excluding 0.x)",
       "groupSlug": "all-minor-patch-semver",
       "matchPackageNames": [
         "*"
