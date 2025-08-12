@@ -32,7 +32,9 @@ kube-prometheus-stack:
         enabled: true
       datasources:
         enabled: true
-    envFromSecret: grafana-secrets
+    # This used to contain Dex client secret, but currently doesn't exist.
+    # Can be recreated if needed with GRAFANA_SSO_CLIENT_SECRET: (dex.grafana -> client_secret in global-secrets namespace)
+    # envFromSecret: grafana-secrets
     grafana.ini:
       server:
         root_url: https://grafana.msng.to
