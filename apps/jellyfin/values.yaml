@@ -457,7 +457,7 @@ app-template:
         jellyseerr:
           image:
             repository: docker.io/fallenbagel/jellyseerr
-            tag: 2.7.2
+            tag: 2.7.3
           env:
             TZ: America/Denver
           resources:
