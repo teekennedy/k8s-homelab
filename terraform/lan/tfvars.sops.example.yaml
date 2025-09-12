@@ -1,0 +1,8 @@
+# API key for unifi controller. See readme for instructions on generating one.
+unifi_api_key: xxxxx
+# local url for api
+unifi_api_url: https://1.2.3.4
+# Set to true to allow self-signed certificates on https
+unifi_allow_insecure: true
+# Name of the unifi site to provision. Probably default
+unifi_site: default
