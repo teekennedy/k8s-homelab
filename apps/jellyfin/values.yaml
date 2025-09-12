@@ -18,11 +18,11 @@ app-template:
     main:
       replicas: 1
       pod:
-        securityContext:
-          fsGroup: &gid 1200
-          fsGroupChangePolicy: "OnRootMismatch"
-          runAsUser: 1200
-          runAsGroup: *gid
+        # securityContext:
+        #   fsGroup: &gid 1200
+        #   fsGroupChangePolicy: "OnRootMismatch"
+        #   runAsUser: 1200
+        #   runAsGroup: *gid
         affinity:
           nodeAffinity:
             requiredDuringSchedulingIgnoredDuringExecution:
@@ -404,8 +404,14 @@ app-template:
       containers:
         jellyfin:
           image:
-            repository: ghcr.io/jellyfin/jellyfin
-            tag: 10.10.7
+            repository: alpine
+            tag: latest
+            # repository: ghcr.io/jellyfin/jellyfin
+            # tag: 10.10.7
+          command:
+            - /bin/sh
+            - -c
+            - 'while sleep 3600; do :; done'
           env:
             TZ: America/Denver
             JELLYFIN_DATA_DIR: "/data"
@@ -413,7 +419,7 @@ app-template:
             JELLYFIN_CONFIG_DIR: "/data/config"
           probes:
             liveness:
-              enabled: true
+              enabled: false
               custom: true
               spec:
                 httpGet:
@@ -425,7 +431,7 @@ app-template:
                 successThreshold: 1
                 timeoutSeconds: 1
             readiness:
-              enabled: true
+              enabled: false
               custom: true
               spec:
                 httpGet:
@@ -449,7 +455,7 @@ app-template:
       replicas: 1
       pod:
         securityContext:
-          fsGroup: *gid
+          fsGroup: &gid 1200
           fsGroupChangePolicy: "OnRootMismatch"
           runAsUser: 1200
           runAsGroup: *gid
