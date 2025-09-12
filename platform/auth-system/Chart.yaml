@@ -1,9 +1,9 @@
 apiVersion: v2
 name: authelia
-version: 0.0.5
+version: 0.0.6
 dependencies:
   - name: authelia
-    version: 0.10.45
+    version: 0.10.46
     repository: https://charts.authelia.com
   - name: app-template
     version: 4.2.0
