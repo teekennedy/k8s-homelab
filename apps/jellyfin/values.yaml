@@ -5,7 +5,7 @@ app-template:
     automountServiceAccountToken: false
   controllers:
     debug:
-      replicas: 1
+      replicas: 0
       containers:
         jellyfin-debug:
           image:
@@ -16,7 +16,7 @@ app-template:
             - infinity
 
     main:
-      replicas: 0
+      replicas: 1
       pod:
         securityContext:
           fsGroup: &gid 1200
