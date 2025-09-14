@@ -16,7 +16,7 @@ app-template:
             - infinity
 
     main:
-      replicas: 1
+      replicas: 0
       pod:
         securityContext:
           fsGroup: &gid 1200
