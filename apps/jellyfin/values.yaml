@@ -5,7 +5,7 @@ app-template:
     automountServiceAccountToken: false
   controllers:
     debug:
-      replicas: 1
+      replicas: 0
       containers:
         jellyfin-debug:
           image:
@@ -498,7 +498,7 @@ app-template:
               memory: 6Gi
               gpu.intel.com/i915: "1"
     jellyseerr:
-      replicas: 0
+      replicas: 1
       pod:
         securityContext:
           fsGroup: *gid
@@ -769,6 +769,9 @@ app-template:
         main:
           jellyfin:
             - path: /data
+        debug:
+          jellyfin-debug:
+            - path: /data
     # For migration from old PVC
     jellyfin-data-old:
       existingClaim: jellyfin-main-backup-2025-09-14
@@ -786,9 +789,6 @@ app-template:
         jellyseerr:
           jellyseerr:
             - path: /app/config
-        debug:
-          jellyfin-debug:
-            - path: /jellyseerr-data
     prowlarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
