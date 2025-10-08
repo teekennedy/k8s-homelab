@@ -1,5 +1,5 @@
 # https://devenv.sh/
-.devenv
+.devenv*
 .pre-commit-config.yaml
 
 # direnv
