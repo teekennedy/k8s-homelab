@@ -1,6 +1,6 @@
 psql:
   clusterName: gitea-psql
-  image: ghcr.io/cloudnative-pg/postgresql:17.6-standard-bookworm
+  image: ghcr.io/cloudnative-pg/postgresql:18.0-standard-bookworm
 
 gitea:
   image:
