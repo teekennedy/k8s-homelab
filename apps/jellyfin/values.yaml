@@ -445,58 +445,6 @@ app-template:
               cpu: 3500m
               memory: 6Gi
               gpu.intel.com/i915: "1"
-    main-old:
-      replicas: 1
-      pod:
-        securityContext:
-          fsGroup: &gid 1200
-          fsGroupChangePolicy: "OnRootMismatch"
-          runAsUser: 1200
-          runAsGroup: *gid
-      containers:
-        jellyfin:
-          image:
-            repository: ghcr.io/jellyfin/jellyfin
-            tag: 10.10.7
-          env:
-            TZ: America/Denver
-            JELLYFIN_DATA_DIR: "/data"
-            JELLYFIN_CACHE_DIR: "/data/cache"
-            JELLYFIN_CONFIG_DIR: "/data/config"
-          probes:
-            liveness:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /health
-                  port: 8096
-                failureThreshold: 5
-                initialDelaySeconds: 30
-                periodSeconds: 10
-                successThreshold: 1
-                timeoutSeconds: 1
-            readiness:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /health
-                  port: 8096
-                failureThreshold: 3
-                initialDelaySeconds: 30
-                periodSeconds: 10
-                successThreshold: 1
-                timeoutSeconds: 1
-          resources:
-            requests:
-              cpu: 1000m
-              memory: 1Gi
-              gpu.intel.com/i915: "1"
-            limits:
-              cpu: 3500m
-              memory: 6Gi
-              gpu.intel.com/i915: "1"
     jellyseerr:
       replicas: 1
       pod:
@@ -626,12 +574,6 @@ app-template:
         http:
           port: 8096
           protocol: HTTP
-    main-old:
-      controller: main-old
-      ports:
-        http:
-          port: 8096
-          protocol: HTTP
     jellyseerr:
       controller: jellyseerr
       ports:
@@ -668,13 +610,6 @@ app-template:
               pathType: Prefix
               service:
                 identifier: main
-                port: http
-        - host: &jellyfinOldHost jellyfin-old.msng.to
-          paths:
-            - path: /
-              pathType: Prefix
-              service:
-                identifier: main-old
                 port: http
         - host: &qbittorrentHost qbittorrent.msng.to
           paths:
@@ -715,7 +650,6 @@ app-template:
         - secretName: jellyfin-tls-certificate
           hosts:
             - *jellyfinHost
-            - *jellyfinOldHost
             - *qbittorrentHost
             - *prowlarrHost
             - *radarrHost
@@ -729,14 +663,6 @@ app-template:
       storageClass: smb
       advancedMounts:
         main:
-          jellyfin:
-            - path: /media/movies
-              readOnly: true
-              subPath: movies
-            - path: /media/shows
-              readOnly: true
-              subPath: shows
-        main-old:
           jellyfin:
             - path: /media/movies
               readOnly: true
@@ -771,13 +697,6 @@ app-template:
             - path: /data
         debug:
           jellyfin-debug:
-            - path: /data
-    # For migration from old PVC
-    jellyfin-data-old:
-      existingClaim: jellyfin-main-backup-2025-09-14
-      advancedMounts:
-        main-old:
-          jellyfin:
             - path: /data
     jellyseerr-data:
       accessMode: ReadWriteOnce
