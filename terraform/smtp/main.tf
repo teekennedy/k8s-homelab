@@ -53,7 +53,7 @@ resource "aws_iam_access_key" "smtp" {
 resource "cloudflare_dns_record" "ses" {
   for_each = { for rec in local.ses_dns_records : rec.id => rec }
   zone_id  = data.cloudflare_zones.zone.result[0].id
-  name     = each.value.name
+  name     = "${each.value.name}.${var.domain}"
   type     = each.value.type
   content  = each.value.content
   priority = try(each.value.priority, null) # MX records require a priority field

@@ -1,3 +1,5 @@
+# Passphrase to encrypt local state
+tofu_local_state_passphrase: "ChangeMe!!1!"
 # https://dash.cloudflare.com/profile
 cloudflare_email: "myaccount@example.com"
 # https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids

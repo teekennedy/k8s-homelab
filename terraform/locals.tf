@@ -3,7 +3,6 @@ data "sops_file" "tfvars" {
 }
 
 locals {
-
   cloudflare_domain     = coalesce(var.cloudflare_domain, data.sops_file.tfvars.data["cloudflare_domain"])
   cloudflare_email      = coalesce(var.cloudflare_email, data.sops_file.tfvars.data["cloudflare_email"])
   cloudflare_api_key    = coalesce(var.cloudflare_api_key, data.sops_file.tfvars.data["cloudflare_api_key"])

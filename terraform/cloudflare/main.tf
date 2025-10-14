@@ -21,7 +21,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared" "homelab" {
 resource "cloudflare_dns_record" "tunnel" {
   zone_id = data.cloudflare_zones.zone.result[0].id
   type    = "CNAME"
-  name    = "homelab-tunnel"
+  name    = "homelab-tunnel.${var.cloudflare_domain}"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
   proxied = false
   ttl     = 1 # Auto
@@ -32,7 +32,7 @@ resource "cloudflare_dns_record" "k8s_host_ipv4" {
   for_each = var.k8s_hosts
   zone_id  = data.cloudflare_zones.zone.result[0].id
   type     = "A"
-  name     = each.key
+  name     = "${each.key}.${var.cloudflare_domain}"
   content  = each.value.ipv4
   proxied  = false
   ttl      = 1 # Auto
