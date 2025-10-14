@@ -35,6 +35,13 @@ module "ntfy" {
   auth   = yamldecode(data.sops_file.tfvars.raw).ntfy
 }
 
+module "backup" {
+  source             = "./backup"
+  backup_bucket_name = local.backup_bucket_name
+  environment        = local.environment
+  pgp_key            = local.pgp_key
+}
+
 module "extra_secrets" {
   # for_each values _must_ be nonsensitive
   for_each  = nonsensitive(local.extra_secrets)

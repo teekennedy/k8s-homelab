@@ -25,6 +25,19 @@ variable "cloudflare_account_id" {
 
 variable "pgp_key" {
   type        = string
-  description = "PGP key reference for the smtp IAM user"
+  description = "PGP key reference for IAM users"
   default     = ""
 }
+
+variable "backup_bucket_name" {
+  type        = string
+  description = "Name for the backup S3 bucket. The region will be appended automatically."
+  default     = "missingtoken-backup"
+}
+
+variable "environment" {
+  type        = string
+  description = "Environment name for tagging resources"
+  default     = "k8s-homelab"
+}
+
