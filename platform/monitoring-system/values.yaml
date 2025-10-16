@@ -256,7 +256,15 @@ kube-prometheus-stack:
       externalUrl: https://prometheus.msng.to
       ## Maximum size of metrics
       ##
-      retentionSize: "45GB"
+      retentionSize: "110GB"
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: longhorn
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 120Gi
       additionalArgs:
         - name: "log.level"
           value: "debug"
