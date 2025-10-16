@@ -1,0 +1,15 @@
+{{ define "__discord_subject" -}}
+[{{ .Status | title }}] {{ .CommonLabels.alertname }} ({{ if .CommonLabels.severity }}{{ .CommonLabels.severity }}{{ else }}none{{ end }})
+{{- end }}
+
+{{/* Render a list of alerts */}}
+{{ define "__discord_alert_list" -}}
+{{ range .Alerts -}}
+- **{{ if .Annotations.summary }}{{ .Annotations.summary }}{{ else if .Annotations.message }}{{ .Annotations.message }}{{ else }}{{ .Labels.alertname }}{{ end }}**
+  {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+  
+  Since {{ tz "America/Denver" .StartsAt  }}
+  Links: {{ if .Annotations.runbook_url }} [runbook]({{ .Annotations.runbook_url }}) | {{ end }}{{ if .GeneratorURL }}[query]({{ .GeneratorURL }}){{ end }}
+{{ "\n" -}}
+{{- end -}}
+{{- end }}

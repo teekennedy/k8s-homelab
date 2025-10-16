@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alert-templates
+  namespace: {{ .Release.Namespace }}
+data:
+  helpers.tmpl: |-
+{{ .Files.Get "files/alertmanager/helpers.tmpl" | nindent 4 }}
