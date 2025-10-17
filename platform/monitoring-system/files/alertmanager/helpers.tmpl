@@ -7,8 +7,8 @@
 {{ range .Alerts -}}
 - **{{ if .Annotations.summary }}{{ .Annotations.summary }}{{ else if .Annotations.message }}{{ .Annotations.message }}{{ else }}{{ .Labels.alertname }}{{ end }}**
   {{- if .Annotations.description }}{{ "\n" }}  {{ .Annotations.description }}{{ end }}
-  
   Since {{ tz "America/Denver" .StartsAt  }}
   Links: {{ if .Annotations.runbook_url }} [runbook]({{ .Annotations.runbook_url }}) | {{ end }}{{ if .GeneratorURL }}[query]({{ .GeneratorURL }}){{ end }}
-{{ end -}}
+
+{{ end }}
 {{- end }}
