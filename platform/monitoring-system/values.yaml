@@ -264,9 +264,12 @@ kube-prometheus-stack:
       serviceMonitorSelectorNilUsesHelmValues: false
       scrapeConfigSelectorNilUsesHelmValues: false
 
-      ## Maximum size of metrics
-      ##
-      retentionSize: "110GB"
+      # Prometheus docs say to set this to maximum 80-85% of the volume size
+      # https://prometheus.io/docs/prometheus/latest/storage/#operational-aspects
+      retentionSize: "96GiB"
+      # Set retentionTime to empty value so prometheus relies solely on retentionSize
+      retrentionTime: ""
+
       storageSpec:
         volumeClaimTemplate:
           spec:
