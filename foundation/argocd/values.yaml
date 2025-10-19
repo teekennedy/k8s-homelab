@@ -29,6 +29,15 @@ argo-cd:
       enabled: true
       serviceMonitor:
         enabled: true
+  # TODO integrate with authelia
+  dex:
+    enabled: false
+  controller:
+    metrics: *metrics
+  repoServer:
+    metrics: *metrics
+  redis:
+    metrics: *metrics
 
 # https://github.com/argoproj/argo-helm/blob/main/charts/argocd-apps/values.yaml
 argocd-apps:
@@ -99,6 +108,3 @@ argocd-apps:
               - CreateNamespace=true
               - ApplyOutOfSyncOnly=true
               - RespectIgnoreDifferences=true
-      syncPolicy:
-        applicationsSync: create-update
-        preserveResourcesOnDeletion: true
