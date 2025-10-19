@@ -35,7 +35,6 @@ spec:
             - -c
           args:
             - |
-              go get .
               # wait for gitea to become available
               timeout 300 sh -c 'until wget -q "$GITEA_HOST" -O /dev/null; do sleep 5; done'
               go run .
@@ -43,27 +42,10 @@ spec:
             - name: source
               mountPath: /go/src/gitea-resources
               readOnly: true
-            - mountPath: /go/pkg/mod
-              name: go-mod-cache
       volumes:
         - name: source
           configMap:
             name: gitea-resources-config
-        - name: go-mod-cache
-          persistentVolumeClaim:
-            claimName: gitea-resources-cache
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: gitea-resources-cache
-  namespace: {{ .Release.Namespace }}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 500Mi
 ---
 apiVersion: v1
 kind: ConfigMap
