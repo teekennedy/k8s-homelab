@@ -5,11 +5,13 @@
     git
     jq
     neovim
+    ripgrep
     tree
     # diagnostic tools
     btop
     pciutils # for lspci
-    smartmontools
+    smartmontools # for smartctl
+    lsof
   ];
   hardware.enableAllFirmware = true;
   nixpkgs.config.allowUnfree = true;

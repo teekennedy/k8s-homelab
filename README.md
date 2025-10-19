@@ -148,7 +148,9 @@ To setup a new host, create the following config:
 
 ## Deploying updates
 
-Use deploy-rs: `deploy -- .#borg-0 --override-input devenv-root "file+file://"<(printf %s "$PWD")`
+Use deploy-rs: `deploy -- .#borg-0`
+
+If you just want to build the nixosSystem for a host (e.g. to test configuration changes), run `nix build -L .#nixosConfigurations.borg-0.config.system.build.toplevel`. `-L` outputs build logs to stderr.
 
 ## Bootstrapping k3s cluster
 
