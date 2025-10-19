@@ -2,7 +2,7 @@ terraform {
   required_version = "~> 1.8"
   required_providers {
     opnsense = {
-      version = "~> 0.13"
+      version = "~> 0.15"
       source  = "browningluke/opnsense"
     }
     sops = {
