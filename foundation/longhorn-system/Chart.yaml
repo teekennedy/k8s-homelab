@@ -2,6 +2,7 @@ apiVersion: v2
 name: longhorn
 description: Distributed block storage
 version: 0.0.4
+# renovate datasource=github-releases depName=longhorn/charts extractVersion=^longhorn-(?<version>.*)$
 appVersion: "1.10.0"
 
 dependencies:
