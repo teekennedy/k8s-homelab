@@ -3,6 +3,10 @@ longhorn:
   defaultSettings:
     allowCollectingLonghornUsageMetrics: false
     defaultDataLocality: best-effort
+    # -- Maximum number of engines that are allowed to concurrently upgrade on each node after Longhorn Manager is upgraded. When the value is "0", Longhorn does not automatically upgrade volume engines to the new default engine image version.
+    concurrentAutomaticEngineUpgradePerNodeLimit: "1"
+    # -- Upgrade Checker that periodically checks for new Longhorn versions. When a new version is available, a notification appears on the Longhorn UI. This setting is enabled by default
+    upgradeChecker: false
   ingress:
     enabled: true
     annotations:
