@@ -254,6 +254,16 @@ kube-prometheus-stack:
     ##
     prometheusSpec:
       externalUrl: https://prometheus.msng.to
+
+      # By default, if you don't specify a selector for prometheus CRDs, it will write a selector that matches only the CRDs that are defined in this helm release
+      # Disabling this to pick up all relevant CRDs
+      # https://stackoverflow.com/q/68085831
+      podMonitorSelectorNilUsesHelmValues: false
+      probeSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      serviceMonitorSelectorNilUsesHelmValues: false
+      scrapeConfigSelectorNilUsesHelmValues: false
+
       ## Maximum size of metrics
       ##
       retentionSize: "110GB"
