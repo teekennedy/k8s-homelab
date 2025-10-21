@@ -9,8 +9,8 @@ renovate:
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
         "autodiscover": true
       }
-  # env:
-  #   LOG_LEVEL: debug
+  env:
+    LOG_LEVEL: debug
   envList:
     - name: RENOVATE_GITHUB_COM_TOKEN
       valueFrom:
