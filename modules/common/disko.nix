@@ -53,7 +53,9 @@
                   priority = 1;
                   name = "ESP";
                   start = "1M";
-                  end = "512M";
+                  # Each boot generation creates a kernel/initrd file that currently takes ~50MB of space
+                  # Partition is sized for 12 generations + 50% space buffer = 900MB, but we'll call it a gig.
+                  end = "1G";
                   type = "EF00";
                   content = {
                     type = "filesystem";

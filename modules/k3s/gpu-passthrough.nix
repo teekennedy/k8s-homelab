@@ -25,12 +25,4 @@ lib.mkIf
   services.xserver.videoDrivers = ["nvidia"];
 
   nixpkgs.config.nvidia.acceptLicense = true;
-  # NB: nvidia-settings, nvidia-x11, and nvidia-persistenced are needed even when using nouveau driver
-  nixpkgs.config.allowUnfreePredicate = pkg:
-    builtins.elem (lib.getName pkg) [
-      "nvidia"
-      "nvidia-settings"
-      "nvidia-x11"
-      "nvidia-persistenced"
-    ];
 }

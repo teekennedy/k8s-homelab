@@ -144,6 +144,7 @@
                     ./hosts/common
                     (./hosts + "/${host.hostname}")
                     ./modules/common
+                    ./modules/restic
                     ./modules/k3s
                     ./modules/users/defaultUser.nix
                     inputs.nixos-facter-modules.nixosModules.facter

@@ -1,3 +1,4 @@
+#tfsec:ignore:AVD-AWS-0143
 resource "aws_iam_user" "restic_backup" {
   name = "restic-backup-user"
   path = "/backup/"

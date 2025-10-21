@@ -58,7 +58,7 @@
         mkfifo wait.fifo
         trap 'rm wait.fifo' EXIT
 
-        deploy --debug-logs --skip-checks -- ".#$1" 2>&1 \
+        deploy --auto-rollback false --debug-logs --skip-checks -- ".#$1" 2>&1 \
           | tee >(grep -v DEBUG) >(grep 'activate-rs --debug-logs activate' | \
               sed -e 's/^.*activate-rs --debug-logs activate \(.*\) --profile-user.*$/\1/' | \
               xargs -I% bash -xc "ssh $host 'nix run --impure nixpkgs#nvd -- --color=always diff /run/current-system %'" ; echo >wait.fifo) \

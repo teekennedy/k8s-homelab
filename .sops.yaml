@@ -32,7 +32,7 @@ creation_rules:
         age:
           - *oxygen_age
           - *host_borg-2
-  - path_regex: modules/k3s/.*\.enc\.yaml
+  - path_regex: modules/*/.*\.enc\.yaml
     key_groups:
       - pgp:
           - *user_tkennedy

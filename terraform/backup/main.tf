@@ -6,6 +6,7 @@ locals {
   bucket_name = "${var.backup_bucket_name}-${data.aws_region.current.region}"
 }
 
+#tfsec:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "backup" {
   bucket = local.bucket_name
 

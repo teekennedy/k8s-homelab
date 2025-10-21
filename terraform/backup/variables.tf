@@ -9,6 +9,12 @@ variable "restic_prefix" {
   default     = "restic/"
 }
 
+variable "aws_region" {
+  type        = string
+  description = "AWS region to deploy resources in"
+  default     = "us-west-2"
+}
+
 variable "environment" {
   type        = string
   description = "Environment name for tagging resources"

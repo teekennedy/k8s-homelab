@@ -1,6 +1,6 @@
 {pkgs, ...}: {
   # Don't suspend / powerdown when the laptop lid is closed.
-  services.logind.lidSwitch = "ignore";
+  services.logind.settings.Login.HandleLidSwitch = "ignore";
 
   systemd.services = {
     "laptop-screen-powersave" = {

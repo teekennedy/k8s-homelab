@@ -28,7 +28,7 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   # Limit the number of generations in the boot menu. Default is null which is unlimited.
-  boot.loader.systemd-boot.configurationLimit = 120;
+  boot.loader.systemd-boot.configurationLimit = 12;
 
   # Enable systemd-resolved
   services.resolved.enable = true;
