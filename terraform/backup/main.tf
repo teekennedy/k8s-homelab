@@ -3,7 +3,10 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
-  bucket_name = "${var.backup_bucket_name}-${data.aws_region.current.region}"
+  bucket_name           = "${var.backup_bucket_name}-${data.aws_region.current.region}"
+  backup_user_keys      = sort(keys(var.backup_users))
+  primary_backup_user   = local.backup_user_keys[0]
+  primary_backup_prefix = var.backup_users[local.primary_backup_user].s3_prefix
 }
 
 #tfsec:ignore:aws-s3-enable-bucket-logging
@@ -76,14 +79,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
 
   # Rule 1: Large objects (>=128 KB): Standard -> IA (45d) -> Glacier Instant Retrieval (90d)
   rule {
-    id     = "restic-large-objects-to-ia-then-gir"
+    id     = "${local.primary_backup_user}-large-objects-to-ia-then-gir"
     status = "Enabled"
 
     filter {
       and {
-        # Limit the rule to your restic prefix if you keep other data in this bucket
+        # Limit the rule to your primary backup prefix if you keep other data in this bucket
         # Omit this line to apply to the whole bucket
-        prefix                   = var.restic_prefix
+        prefix                   = local.primary_backup_prefix
         object_size_greater_than = 131072 # 128 KB
       }
     }
@@ -101,12 +104,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
 
   # Rule 2: Small objects (<128 KB): Standard -> IA (45d), do NOT move to GIR
   rule {
-    id     = "restic-small-objects-to-ia-only"
+    id     = "${local.primary_backup_user}-small-objects-to-ia-only"
     status = "Enabled"
 
     filter {
       and {
-        prefix                = var.restic_prefix
+        prefix                = local.primary_backup_prefix
         object_size_less_than = 131072 # 128 KB
       }
     }

@@ -13,24 +13,26 @@ output "bucket_region" {
   value       = data.aws_region.current.region
 }
 
-output "iam_user_name" {
-  description = "Name of the IAM user for backup operations"
-  value       = aws_iam_user.restic_backup.name
+output "iam_users" {
+  description = "IAM users for backup operations keyed by configuration key."
+  value = {
+    for key, user in aws_iam_user.backup :
+    key => {
+      name = user.name
+      arn  = user.arn
+    }
+  }
 }
 
-output "iam_user_arn" {
-  description = "ARN of the IAM user for backup operations"
-  value       = aws_iam_user.restic_backup.arn
-}
-
-output "access_key_id" {
-  description = "Access Key ID for the backup IAM user"
-  value       = aws_iam_access_key.restic_backup.id
-}
-
-output "encrypted_secret_access_key" {
-  description = "PGP encrypted Secret Access Key for the backup IAM user"
-  value       = aws_iam_access_key.restic_backup.encrypted_secret
+output "access_keys" {
+  description = "Access keys for backup IAM users keyed by configuration key."
+  value = {
+    for key, access_key in aws_iam_access_key.backup :
+    key => {
+      access_key_id               = access_key.id
+      encrypted_secret_access_key = access_key.encrypted_secret
+    }
+  }
 }
 
 output "kms_key_arn" {

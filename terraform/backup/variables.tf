@@ -3,10 +3,24 @@ variable "backup_bucket_name" {
   description = "Name for the backup S3 bucket. The region will be appended automatically."
 }
 
-variable "restic_prefix" {
-  description = "Optional prefix for your restic repo within the bucket (e.g., \"restic/\"). Use empty string to apply rules to the whole bucket."
-  type        = string
-  default     = "restic/"
+variable "backup_users" {
+  description = "Backup IAM users and their S3 permissions."
+  type = map(
+    object({
+      s3_prefix = string
+      path      = optional(string)
+    })
+  )
+  default = {
+    "restic-backup-user" = {
+      s3_prefix = "restic/"
+    }
+  }
+
+  validation {
+    condition     = length(var.backup_users) > 0
+    error_message = "backup_users must contain at least one entry."
+  }
 }
 
 variable "aws_region" {

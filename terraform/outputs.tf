@@ -9,19 +9,13 @@ output "backup_bucket_region" {
   value       = module.backup.bucket_region
 }
 
-output "backup_iam_user_name" {
-  description = "Name of the IAM user for backup operations"
-  value       = module.backup.iam_user_name
+output "backup_iam_users" {
+  description = "IAM users for backup operations keyed by configuration key."
+  value       = module.backup.iam_users
 }
 
-output "backup_access_key_id" {
-  description = "Access Key ID for the backup IAM user"
-  value       = module.backup.access_key_id
-}
-
-output "backup_encrypted_secret_access_key" {
-  description = "Encrypted Secret Access Key for the backup IAM user"
-  value       = module.backup.encrypted_secret_access_key
+output "backup_access_keys" {
+  description = "Access key material for backup IAM users keyed by configuration key."
+  value       = module.backup.access_keys
   sensitive   = true
 }
-

@@ -13,14 +13,14 @@ data "aws_iam_policy_document" "kms_key" {
     resources = ["*"]
   }
 
-  # Allow the backup IAM user to use the key *via S3 only* and only
+  # Allow the backup IAM users to use the key *via S3 only* and only
   # when the S3 encryption context references THIS bucket/prefix.
   statement {
     sid    = "AllowBackupUserUseKeyViaS3ForThisBucket"
     effect = "Allow"
     principals {
       type        = "AWS"
-      identifiers = [aws_iam_user.restic_backup.arn]
+      identifiers = [for _, user in aws_iam_user.backup : user.arn]
     }
     actions = [
       "kms:Encrypt",
