@@ -29,8 +29,8 @@ output "access_keys" {
   value = {
     for key, access_key in aws_iam_access_key.backup :
     key => {
-      access_key_id               = access_key.id
-      encrypted_secret_access_key = access_key.encrypted_secret
+      AWS_ACCESS_KEY_ID     = access_key.id
+      AWS_SECRET_ACCESS_KEY = access_key.secret
     }
   }
 }

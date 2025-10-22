@@ -29,8 +29,7 @@ resource "aws_iam_user" "backup" {
 resource "aws_iam_access_key" "backup" {
   for_each = aws_iam_user.backup
 
-  user    = each.value.name
-  pgp_key = var.pgp_key
+  user = each.value.name
 }
 
 data "aws_iam_policy_document" "backup_policy" {

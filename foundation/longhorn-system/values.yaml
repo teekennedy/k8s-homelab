@@ -7,6 +7,15 @@ longhorn:
     concurrentAutomaticEngineUpgradePerNodeLimit: "1"
     # -- Upgrade Checker that periodically checks for new Longhorn versions. When a new version is available, a notification appears on the Longhorn UI. This setting is enabled by default
     upgradeChecker: false
+  defaultBackupStore:
+    # -- Endpoint used to access the default backupstore.
+    backupTarget: s3://missingtoken-backup-us-west-2@us-west-2/longhorn/
+    # Secret managed by terraform
+    backupTargetCredentialSecret: longhorn-backup-user
+    # -- Number of seconds that Longhorn waits before checking the default backupstore for new backups.
+    # This setting affects Disaster Recovery volumes which are incrementally restored from backup on an ongoing basis.
+    # See https://longhorn.io/docs/archives/1.7.1/concepts/#34-backupstore-update-intervals-rto-and-rpo
+    pollInterval: ~
   ingress:
     enabled: true
     annotations:

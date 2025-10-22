@@ -34,8 +34,3 @@ variable "environment" {
   description = "Environment name for tagging resources"
   default     = "k8s-homelab"
 }
-
-variable "pgp_key" {
-  type        = string
-  description = "PGP key for encrypting IAM access key secrets"
-}

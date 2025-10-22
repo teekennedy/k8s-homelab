@@ -39,7 +39,21 @@ module "backup" {
   source             = "./backup"
   backup_bucket_name = local.backup_bucket_name
   environment        = local.environment
-  pgp_key            = local.pgp_key
+  backup_users = {
+    "restic-backup-user" = {
+      s3_prefix = "restic/"
+    }
+    "longhorn-backup-user" = {
+      s3_prefix = "longhorn/"
+    }
+  }
+}
+
+module "longhorn_backup_secret" {
+  source    = "./k8s-secret"
+  name      = "longhorn-backup-user"
+  namespace = "longhorn-system"
+  data      = sensitive(module.backup.access_keys["longhorn-backup-user"])
 }
 
 module "extra_secrets" {
