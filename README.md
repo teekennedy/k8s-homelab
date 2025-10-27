@@ -139,12 +139,23 @@ To setup a new host, create the following config:
   - `nix build .#nixosConfigurations.installIso.config.system.build.isoImage`
 - write the installer image to a drive and boot the machine from it
 - generate and save facter configuration:
-  - `nixos-anywhere -- --flake .#nixosConfigurations.borg-0 --generate-hardware-config nixos-facter ./hosts/borg-0/facter.json --target-host root@borg-0`
+  - `nixos-anywhere -- --flake .#nixosConfigurations.borg-X --generate-hardware-config nixos-facter ./hosts/borg-0/facter.json --phases '' --target-host root@<ip-addr>`
+    (NB: the `--phases ''` is important to prevent nixos-anywhere from running the full installation process including formatting your disks!)
 - Set `disko.devices.disk.main.device` to the filesystem root device, and optionally `disko.longhornDevice` to the device used for k8s longhorn.
   - Make sure to use persistent device names from `/dev/disk/by-id`. Check the generated facter.json for available device names.
 - bootstrap the host:
-  - `bootstrap-host borg-0 -- --target-host root@<ip_addr>`
-- confirm you're able to login as your default user via SSH `ssh borg-0`
+  - `bootstrap-host borg-X -- --target-host root@<ip_addr>`
+  - The script will ask you for a password for the primary user interactively. This gets passed into `mkpasswd` to produce a hash which is then encrypted with sops.
+  - The script also generates an SSH keypair and encrypts it with sops. It adds the public key to .sops.yaml, but does not update any of the files. You have to do the following manually:
+    - Add the missing `restic_repo_password` yaml entry to `hosts/borg-X/secrets.yaml`, set to a secure random string.
+    - Add a new entry for `hosts/borg-X/secrets\.yaml` that references the new host key.
+    - Run `sops encrypt --in-place ./hosts/borg-X/secrets.yaml` to encrypt the secrets file.
+    - Run `git add hosts/borg-X` to ensure the new sops file and any config get added to the flake eval.
+    - Add the new host key to the entry for `modules/*/.*\.enc\.yaml`.
+    - Run `sops updatekeys modules/*/*.enc.yaml` to re-encrypt shared secrets with the new keys.
+  - With the manual steps out of the way, run `bootstrap-host borg-X -- --target-host root@<ip_addr>` once more. This time it should complete successfully.
+- Confirm you're able to login as your default user via SSH `ssh borg-X`
+- (optional) Add an external dns entry for the new host by updating the `k8s_hosts` input to the `cloudflare` module in terraform/main.tf.
 
 ## Deploying updates
 

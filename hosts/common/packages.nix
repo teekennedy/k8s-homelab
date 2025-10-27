@@ -12,6 +12,7 @@
     pciutils # for lspci
     smartmontools # for smartctl
     lsof
+    unixtools.netstat
   ];
   hardware.enableAllFirmware = true;
   nixpkgs.config.allowUnfree = true;

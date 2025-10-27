@@ -51,7 +51,7 @@
             system = "x86_64-linux";
             modules = [
               ({...}: {
-                disko.devices.disk.main.device = "/dev/disk/by-id/ata-NT-256_2242_0006245000370";
+                disko.devices.disk.main.device = "/dev/disk/by-id/ata-TS512GMTS430S_J478260466";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
                 system.stateVersion = "25.05";
                 systemd.network.networks."10-ethernet-static".networkConfig = {
@@ -108,6 +108,27 @@
                 environment.systemPackages = [
                   (inputs.lenovo_sa120_fanspeed.packages.x86_64-linux.default)
                 ];
+
+                services.k3s = {
+                  role = "server";
+                  serverAddr = "https://10.69.80.10:6443";
+                };
+              })
+            ];
+          }
+          {
+            hostname = "borg-3";
+            system = "x86_64-linux";
+            modules = [
+              ({...}: {
+                disko.devices.disk.main.device = "/dev/disk/by-id/nvme-APPLE_SSD_AP0512N_C02949500NYNGJ21Q";
+                disko.longhornDevice = "/dev/disk/by-id/nvme-ADATA_SX8200PNP_2K46292842UU";
+                system.stateVersion = "25.11";
+
+                systemd.network.networks."10-ethernet-static".networkConfig = {
+                  Address = "10.69.80.13/25";
+                  Gateway = ["10.69.80.1"];
+                };
 
                 services.k3s = {
                   role = "server";

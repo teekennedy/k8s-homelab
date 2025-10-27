@@ -136,6 +136,7 @@
                     type = "filesystem";
                     format = "ext4";
                     mountpoint = "/var/lib/longhorn";
+                    mountOptions = ["noatime"];
                   };
                 };
               };

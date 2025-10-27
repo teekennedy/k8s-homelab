@@ -9,7 +9,7 @@ keys:
   - &host_borg-0 age134rsuzlwf7fqzl3zluzjmheez6y4x5mmakfsejpjenr6qy3st3rs3rd5l9
   - &host_borg-1 age1sytxxylgnjkdev2qjds6zdwn6ynt73tn4u7lvg27cjdwj97lj4xs75ycyf
   - &host_borg-2 age12uwv74ykhvs45aftm8d4v03ry44jdkt93nmslhktc2u4fq7j7yyqg5zdph
-
+  - &host_borg-3 age1y8n63p4zrlzxphe9k7hlc27vhk3g3k32nz0p4eg66tz4p2pnjavq4aq3xp
 creation_rules:
   - path_regex: hosts/borg-0/secrets\.yaml
     key_groups:
@@ -32,6 +32,13 @@ creation_rules:
         age:
           - *oxygen_age
           - *host_borg-2
+  - path_regex: hosts/borg-3/secrets\.yaml
+    key_groups:
+      - pgp:
+          - *user_tkennedy
+        age:
+          - *oxygen_age
+          - *host_borg-3
   - path_regex: modules/*/.*\.enc\.yaml
     key_groups:
       - pgp:
@@ -41,6 +48,7 @@ creation_rules:
           - *host_borg-0
           - *host_borg-1
           - *host_borg-2
+          - *host_borg-3
   - path_regex: terraform/.*\.sops\.ya?ml
     key_groups:
       - age:
