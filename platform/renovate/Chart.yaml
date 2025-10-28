@@ -1,5 +1,6 @@
 apiVersion: v2
 name: renovate
+# renovate datasource=github-releases depName=renovatebot/helm-charts extractVersion=^renovate-(?<version>.*)$
 version: 0.0.14
 dependencies:
   - name: renovate

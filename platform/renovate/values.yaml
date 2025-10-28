@@ -9,9 +9,24 @@ renovate:
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
         "autodiscover": true
       }
+    persistence:
+      cache:
+        # -- Allow the cache to persist between runs
+        enabled: true
+        # -- Storage class of the cache PVC
+        storageClass: longhorn
+        # -- Storage size of the cache PVC
+        storageSize: "5Gi"
+        # -- Labels to set on the cache PVC
+        labels: {}
   env:
     LOG_LEVEL: debug
   envList:
+    # Use sqlite for cache instead of filesystem
+    # https://docs.renovatebot.com/self-hosted-experimental/#renovate_x_sqlite_package_cache
+    # https://github.com/renovatebot/renovate/discussions/30525
+    - name: RENOVATE_X_SQLITE_PACKAGE_CACHE
+      value: "true"
     - name: RENOVATE_GITHUB_COM_TOKEN
       valueFrom:
         secretKeyRef:

@@ -45,6 +45,31 @@
         "^(?:gh|ls)cr\\.io/linuxserver/"
       ],
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-ls(?<revision>\\d+)$"
+    },
+    // override the renovate-detected sourceUrl to point to the upstream repo instead
+    {
+      "matchPackageNames": ["ghcr.io/jellyfin/jellyfin"],
+      "sourceUrl": "https://github.com/jellyfin/jellyfin"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackagePatterns": ["^(?:gh|ls)cr\\.io/linuxserver/prowlarr$"],
+      "sourceUrl": "https://github.com/Prowlarr/Prowlarr"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackagePatterns": ["^(?:gh|ls)cr\\.io/linuxserver/sonarr$"],
+      "sourceUrl": "https://github.com/Sonarr/Sonarr"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackagePatterns": ["^(?:gh|ls)cr\\.io/linuxserver/radarr$"],
+      "sourceUrl": "https://github.com/Radarr/Radarr"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackagePatterns": ["^(?:gh|ls)cr\\.io/linuxserver/qbittorrent$"],
+      "sourceUrl": "https://github.com/qbittorrent/qBittorrent"
     }
   ]
 }
