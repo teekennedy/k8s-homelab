@@ -708,6 +708,19 @@ app-template:
         jellyseerr:
           jellyseerr:
             - path: /app/config
+    jellyseerr-cache:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      # As of 2025-10-27 this was using 165MB
+      size: 1Gi
+      storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
+      advancedMounts:
+        jellyseerr:
+          jellyseerr:
+            - path: /app/config/cache
     prowlarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
