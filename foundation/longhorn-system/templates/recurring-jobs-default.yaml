@@ -3,19 +3,6 @@
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
-  name: default-snapshot-daily
-  namespace: {{ .Release.Namespace }}
-spec:
-  concurrency: 1
-  cron: 0 0 * * *
-  groups: ["default"]
-  retain: 1
-  task: snapshot
-
----
-apiVersion: longhorn.io/v1beta2
-kind: RecurringJob
-metadata:
   name: default-backup-daily
   namespace: {{ .Release.Namespace }}
 spec:
