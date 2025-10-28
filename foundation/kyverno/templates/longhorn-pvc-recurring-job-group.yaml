@@ -14,14 +14,17 @@ spec:
               kinds: ["PersistentVolumeClaim"]
       preconditions:
         all:
-          # 1) PVC currently has the default group label set to "enabled"
-          - key: "{{ `{{ request.object.metadata.labels.\"recurring-job-group.longhorn.io/default\" }}` }}"
-            operator: Equals
-            value: "enabled"
-          # 2) There exists at least one *other* group label under recurring-job-group.longhorn.io/*
+          # A) Does the PVC have ANY non-default recurring-job group label?
+          #    (i.e., any key starting with the prefix and not exactly .../default)
           - key: "{{ `{{ length(keys(request.object.metadata.labels)[?contains(@, 'recurring-job-group.longhorn.io/') && @ != 'recurring-job-group.longhorn.io/default']) }}` }}"
             operator: GreaterThan
             value: 0
+
+          # B) Does the PVC currently have the default group label at all?
+          - key: "{{ `{{ contains(keys(request.object.metadata.labels), 'recurring-job-group.longhorn.io/default') }}` }}"
+            operator: Equals
+            value: true
+
       mutate:
         patchesJson6902: |-
           - op: remove
