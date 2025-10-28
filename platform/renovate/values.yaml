@@ -1,6 +1,7 @@
 renovate:
   cronjob:
     schedule: '0 9 * * *'  # Everyday at 09:00
+    ttlSecondsAfterFinished: 259200 # 3 days
   renovate:
     config: |
       {
@@ -18,7 +19,9 @@ renovate:
         # -- Storage size of the cache PVC
         storageSize: "5Gi"
         # -- Labels to set on the cache PVC
-        labels: {}
+        labels:
+          recurring-job.longhorn.io/source: "enabled"
+          recurring-job-group.longhorn.io/ephemeral: "enabled"
   env:
     LOG_LEVEL: debug
   envList:

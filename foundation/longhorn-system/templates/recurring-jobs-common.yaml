@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://github.com/datreeio/CRDs-catalog/raw/refs/heads/main/longhorn.io/recurringjob_v1beta2.json
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: all-trim-daily
+  namespace: {{ .Release.Namespace }}
+spec:
+  concurrency: 1
+  cron: 0 4 * * *     # 04:00 daily
+  groups:
+  - ephemeral
+  - secondary
+  - default
+  - critical
+  retain: 0
+  task: filesystem-trim
+

@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=https://github.com/datreeio/CRDs-catalog/raw/refs/heads/main/longhorn.io/recurringjob_v1beta2.json
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: default-snapshot-daily
+  namespace: {{ .Release.Namespace }}
+spec:
+  concurrency: 1
+  cron: 0 0 * * *
+  groups: ["default"]
+  retain: 1
+  task: snapshot
+
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: default-backup-daily
+  namespace: {{ .Release.Namespace }}
+spec:
+  concurrency: 1
+  cron: "30 2 * * *"         # 02:30 daily
+  groups: ["default"]
+  retain: 3
+  task: backup
+
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: default-backup-weekly
+  namespace: {{ .Release.Namespace }}
+spec:
+  concurrency: 1
+  cron: "0 3 * * 0"          # 03:00 Sundays
+  groups: ["default"]
+  retain: 2
+  task: backup
+
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: default-backup-monthly
+  namespace: {{ .Release.Namespace }}
+spec:
+  concurrency: 1
+  cron: "30 3 1 * *"          # 03:30 on the 1st of the month
+  groups: ["default"]
+  retain: 6
+  task: backup
