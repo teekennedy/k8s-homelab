@@ -9,40 +9,7 @@ spec:
   concurrency: 1
   cron: "30 2 * * *"         # 02:30 daily
   groups: ["default"]
-  retain: 3
+  retain: 14
   task: backup
   labels:
-    group: default
-    frequency: daily
-
----
-apiVersion: longhorn.io/v1beta2
-kind: RecurringJob
-metadata:
-  name: default-backup-weekly
-  namespace: {{ .Release.Namespace }}
-spec:
-  concurrency: 1
-  cron: "0 3 * * 0"          # 03:00 Sundays
-  groups: ["default"]
-  retain: 2
-  task: backup
-  labels:
-    group: default
-    frequency: weekly
-
----
-apiVersion: longhorn.io/v1beta2
-kind: RecurringJob
-metadata:
-  name: default-backup-monthly
-  namespace: {{ .Release.Namespace }}
-spec:
-  concurrency: 1
-  cron: "30 3 1 * *"          # 03:30 on the 1st of the month
-  groups: ["default"]
-  retain: 6
-  task: backup
-  labels:
-    group: default
-    frequency: monthly
+    job: default-backup-daily

@@ -3,7 +3,7 @@
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
-  name: critical-snap-hourly
+  name: critical-snapshot-hourly
   namespace: {{ .Release.Namespace }}
 spec:
   concurrency: 2
@@ -11,6 +11,8 @@ spec:
   groups: ["critical"]
   retain: 24
   task: snapshot
+  labels:
+    job: critical-snapshot-hourly
 
 ---
 apiVersion: longhorn.io/v1beta2
@@ -22,40 +24,7 @@ spec:
   concurrency: 1
   cron: "30 2 * * *"         # 02:30 daily
   groups: ["critical"]
-  retain: 7
+  retain: 30
   task: backup
   labels:
-    group: critical
-    frequency: daily
-
----
-apiVersion: longhorn.io/v1beta2
-kind: RecurringJob
-metadata:
-  name: critical-backup-weekly
-  namespace: {{ .Release.Namespace }}
-spec:
-  concurrency: 1
-  cron: "0 3 * * 0"         # 03:00 on Sundays
-  groups: ["critical"]
-  retain: 4
-  task: backup
-  labels:
-    group: critical
-    frequency: weekly
-
----
-apiVersion: longhorn.io/v1beta2
-kind: RecurringJob
-metadata:
-  name: critical-backup-monthly
-  namespace: {{ .Release.Namespace }}
-spec:
-  concurrency: 1
-  cron: "30 3 1 * *"          # 03:30 on the 1st of the month
-  groups: ["critical"]
-  retain: 12
-  task: backup
-  labels:
-    group: critical
-    frequency: monthly
+    job: critical-backup-daily

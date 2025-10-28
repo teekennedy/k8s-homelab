@@ -12,37 +12,4 @@ spec:
   retain: 1
   task: backup
   labels:
-    group: secondary
-    frequency: daily
-
----
-apiVersion: longhorn.io/v1beta2
-kind: RecurringJob
-metadata:
-  name: secondary-backup-weekly
-  namespace: {{ .Release.Namespace }}
-spec:
-  concurrency: 1
-  cron: "0 3 * * 0"          # 03:00 Sundays
-  groups: ["secondary"]
-  retain: 1
-  task: backup
-  labels:
-    group: secondary
-    frequency: weekly
-
----
-apiVersion: longhorn.io/v1beta2
-kind: RecurringJob
-metadata:
-  name: secondary-backup-monthly
-  namespace: {{ .Release.Namespace }}
-spec:
-  concurrency: 1
-  cron: "30 3 1 * *"          # 03:30 on the 1st of the month
-  groups: ["secondary"]
-  retain: 1
-  task: backup
-  labels:
-    group: secondary
-    frequency: monthly
+    job: secondary-backup-daily
