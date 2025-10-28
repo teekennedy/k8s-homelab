@@ -506,14 +506,28 @@ app-template:
             repository: lscr.io/linuxserver/radarr
             tag: 5.28.0.10274-ls286
           env:
+            # https://wiki.servarr.com/en/radarr/environment-variables
             TZ: America/Denver
+            RADARR__LOG__ANALYTICSENABLED: "false"
+            RADARR__LOG__CONSOLELEVEL: "info"
+            RADARR__LOG__DBENABLED: "false"
+            RADARR__UPDATE__AUTOMATICALLY: "false"
         # https://docs.linuxserver.io/images/docker-sonarr/
         sonarr:
           image:
             repository: lscr.io/linuxserver/sonarr
             tag: 4.0.15.2941-ls296
           env:
+            # https://wiki.servarr.com/en/sonarr/environment-variables
             TZ: America/Denver
+            # Disable analytics
+            SONARR__LOG__ANALYTICSENABLED: "false"
+            # Stdout log level
+            SONARR__LOG__CONSOLELEVEL: "info"
+            # Disable sonarr log database
+            SONARR__LOG__DBENABLED: "false"
+            # Disable automatic updates
+            SONARR__UPDATE__AUTOMATICALLY: "false"
     downloader:
       replicas: 1
       pod:
@@ -695,9 +709,6 @@ app-template:
         main:
           jellyfin:
             - path: /data
-        debug:
-          jellyfin-debug:
-            - path: /data
     jellyseerr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -708,6 +719,9 @@ app-template:
         jellyseerr:
           jellyseerr:
             - path: /app/config
+        debug:
+          jellyfin-debug:
+            - path: /data
     jellyseerr-cache:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -721,6 +735,9 @@ app-template:
         jellyseerr:
           jellyseerr:
             - path: /app/config/cache
+        debug:
+          jellyfin-debug:
+            - path: /cache
     prowlarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
