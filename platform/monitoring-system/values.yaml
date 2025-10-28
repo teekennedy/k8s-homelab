@@ -147,7 +147,7 @@ kube-prometheus-stack:
   ##
   kubeControllerManager:
     enabled: true
-    endpoints: &nodeIPs ["10.69.80.10", "10.69.80.11", "10.69.80.12"]
+    endpoints: &nodeIPs ["10.69.80.10", "10.69.80.12", "10.69.80.13"]
     serviceMonitor:
       metricRelabelings:
         # Remove duplicate labels provided by k3s
