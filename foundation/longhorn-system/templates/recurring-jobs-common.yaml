@@ -16,3 +16,16 @@ spec:
   retain: 0
   task: filesystem-trim
 
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: system-backup-daily
+  namespace: {{ .Release.Namespace }}
+spec:
+  task: system-backup
+  cron: "0 2 * * *"   # 02:00 daily
+  retain: 30
+  parameters:
+    # Don't backup volumes as part of this job
+    volume-backup-policy: disabled
