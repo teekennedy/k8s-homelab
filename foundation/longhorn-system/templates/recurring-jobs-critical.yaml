@@ -24,6 +24,9 @@ spec:
   groups: ["critical"]
   retain: 7
   task: backup
+  labels:
+    group: critical
+    frequency: daily
 
 ---
 apiVersion: longhorn.io/v1beta2
@@ -37,6 +40,9 @@ spec:
   groups: ["critical"]
   retain: 4
   task: backup
+  labels:
+    group: critical
+    frequency: weekly
 
 ---
 apiVersion: longhorn.io/v1beta2
@@ -50,3 +56,6 @@ spec:
   groups: ["critical"]
   retain: 12
   task: backup
+  labels:
+    group: critical
+    frequency: monthly

@@ -11,6 +11,9 @@ spec:
   groups: ["secondary"]
   retain: 1
   task: backup
+  labels:
+    group: secondary
+    frequency: daily
 
 ---
 apiVersion: longhorn.io/v1beta2
@@ -24,6 +27,9 @@ spec:
   groups: ["secondary"]
   retain: 1
   task: backup
+  labels:
+    group: secondary
+    frequency: weekly
 
 ---
 apiVersion: longhorn.io/v1beta2
@@ -37,3 +43,6 @@ spec:
   groups: ["secondary"]
   retain: 1
   task: backup
+  labels:
+    group: secondary
+    frequency: monthly

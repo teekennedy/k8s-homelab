@@ -11,6 +11,9 @@ spec:
   groups: ["default"]
   retain: 3
   task: backup
+  labels:
+    group: default
+    frequency: daily
 
 ---
 apiVersion: longhorn.io/v1beta2
@@ -24,6 +27,9 @@ spec:
   groups: ["default"]
   retain: 2
   task: backup
+  labels:
+    group: default
+    frequency: weekly
 
 ---
 apiVersion: longhorn.io/v1beta2
@@ -37,3 +43,6 @@ spec:
   groups: ["default"]
   retain: 6
   task: backup
+  labels:
+    group: default
+    frequency: monthly
