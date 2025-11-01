@@ -20,6 +20,8 @@
       };
       k8s = {
         comment = "Volume storage for kubernetes cluster";
+        # TODO create /storage/nas/k8s/backups dir owned by smb-k8s user/group
+        # This was done interactively on 2025/11/01
         path = "/storage/nas/k8s";
         writable = "yes";
         # public = no is the default, but it's good to be explicit
