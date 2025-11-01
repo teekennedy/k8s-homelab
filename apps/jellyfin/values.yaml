@@ -5,7 +5,7 @@ app-template:
     automountServiceAccountToken: false
   controllers:
     debug:
-      replicas: 0
+      replicas: 1
       containers:
         jellyfin-debug:
           image:
@@ -485,7 +485,7 @@ app-template:
                 successThreshold: 1
                 timeoutSeconds: 3
     arrs:
-      replicas: 1
+      replicas: 0
       pod:
         securityContext:
           fsGroup: *gid
@@ -719,9 +719,6 @@ app-template:
         jellyseerr:
           jellyseerr:
             - path: /app/config
-        debug:
-          jellyfin-debug:
-            - path: /data
     jellyseerr-cache:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -735,9 +732,6 @@ app-template:
         jellyseerr:
           jellyseerr:
             - path: /app/config/cache
-        debug:
-          jellyfin-debug:
-            - path: /cache
     prowlarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -758,16 +752,63 @@ app-template:
         arrs:
           radarr:
             - path: /config
+    # Mounts
+    # /config longhorn secondary
+    # /config/Backups smb
+    # /config/MediaCover longhorn cache
+    # /config/logs emptydir
     sonarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
       # As of 2025-07-22 this was using 317MB
       size: 5Gi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/secondary: "enabled"
       advancedMounts:
         arrs:
           sonarr:
             - path: /config
+        debug:
+          jellyfin-debug:
+            - path: /sonarr/data
+    arr-backups:
+      accessMode: ReadWriteMany
+      type: persistentVolumeClaim
+      size: 5Gi
+      storageClass: smb
+      volumeName: jellyfin-arrs-backups
+      retain: true
+      advancedMounts:
+        arrs:
+          sonarr:
+            - path: /config/Backups
+              subPath: sonarr
+        debug:
+          jellyfin-debug:
+            - path: /sonarr/backups
+    sonarr-cache:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      size: 5Gi
+      storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
+      advancedMounts:
+        arrs:
+          sonarr:
+            - path: /config/MediaCover
+        debug:
+          jellyfin-debug:
+            - path: /sonarr/cache
+    sonarr-logs:
+      type: emptyDir
+      advancedMounts:
+        arrs:
+          sonarr:
+            - path: /config/logs
     qbittorrent-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
