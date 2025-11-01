@@ -776,9 +776,8 @@ app-template:
     arr-backups:
       accessMode: ReadWriteMany
       type: persistentVolumeClaim
-      size: 5Gi
-      storageClass: smb
-      volumeName: jellyfin-arrs-backups
+      size: 10Gi
+      storageClass: smb-backups
       retain: true
       advancedMounts:
         arrs:

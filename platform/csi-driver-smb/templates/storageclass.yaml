@@ -1,24 +1,29 @@
+{{- $ns := .Release.Namespace -}}
+{{- $base := dict "name" "smb" "source" "//borg-2.msng.to/k8s" "reclaimPolicy" "Delete" -}}
+{{- $backups := dict "name" "smb-backups" "source" "//borg-2.msng.to/k8s/backups" "reclaimPolicy" "Retain" -}}
+{{- range $sc := list $base $backups }}
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: smb
+  name: {{ $sc.name }}
 provisioner: smb.csi.k8s.io
 parameters:
-  source: //borg-2.msng.to/k8s
+  source: {{ $sc.source }}
   # if csi.storage.k8s.io/provisioner-secret is provided, will create a sub directory
   # with PV name under source
   csi.storage.k8s.io/provisioner-secret-name: smbcreds
-  csi.storage.k8s.io/provisioner-secret-namespace: {{ .Release.Namespace }}
+  csi.storage.k8s.io/provisioner-secret-namespace: {{ $ns }}
   csi.storage.k8s.io/node-stage-secret-name: smbcreds
-  csi.storage.k8s.io/node-stage-secret-namespace: {{ .Release.Namespace }}
+  csi.storage.k8s.io/node-stage-secret-namespace: {{ $ns }}
 volumeBindingMode: Immediate
-reclaimPolicy: Retain
+reclaimPolicy: {{ $sc.reclaimPolicy }}
 allowVolumeExpansion: true
 mountOptions:
-   # uid/gid that owns all files or directories on the mount when the server doesn't provide ownership information
+  # uid/gid that owns all files or directories on the mount when the server doesn't provide ownership information
   - uid=1200
   - gid=1200
   - mfsymlinks # use text-based symlinks
   - cache=strict
-  - noserverino  # required to prevent data corruption
+  - noserverino # required to prevent data corruption
+{{- end }}
