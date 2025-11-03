@@ -17,6 +17,9 @@
       ]
     }
   ],
+  "nix": {
+    "enabled": true
+  },
   "packageRules": [
     {
       "groupName": "all non-major dependencies (excluding 0.x)",
