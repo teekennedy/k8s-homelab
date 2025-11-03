@@ -405,7 +405,7 @@ app-template:
         jellyfin:
           image:
             repository: ghcr.io/jellyfin/jellyfin
-            tag: 10.11.1
+            tag: 10.11.2
           env:
             TZ: America/Denver
             JELLYFIN_DATA_DIR: "/data"
