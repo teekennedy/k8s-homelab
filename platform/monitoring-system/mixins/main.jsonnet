@@ -93,7 +93,7 @@ local grafanaDashboardConfigMap(folder, name, json) = {
     },
   },
   data: {
-    [name]: std.manifestJsonEx(json, '    '),
+    [name]: std.manifestJsonEx(json, ''),
   },
 };
 
@@ -107,7 +107,7 @@ local excludedDashboards = [
 ];
 
 local generateGrafanaDashboardConfigMaps(mixin) = if std.objectHas(mixin, 'grafanaDashboards') && mixin.grafanaDashboards != null then {
-  ['grafana-dashboard-' + name]: grafanaDashboardConfigMap(folder, name, mixin.grafanaDashboards[folder][name])
+  ['grafana-dashboard-' + name]: grafanaDashboardConfigMap(folder, name, mixin.grafanaDashboards[folder][name] + {timezone: "browser"})
   for folder in std.objectFields(mixin.grafanaDashboards)
   for name in std.objectFields(mixin.grafanaDashboards[folder])
   if std.member(excludedDashboards, name) == false
