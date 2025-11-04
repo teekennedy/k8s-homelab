@@ -9,9 +9,10 @@
     tree
     # diagnostic tools
     btop
+    lsof
     pciutils # for lspci
     smartmontools # for smartctl
-    lsof
+    sysstat # for iostat
     unixtools.netstat
   ];
   hardware.enableAllFirmware = true;
