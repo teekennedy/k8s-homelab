@@ -17,6 +17,8 @@ authelia:
       entryPoints: ["websecure"]
   configMap:
     theme: auto
+    extraConfigs:
+      - /config/ca-trust-store.yaml
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
     authentication_backend:
       # Password reset through authelia works normally.
@@ -42,7 +44,6 @@ authelia:
 
         # Configure TLS for LDAPS
         tls:
-          skip_verify: true # TODO !! YOU MUST CHANGE THIS
           minimum_version: TLS1.2
 
         # Allow sign in with either username or email
@@ -127,6 +128,21 @@ authelia:
           secretKeyRef:
             name: smtp-creds
             key: username
+    # Add step CA to Authelia's trusted certificates
+    extraVolumeMounts:
+      - name: certificates
+        mountPath: /certificates
+        readOnly: true
+      - name: ca-trust-store-config
+        mountPath: /config
+        readOnly: true
+    extraVolumes:
+      - name: certificates
+        configMap:
+          name: step-ca-bundle
+      - name: ca-trust-store-config
+        configMap:
+          name: authelia-ca-trust-store
     resources:
       limits:
         cpu: '4.00'

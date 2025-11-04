@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-ca-trust-store
+  namespace: {{ .Release.Namespace }}
+data:
+  ca-trust-store.yaml: |
+    certificates_directory: '/certificates'
+
