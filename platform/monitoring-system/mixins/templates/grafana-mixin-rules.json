@@ -1,0 +1,40 @@
+{
+   "apiVersion": "monitoring.coreos.com/v1",
+   "kind": "PrometheusRule",
+   "metadata": {
+      "labels": {
+         "prometheus": "k8s"
+      },
+      "name": "grafana",
+      "namespace": "monitoring-system"
+   },
+   "spec": {
+      "groups": [
+         {
+            "name": "GrafanaAlerts",
+            "rules": [
+               {
+                  "alert": "GrafanaRequestsFailing",
+                  "annotations": {
+                     "message": "{{ $labels.namespace }}/{{ $labels.job }}/{{ $labels.handler }} is experiencing {{ $value | humanize }}% errors"
+                  },
+                  "expr": "100 * sum without (status_code) (namespace_job_handler_statuscode:grafana_http_request_duration_seconds_count:rate5m{handler!~\"/api/datasources/proxy/:id.*|/api/ds/query|/api/tsdb/query\", status_code=~\"5..\"})\n/\nsum without (status_code) (namespace_job_handler_statuscode:grafana_http_request_duration_seconds_count:rate5m{handler!~\"/api/datasources/proxy/:id.*|/api/ds/query|/api/tsdb/query\"})\n> 50\n",
+                  "for": "5m",
+                  "labels": {
+                     "severity": "warning"
+                  }
+               }
+            ]
+         },
+         {
+            "name": "grafana_rules",
+            "rules": [
+               {
+                  "expr": "sum by (namespace, job, handler, status_code) (rate(grafana_http_request_duration_seconds_count[5m]))\n",
+                  "record": "namespace_job_handler_statuscode:grafana_http_request_duration_seconds_count:rate5m"
+               }
+            ]
+         }
+      ]
+   }
+}

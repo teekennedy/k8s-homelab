@@ -1,0 +1,7 @@
+{{- $namespace := .Release.Namespace }}
+{{- $files := .Files.Glob "mixins/templates/*" }}
+
+{{- range $path, $_ := $files }}
+---
+{{ $.Files.Get $path }}
+{{- end }}
