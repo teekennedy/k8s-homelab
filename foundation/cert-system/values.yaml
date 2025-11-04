@@ -5,6 +5,11 @@ cert-manager:
     servicemonitor:
       enabled: true
 
+trust-manager:
+  app:
+    trust:
+      namespace: cert-system
+
 # https://github.com/smallstep/helm-charts/tree/master/step-certificates
 step-certificates:
   image:

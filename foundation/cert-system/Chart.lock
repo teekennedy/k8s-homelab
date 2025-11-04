@@ -2,11 +2,14 @@ dependencies:
 - name: cert-manager
   repository: https://charts.jetstack.io
   version: v1.19.1
+- name: trust-manager
+  repository: https://charts.jetstack.io
+  version: v0.20.2
 - name: step-certificates
   repository: https://smallstep.github.io/helm-charts
   version: 1.28.4
 - name: step-issuer
   repository: https://smallstep.github.io/helm-charts
   version: 1.9.9
-digest: sha256:2a00450e72212a59d30ca22d251c52803882a7ff79e59ffb4927a0494a758c46
-generated: "2025-10-19T04:46:11.39406507Z"
+digest: sha256:64ce87611a4ad626ffa508fba3ab54da2b792ee962a8d11b79ba695f6019648f
+generated: "2025-11-03T18:04:41.782379-07:00"
