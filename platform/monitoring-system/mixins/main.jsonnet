@@ -29,6 +29,7 @@ local nodeExporterMixin = addMixin({
       grafanaK8s+: {
         grafanaTimezone: 'browser',
       },
+      nodeExporterSelector: 'job="node-exporter"',
     },
   },
 });
