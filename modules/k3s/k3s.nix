@@ -101,14 +101,9 @@
             providers:
               kubernetesGateway:
                 enabled: true
-            # These settings affect traefik helm v36.3.0+
-            # The config was changed in this commit
-            # https://github.com/traefik/traefik-helm-chart/commit/baa573c5d80a03f89bb566235e3388540dbb347e
             global:
               checkNewVersion: false
               sendAnonymousUsage: false
-            # These settings are for Traefik helm prior to v36.3.0
-            globalArguments: []
         EOF
       '';
     };
