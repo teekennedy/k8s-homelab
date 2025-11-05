@@ -516,7 +516,7 @@ app-template:
         sonarr:
           image:
             repository: lscr.io/linuxserver/sonarr
-            tag: 4.0.15.2941-ls296
+            tag: 4.0.16.2944-ls297
           env:
             # https://wiki.servarr.com/en/sonarr/environment-variables
             TZ: America/Denver
