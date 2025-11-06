@@ -129,10 +129,53 @@ local grafanaDashboards =
   prometheusMixinHelmGrafanaDashboards +
   prometheusOperatorMixinHelmGrafanaDashboards;
 
+/* Patch NodeMemoryHighUtilization to be ZFS-aware */
+local withZfsAwareMemoryAlert(rules) =
+  rules {
+  spec+: {
+    groups: [
+      g {
+        rules: [
+          if std.objectHas(r, 'alert') && r.alert == 'NodeMemoryHighUtilization' then
+            r {
+              expr: |||
+                (
+                  (
+                    (
+                      1 -
+                      (
+                        node_memory_MemAvailable_bytes{job="node-exporter"}
+                      + node_zfs_arc_size{job="node-exporter"}
+                      )
+                      / node_memory_MemTotal_bytes{job="node-exporter"}
+                    ) * 100
+                  )
+                  or
+                  (
+                    (
+                      1 -
+                      node_memory_MemAvailable_bytes{job="node-exporter"}
+                      / node_memory_MemTotal_bytes{job="node-exporter"}
+                    ) * 100
+                    unless on(instance) node_zfs_arc_size{job="node-exporter"}
+                  )
+                )
+                > 90
+              |||,
+            }
+          else
+            r
+          for r in g.rules
+        ],
+      }
+      for g in rules.spec.groups
+    ],
+    },
+  };
 
 local prometheusAlerts = {
   'kubernetes-mixin-rules.json': kubernetesMixin.prometheusRules,
-  'node-exporter-mixin-rules.json': nodeExporterMixin.prometheusRules,
+  'node-exporter-mixin-rules.json': withZfsAwareMemoryAlert(nodeExporterMixin.prometheusRules),
   'coredns-mixin-rules.json': corednsMixin.prometheusRules,
   'grafana-mixin-rules.json': grafanaMixin.prometheusRules,
   'prometheus-mixin-rules.json': prometheusMixin.prometheusRules,

@@ -268,7 +268,7 @@
                      "description": "Memory is filling up at {{ $labels.instance }}, has been above 90% for the last 15 minutes, is currently at {{ printf \"%.2f\" $value }}%.\n",
                      "summary": "Host is running out of memory."
                   },
-                  "expr": "100 - (node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * 100) > 90\n",
+                  "expr": "(\n  (\n    (\n      1 -\n      (\n        node_memory_MemAvailable_bytes{job=\"node-exporter\"}\n      + node_zfs_arc_size{job=\"node-exporter\"}\n      )\n      / node_memory_MemTotal_bytes{job=\"node-exporter\"}\n    ) * 100\n  )\n  or\n  (\n    (\n      1 -\n      node_memory_MemAvailable_bytes{job=\"node-exporter\"}\n      / node_memory_MemTotal_bytes{job=\"node-exporter\"}\n    ) * 100\n    unless on(instance) node_zfs_arc_size{job=\"node-exporter\"}\n  )\n)\n> 90\n",
                   "for": "15m",
                   "labels": {
                      "severity": "warning"
