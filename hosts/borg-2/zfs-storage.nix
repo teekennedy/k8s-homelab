@@ -1,5 +1,5 @@
 # Disko configuration for raidz2 storage pool
-{
+{config, ...}: {
   # ZFS requires that networking.hostId be set
   # Generated using: head -c4 /dev/urandom | od -A none -t x4
   networking.hostId = "1f58744a";
@@ -10,6 +10,21 @@
     randomizedDelaySec = "1h";
     pools = ["storage"];
   };
+  # Tell zfs to leave a minimum of 10% total memory free.
+  boot.extraModprobeConfig = with builtins; let
+    total_mem_bytes =
+      (
+        head (filter
+          (elem: elem.type == "phys_mem")
+          (head (filter
+            (elem: elem.model == "Main Memory")
+            config.facter.report.hardware.memory))
+              .resources)
+      )
+          .range;
+  in ''
+    options zfs zfs_arc_sys_free=${toString (floor (mul total_mem_bytes 0.1))}
+  '';
   disko.devices = {
     disk = {
       nas-a = {

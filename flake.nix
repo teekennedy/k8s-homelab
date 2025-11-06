@@ -203,11 +203,7 @@
             installIso = inputs.nixpkgs.lib.nixosSystem {
               system = "x86_64-linux";
               modules = [
-                # The zfs kernel module 2.3.0 is incompatible with kernel 6.13 or higher
-                # https://github.com/NixOS/nixpkgs/blob/799ba5bffed04ced7067a91798353d360788b30d/pkgs/os-specific/linux/zfs/2_3.nix
-                # Falling back to "old" kernel 6.12.12 for now
-                "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
-                # "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel.nix"
+                "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal-new-kernel.nix"
                 ({
                   lib,
                   pkgs,
