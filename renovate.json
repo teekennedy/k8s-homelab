@@ -43,36 +43,55 @@
       "versioning": "regex:^(?<minor>\\d+)-(?<patch>\\d+)-(?<build>\\d+)-(?<compatibility>.*)?$"
     },
     {
-      "matchDatasources": ["docker"],
-      "matchPackagePatterns": [
-        "^(?:gh|ls)cr\\.io/linuxserver/"
+      "matchDatasources": [
+        "docker"
       ],
-      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-ls(?<revision>\\d+)$"
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-ls(?<revision>\\d+)$",
+      "matchPackageNames": [
+        "/^(?:gh|ls)cr\\.io/linuxserver//"
+      ]
     },
-    // override the renovate-detected sourceUrl to point to the upstream repo instead
     {
-      "matchPackageNames": ["ghcr.io/jellyfin/jellyfin"],
+      "matchPackageNames": [
+        "ghcr.io/jellyfin/jellyfin"
+      ],
       "sourceUrl": "https://github.com/jellyfin/jellyfin"
     },
     {
-      "matchDatasources": ["docker"],
-      "matchPackagePatterns": ["^(?:gh|ls)cr\\.io/linuxserver/prowlarr$"],
-      "sourceUrl": "https://github.com/Prowlarr/Prowlarr"
+      "matchDatasources": [
+        "docker"
+      ],
+      "sourceUrl": "https://github.com/Prowlarr/Prowlarr",
+      "matchPackageNames": [
+        "/^(?:gh|ls)cr\\.io/linuxserver/prowlarr$/"
+      ]
     },
     {
-      "matchDatasources": ["docker"],
-      "matchPackagePatterns": ["^(?:gh|ls)cr\\.io/linuxserver/sonarr$"],
-      "sourceUrl": "https://github.com/Sonarr/Sonarr"
+      "matchDatasources": [
+        "docker"
+      ],
+      "sourceUrl": "https://github.com/Sonarr/Sonarr",
+      "matchPackageNames": [
+        "/^(?:gh|ls)cr\\.io/linuxserver/sonarr$/"
+      ]
     },
     {
-      "matchDatasources": ["docker"],
-      "matchPackagePatterns": ["^(?:gh|ls)cr\\.io/linuxserver/radarr$"],
-      "sourceUrl": "https://github.com/Radarr/Radarr"
+      "matchDatasources": [
+        "docker"
+      ],
+      "sourceUrl": "https://github.com/Radarr/Radarr",
+      "matchPackageNames": [
+        "/^(?:gh|ls)cr\\.io/linuxserver/radarr$/"
+      ]
     },
     {
-      "matchDatasources": ["docker"],
-      "matchPackagePatterns": ["^(?:gh|ls)cr\\.io/linuxserver/qbittorrent$"],
-      "sourceUrl": "https://github.com/qbittorrent/qBittorrent"
+      "matchDatasources": [
+        "docker"
+      ],
+      "sourceUrl": "https://github.com/qbittorrent/qBittorrent",
+      "matchPackageNames": [
+        "/^(?:gh|ls)cr\\.io/linuxserver/qbittorrent$/"
+      ]
     }
   ]
 }
