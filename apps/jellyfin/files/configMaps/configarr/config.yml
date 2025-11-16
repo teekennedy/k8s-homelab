@@ -1,0 +1,109 @@
+trashGuideUrl: https://github.com/TRaSH-Guides/Guides
+recyclarrConfigUrl: https://github.com/recyclarr/config-templates
+
+# With this options you can disable or enable processing for *arrs. Default is enabled
+sonarrEnabled: true
+radarrEnabled: true
+whisparrEnabled: false
+readarrEnabled: false
+lidarrEnabled: false
+
+# Sonarr Configuration
+sonarr:
+  shows:
+    base_url: http://jellyfin-arrs.jellyfin.svc.cluster.local:8989 # Sonarr instance URL
+    api_key: !secret SONARR_API_KEY # Reference to API key in secrets.yml
+
+    quality_definition:
+      type: series # Quality definition type for Sonarr
+
+    # delete_unmanaged_custom_formats:
+    #   enabled: true
+    #   ignore: # optional
+    #     - some-cf
+
+    # Media Naming Configuration
+    # https://github.com/TRaSH-Guides/Guides/blob/master/docs/json/sonarr/naming/sonarr-naming.json
+    media_naming:
+      series: jellyfin-tvdb
+      season: default
+      episodes:
+        rename: true
+        standard: default
+        daily: default
+        anime: default
+
+    include: # Template includes
+      # Quality Profiles
+      # https://github.com/TRaSH-Guides/Guides/tree/master/docs/json/sonarr/quality-profiles
+      - template: 72dae194fc92bf828f32cde7744e51a1 # Web 1080p
+        source: TRASH
+      - template: 9d142234e45d6143785ac55f5a9e8dc9 # Web 1080p alternative (what I'd call "flexible")
+        source: TRASH
+
+    # Delete everything not managed by configarr
+    delete_unmanaged_custom_formats:
+      enabled: true
+      # ignore: # optional
+      #   - some-cf
+
+    # https://github.com/TRaSH-Guides/Guides/tree/master/docs/json/sonarr/cf
+    custom_formats:
+      - trash_ids:
+          - 32b367365729d530ca1c124a0b180c64 # Bad Dual Groups
+        assign_scores_to:
+          - name: WEB-1080p
+          - name: WEB-1080p (Flexible)
+
+    renameQualityProfiles:
+      - from: WEB-1080p (Alternative)
+        to: WEB-1080p (Flexible)
+
+# Radarr Configuration
+radarr:
+  movies: # Instance name (can be any unique identifier)
+    base_url: http://jellyfin-arrs.jellyfin.svc.cluster.local:7878 # Radarr instance URL
+    api_key: !secret RADARR_API_KEY # Reference to API key in secrets.yml
+
+    quality_definition:
+      type: movie # Quality definition type for Radarr
+
+    # Delete everything not managed by configarr
+    delete_unmanaged_custom_formats:
+      enabled: true
+      # ignore: # optional
+      #   - some-cf
+
+    # Media Naming Configuration
+    media_naming:
+      folder: jellyfin-tmdb
+      movie:
+        rename: true
+        standard: jellyfin-tmdb
+
+    include:
+      # Quality profiles
+      # https://github.com/TRaSH-Guides/Guides/tree/master/docs/json/radarr/quality-profiles
+      - template: d1d67249d3890e49bc12e275d989a7e9 # HD BluRay + WEBDL 1080p
+        source: TRASH
+      - template: 9ca12ea80aa55ef916e3751f4b874151 # remux web 1080p
+        source: TRASH
+      - template: fd161a61e3ab826d3a22d53f935696dd # remux web 2160p
+        source: TRASH
+
+    custom_formats:
+      - trash_ids:
+          - b6832f586342ef70d9c128d40c07b872 # Bad Dual Groups
+        assign_scores_to:
+          - name: Remux + WEB 1080p
+          - name: Remux + WEB 2160p
+          - name: HD Bluray + WEB
+
+# experimental support: check https://configarr.rayak.de/docs/configuration/experimental-support
+whisparr: {}
+
+# experimental support: check https://configarr.rayak.de/docs/configuration/experimental-support
+readarr: {}
+
+# experimental support: check https://configarr.rayak.de/docs/configuration/experimental-support
+lidarr: {}

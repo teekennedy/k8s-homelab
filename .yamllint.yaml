@@ -5,6 +5,7 @@ ignore: |
   *.sops.yaml
   foundation/**/templates/**/*.yaml
   platform/**/templates/**/*.yaml
+  apps/**/templates/**/*.yaml
 extends: default
 rules:
   truthy:

@@ -1,0 +1,29 @@
+{{- $rootContext := . -}}
+{{- $basePath := "files/configMaps"}}
+
+{{- /* Step 1: Collect folders */ -}}
+{{- $folders := dict -}}
+{{- range $path, $_ :=  .Files.Glob (printf "%s/**" $basePath) }}
+  {{- $_ := set $folders (dir $path) "" -}}
+{{- end -}}
+{{- $folders = keys $folders | uniq | sortAlpha -}} 
+
+{{- /* Step 2: Process each folder */ -}}
+{{- range $folder := $folders -}}
+  {{- $folderRelativeToBasePath := replace $basePath "" $folder | trimPrefix "/" -}}
+  {{- $sanitizedFolderRelativeToBasePath := regexReplaceAll "\\W+" (clean $folderRelativeToBasePath) "-" -}}
+  {{- if eq $sanitizedFolderRelativeToBasePath "-" -}}
+    {{- $sanitizedFolderRelativeToBasePath = base $folder -}}
+  {{- end -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $sanitizedFolderRelativeToBasePath }}
+  namespace: {{ $rootContext.Release.Namespace }}
+data:
+{{- range $path, $_ :=  $rootContext.Files.Glob  (printf "%s/*" $folder) }}
+  {{ $path | base }}: |-
+    {{- $rootContext.Files.Get $path | nindent 4 }}
+{{ end }}
+{{- end -}}
