@@ -1,3 +1,5 @@
 # https://github.com/kubereboot/charts/tree/main/charts/kured
 kured:
   revisionHistoryLimit: 3
+  configuration:
+    prometheusUrl: http://monitoring-system-kube-pro-prometheus.monitoring-system.svc.cluster.local:9090
