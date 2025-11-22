@@ -2,5 +2,6 @@
 kured:
   revisionHistoryLimit: 3
   configuration:
-    prometheusUrl: http://monitoring-system-kube-pro-prometheus.monitoring-system.svc.cluster.local:9090
-    alertFiringOnly: true
+    timeZone: America/Denver
+    # prometheusUrl: http://monitoring-system-kube-pro-prometheus.monitoring-system.svc.cluster.local:9090
+    # alertFiringOnly: true
