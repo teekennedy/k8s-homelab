@@ -3,5 +3,6 @@ kured:
   revisionHistoryLimit: 3
   configuration:
     timeZone: America/Denver
-    # prometheusUrl: http://monitoring-system-kube-pro-prometheus.monitoring-system.svc.cluster.local:9090
-    # alertFiringOnly: true
+    prometheusUrl: http://monitoring-system-kube-pro-prometheus.monitoring-system.svc.cluster.local:9090
+    # How often to check for sentinel file
+    period: "30m0s"
