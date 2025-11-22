@@ -7,3 +7,4 @@ kured:
     # How often to check for sentinel file
     period: "30m0s"
     rebootCommand: "/run/current-system/sw/bin/systemctl reboot"
+    alertFilterRegexp: "^(LonghornVolumeActualSpaceUsedWarning)$"
