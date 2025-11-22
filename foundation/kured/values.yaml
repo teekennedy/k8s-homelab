@@ -6,3 +6,4 @@ kured:
     prometheusUrl: http://monitoring-system-kube-pro-prometheus.monitoring-system.svc.cluster.local:9090
     # How often to check for sentinel file
     period: "30m0s"
+    rebootCommand: "/run/current-system/sw/bin/systemctl reboot"
