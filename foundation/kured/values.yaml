@@ -1,0 +1,3 @@
+# https://github.com/kubereboot/charts/tree/main/charts/kured
+kured:
+  revisionHistoryLimit: 3
