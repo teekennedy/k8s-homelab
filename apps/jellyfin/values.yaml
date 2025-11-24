@@ -509,7 +509,7 @@ app-template:
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 5.28.0.10274-ls286
+            tag: 6.0.4.10291-ls288
           env:
             # https://wiki.servarr.com/en/radarr/environment-variables
             TZ: America/Denver
