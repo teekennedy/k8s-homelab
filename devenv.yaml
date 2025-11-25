@@ -2,6 +2,12 @@
 inputs:
   nixpkgs:
     url: github:cachix/devenv-nixpkgs/rolling
+  # Override deploy-rs binary to nix 2.32 compatible version until it gets added to upstream
+  deploy-rs:
+    url: "github:serokell/deploy-rs"
+    inputs:
+      nixpkgs:
+        follows: "nixpkgs"
 
 # If you're using non-OSS software, you can set allowUnfree to true.
 # allowUnfree: true

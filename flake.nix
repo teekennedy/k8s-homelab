@@ -29,17 +29,7 @@
           inherit system;
 
           overlays = [
-            (_: prev: rec {
-              vectorcode = prev.vectorcode.overridePythonAttrs rec {
-                version = "0.6.13";
-                src = prev.fetchFromGitHub {
-                  owner = "Davidyz";
-                  repo = "VectorCode";
-                  tag = version;
-                  hash = "sha256-ok6n0gW6Ahqr7vdoJ2Mj6Kz72mTmSbxIO3bG82T7QQI=";
-                };
-              };
-            })
+            (_: prev: {deploy-rs = inputs.deploy-rs.outputs.packages.${prev.stdenv.hostPlatform.system}.deploy-rs;})
           ];
         };
       };
