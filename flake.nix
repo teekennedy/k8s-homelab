@@ -57,31 +57,6 @@
             ];
           }
           {
-            hostname = "borg-1";
-            system = "x86_64-linux";
-            modules = [
-              ({...}: {
-                disko.devices.disk.main.device = "/dev/disk/by-id/nvme-Aura_Pro_X2_OW23012314C43991F";
-                disko.longhornDevice = "/dev/disk/by-id/usb-ADATA_SX_8200PNP_012345678906-0:0";
-                system.stateVersion = "25.05";
-
-                systemd.network.networks."10-ethernet-static".networkConfig = {
-                  Address = "10.69.80.11/25";
-                  Gateway = ["10.69.80.1"];
-                };
-
-                services.k3s = {
-                  role = "server";
-                  serverAddr = "https://10.69.80.10:6443";
-                  extraFlags = [
-                    "--node-label"
-                    "generic-cdi-plugin/nvidia=enabled"
-                  ];
-                };
-              })
-            ];
-          }
-          {
             hostname = "borg-2";
             system = "x86_64-linux";
             modules = [
