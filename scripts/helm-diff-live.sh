@@ -95,7 +95,10 @@ get_last_modified() {
 last_modified="$(get_last_modified "$chart_path")"
 last_successfully_modified=0
 
-if helm template -n "$namespace" "$release" "$chart_path" >"$output_dir/$last_modified.yaml"; then
+# Make sure dependencies are up to date
+helm dependency update "$chart_path"
+
+if helm template -n "$namespace" "$release" "$chart_path" | tee "$output_dir/$last_modified.yaml" | bat -l yaml; then
   last_successfully_modified="$last_modified"
 fi
 
@@ -103,7 +106,11 @@ while sleep 1; do
   modified="$(get_last_modified "$chart_path")"
   if [[ $modified -gt $last_modified ]]; then
     if helm template -n "$namespace" "$release" "$chart_path" >"$output_dir/$modified.yaml"; then
-      delta "$output_dir/$last_successfully_modified.yaml" "$output_dir/$modified.yaml" || :
+      # Safely shell-quote the filenames
+      quoted_files=$(printf ' %q' "$output_dir/$last_successfully_modified.yaml" "$output_dir/$modified.yaml")
+
+      # Let the shell re-parse the difftool command line with the quoted filenames
+      eval "$difftool$quoted_files" || :
       last_successfully_modified="$modified"
     fi
     last_modified="$modified"
