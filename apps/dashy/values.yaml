@@ -2,12 +2,10 @@ dashy:
   image:
     repository: lissy93/dashy
     pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
     tag: "release-3.1.1"
 
   env:
     YARN_CACHE_FOLDER: "/cache/yarn"
-    YARN_SILENT: ""
 
   volumeMounts:
     - name: cache
@@ -23,7 +21,7 @@ dashy:
         - ALL
     fsGroup: &gid 2000
     fsGroupChangePolicy: "OnRootMismatch"
-    readOnlyRootFilesystem: true
+    # readOnlyRootFilesystem: true
     runAsNonRoot: true
     runAsUser: 1000
     runAsGroup: *gid
