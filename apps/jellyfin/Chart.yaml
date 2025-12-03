@@ -1,7 +1,8 @@
 apiVersion: v2
 name: jellyfin
-# renovate datasource=github-releases depName=jellyfin/jellyfin extractVersion=^(?<version>.*)$
 version: 0.0.6
+# renovate datasource=github-releases depName=jellyfin/jellyfin extractVersion=^(?<version>.*)$
+appVersion: "10.11.3"
 dependencies:
   - name: app-template
     version: 4.4.0
