@@ -1,0 +1,9 @@
+apiVersion: v2
+name: dashy
+version: "0.0.1"
+# renovate datasource=github-releases depName=lissy93/dashy extractVersion=^(?<version>.*)$
+appVersion: "3.1.1"
+dependencies:
+  - name: dashy
+    version: "1.0.0"
+    repository: https://vyrtualsynthese.github.io/selfhosted-helmcharts/

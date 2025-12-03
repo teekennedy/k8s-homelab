@@ -1,0 +1,28 @@
+dashy:
+  image:
+    repository: lissy93/dashy
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "release-3.1.1"
+
+  securityContext:
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+
+  ingress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: &dashyHost msng.to
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: dashy-tls-certificate
+        hosts:
+          - *dashyHost
