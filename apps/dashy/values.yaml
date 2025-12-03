@@ -5,6 +5,17 @@ dashy:
     # Overrides the image tag whose default is the chart appVersion.
     tag: "release-3.1.1"
 
+  env:
+    YARN_CACHE_FOLDER: "/cache/yarn"
+
+  volumeMounts:
+    - name: cache
+      mountPath: /cache
+
+  volumes:
+    - name: cache
+      persistentVolumeClaim:
+        claimName: "dashy-cache"
   securityContext:
     capabilities:
       drop:

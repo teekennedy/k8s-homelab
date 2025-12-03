@@ -1,0 +1,16 @@
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: dashy-cache
+  labels:
+    recurring-job-group.longhorn.io/ephemeral: enabled
+    recurring-job.longhorn.io/source: enabled
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "1Gi"
+  storageClassName: "longhorn"
