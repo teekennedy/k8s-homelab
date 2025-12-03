@@ -15,16 +15,16 @@ dashy:
     - name: cache
       persistentVolumeClaim:
         claimName: "dashy-cache"
-  securityContext:
-    capabilities:
-      drop:
-        - ALL
-    fsGroup: &gid 2000
-    fsGroupChangePolicy: "OnRootMismatch"
-    # readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    runAsUser: 1000
-    runAsGroup: *gid
+  # securityContext:
+  #   capabilities:
+  #     drop:
+  #       - ALL
+  #   fsGroup: &gid 1000
+  #   fsGroupChangePolicy: "OnRootMismatch"
+  #   readOnlyRootFilesystem: true
+  #   runAsNonRoot: true
+  #   runAsUser: 1000
+  #   runAsGroup: *gid
 
   ingress:
     enabled: true
