@@ -4,10 +4,6 @@ This is the repo I use to manage the bare metal k8s cluster I setup at home out 
 
 # Setup
 
-## MacOS Specific
-
-MacOS cannot natively build packages for
-
 ## Bootstrapping Secrets
 
 This repo uses [sops-nix](https://github.com/Mic92/sops-nix) to manage sensitive data. There are many ways to encrypt secrets in sops, and many existing guides for setting up and managing those keys, so I won't repeat them here.
