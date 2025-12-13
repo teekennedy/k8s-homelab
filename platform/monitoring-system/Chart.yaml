@@ -1,8 +1,8 @@
 apiVersion: v2
 name: kube-prometheus-stack
 # renovate datasource=github-releases depName=prometheus-community/helm-charts extractVersion=^kube-prometheus-stack-(?<version>.*)$
-version: 0.0.20
+version: 0.0.21
 dependencies:
   - name: kube-prometheus-stack
-    version: 79.8.0
+    version: 80.4.1
     repository: https://prometheus-community.github.io/helm-charts
