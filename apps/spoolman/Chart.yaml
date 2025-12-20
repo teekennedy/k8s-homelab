@@ -2,10 +2,10 @@ apiVersion: v2
 name: spoolman
 description: Keep track of your inventory of 3D-printer filament spools.
 type: application
-version: 0.1.4
+version: 0.1.5
 # renovate datasource=github-releases depName=Donkie/Spoolman extractVersion=^v(?<version>.*)$
 appVersion: "0.22.1"
 dependencies:
   - name: app-template
-    version: 4.4.0
+    version: 4.5.0
     repository: https://bjw-s-labs.github.io/helm-charts

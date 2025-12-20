@@ -405,7 +405,7 @@ app-template:
         jellyfin:
           image:
             repository: ghcr.io/jellyfin/jellyfin
-            tag: 10.11.3
+            tag: 10.11.5
           env:
             TZ: America/Denver
             JELLYFIN_DATA_DIR: "/data"
@@ -502,14 +502,14 @@ app-template:
         prowlarr:
           image:
             repository: lscr.io/linuxserver/prowlarr
-            tag: 2.3.0.5236-ls132
+            tag: 2.3.0.5236-ls134
           env:
             TZ: America/Denver
         # https://docs.linuxserver.io/images/docker-radarr/
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 6.0.4.10291-ls288
+            tag: 6.0.4.10291-ls289
           env:
             # https://wiki.servarr.com/en/radarr/environment-variables
             TZ: America/Denver
@@ -526,7 +526,7 @@ app-template:
         sonarr:
           image:
             repository: lscr.io/linuxserver/sonarr
-            tag: 4.0.16.2944-ls298
+            tag: 4.0.16.2944-ls300
           env:
             # https://wiki.servarr.com/en/sonarr/environment-variables
             TZ: America/Denver
