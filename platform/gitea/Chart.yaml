@@ -1,7 +1,6 @@
 apiVersion: v2
 name: gitea
 version: 0.0.5
-# renovate datasource=github-releases depName=go-gitea/gitea extractVersion=^v(?<version>.*)$
 appVersion: 1.25.3
 dependencies:
   - name: gitea

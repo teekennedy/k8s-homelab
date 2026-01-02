@@ -2,7 +2,6 @@ apiVersion: v2
 name: kured
 description: KUbernetes REboot Daemon
 version: 0.0.7
-# renovate datasource=github-releases depName=kubereboot/kured extractVersion=^(?<version>.*)$
 appVersion: "1.20.0"
 
 dependencies:

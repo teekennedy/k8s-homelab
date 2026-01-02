@@ -2,7 +2,6 @@ apiVersion: v2
 name: node-feature-discovery
 description: A Kubernetes add-on for detecting hardware features and system configuration.
 version: 0.1.4
-# renovate datasource=github-releases depName=kubernetes-sigs/node-feature-discovery extractVersion=^v(?<version>.*)$
 appVersion: 0.18.2
 dependencies:
   - name: node-feature-discovery

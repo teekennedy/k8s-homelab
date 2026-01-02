@@ -7,14 +7,148 @@
   "bumpVersion": "patch",
   "customManagers": [
     {
-      "description": "Automatically update helm chart app version",
+      "description": "Sync Dashy appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "/(^|/)Chart\\.yaml$/"
+        "apps/dashy/Chart.yaml"
       ],
       "matchStrings": [
-        "# renovate datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) extractVersion=(?<extractVersion>\\S+)\\nappVersion:\\s?(?<currentValue>\\S+)\\n"
-      ]
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "lissy93/dashy",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    },
+    {
+      "description": "Sync Jellyfin appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "apps/jellyfin/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "jellyfin/jellyfin",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    },
+    {
+      "description": "Sync Spoolman appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "apps/spoolman/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "Donkie/Spoolman",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Sync Kyverno appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "foundation/kyverno/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kyverno/kyverno",
+      "extractVersionTemplate": "^(?<version>.*)$",
+      "versioningTemplate": "loose"
+    },
+    {
+      "description": "Sync CloudNativePG appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "foundation/cnpg-system/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "cloudnative-pg/cloudnative-pg",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Sync intel-device-plugins appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "foundation/intel-device-plugins-gpu/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "intel/intel-device-plugins-for-kubernetes",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Sync kured appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "foundation/kured/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kubereboot/kured",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    },
+    {
+      "description": "Sync longhorn appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "foundation/longhorn-system/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "longhorn/charts",
+      "extractVersionTemplate": "^longhorn-(?<version>.*)$"
+    },
+    {
+      "description": "Sync node-feature-discovery appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "foundation/node-feature-discovery/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kubernetes-sigs/node-feature-discovery",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Sync secret-system appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "foundation/secret-system/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "mittwald/kubernetes-secret-generator",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Sync Gitea appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "platform/gitea/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "go-gitea/gitea",
+      "extractVersionTemplate": "^v(?<version>.*)$"
     }
   ],
   "nix": {
@@ -32,6 +166,190 @@
         "patch"
       ],
       "matchCurrentValue": "!/^v?0\\./"
+    },
+    {
+      "groupName": "helm dashy",
+      "matchFileNames": [
+        "apps/dashy/**"
+      ],
+      "matchPackageNames": [
+        "dashy",
+        "lissy93/dashy"
+      ]
+    },
+    {
+      "groupName": "helm jellyfin",
+      "matchFileNames": [
+        "apps/jellyfin/**"
+      ],
+      "matchPackageNames": [
+        "app-template",
+        "ghcr.io/jellyfin/jellyfin"
+      ]
+    },
+    {
+      "groupName": "helm spoolman",
+      "matchFileNames": [
+        "apps/spoolman/**"
+      ],
+      "matchPackageNames": [
+        "app-template",
+        "ghcr.io/donkie/spoolman"
+      ]
+    },
+    {
+      "groupName": "helm argocd",
+      "matchFileNames": [
+        "foundation/argocd/**"
+      ],
+      "matchPackageNames": [
+        "argo-cd",
+        "argocd-apps"
+      ]
+    },
+    {
+      "groupName": "helm cert-system",
+      "matchFileNames": [
+        "foundation/cert-system/**"
+      ],
+      "matchPackageNames": [
+        "cert-manager",
+        "trust-manager",
+        "step-certificates",
+        "step-issuer",
+        "cr.step.sm/smallstep/step-ca",
+        "cr.step.sm/smallstep/step-issuer"
+      ]
+    },
+    {
+      "groupName": "helm cnpg-system",
+      "matchFileNames": [
+        "foundation/cnpg-system/**"
+      ],
+      "matchPackageNames": [
+        "cloudnative-pg"
+      ]
+    },
+    {
+      "groupName": "helm external-dns",
+      "matchFileNames": [
+        "foundation/external-dns/**"
+      ],
+      "matchPackageNames": [
+        "external-dns"
+      ]
+    },
+    {
+      "groupName": "helm generic-cdi-plugin",
+      "matchFileNames": [
+        "foundation/generic-cdi-plugin/**"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/olfillasodikno/generic-cdi-plugin"
+      ]
+    },
+    {
+      "groupName": "helm intel-device-plugins-gpu",
+      "matchFileNames": [
+        "foundation/intel-device-plugins-gpu/**"
+      ],
+      "matchPackageNames": [
+        "intel-device-plugins-operator",
+        "intel-device-plugins-gpu"
+      ]
+    },
+    {
+      "groupName": "helm kyverno",
+      "matchFileNames": [
+        "foundation/kyverno/**"
+      ],
+      "matchPackageNames": [
+        "kyverno"
+      ]
+    },
+    {
+      "groupName": "helm kured",
+      "matchFileNames": [
+        "foundation/kured/**"
+      ],
+      "matchPackageNames": [
+        "kured"
+      ]
+    },
+    {
+      "groupName": "helm longhorn-system",
+      "matchFileNames": [
+        "foundation/longhorn-system/**"
+      ],
+      "matchPackageNames": [
+        "longhorn"
+      ]
+    },
+    {
+      "groupName": "helm node-feature-discovery",
+      "matchFileNames": [
+        "foundation/node-feature-discovery/**"
+      ],
+      "matchPackageNames": [
+        "node-feature-discovery"
+      ]
+    },
+    {
+      "groupName": "helm secret-system",
+      "matchFileNames": [
+        "foundation/secret-system/**"
+      ],
+      "matchPackageNames": [
+        "kubernetes-secret-generator"
+      ]
+    },
+    {
+      "groupName": "helm auth-system",
+      "matchFileNames": [
+        "platform/auth-system/**"
+      ],
+      "matchPackageNames": [
+        "authelia",
+        "app-template",
+        "ghcr.io/lldap/lldap"
+      ]
+    },
+    {
+      "groupName": "helm csi-driver-smb",
+      "matchFileNames": [
+        "platform/csi-driver-smb/**"
+      ],
+      "matchPackageNames": [
+        "csi-driver-smb"
+      ]
+    },
+    {
+      "groupName": "helm gitea",
+      "matchFileNames": [
+        "platform/gitea/**"
+      ],
+      "matchPackageNames": [
+        "gitea"
+      ]
+    },
+    {
+      "groupName": "helm monitoring-system",
+      "matchFileNames": [
+        "platform/monitoring-system/**"
+      ],
+      "matchPackageNames": [
+        "kube-prometheus-stack",
+        "teekennedy/prometheus-operator"
+      ]
+    },
+    {
+      "groupName": "helm renovate",
+      "matchFileNames": [
+        "platform/renovate/**"
+      ],
+      "matchPackageNames": [
+        "renovate"
+      ]
     },
     {
       "matchDatasources": [
