@@ -3,7 +3,7 @@
   lib,
   ...
 }: let
-  backupName = "persistent";
+  backupName = "persistent-daily";
   repoBase = "s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/hosts";
   hasPersistent =
     (config ? fileSystems)
@@ -32,6 +32,11 @@ in {
       environmentFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.restic_env_file.path;
       repository = "${repoBase}/${config.networking.hostName}";
       paths = ["/persistent"];
+      pruneOpts = [
+        "--keep-daily 7"
+        "--keep-weekly 4"
+        "--keep-monthly 12"
+      ];
       extraBackupArgs = [
         # exclude a folder’s content if it contains the special CACHEDIR.TAG file, but keep CACHEDIR.TAG
         # https://bford.info/cachedir/
@@ -39,14 +44,9 @@ in {
         # prevent restic from crossing filesystem boundaries and subvolumes when performing a backup
         "--one-file-system"
       ];
-      pruneOpts = [
-        "--keep-daily 7"
-        "--keep-weekly 4"
-        "--keep-monthly 12"
-      ];
       timerConfig = {
         OnCalendar = "daily";
-        RandomizedDelaySec = "1h";
+        RandomizedDelaySec = "2h";
         Persistent = true;
       };
     };

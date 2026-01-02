@@ -13,13 +13,16 @@ Following the 3-2-1 rule of backups, all of my data will be stored in:
 
 Thanks to nix-impermanence, I have a minimal set of files that are necessary for backup, all stored under the /persistent subvolume of the host's root filesystem.
 
-These files are backed up nightly to S3 thanks to a restic cronjob. TODO also backup to NAS.
+These files are backed up daily to S3 via restic (job: `persistent-daily`).
+Restic uses the default cache dir at `/var/cache/restic-backups-<job>` and `/var/cache` is persisted on `/cache`.
 
 **retention policy**: 7 daily, 4 weekly, 12 monthly.
 
 ### Kubernetes persistent volumes
 
 I'm using Longhorn as my default storage class for persistent volumes.
+Backups land on the NAS via NFS (borg-2) at `nfs://10.69.80.12:/backups/longhorn`.
+A restic job on borg-2 (`longhorn-weekly`) backs the NAS backup directory to S3 weekly (repo: `restic/longhorn`).
 Volumes are organized into different retention tiers based on how much it would suck to lose its data:
 
 - **critical**: Data that if lost, I would never be able to get back: photos, videos, and personal projects.
@@ -34,4 +37,3 @@ Volumes are organized into different retention tiers based on how much it would 
 - **ephemeral**: Tempfiles and cached data that should be excluded from backup.
   - snapshot policy: none.
   - rentention policy: none.
-

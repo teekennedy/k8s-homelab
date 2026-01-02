@@ -64,6 +64,8 @@
   environment.persistence."/cache" = {
     hideMounts = true;
     directories = [
+      # application cache directory (according to FHS)
+      "/var/cache"
       # containerd default metadata dir
       "/var/lib/containerd"
       # k3s data dirs

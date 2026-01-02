@@ -35,6 +35,52 @@ data "aws_iam_policy_document" "bucket_policy" {
       values   = ["false"]
     }
   }
+
+  statement {
+    sid    = "AllowStorageClassAnalysisExport"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+    actions = ["s3:PutObject"]
+    resources = [
+      "${aws_s3_bucket.backup.arn}/analytics/storage-class/*"
+    ]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.backup.arn]
+    }
+  }
+
+  statement {
+    sid    = "AllowStorageClassAnalysisGetBucketLocation"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+    actions = ["s3:GetBucketLocation"]
+    resources = [
+      aws_s3_bucket.backup.arn
+    ]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.backup.arn]
+    }
+  }
 }
 
 resource "aws_s3_bucket_policy" "backup" {
