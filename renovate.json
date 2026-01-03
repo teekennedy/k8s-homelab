@@ -5,6 +5,7 @@
     "security:openssf-scorecard"
   ],
   "bumpVersion": "patch",
+  "prHourlyLimit": 12,
   "customManagers": [
     {
       "description": "Sync Dashy appVersion with GitHub releases",
@@ -161,6 +162,15 @@
       "matchPackageNames": [
         "*"
       ],
+      "matchManagers": [
+        "gomod",
+        "helm-values",
+        "helmfile",
+        "helmv3",
+        "jsonnet-bundler",
+        "nix",
+        "terraform"
+      ],
       "matchUpdateTypes": [
         "minor",
         "patch"
@@ -183,8 +193,17 @@
         "apps/jellyfin/**"
       ],
       "matchPackageNames": [
+        "alpine",
         "app-template",
-        "ghcr.io/jellyfin/jellyfin"
+        "ghcr.io/jellyfin/jellyfin",
+        "docker.io/fallenbagel/jellyseerr",
+        "lscr.io/linuxserver/prowlarr",
+        "lscr.io/linuxserver/radarr",
+        "lscr.io/linuxserver/sonarr",
+        "ghcr.io/unpackerr/unpackerr",
+        "lscr.io/linuxserver/qbittorrent",
+        "docker.io/qmcgaw/gluetun",
+        "jellyfin/jellyfin"
       ]
     },
     {
@@ -194,7 +213,8 @@
       ],
       "matchPackageNames": [
         "app-template",
-        "ghcr.io/donkie/spoolman"
+        "ghcr.io/donkie/spoolman",
+        "Donkie/Spoolman"
       ]
     },
     {
@@ -227,7 +247,8 @@
         "foundation/cnpg-system/**"
       ],
       "matchPackageNames": [
-        "cloudnative-pg"
+        "cloudnative-pg",
+        "cloudnative-pg/cloudnative-pg"
       ]
     },
     {
@@ -255,7 +276,8 @@
       ],
       "matchPackageNames": [
         "intel-device-plugins-operator",
-        "intel-device-plugins-gpu"
+        "intel-device-plugins-gpu",
+        "intel/intel-device-plugins-for-kubernetes"
       ]
     },
     {
@@ -264,7 +286,8 @@
         "foundation/kyverno/**"
       ],
       "matchPackageNames": [
-        "kyverno"
+        "kyverno",
+        "kyverno/kyverno"
       ]
     },
     {
@@ -273,7 +296,8 @@
         "foundation/kured/**"
       ],
       "matchPackageNames": [
-        "kured"
+        "kured",
+        "kubereboot/kured"
       ]
     },
     {
@@ -282,7 +306,8 @@
         "foundation/longhorn-system/**"
       ],
       "matchPackageNames": [
-        "longhorn"
+        "longhorn",
+        "longhorn/charts"
       ]
     },
     {
@@ -291,7 +316,8 @@
         "foundation/node-feature-discovery/**"
       ],
       "matchPackageNames": [
-        "node-feature-discovery"
+        "node-feature-discovery",
+        "kubernetes-sigs/node-feature-discovery"
       ]
     },
     {
@@ -300,7 +326,8 @@
         "foundation/secret-system/**"
       ],
       "matchPackageNames": [
-        "kubernetes-secret-generator"
+        "kubernetes-secret-generator",
+        "mittwald/kubernetes-secret-generator"
       ]
     },
     {
@@ -329,7 +356,9 @@
         "platform/gitea/**"
       ],
       "matchPackageNames": [
-        "gitea"
+        "gitea",
+        "ghcr.io/cloudnative-pg/postgresql",
+        "go-gitea/gitea"
       ]
     },
     {
@@ -339,7 +368,8 @@
       ],
       "matchPackageNames": [
         "kube-prometheus-stack",
-        "teekennedy/prometheus-operator"
+        "teekennedy/prometheus-operator",
+        "ghcr.io/teekennedy/prometheus-operator"
       ]
     },
     {
@@ -356,6 +386,35 @@
         "docker"
       ],
       "matchPackageNames": [
+        "alpine"
+      ],
+      "allowedVersions": "/^latest$/",
+      "pinDigests": true
+    },
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "lissy93/dashy"
+      ],
+      "versioning": "regex:^release-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
+    },
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/teekennedy/prometheus-operator"
+      ],
+      "allowedVersions": "/^discord-webhook-file-fix$/",
+      "pinDigests": true
+    },
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
         "ghcr.io/lldap/lldap"
       ],
       "versioning": "regex:^(?<minor>\\d+)-(?<patch>\\d+)-(?<build>\\d+)-(?<compatibility>.*)?$"
@@ -364,7 +423,7 @@
       "matchDatasources": [
         "docker"
       ],
-      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-ls(?<revision>\\d+)$",
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:[.-]r?(?<build>\\d+))?-ls(?<revision>\\d+)$",
       "matchPackageNames": [
         "/^(?:gh|ls)cr\\.io/linuxserver//"
       ]
