@@ -18,6 +18,7 @@
       },
       "original": {
         "owner": "serokell",
+        "ref": "master",
         "repo": "deploy-rs",
         "type": "github"
       }
@@ -38,6 +39,7 @@
       },
       "original": {
         "owner": "nix-community",
+        "ref": "master",
         "repo": "disko",
         "type": "github"
       }
@@ -72,6 +74,7 @@
       },
       "original": {
         "owner": "hercules-ci",
+        "ref": "main",
         "repo": "flake-parts",
         "type": "github"
       }
@@ -87,6 +90,7 @@
       },
       "original": {
         "owner": "nix-community",
+        "ref": "master",
         "repo": "impermanence",
         "type": "github"
       }
@@ -118,6 +122,7 @@
       },
       "original": {
         "owner": "nix-community",
+        "ref": "main",
         "repo": "nixos-facter-modules",
         "type": "github"
       }
@@ -181,6 +186,7 @@
       },
       "original": {
         "owner": "Mic92",
+        "ref": "master",
         "repo": "sops-nix",
         "type": "github"
       }

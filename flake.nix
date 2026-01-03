@@ -1,18 +1,18 @@
 {
   description = "teekennedy's homelab";
   inputs = {
-    deploy-rs.url = "github:serokell/deploy-rs";
+    deploy-rs.url = "github:serokell/deploy-rs?ref=master";
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
-    nixos-facter-modules.url = "github:nix-community/nixos-facter-modules";
+    nixos-facter-modules.url = "github:nix-community/nixos-facter-modules?ref=main";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    disko.url = "github:nix-community/disko";
+    disko.url = "github:nix-community/disko?ref=master";
     disko.inputs.nixpkgs.follows = "nixpkgs";
-    impermanence.url = "github:nix-community/impermanence";
+    impermanence.url = "github:nix-community/impermanence?ref=master";
     lenovo_sa120_fanspeed.url = "./modules/packages/lenovo_sa120_fanspeed";
     lenovo_sa120_fanspeed.inputs.nixpkgs.follows = "nixpkgs";
-    sops-nix.url = "github:Mic92/sops-nix";
+    sops-nix.url = "github:Mic92/sops-nix?ref=master";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
-    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts.url = "github:hercules-ci/flake-parts?ref=main";
   };
 
   outputs = inputs @ {
