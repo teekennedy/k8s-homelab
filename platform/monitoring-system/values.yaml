@@ -129,7 +129,7 @@ kube-prometheus-stack:
     image:
       registry: ghcr.io
       repository: teekennedy/prometheus-operator
-      tag: discord-webhook-file-fix
+      tag: discord-webhook-file-fix@sha256:9214d2f42956c8a6f95c8c662389fd4d3933ba88b2a5cb5b847321dc9138c076
       pullPolicy: IfNotPresent
     ## Create Endpoints objects for kubelet targets.
     kubeletEndpointsEnabled: false
