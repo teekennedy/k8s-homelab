@@ -1,12 +1,12 @@
 apiVersion: v2
 name: cert-system
-version: 0.0.6
+version: 0.0.7
 dependencies:
   - name: cert-manager
     version: v1.19.2
     repository: https://charts.jetstack.io
   - name: trust-manager
-    version: v0.20.2
+    version: v0.20.3
     repository: https://charts.jetstack.io
   - name: step-certificates
     version: "1.29.0"

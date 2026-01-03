@@ -16,7 +16,7 @@ step-certificates:
     # https://hub.docker.com/_/busybox
     initContainerRepository: busybox:1.37.0
     repository: cr.step.sm/smallstep/step-ca
-    tag: "0.28.4"
+    tag: "0.29.0"
   # Override the full name used in CA dns name and url
   # Defaults to <Release.Name>-<Chart.Name>
   fullnameOverride: step-ca
@@ -46,7 +46,7 @@ step-certificates:
 step-issuer:
   image:
     repository: cr.step.sm/smallstep/step-issuer
-    tag: "0.9.9"
+    tag: "0.9.11"
   # For the cert-manager approver
   certManager:
     serviceAccount:
