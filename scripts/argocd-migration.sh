@@ -147,6 +147,28 @@ detect_revision() {
   yq -r ".argocd-apps.applicationsets.${DEFAULT_APPSET_NAME}.generators[0].git.revision // \"\"" "$VALUES_FILE"
 }
 
+generate_app_manifest_from_live() {
+  local app="$1"
+  local output="$2"
+
+  if [ -z "$app" ] || [ -z "$output" ]; then
+    echo "generate_app_manifest_from_live requires app name and output path" >&2
+    return 1
+  fi
+
+  if command -v kubectl >/dev/null 2>&1; then
+    kubectl -n "$DEFAULT_NAMESPACE" get application "$app" -o yaml >"$output"
+  elif command -v argocd >/dev/null 2>&1; then
+    argocd app get "$app" -o yaml >"$output"
+  else
+    echo "Neither kubectl nor argocd CLI available to fetch live Application $app." >&2
+    return 1
+  fi
+
+  yq -i 'del(.metadata.ownerReferences, .metadata.managedFields, .metadata.resourceVersion, .metadata.uid, .metadata.generation, .metadata.creationTimestamp, .metadata.annotations."kubectl.kubernetes.io/last-applied-configuration", .status)' "$output"
+  yq -i ".metadata.name = \"$app\" | .metadata.namespace = \"$DEFAULT_NAMESPACE\"" "$output"
+}
+
 remove_appset_path() {
   local path="$1"
 
@@ -386,8 +408,8 @@ migrate_app() {
   git mv "$src" "$dest"
 
   if [ ! -f "$manifest" ]; then
-    echo "Expected Application manifest $manifest not found after move." >&2
-    exit 1
+    echo "Application manifest $manifest not found after move; generating from live Application $app."
+    generate_app_manifest_from_live "$app" "$manifest"
   fi
 
   yq -i ".spec.source.path = \"$dest\"" "$manifest"
@@ -402,8 +424,8 @@ migrate_app() {
     echo "Skipping argocd diff (parent not provided or argocd CLI missing)."
   fi
 
-  commit_and_push "Migrating $tier/$app to k8s"
-  sync_after_migration "$tier" "$app"
+  commit_and_push "Migrating $tier/$app to k8s/"
+  sync_after_migration "${tier}-root" "$app"
 }
 
 decommission_appset() {
