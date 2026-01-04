@@ -72,7 +72,6 @@ argocd-apps:
               - path: foundation/cnpg-system
               - path: foundation/external-dns
               - path: foundation/generic-cdi-plugin
-              - path: foundation/intel-device-plugins-gpu
               - path: foundation/kured
               - path: foundation/kyverno
               - path: foundation/longhorn-system
