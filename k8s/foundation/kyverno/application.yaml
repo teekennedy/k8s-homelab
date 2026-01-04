@@ -59,7 +59,7 @@ spec:
       kind: CustomResourceDefinition
   project: default
   source:
-    path: foundation/kyverno
+    path: k8s/foundation/kyverno
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
