@@ -125,7 +125,8 @@ argocd-apps:
         path: k8s
         directory:
           include: "*/application.yaml"
-          recurse: false
+          exclude: "*/**/application.yaml"
+          recurse: true
       syncPolicy:
         syncOptions:
           - CreateNamespace=true
