@@ -68,7 +68,6 @@ argocd-apps:
               - path: platform/kanidm
               - path: platform/monitoring-system
               - path: foundation/argocd
-              - path: foundation/cnpg-system
               - path: foundation/external-dns
               - path: foundation/longhorn-system
       syncPolicy:

@@ -43,7 +43,7 @@ spec:
       kind: CustomResourceDefinition
   project: default
   source:
-    path: foundation/cnpg-system
+    path: k8s/foundation/cnpg-system
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
