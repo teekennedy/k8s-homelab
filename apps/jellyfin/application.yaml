@@ -5,13 +5,6 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
   name: jellyfin
   namespace: argocd
-  ownerReferences:
-    - apiVersion: argoproj.io/v1alpha1
-      blockOwnerDeletion: true
-      controller: true
-      kind: ApplicationSet
-      name: root
-      uid: 0c3323b9-2b93-43c0-8a93-3f6273d5876b
 spec:
   destination:
     name: in-cluster

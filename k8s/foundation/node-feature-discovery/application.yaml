@@ -52,7 +52,7 @@ spec:
       kind: CustomResourceDefinition
   project: default
   source:
-    path: foundation/node-feature-discovery
+    path: k8s/foundation/node-feature-discovery
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:

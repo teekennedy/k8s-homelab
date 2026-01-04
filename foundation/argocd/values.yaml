@@ -76,7 +76,6 @@ argocd-apps:
               - path: foundation/kured
               - path: foundation/kyverno
               - path: foundation/longhorn-system
-              - path: foundation/node-feature-discovery
               - path: foundation/secret-system
       syncPolicy:
         preserveResourcesOnDeletion: true
