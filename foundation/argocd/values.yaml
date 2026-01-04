@@ -72,7 +72,6 @@ argocd-apps:
               - path: foundation/cnpg-system
               - path: foundation/external-dns
               - path: foundation/longhorn-system
-              - path: foundation/secret-system
       syncPolicy:
         preserveResourcesOnDeletion: true
       template:
