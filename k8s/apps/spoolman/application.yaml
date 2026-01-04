@@ -50,7 +50,7 @@ spec:
       kind: CustomResourceDefinition
   project: default
   source:
-    path: apps/spoolman
+    path: k8s/apps/spoolman
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
