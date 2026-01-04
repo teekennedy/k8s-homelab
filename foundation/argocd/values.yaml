@@ -110,3 +110,21 @@ argocd-apps:
               - CreateNamespace=true
               - ApplyOutOfSyncOnly=true
               - RespectIgnoreDifferences=true
+  applications:
+    k8s-root:
+      namespace: argocd
+      project: default
+      destination:
+        name: in-cluster
+        namespace: argocd
+      source:
+        repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
+        targetRevision: main
+        path: k8s
+        directory:
+          recurse: true
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true
+          - RespectIgnoreDifferences=true

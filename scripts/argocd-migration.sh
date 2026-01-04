@@ -152,27 +152,13 @@ ensure_root_application_entry() {
   local repo_url="$1"
   local revision="$2"
 
-  yq -i '.argocd-apps.applications = (.argocd-apps.applications // [])' "$VALUES_FILE"
-  if yq -e ".argocd-apps.applications[] | select(.name == \"$DEFAULT_ROOT_APP_NAME\")" "$VALUES_FILE" >/dev/null 2>&1; then
-    echo "Root application $DEFAULT_ROOT_APP_NAME already present in $VALUES_FILE"
+  yq -i '.argocd-apps.applications = (if (.argocd-apps.applications // {} | type) == "!!map" then .argocd-apps.applications // {} else {} end)' "$VALUES_FILE"
+  if yq -e ".argocd-apps.applications | has(\"$DEFAULT_ROOT_APP_NAME\")" "$VALUES_FILE" >/dev/null 2>&1; then
+    echo "Root application $DEFAULT_ROOT_APP_NAME already present in $VALUES_FILE (applications map)"
     return
   fi
 
-  yq -i "
-    .argocd-apps.applications += [{
-      name: \"$DEFAULT_ROOT_APP_NAME\",
-      namespace: \"$DEFAULT_NAMESPACE\",
-      project: \"$DEFAULT_PROJECT\",
-      destination: { name: \"$DEFAULT_CLUSTER_NAME\", namespace: \"$DEFAULT_NAMESPACE\" },
-      source: {
-        repoURL: \"$repo_url\",
-        targetRevision: \"$revision\",
-        path: \"$K8S_ROOT\",
-        directory: { recurse: true }
-      },
-      syncPolicy: { syncOptions: [\"CreateNamespace=true\", \"ApplyOutOfSyncOnly=true\", \"RespectIgnoreDifferences=true\"] }
-    }]
-  " "$VALUES_FILE"
+  yq -i ".argocd-apps.applications.\"$DEFAULT_ROOT_APP_NAME\" = {\"namespace\": \"$DEFAULT_NAMESPACE\", \"project\": \"$DEFAULT_PROJECT\", \"destination\": {\"name\": \"$DEFAULT_CLUSTER_NAME\", \"namespace\": \"$DEFAULT_NAMESPACE\"}, \"source\": {\"repoURL\": \"$repo_url\", \"targetRevision\": \"$revision\", \"path\": \"$K8S_ROOT\", \"directory\": {\"recurse\": true}}, \"syncPolicy\": {\"syncOptions\": [\"CreateNamespace=true\", \"ApplyOutOfSyncOnly=true\", \"RespectIgnoreDifferences=true\"]}}" "$VALUES_FILE"
   echo "Added root Application $DEFAULT_ROOT_APP_NAME to $VALUES_FILE"
 }
 
@@ -234,10 +220,7 @@ safety_toggles() {
     return
   fi
 
-  yq -i "
-    .argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.template.spec.syncPolicy.automated.prune = false |
-    .argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.template.spec.syncPolicy.automated.selfHeal = false
-  " "$VALUES_FILE"
+  yq -i ".argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.template.spec.syncPolicy.automated.prune = false | .argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.template.spec.syncPolicy.automated.selfHeal = false" "$VALUES_FILE"
   echo "Safety toggles applied to $VALUES_FILE"
   commit_and_push
 }
@@ -390,10 +373,7 @@ revert_safety() {
     echo "ApplicationSet $DEFAULT_APPSET_NAME not found in $VALUES_FILE; nothing to revert." >&2
     return
   fi
-  yq -i "
-    .argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.template.spec.syncPolicy.automated.prune = true |
-    .argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.template.spec.syncPolicy.automated.selfHeal = true
-  " "$VALUES_FILE"
+  yq -i ".argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.template.spec.syncPolicy.automated.prune = true | .argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.template.spec.syncPolicy.automated.selfHeal = true" "$VALUES_FILE"
   echo "Safety toggles reverted in $VALUES_FILE"
   commit_and_push
 }
