@@ -11,9 +11,6 @@ argo-cd:
       controller.diff.server.side: false
     # argocd-cm configmap
     cm:
-      # this used to be the default, but was changed to match upstream's default of "" in v9.0.1 of the argo-cd helm chart
-      params:
-        applicationsetcontroller.policy: 'create-only'
       # ArgoCD's default annotation tracking stores a large amount of data in annotations for large resources.
       # This can cause sync errors when the maximum annotation size is exceeded.
       # Use labels instead of annotations for resource tracking.
@@ -53,71 +50,6 @@ argo-cd:
     metrics: *metrics
 # https://github.com/argoproj/argo-helm/blob/main/charts/argocd-apps/values.yaml
 argocd-apps:
-  applicationsets:
-    root:
-      namespace: argocd
-      generators:
-        - git:
-            repoURL: &repoURL http://gitea-http.gitea:3000/ops/k8s-homelab
-            revision: &revision main
-            directories:
-              - path: foundation/argocd
-      syncPolicy:
-        preserveResourcesOnDeletion: true
-      template:
-        metadata:
-          name: '{{path.basename}}'
-        spec:
-          destination:
-            name: in-cluster
-            namespace: '{{path.basename}}'
-          project: default
-          source:
-            repoURL: *repoURL
-            path: '{{path}}'
-            targetRevision: *revision
-          # When PVCs are migrated manually they have explicit storageClassName and volumeName
-          ignoreDifferences:
-            - kind: PersistentVolumeClaim
-              jsonPointers:
-                - /spec/volumeName
-                - /spec/storageClassName
-            - kind: Secret
-              namespace: auth-system
-              name: lldap-authelia-bind-user
-              jsonPointers:
-                - /data
-            - kind: Secret
-              namespace: auth-system
-              name: authelia-secrets
-              jsonPointers:
-                - /data
-            - kind: Secret
-              namespace: gitea
-              name: gitea-admin-secret
-              jsonPointers:
-                - /data
-            - kind: Secret
-              namespace: monitoring-system
-              name: monitoring-system-grafana
-              jsonPointers:
-                - /data
-            - kind: CustomResourceDefinition
-              group: apiextensions.k8s.io
-          syncPolicy:
-            automated:
-              prune: false
-              selfHeal: false
-            retry:
-              limit: 10
-              backoff:
-                duration: 1m
-                factor: 2
-                maxDuration: 16m
-            syncOptions:
-              - CreateNamespace=true
-              - ApplyOutOfSyncOnly=true
-              - RespectIgnoreDifferences=true
   applications:
     k8s-root:
       namespace: argocd
