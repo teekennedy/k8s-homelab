@@ -20,3 +20,6 @@ spec:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
       - RespectIgnoreDifferences=true
+    automated:
+      prune: false
+      selfHeal: false
