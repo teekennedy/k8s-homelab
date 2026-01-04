@@ -61,11 +61,23 @@ argocd-apps:
             repoURL: &repoURL http://gitea-http.gitea:3000/ops/k8s-homelab
             revision: &revision main
             directories:
-              - path: foundation/*
-              - path: foundation/longhorn
-                exclude: true
-              - path: platform/*
-              - path: apps/*
+              - path: apps/jellyfin
+              - path: platform/auth-system
+              - path: platform/csi-driver-smb
+              - path: platform/gitea
+              - path: platform/kanidm
+              - path: platform/monitoring-system
+              - path: foundation/argocd
+              - path: foundation/cert-system
+              - path: foundation/cnpg-system
+              - path: foundation/external-dns
+              - path: foundation/generic-cdi-plugin
+              - path: foundation/intel-device-plugins-gpu
+              - path: foundation/kured
+              - path: foundation/kyverno
+              - path: foundation/longhorn-system
+              - path: foundation/node-feature-discovery
+              - path: foundation/secret-system
       syncPolicy:
         preserveResourcesOnDeletion: true
       template:

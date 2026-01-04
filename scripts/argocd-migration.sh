@@ -145,6 +145,31 @@ detect_revision() {
   yq -r ".argocd-apps.applicationsets.${DEFAULT_APPSET_NAME}.generators[0].git.revision // \"\"" "$VALUES_FILE"
 }
 
+remove_appset_path() {
+  local path="$1"
+
+  if [ -z "$path" ]; then
+    echo "remove_appset_path requires a path" >&2
+    return 1
+  fi
+
+  if ! yq -e ".argocd-apps.applicationsets | has(\"$DEFAULT_APPSET_NAME\")" "$VALUES_FILE" >/dev/null 2>&1; then
+    echo "ApplicationSet $DEFAULT_APPSET_NAME not found in $VALUES_FILE; skipping removal of $path." >&2
+    return 0
+  fi
+
+  local before after
+  before=$(yq -r ".argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.generators[0].git.directories | length" "$VALUES_FILE" 2>/dev/null || echo "")
+  yq -i ".argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.generators[0].git.directories = ((.argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.generators[0].git.directories // []) | map(select(.path != \"$path\")))" "$VALUES_FILE"
+  after=$(yq -r ".argocd-apps.applicationsets.$DEFAULT_APPSET_NAME.generators[0].git.directories | length" "$VALUES_FILE" 2>/dev/null || echo "")
+
+  if [ -n "$before" ] && [ -n "$after" ] && [ "$before" = "$after" ]; then
+    echo "No ApplicationSet directory entry found for $path."
+  else
+    echo "Removed $path from ApplicationSet $DEFAULT_APPSET_NAME directories list."
+  fi
+}
+
 ensure_app_of_apps_file() {
   local tier="$1"
   local app_name="$2"
@@ -365,6 +390,8 @@ migrate_app() {
 
   yq -i ".spec.source.path = \"$dest\"" "$manifest"
   yq e 'true' "$manifest" >/dev/null
+
+  remove_appset_path "$src"
 
   if [ -n "$parent" ] && command -v argocd >/dev/null 2>&1; then
     echo "Running argocd app diff for parent $parent (no sync)..."
