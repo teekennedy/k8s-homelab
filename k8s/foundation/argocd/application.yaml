@@ -43,7 +43,7 @@ spec:
       kind: CustomResourceDefinition
   project: default
   source:
-    path: foundation/argocd
+    path: k8s/foundation/argocd
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
