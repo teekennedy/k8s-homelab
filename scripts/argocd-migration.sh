@@ -57,6 +57,28 @@ ensure_repo_root() {
   cd "$root"
 }
 
+sync_after_migration() {
+  local app="$1"
+  if [ -z "$app" ]; then
+    echo "sync_after_migration requires app name" >&2
+    return
+  fi
+  if ! command -v argocd >/dev/null 2>&1; then
+    echo "argocd CLI not found; skipping automatic syncs." >&2
+    return
+  fi
+
+  echo "Will run argocd app sync in order: argocd -> $DEFAULT_ROOT_APP_NAME -> $app"
+  if ! confirm "Proceed with argocd syncs?"; then
+    echo "Skipping argocd syncs."
+    return
+  fi
+
+  argocd app sync argocd
+  argocd app sync "$DEFAULT_ROOT_APP_NAME"
+  argocd app sync "$app"
+}
+
 init_log_dir() {
   mkdir -p "$LOG_ROOT"
   LOG_DIR="${LOG_ROOT}/$(date +%Y%m%d-%H%M%S)"
@@ -79,6 +101,8 @@ ensure_upstream() {
 }
 
 commit_and_push() {
+  local default_msg="${1:-}"
+
   if ! git_dirty; then
     echo "No git changes to commit."
     return
@@ -90,7 +114,19 @@ commit_and_push() {
     return
   fi
 
-  read -r -p "Commit message: " commit_msg
+  local commit_msg=""
+  if [ -n "$default_msg" ]; then
+    read -r -p "Commit message [$default_msg]: " commit_msg
+    commit_msg="${commit_msg:-$default_msg}"
+  else
+    read -r -p "Commit message: " commit_msg
+  fi
+
+  if [ -z "$commit_msg" ]; then
+    echo "No commit message provided; skipping commit."
+    return
+  fi
+
   git add -A
   git commit -m "$commit_msg"
 
@@ -337,7 +373,8 @@ migrate_app() {
     echo "Skipping argocd diff (parent not provided or argocd CLI missing)."
   fi
 
-  commit_and_push
+  commit_and_push "Migrating $tier/$app to k8s"
+  sync_after_migration "$app"
 }
 
 decommission_appset() {
