@@ -56,6 +56,8 @@ argocd-apps:
                 exclude: true
               - path: platform/*
               - path: apps/*
+      syncPolicy:
+        preserveResourcesOnDeletion: true
       template:
         metadata:
           name: '{{path.basename}}'
@@ -97,7 +99,6 @@ argocd-apps:
             - kind: CustomResourceDefinition
               group: apiextensions.k8s.io
           syncPolicy:
-            preserveResourcesOnDeletion: true
             automated:
               prune: false
               selfHeal: false
@@ -123,8 +124,8 @@ argocd-apps:
         targetRevision: main
         path: k8s
         directory:
-          include: "**/application.yaml"
-          recurse: true
+          include: "*/application.yaml"
+          recurse: false
       syncPolicy:
         syncOptions:
           - CreateNamespace=true

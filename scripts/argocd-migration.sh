@@ -195,7 +195,7 @@ ensure_root_application_entry() {
     return
   fi
 
-  yq -i ".argocd-apps.applications.\"$DEFAULT_ROOT_APP_NAME\" = {\"namespace\": \"$DEFAULT_NAMESPACE\", \"project\": \"$DEFAULT_PROJECT\", \"destination\": {\"name\": \"$DEFAULT_CLUSTER_NAME\", \"namespace\": \"$DEFAULT_NAMESPACE\"}, \"source\": {\"repoURL\": \"$repo_url\", \"targetRevision\": \"$revision\", \"path\": \"$K8S_ROOT\", \"directory\": {\"include\": \"**/application.yaml\", \"recurse\": true}}, \"syncPolicy\": {\"syncOptions\": [\"CreateNamespace=true\", \"ApplyOutOfSyncOnly=true\", \"RespectIgnoreDifferences=true\"]}}" "$VALUES_FILE"
+  yq -i ".argocd-apps.applications.\"$DEFAULT_ROOT_APP_NAME\" = {\"namespace\": \"$DEFAULT_NAMESPACE\", \"project\": \"$DEFAULT_PROJECT\", \"destination\": {\"name\": \"$DEFAULT_CLUSTER_NAME\", \"namespace\": \"$DEFAULT_NAMESPACE\"}, \"source\": {\"repoURL\": \"$repo_url\", \"targetRevision\": \"$revision\", \"path\": \"$K8S_ROOT\", \"directory\": {\"include\": \"*/application.yaml\", \"recurse\": false}}, \"syncPolicy\": {\"syncOptions\": [\"CreateNamespace=true\", \"ApplyOutOfSyncOnly=true\", \"RespectIgnoreDifferences=true\"]}}" "$VALUES_FILE"
   echo "Added root Application $DEFAULT_ROOT_APP_NAME to $VALUES_FILE"
 }
 
