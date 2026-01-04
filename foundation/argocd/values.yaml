@@ -13,7 +13,7 @@ argo-cd:
     cm:
       # this used to be the default, but was changed to match upstream's default of "" in v9.0.1 of the argo-cd helm chart
       params:
-        applicationsetcontroller.policy: 'sync'
+        applicationsetcontroller.policy: 'create-only'
       # ArgoCD's default annotation tracking stores a large amount of data in annotations for large resources.
       # This can cause sync errors when the maximum annotation size is exceeded.
       # Use labels instead of annotations for resource tracking.
