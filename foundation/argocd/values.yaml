@@ -41,7 +41,6 @@ argo-cd:
     metrics: *metrics
   redis:
     metrics: *metrics
-
 # https://github.com/argoproj/argo-helm/blob/main/charts/argocd-apps/values.yaml
 argocd-apps:
   applicationsets:
@@ -99,8 +98,8 @@ argocd-apps:
               group: apiextensions.k8s.io
           syncPolicy:
             automated:
-              prune: true
-              selfHeal: true
+              prune: false
+              selfHeal: false
             retry:
               limit: 10
               backoff:
