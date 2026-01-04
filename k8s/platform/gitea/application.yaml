@@ -43,7 +43,7 @@ spec:
       kind: CustomResourceDefinition
   project: default
   source:
-    path: platform/gitea
+    path: k8s/platform/gitea
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
