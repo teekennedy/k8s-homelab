@@ -58,9 +58,10 @@ ensure_repo_root() {
 }
 
 sync_after_migration() {
-  local app="$1"
-  if [ -z "$app" ]; then
-    echo "sync_after_migration requires app name" >&2
+  local tier="$1"
+  local app="$2"
+  if [ -z "$app" -o -z "$tier" ]; then
+    echo "sync_after_migration requires tier and app name" >&2
     return
   fi
   if ! command -v argocd >/dev/null 2>&1; then
@@ -68,7 +69,7 @@ sync_after_migration() {
     return
   fi
 
-  echo "Will run argocd app sync in order: argocd -> $DEFAULT_ROOT_APP_NAME -> $app"
+  echo "Will run argocd app sync in order: argocd -> $DEFAULT_ROOT_APP_NAME -> $tier -> $app"
   if ! confirm "Proceed with argocd syncs?"; then
     echo "Skipping argocd syncs."
     return
@@ -76,6 +77,7 @@ sync_after_migration() {
 
   argocd app sync argocd
   argocd app sync "$DEFAULT_ROOT_APP_NAME"
+  argocd app sync "$tier"
   argocd app sync "$app"
 }
 
@@ -401,7 +403,7 @@ migrate_app() {
   fi
 
   commit_and_push "Migrating $tier/$app to k8s"
-  sync_after_migration "$app"
+  sync_after_migration "$tier" "$app"
 }
 
 decommission_appset() {
