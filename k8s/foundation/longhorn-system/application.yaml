@@ -48,7 +48,7 @@ spec:
     targetRevision: main
   syncPolicy:
     automated:
-      prune: false
+      prune: true
       selfHeal: false
     retry:
       backoff:

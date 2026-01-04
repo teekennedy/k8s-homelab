@@ -40,7 +40,9 @@ spec:
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
-    automated: {}
+    automated:
+      prune: true
+      selfHeal: false
     retry:
       backoff:
         duration: 1m
