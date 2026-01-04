@@ -122,6 +122,7 @@ argocd-apps:
         targetRevision: main
         path: k8s
         directory:
+          include: "**/application.yaml"
           recurse: true
       syncPolicy:
         syncOptions:

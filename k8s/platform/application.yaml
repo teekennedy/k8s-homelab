@@ -13,6 +13,7 @@ spec:
     targetRevision: "main"
     path: "k8s/platform"
     directory:
+      include: "**/application.yaml"
       recurse: true
   syncPolicy:
     syncOptions:
