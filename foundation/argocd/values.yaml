@@ -61,7 +61,6 @@ argocd-apps:
             repoURL: &repoURL http://gitea-http.gitea:3000/ops/k8s-homelab
             revision: &revision main
             directories:
-              - path: platform/auth-system
               - path: platform/csi-driver-smb
               - path: platform/gitea
               - path: platform/kanidm
