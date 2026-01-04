@@ -13,7 +13,7 @@ resource "terraform_data" "create_namespace" {
   }
 }
 
-resource "kubernetes_secret" "external" {
+resource "kubernetes_secret_v1" "external" {
   metadata {
     name      = var.name
     namespace = terraform_data.create_namespace.output

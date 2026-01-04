@@ -59,9 +59,9 @@ resource "cloudflare_api_token" "external_dns" {
   policies = [{
     effect            = "allow"
     permission_groups = local.dns_edit_permission_groups
-    resources = {
+    resources = jsonencode({
       "com.cloudflare.api.account.zone.*" = "*"
-    }
+    })
   }]
 }
 
@@ -81,9 +81,9 @@ resource "cloudflare_api_token" "cert_manager" {
   policies = [{
     effect            = "allow"
     permission_groups = local.dns_edit_permission_groups
-    resources = {
+    resources = jsonencode({
       "com.cloudflare.api.account.zone.*" = "*"
-    }
+    })
   }]
 }
 
