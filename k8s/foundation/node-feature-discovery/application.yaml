@@ -3,8 +3,6 @@ kind: Application
 metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
-    - post-delete-finalizer.argocd.argoproj.io
-    - post-delete-finalizer.argocd.argoproj.io/cleanup
   name: node-feature-discovery
   namespace: argocd
 spec:
