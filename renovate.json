@@ -11,7 +11,7 @@
       "description": "Sync Dashy appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "apps/dashy/Chart.yaml"
+        "k8s/apps/dashy/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -24,7 +24,7 @@
       "description": "Sync Jellyfin appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "apps/jellyfin/Chart.yaml"
+        "k8s/apps/jellyfin/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -37,7 +37,7 @@
       "description": "Sync Spoolman appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "apps/spoolman/Chart.yaml"
+        "k8s/apps/spoolman/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -50,7 +50,7 @@
       "description": "Sync Kyverno appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "foundation/kyverno/Chart.yaml"
+        "k8s/foundation/kyverno/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -64,7 +64,7 @@
       "description": "Sync CloudNativePG appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "foundation/cnpg-system/Chart.yaml"
+        "k8s/foundation/cnpg-system/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -77,7 +77,7 @@
       "description": "Sync intel-device-plugins appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "foundation/intel-device-plugins-gpu/Chart.yaml"
+        "k8s/foundation/intel-device-plugins-gpu/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -90,7 +90,7 @@
       "description": "Sync kured appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "foundation/kured/Chart.yaml"
+        "k8s/foundation/kured/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -103,7 +103,7 @@
       "description": "Sync longhorn appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "foundation/longhorn-system/Chart.yaml"
+        "k8s/foundation/longhorn-system/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -116,7 +116,7 @@
       "description": "Sync node-feature-discovery appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "foundation/node-feature-discovery/Chart.yaml"
+        "k8s/foundation/node-feature-discovery/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -129,7 +129,7 @@
       "description": "Sync secret-system appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "foundation/secret-system/Chart.yaml"
+        "k8s/foundation/secret-system/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -142,7 +142,7 @@
       "description": "Sync Gitea appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
-        "platform/gitea/Chart.yaml"
+        "k8s/platform/gitea/Chart.yaml"
       ],
       "matchStrings": [
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
@@ -180,7 +180,7 @@
     {
       "groupName": "helm dashy",
       "matchFileNames": [
-        "apps/dashy/**"
+        "k8s/apps/dashy/**"
       ],
       "matchPackageNames": [
         "dashy",
@@ -190,7 +190,7 @@
     {
       "groupName": "helm jellyfin",
       "matchFileNames": [
-        "apps/jellyfin/**"
+        "k8s/apps/jellyfin/**"
       ],
       "matchPackageNames": [
         "alpine",
@@ -209,7 +209,7 @@
     {
       "groupName": "helm spoolman",
       "matchFileNames": [
-        "apps/spoolman/**"
+        "k8s/apps/spoolman/**"
       ],
       "matchPackageNames": [
         "app-template",
@@ -220,7 +220,7 @@
     {
       "groupName": "helm argocd",
       "matchFileNames": [
-        "foundation/argocd/**"
+        "k8s/foundation/argocd/**"
       ],
       "matchPackageNames": [
         "argo-cd",
@@ -230,7 +230,7 @@
     {
       "groupName": "helm cert-system",
       "matchFileNames": [
-        "foundation/cert-system/**"
+        "k8s/foundation/cert-system/**"
       ],
       "matchPackageNames": [
         "cert-manager",
@@ -244,7 +244,7 @@
     {
       "groupName": "helm cnpg-system",
       "matchFileNames": [
-        "foundation/cnpg-system/**"
+        "k8s/foundation/cnpg-system/**"
       ],
       "matchPackageNames": [
         "cloudnative-pg",
@@ -254,7 +254,7 @@
     {
       "groupName": "helm external-dns",
       "matchFileNames": [
-        "foundation/external-dns/**"
+        "k8s/foundation/external-dns/**"
       ],
       "matchPackageNames": [
         "external-dns"
@@ -263,7 +263,7 @@
     {
       "groupName": "helm generic-cdi-plugin",
       "matchFileNames": [
-        "foundation/generic-cdi-plugin/**"
+        "k8s/foundation/generic-cdi-plugin/**"
       ],
       "matchPackageNames": [
         "ghcr.io/olfillasodikno/generic-cdi-plugin"
@@ -272,7 +272,7 @@
     {
       "groupName": "helm intel-device-plugins-gpu",
       "matchFileNames": [
-        "foundation/intel-device-plugins-gpu/**"
+        "k8s/foundation/intel-device-plugins-gpu/**"
       ],
       "matchPackageNames": [
         "intel-device-plugins-operator",
@@ -283,7 +283,7 @@
     {
       "groupName": "helm kyverno",
       "matchFileNames": [
-        "foundation/kyverno/**"
+        "k8s/foundation/kyverno/**"
       ],
       "matchPackageNames": [
         "kyverno",
@@ -293,7 +293,7 @@
     {
       "groupName": "helm kured",
       "matchFileNames": [
-        "foundation/kured/**"
+        "k8s/foundation/kured/**"
       ],
       "matchPackageNames": [
         "kured",
@@ -303,7 +303,7 @@
     {
       "groupName": "helm longhorn-system",
       "matchFileNames": [
-        "foundation/longhorn-system/**"
+        "k8s/foundation/longhorn-system/**"
       ],
       "matchPackageNames": [
         "longhorn",
@@ -313,7 +313,7 @@
     {
       "groupName": "helm node-feature-discovery",
       "matchFileNames": [
-        "foundation/node-feature-discovery/**"
+        "k8s/foundation/node-feature-discovery/**"
       ],
       "matchPackageNames": [
         "node-feature-discovery",
@@ -323,7 +323,7 @@
     {
       "groupName": "helm secret-system",
       "matchFileNames": [
-        "foundation/secret-system/**"
+        "k8s/foundation/secret-system/**"
       ],
       "matchPackageNames": [
         "kubernetes-secret-generator",
@@ -333,7 +333,7 @@
     {
       "groupName": "helm auth-system",
       "matchFileNames": [
-        "platform/auth-system/**"
+        "k8s/platform/auth-system/**"
       ],
       "matchPackageNames": [
         "authelia",
@@ -344,7 +344,7 @@
     {
       "groupName": "helm csi-driver-smb",
       "matchFileNames": [
-        "platform/csi-driver-smb/**"
+        "k8s/platform/csi-driver-smb/**"
       ],
       "matchPackageNames": [
         "csi-driver-smb"
@@ -353,7 +353,7 @@
     {
       "groupName": "helm gitea",
       "matchFileNames": [
-        "platform/gitea/**"
+        "k8s/platform/gitea/**"
       ],
       "matchPackageNames": [
         "gitea",
@@ -364,7 +364,7 @@
     {
       "groupName": "helm monitoring-system",
       "matchFileNames": [
-        "platform/monitoring-system/**"
+        "k8s/platform/monitoring-system/**"
       ],
       "matchPackageNames": [
         "kube-prometheus-stack",
@@ -375,7 +375,7 @@
     {
       "groupName": "helm renovate",
       "matchFileNames": [
-        "platform/renovate/**"
+        "k8s/platform/renovate/**"
       ],
       "matchPackageNames": [
         "renovate"

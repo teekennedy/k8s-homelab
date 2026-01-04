@@ -151,7 +151,7 @@ To setup a new host, create the following config:
     - Run `sops updatekeys modules/*/*.enc.yaml` to re-encrypt shared secrets with the new keys.
   - With the manual steps out of the way, run `bootstrap-host borg-X -- --target-host root@<ip_addr>` once more. This time it should complete successfully.
 - Confirm you're able to login as your default user via SSH `ssh borg-X`
-- Update the YAML anchored list of `&nodeIPs` inside platform/monitoring-system/values.yaml. This need to be specified explicitly since they're not running as standalone pods in k3s.
+- Update the YAML anchored list of `&nodeIPs` inside k8s/platform/monitoring-system/values.yaml. This need to be specified explicitly since they're not running as standalone pods in k3s.
 - (optional) Add an external dns entry for the new host by updating the `k8s_hosts` input to the `cloudflare` module in terraform/main.tf.
 
 ## Deploying updates

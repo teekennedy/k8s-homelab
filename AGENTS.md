@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 - `hosts/<hostname>/` holds host-specific NixOS modules, `secrets.yaml`, and facter reports; keep new nodes under `hosts/common` for shared bits.
 - `modules/` provides reusable Nix modules (e.g. `modules/k3s`, `modules/users/defaultUser.nix`) that get imported by each host; extend here before duplicating config.
-- `foundation/` defines cluster-wide Helm releases managed via `foundation/helmfile.yaml`; `platform/` layers higher-level services, and `apps/` tracks user-facing workloads.
+- `k8s/foundation/`, `k8s/platform/`, and `k8s/apps/` hold Argo CD application definitions (tier app-of-apps live at `k8s/<tier>/application.yaml`).
 - `terraform/` contains infrastructure state (OpenTofu) for network storage; `scripts/` includes bootstrap helpers such as `scripts/bootstrap-host.sh`.
 
 ## Build, Test, and Development Commands
