@@ -43,7 +43,7 @@ spec:
       kind: CustomResourceDefinition
   project: default
   source:
-    path: apps/jellyfin
+    path: k8s/apps/jellyfin
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
