@@ -581,7 +581,7 @@ app-template:
         qbittorrent:
           image:
             repository: lscr.io/linuxserver/qbittorrent
-            tag: 5.1.4-r1-ls433
+            tag: 5.1.4-r1-ls435
           env:
             TZ: America/Denver
             PUID: "1200"
