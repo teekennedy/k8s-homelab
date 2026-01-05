@@ -20,6 +20,10 @@ spec:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
       - RespectIgnoreDifferences=true
-    automated:
-      prune: false
-      selfHeal: false
+    # When prune / selfHeal are explicitly set to false, the application gets stuck in an OutOfSync loop.
+    # This is because the values have the `omitempty` json tag, which means after applying the changes,
+    # automated will be an empty object.
+    # See https://github.com/argoproj/argo-cd/issues/22546
+    automated: {}
+    #   prune: false
+    #   selfHeal: false
