@@ -5,7 +5,7 @@ app-template:
     automountServiceAccountToken: false
   controllers:
     debug:
-      replicas: 1
+      replicas: 0
       containers:
         jellyfin-debug:
           image:
@@ -16,7 +16,7 @@ app-template:
             - infinity
 
     main:
-      replicas: 0
+      replicas: 1
       pod:
         securityContext:
           fsGroup: &gid 1200
@@ -613,6 +613,40 @@ app-template:
             capabilities:
               add:
                 - NET_ADMIN
+    configarr:
+      type: cronjob
+      cronjob:
+        schedule: "0 */8 * * *"
+        successfulJobsHistory: 1
+        failedJobsHistory: 1
+      pod:
+        restartPolicy: Never
+      initContainers:
+        write-secrets-yaml:
+          image:
+            repository: alpine
+            tag: 3.22.2
+          envFrom:
+            - secretRef:
+                name: api-keys
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cat <<EOF >/app/config/secrets.yml
+              SONARR_API_KEY: "${SONARR_API_KEY}"
+              RADARR_API_KEY: "${RADARR_API_KEY}"
+              EOF
+              chmod 600 /app/config/secrets.yml
+      containers:
+        configarr:
+          image:
+            repository: ghcr.io/raydak-labs/configarr
+            tag: 1.12.1
+            pullPolicy: IfNotPresent
+          tty: true # for color support
+          env:
+            LOG_STACKTRACE: "true"
   service:
     main:
       controller: main
@@ -773,6 +807,31 @@ app-template:
             - path: /data/config/logging.json
               readOnly: true
               subPath: logging.json
+    configarr-repos:
+      type: emptyDir
+      advancedMounts:
+        configarr:
+          configarr:
+            - path: /app/repos
+    configarr-config:
+      type: configMap
+      name: configarr
+      advancedMounts:
+        configarr:
+          configarr:
+            - path: /app/config/config.yml
+              readOnly: true
+              subPath: config.yml
+    configarr-secrets:
+      type: emptyDir
+      advancedMounts:
+        configarr:
+          write-secrets-yaml:
+            - path: /app/config
+          configarr:
+            - path: /app/config/secrets.yml
+              readOnly: true
+              subPath: secrets.yml
     jellyseerr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
