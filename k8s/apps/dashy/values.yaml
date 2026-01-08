@@ -4,6 +4,56 @@ dashy:
     pullPolicy: IfNotPresent
     tag: "release-3.1.1"
 
+  static:
+    configMapContent:
+      conf: |-
+        pageInfo:
+          title: msng.to
+          description: Missingtoken's Homelab
+          navLinks:
+            - title: GitHub
+              path: https://github.com/teekennedy/k8s-homelab
+              target: newtab
+        appConfig:
+          theme: fallout
+          layout: auto
+          iconSize: large
+        sections:
+          - name: Media
+            icon: fas fa-compact-disc
+            displayData:
+              sortBy: default
+              rows: 1
+              cols: 1
+              collapsed: false
+              hideForGuests: false
+            items:
+              - &ref_0
+                title: Jellyfin
+                description: Stream movies and shows
+                icon: si-jellyfin
+                url: https://jellyfin.msng.to/
+                target: sametab
+                id: 0_480_jellyfin
+              - &ref_1
+                title: Jellyseerr
+                description: Request media
+                icon: fas fa-concierge-bell
+                url: https://jellyseerr.msng.to/
+                id: 1_480_jellyseerr
+            filteredItems:
+              - *ref_0
+              - *ref_1
+          - name: Status
+            displayData:
+              sortBy: default
+              rows: 1
+              cols: 1
+              collapsed: false
+              hideForGuests: false
+            items: []
+            filteredItems: []
+
   env:
     YARN_CACHE_FOLDER: "/cache/yarn"
 
