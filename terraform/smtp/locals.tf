@@ -1,6 +1,5 @@
 locals {
   account_id = data.aws_caller_identity.this.account_id
-  region     = data.aws_region.this.region
   ses_dns_records = [
     {
       id      = "verification-txt"
@@ -19,7 +18,7 @@ locals {
       name     = "mail"
       type     = "MX"
       priority = 10
-      content  = "feedback-smtp.${local.region}.amazonses.com"
+      content  = "feedback-smtp.${var.aws_region}.amazonses.com"
     },
     {
       id      = "dmarc"

@@ -50,6 +50,37 @@ data "aws_iam_policy_document" "kms_key" {
       ]
     }
   }
+
+  # Allow S3 analytics export to write to the SSE-KMS encrypted bucket.
+  statement {
+    sid    = "AllowS3AnalyticsExport"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+    actions = [
+      "kms:Encrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey"
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["s3.${data.aws_region.current.region}.amazonaws.com"]
+    }
+    condition {
+      test     = "ForAnyValue:StringLike"
+      variable = "kms:EncryptionContext:aws:s3:arn"
+      values = [
+        aws_s3_bucket.backup.arn,
+        "${aws_s3_bucket.backup.arn}/*"
+      ]
+    }
+  }
 }
 
 resource "aws_kms_key" "backup" {

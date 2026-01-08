@@ -16,7 +16,7 @@ data "aws_iam_policy_document" "send_mail" {
   statement {
     sid       = "AllowSendMail"
     actions   = ["ses:SendRawEmail"]
-    resources = ["arn:${data.aws_partition.this.partition}:ses:${local.region}:${local.account_id}:identity/*"]
+    resources = ["arn:${data.aws_partition.this.partition}:ses:${var.aws_region}:${local.account_id}:identity/*"]
 
     condition {
       test     = "StringLike"

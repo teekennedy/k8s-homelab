@@ -8,15 +8,10 @@ variable "domain" {
   type        = string
 }
 
-variable "cloudflare_email" {
+variable "aws_region" {
+  description = "AWS region where SES resources are managed"
+  default     = "us-west-2"
   type        = string
-  description = "CloudFlare profile email address. Found under https://dash.cloudflare.com/profile"
-}
-
-variable "cloudflare_api_key" {
-  type        = string
-  description = "CloudFlare Global API key. Found under https://dash.cloudflare.com/profile/api-tokens"
-  sensitive   = true
 }
 
 variable "pgp_key" {

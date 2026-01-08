@@ -13,12 +13,10 @@ module "cloudflare" {
 }
 
 module "smtp" {
-  source             = "./smtp"
-  domain             = local.cloudflare_domain
-  username           = join("-", [replace(local.cloudflare_domain, ".", "-"), "smtp-user"])
-  cloudflare_api_key = local.cloudflare_api_key
-  cloudflare_email   = local.cloudflare_email
-  pgp_key            = local.pgp_key
+  source   = "./smtp"
+  domain   = local.cloudflare_domain
+  username = join("-", [replace(local.cloudflare_domain, ".", "-"), "smtp-user"])
+  pgp_key  = local.pgp_key
 }
 
 module "smtp_secret" {

@@ -12,12 +12,13 @@ terraform {
     }
     external = {
       source  = "hashicorp/external"
-      version = "~> 2.3.5"
+      version = "~> 2.3"
     }
   }
 }
 
 provider "aws" {
+  region = var.aws_region
   default_tags {
     tags = {}
   }

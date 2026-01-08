@@ -6,7 +6,10 @@ locals {
   bucket_name = "${var.backup_bucket_name}-${data.aws_region.current.region}"
 }
 
-#tfsec:ignore:aws-s3-enable-bucket-logging
+# Backup software (e.g. restic) is expected to manage multiple snapshot / restore points on its own.
+# Therefore, versioning is purposely disabled as it wastes S3 bucket size.
+# Bucket logging is disabled because auditability is not a concern here.
+#tfsec:ignore:aws-s3-enable-bucket-logging tfsec:ignore:aws-s3-enable-versioning
 resource "aws_s3_bucket" "backup" {
   bucket = local.bucket_name
 
