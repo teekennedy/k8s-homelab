@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: homepage
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  settings.yaml: |-
+    title: "Missingtoken's Homelab"
+    description: "Missingtoken's Homelab"
+  kubernetes.yaml: |-
+    mode: cluster
+    ingress: true
+  widgets.yaml: |-
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+          label: "cluster"
+        nodes:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+    - resources:
+        label: NAS
+        disk: /mnt/nas
+        expanded: true

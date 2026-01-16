@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homepage-nas
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: homepage
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  resources:
+    requests:
+      storage: 1Mi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: smb
