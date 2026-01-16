@@ -1,6 +1,0 @@
-dependencies:
-- name: dashy
-  repository: https://vyrtualsynthese.github.io/selfhosted-helmcharts/
-  version: 1.0.0
-digest: sha256:9bfcfc14322ba00dbfe1a25ba9d361fa3950427c495ee9d759cee558e757a870
-generated: "2026-01-16T14:07:14.216759-07:00"
