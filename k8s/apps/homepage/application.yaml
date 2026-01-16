@@ -1,31 +1,28 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
+  name: homepage
+  namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
-  name: dashy
-  namespace: argocd
 spec:
   destination:
     name: in-cluster
-    namespace: dashy
+    namespace: homepage
   ignoreDifferences:
     - jsonPointers:
         - /spec/volumeName
         - /spec/storageClassName
       kind: PersistentVolumeClaim
-    - group: apiextensions.k8s.io
-      kind: CustomResourceDefinition
   project: default
   source:
-    path: k8s/apps/dashy
+    path: k8s/apps/homepage
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
     automated:
       prune: true
       selfHeal: false
-      allowEmpty: true
     retry:
       backoff:
         duration: 1m

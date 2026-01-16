@@ -6,3 +6,4 @@ dependencies:
   - name: dashy
     version: "1.0.0"
     repository: https://vyrtualsynthese.github.io/selfhosted-helmcharts/
+    condition: dashy.enabled

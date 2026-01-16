@@ -1,3 +1,4 @@
+{{- if .Values.dashy.enabled }}
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
@@ -14,3 +15,4 @@ spec:
     requests:
       storage: "1Gi"
   storageClassName: "longhorn"
+{{- end }}

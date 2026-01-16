@@ -1,4 +1,5 @@
 dashy:
+  enabled: false
   image:
     repository: lissy93/dashy
     pullPolicy: IfNotPresent
