@@ -29,3 +29,4 @@ spec:
         patchesJson6902: |-
           - op: remove
             path: /metadata/labels/recurring-job-group.longhorn.io~1default
+      skipBackgroundRequests: true
