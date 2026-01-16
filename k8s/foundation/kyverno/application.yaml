@@ -5,22 +5,6 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
   name: kyverno
   namespace: argocd
-operation:
-  initiatedBy:
-    automated: true
-  retry:
-    backoff:
-      duration: 1m
-      factor: 2
-      maxDuration: 16m
-    limit: 10
-  sync:
-    prune: true
-    revision: 4a515e216637f9f12c014fa76920ea795b0bcd36
-    syncOptions:
-      - CreateNamespace=true
-      - ApplyOutOfSyncOnly=true
-      - RespectIgnoreDifferences=true
 spec:
   destination:
     name: in-cluster
@@ -30,21 +14,6 @@ spec:
         - /spec/volumeName
         - /spec/storageClassName
       kind: PersistentVolumeClaim
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: lldap-authelia-bind-user
-      namespace: auth-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: authelia-secrets
-      namespace: auth-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: gitea-admin-secret
-      namespace: gitea
     - jsonPointers:
         - /data
       kind: Secret
@@ -76,3 +45,5 @@ spec:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
       - RespectIgnoreDifferences=true
+      - ServerSideApply=true
+      - ClientSideApplyMigration=false
