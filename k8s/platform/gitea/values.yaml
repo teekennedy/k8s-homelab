@@ -108,10 +108,11 @@ gitea-resources:
       accessTokens:
         - name: homepage
           scopes:
+            - read:issue
+            - read:notification
+            - read:organization
             - read:repository
             - read:user
-            - read:organization
-            - read:notification
     - name: tkennedy
       fullName: Terrance Kennedy
       email: terrance@missingtoken.net
