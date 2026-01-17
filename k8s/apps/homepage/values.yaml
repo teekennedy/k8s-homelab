@@ -44,10 +44,19 @@ homepage:
 
 secret-sync:
   enabled: true
+  cron:
+    enabled: false
   schedule: "*/30 * * * *"
   image:
     repository: golang
     tag: 1.25.5-alpine
+  events:
+    enabled: true
+    eventBusName: homepage-secret-sync
+    eventSourceName: homepage-secret-sync
+    sensorName: homepage-secret-sync
+    eventSourceServiceAccount: homepage-secret-sync-eventsource
+    sensorServiceAccount: homepage-secret-sync-sensor
   output-secret:
     name: homepage-secrets
     namespace: homepage
