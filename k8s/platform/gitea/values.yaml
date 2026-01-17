@@ -111,6 +111,7 @@ gitea-resources:
             - read:repository
             - read:user
             - read:organization
+            - read:notification
     - name: tkennedy
       fullName: Terrance Kennedy
       email: terrance@missingtoken.net
