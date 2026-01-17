@@ -177,6 +177,8 @@ kube-prometheus-stack:
         gethomepage.dev/name: "Prometheus"
         gethomepage.dev/description: "Metrics and alerting"
         gethomepage.dev/icon: "si-prometheus"
+        gethomepage.dev/widget.type: "prometheus"
+        gethomepage.dev/widget.url: "https://prometheus.msng.to"
       hosts:
         - &promHost prometheus.msng.to
       tls:

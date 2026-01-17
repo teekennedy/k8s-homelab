@@ -79,6 +79,8 @@ app-template:
         gethomepage.dev/name: "Spoolman"
         gethomepage.dev/description: "Filament spool manager"
         gethomepage.dev/icon: "spoolman.svg"
+        gethomepage.dev/widget.type: "spoolman"
+        gethomepage.dev/widget.url: "https://spoolman.msng.to"
       hosts:
         - host: &spoolmanHost spoolman.msng.to
           paths:
