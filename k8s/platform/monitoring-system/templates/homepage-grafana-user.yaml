@@ -1,0 +1,94 @@
+{{- $config := index .Values "kube-prometheus-stack" "homepage-grafana" | default dict -}}
+{{- if (index $config "enabled") -}}
+{{- $user := index $config "user" | default dict -}}
+{{- $secret := index $config "secret" | default dict -}}
+{{- $username := default "homepage" (index $user "name") -}}
+{{- $email := default "homepage@msng.to" (index $user "email") -}}
+{{- $secretName := default "homepage-grafana-credentials" (index $secret "name") -}}
+{{- $grafanaService := printf "%s-grafana" .Release.Name -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    secret-generator.v1.mittwald.de/type: basic-auth
+    secret-generator.v1.mittwald.de/basic-auth-username: {{ $username }}
+type: kubernetes.io/basic-auth
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: homepage-grafana-user
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    helm.sh/hook: post-install,post-upgrade
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: provision
+          image: alpine:3.22.2
+          command:
+            - sh
+            - -c
+          args:
+            - |
+              set -euo pipefail
+              apk add --no-cache curl jq
+              grafana_url="http://{{ $grafanaService }}"
+
+              timeout 300 sh -c "until curl -sf \"${grafana_url}/api/health\" >/dev/null; do sleep 5; done"
+
+              user_json=$(curl -sf -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" "${grafana_url}/api/users/lookup?loginOrEmail=${HOMEPAGE_GRAFANA_USERNAME}" || true)
+              user_id=$(echo "${user_json}" | jq -r '.id // empty')
+
+              if [ -z "${user_id}" ]; then
+                curl -sf -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
+                  -H "Content-Type: application/json" \
+                  -X POST \
+                  -d "{\"name\":\"Homepage\",\"email\":\"${HOMEPAGE_GRAFANA_EMAIL}\",\"login\":\"${HOMEPAGE_GRAFANA_USERNAME}\",\"password\":\"${HOMEPAGE_GRAFANA_PASSWORD}\"}" \
+                  "${grafana_url}/api/admin/users" || true
+
+                user_json=$(curl -sf -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" "${grafana_url}/api/users/lookup?loginOrEmail=${HOMEPAGE_GRAFANA_USERNAME}" || true)
+                user_id=$(echo "${user_json}" | jq -r '.id // empty')
+              fi
+
+              if [ -z "${user_id}" ]; then
+                echo "Unable to find or create Grafana user ${HOMEPAGE_GRAFANA_USERNAME}" >&2
+                exit 1
+              fi
+
+              curl -sf -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
+                -H "Content-Type: application/json" \
+                -X PUT \
+                -d "{\"password\":\"${HOMEPAGE_GRAFANA_PASSWORD}\"}" \
+                "${grafana_url}/api/admin/users/${user_id}/password"
+          env:
+            - name: GRAFANA_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $grafanaService }}
+                  key: admin-user
+            - name: GRAFANA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $grafanaService }}
+                  key: admin-password
+            - name: HOMEPAGE_GRAFANA_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: username
+            - name: HOMEPAGE_GRAFANA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: password
+            - name: HOMEPAGE_GRAFANA_EMAIL
+              value: {{ $email | quote }}
+{{- end }}

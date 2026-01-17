@@ -506,6 +506,11 @@ app-template:
             tag: 2.3.0.5236-ls134
           env:
             TZ: America/Denver
+            PROWLARR__AUTH__APIKEY:
+              valueFrom:
+                secretKeyRef:
+                  name: api-keys
+                  key: PROWLARR_API_KEY
         # https://docs.linuxserver.io/images/docker-radarr/
         radarr:
           image:
@@ -688,6 +693,10 @@ app-template:
         gethomepage.dev/name: "Jellyfin"
         gethomepage.dev/description: "Media server"
         gethomepage.dev/icon: "si-jellyfin"
+        gethomepage.dev/pod-selector: "app.kubernetes.io/controller=main"
+        gethomepage.dev/widget.type: "jellyfin"
+        gethomepage.dev/widget.url: "https://jellyfin.msng.to"
+        gethomepage.dev/widget.key: '{{ "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}" }}'
       hosts:
         - host: &jellyfinHost jellyfin.msng.to
           paths:
@@ -709,6 +718,10 @@ app-template:
         gethomepage.dev/name: "Jellyseerr"
         gethomepage.dev/description: "Request media"
         gethomepage.dev/icon: "jellyseerr.svg"
+        gethomepage.dev/pod-selector: "app.kubernetes.io/controller=jellyseerr"
+        gethomepage.dev/widget.type: "jellyseerr"
+        gethomepage.dev/widget.url: "https://jellyseerr.msng.to"
+        gethomepage.dev/widget.key: '{{ "{{HOMEPAGE_VAR_JELLYSEERR_API_KEY}}" }}'
       hosts:
         - host: &jellyseerrHost jellyseerr.msng.to
           paths:
@@ -730,6 +743,11 @@ app-template:
         gethomepage.dev/name: "QBittorrent"
         gethomepage.dev/description: "Download management"
         gethomepage.dev/icon: "si-qbittorrent"
+        gethomepage.dev/pod-selector: "app.kubernetes.io/controller=downloader"
+        gethomepage.dev/widget.type: "qbittorrent"
+        gethomepage.dev/widget.url: "https://qbittorrent.msng.to"
+        gethomepage.dev/widget.username: '{{ "{{HOMEPAGE_VAR_QBITTORRENT_USERNAME}}" }}'
+        gethomepage.dev/widget.password: '{{ "{{HOMEPAGE_VAR_QBITTORRENT_PASSWORD}}" }}'
       hosts:
         - host: &qbittorrentHost qbittorrent.msng.to
           paths:
@@ -751,6 +769,10 @@ app-template:
         gethomepage.dev/name: "Prowlarr"
         gethomepage.dev/description: "Indexer management"
         gethomepage.dev/icon: "prowlarr.svg"
+        gethomepage.dev/pod-selector: "app.kubernetes.io/controller=arrs"
+        gethomepage.dev/widget.type: "prowlarr"
+        gethomepage.dev/widget.url: "https://prowlarr.msng.to"
+        gethomepage.dev/widget.key: '{{ "{{HOMEPAGE_VAR_PROWLARR_API_KEY}}" }}'
       hosts:
         - host: &prowlarrHost prowlarr.msng.to
           paths:
@@ -772,6 +794,10 @@ app-template:
         gethomepage.dev/name: "Radarr"
         gethomepage.dev/description: "Movie collection manager"
         gethomepage.dev/icon: "si-radarr"
+        gethomepage.dev/pod-selector: "app.kubernetes.io/controller=arrs"
+        gethomepage.dev/widget.type: "radarr"
+        gethomepage.dev/widget.url: "https://radarr.msng.to"
+        gethomepage.dev/widget.key: '{{ "{{HOMEPAGE_VAR_RADARR_API_KEY}}" }}'
       hosts:
         - host: &radarrHost radarr.msng.to
           paths:
@@ -793,6 +819,10 @@ app-template:
         gethomepage.dev/name: "Sonarr"
         gethomepage.dev/description: "TV show collection manager"
         gethomepage.dev/icon: "si-sonarr"
+        gethomepage.dev/pod-selector: "app.kubernetes.io/controller=arrs"
+        gethomepage.dev/widget.type: "sonarr"
+        gethomepage.dev/widget.url: "https://sonarr.msng.to"
+        gethomepage.dev/widget.key: '{{ "{{HOMEPAGE_VAR_SONARR_API_KEY}}" }}'
       hosts:
         - host: &sonarrHost sonarr.msng.to
           paths:

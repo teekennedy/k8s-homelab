@@ -15,6 +15,10 @@ gitea:
       gethomepage.dev/group: "Development"
       gethomepage.dev/name: "Git"
       gethomepage.dev/icon: "si-gitea"
+      gethomepage.dev/pod-selector: "app.kubernetes.io/name=gitea"
+      gethomepage.dev/widget.type: "gitea"
+      gethomepage.dev/widget.url: "https://git.msng.to"
+      gethomepage.dev/widget.key: "{{HOMEPAGE_VAR_GITEA_API_KEY}}"
     hosts:
       - host: &host git.msng.to
         paths:
@@ -96,6 +100,17 @@ gitea-resources:
             - write:issue
             - read:organization
             - read:misc
+    - name: homepage
+      fullName: Homepage
+      email: homepage@msng.to
+      secretName: homepage-gitea-credentials
+      secretNamespace: gitea
+      accessTokens:
+        - name: homepage
+          scopes:
+            - read:repository
+            - read:user
+            - read:organization
     - name: tkennedy
       fullName: Terrance Kennedy
       email: terrance@missingtoken.net

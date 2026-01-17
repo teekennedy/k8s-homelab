@@ -38,3 +38,77 @@ homepage:
     - name: nas
       persistentVolumeClaim:
         claimName: homepage-nas
+  extraEnvFrom:
+    - secretRef:
+        name: homepage-secrets
+
+secret-sync:
+  enabled: true
+  schedule: "*/30 * * * *"
+  image:
+    repository: golang
+    tag: 1.25.5-alpine
+  output-secret:
+    name: homepage-secrets
+    namespace: homepage
+    type: Opaque
+  mappings:
+    - env: HOMEPAGE_VAR_JELLYSEERR_API_KEY
+      source:
+        namespace: jellyfin
+        name: api-keys
+        key: SEERR_API_KEY
+    - env: HOMEPAGE_VAR_SONARR_API_KEY
+      source:
+        namespace: jellyfin
+        name: api-keys
+        key: SONARR_API_KEY
+    - env: HOMEPAGE_VAR_RADARR_API_KEY
+      source:
+        namespace: jellyfin
+        name: api-keys
+        key: RADARR_API_KEY
+    - env: HOMEPAGE_VAR_PROWLARR_API_KEY
+      source:
+        namespace: jellyfin
+        name: api-keys
+        key: PROWLARR_API_KEY
+    - env: HOMEPAGE_VAR_GRAFANA_USERNAME
+      source:
+        namespace: monitoring-system
+        name: homepage-grafana-credentials
+        key: username
+    - env: HOMEPAGE_VAR_GRAFANA_PASSWORD
+      source:
+        namespace: monitoring-system
+        name: homepage-grafana-credentials
+        key: password
+    - env: HOMEPAGE_VAR_GITEA_API_KEY
+      source:
+        namespace: gitea
+        name: homepage-gitea-credentials
+        key: token
+    - env: HOMEPAGE_VAR_JELLYFIN_API_KEY
+      source:
+        namespace: jellyfin
+        name: jellyfin-homepage-api-key
+        key: api-key
+      optional: true
+    - env: HOMEPAGE_VAR_QBITTORRENT_USERNAME
+      source:
+        namespace: jellyfin
+        name: qbittorrent-homepage-credentials
+        key: username
+      optional: true
+    - env: HOMEPAGE_VAR_QBITTORRENT_PASSWORD
+      source:
+        namespace: jellyfin
+        name: qbittorrent-homepage-credentials
+        key: password
+      optional: true
+    - env: HOMEPAGE_VAR_ARGOCD_API_KEY
+      source:
+        namespace: argocd
+        name: homepage-argocd-token
+        key: token
+      optional: true

@@ -24,6 +24,7 @@ longhorn:
       gethomepage.dev/name: "Longhorn"
       gethomepage.dev/description: "Distributed block storage"
       gethomepage.dev/icon: "longhorn.svg"
+      gethomepage.dev/pod-selector: "app=longhorn-ui"
     host: longhorn.msng.to
     path: /
     pathType: Prefix

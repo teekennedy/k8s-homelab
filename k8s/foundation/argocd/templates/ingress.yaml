@@ -10,6 +10,10 @@ metadata:
     gethomepage.dev/description: "Continuous delivery"
     gethomepage.dev/icon: "argocd.svg"
     gethomepage.dev/href: "https://argocd.msng.to"
+    gethomepage.dev/pod-selector: "app.kubernetes.io/name=argo-cd-server"
+    gethomepage.dev/widget.type: "argocd"
+    gethomepage.dev/widget.url: "https://argocd.msng.to"
+    gethomepage.dev/widget.key: {{ "{{HOMEPAGE_VAR_ARGOCD_API_KEY}}" | quote }}
 spec:
   entryPoints:
     - websecure
