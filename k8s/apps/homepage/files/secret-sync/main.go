@@ -2,16 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"reflect"
+	"time"
 
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -20,6 +23,7 @@ import (
 type Config struct {
 	OutputSecret OutputSecret `yaml:"output-secret"`
 	Mappings     []Mapping    `yaml:"mappings"`
+	Rollout      Rollout      `yaml:"rollout"`
 }
 
 type OutputSecret struct {
@@ -42,7 +46,15 @@ type SourceRef struct {
 	Key       string `yaml:"key"`
 }
 
+type Rollout struct {
+	Enabled    bool   `yaml:"enabled"`
+	Namespace  string `yaml:"namespace"`
+	Deployment string `yaml:"deployment"`
+	Annotation string `yaml:"annotation"`
+}
+
 const defaultConfigPath = "/config/config.yaml"
+const defaultRolloutAnnotation = "homepage-secret-sync/restarted-at"
 
 func main() {
 	configPath := os.Getenv("CONFIG_PATH")
@@ -59,6 +71,8 @@ func main() {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		log.Fatalf("parse config: %v", err)
 	}
+
+	normalizeRollout(&cfg)
 
 	if err := validateConfig(cfg); err != nil {
 		log.Fatalf("invalid config: %v", err)
@@ -103,6 +117,12 @@ func main() {
 	}
 	if updated {
 		log.Printf("updated secret %s/%s", cfg.OutputSecret.Namespace, cfg.OutputSecret.Name)
+		if cfg.Rollout.Enabled {
+			if err := rolloutDeployment(ctx, client, cfg.Rollout); err != nil {
+				log.Fatalf("rollout deployment %s/%s: %v", cfg.Rollout.Namespace, cfg.Rollout.Deployment, err)
+			}
+			log.Printf("rolled out deployment %s/%s", cfg.Rollout.Namespace, cfg.Rollout.Deployment)
+		}
 		return
 	}
 	log.Printf("secret %s/%s is already up to date", cfg.OutputSecret.Namespace, cfg.OutputSecret.Name)
@@ -126,7 +146,22 @@ func validateConfig(cfg Config) error {
 			return fmt.Errorf("mappings[%d].source requires namespace, name, and key", i)
 		}
 	}
+	if cfg.Rollout.Enabled && cfg.Rollout.Deployment == "" {
+		return errors.New("rollout.deployment is required when rollout is enabled")
+	}
 	return nil
+}
+
+func normalizeRollout(cfg *Config) {
+	if !cfg.Rollout.Enabled {
+		return
+	}
+	if cfg.Rollout.Namespace == "" {
+		cfg.Rollout.Namespace = cfg.OutputSecret.Namespace
+	}
+	if cfg.Rollout.Annotation == "" {
+		cfg.Rollout.Annotation = defaultRolloutAnnotation
+	}
 }
 
 func readSecretKey(ctx context.Context, client *kubernetes.Clientset, mapping Mapping) ([]byte, bool, error) {
@@ -173,4 +208,27 @@ func updateSecret(ctx context.Context, secretClient corev1client.SecretInterface
 
 	_, err := secretClient.Update(ctx, updated, metav1.UpdateOptions{})
 	return true, err
+}
+
+func rolloutDeployment(ctx context.Context, client *kubernetes.Clientset, cfg Rollout) error {
+	annotationValue := time.Now().UTC().Format(time.RFC3339)
+	patch := map[string]any{
+		"spec": map[string]any{
+			"template": map[string]any{
+				"metadata": map[string]any{
+					"annotations": map[string]string{
+						cfg.Annotation: annotationValue,
+					},
+				},
+			},
+		},
+	}
+
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return fmt.Errorf("marshal rollout patch: %w", err)
+	}
+
+	_, err = client.AppsV1().Deployments(cfg.Namespace).Patch(ctx, cfg.Deployment, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	return err
 }

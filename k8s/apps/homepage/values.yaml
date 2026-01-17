@@ -57,6 +57,11 @@ secret-sync:
     sensorName: homepage-secret-sync
     eventSourceServiceAccount: homepage-secret-sync-eventsource
     sensorServiceAccount: homepage-secret-sync-sensor
+  rollout:
+    enabled: true
+    namespace: homepage
+    deployment: homepage
+    annotation: homepage-secret-sync/restarted-at
   output-secret:
     name: homepage-secrets
     namespace: homepage
