@@ -15,7 +15,6 @@ metadata:
   annotations:
     secret-generator.v1.mittwald.de/type: basic-auth
     secret-generator.v1.mittwald.de/basic-auth-username: {{ $username }}
-type: kubernetes.io/basic-auth
 ---
 apiVersion: batch/v1
 kind: Job
