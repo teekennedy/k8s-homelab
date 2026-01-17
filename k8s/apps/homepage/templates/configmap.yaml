@@ -13,6 +13,10 @@ data:
   kubernetes.yaml: |-
     mode: cluster
     ingress: true
+  services.yaml: |-
+    []
+  bookmarks.yaml: |-
+    []
   widgets.yaml: |-
     - kubernetes:
         cluster:

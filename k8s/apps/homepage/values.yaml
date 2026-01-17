@@ -20,6 +20,12 @@ homepage:
       mountPath: /app/config/kubernetes.yaml
       subPath: kubernetes.yaml
     - name: homepage-config
+      mountPath: /app/config/services.yaml
+      subPath: services.yaml
+    - name: homepage-config
+      mountPath: /app/config/bookmarks.yaml
+      subPath: bookmarks.yaml
+    - name: homepage-config
       mountPath: /app/config/widgets.yaml
       subPath: widgets.yaml
     - name: nas
