@@ -679,10 +679,15 @@ app-template:
           port: 8080
           protocol: HTTP
   ingress:
-    main:
+    jellyfin:
       enabled: true
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/group: "Media"
+        gethomepage.dev/name: "Jellyfin"
+        gethomepage.dev/description: "Media server"
+        gethomepage.dev/icon: "si-jellyfin"
       hosts:
         - host: &jellyfinHost jellyfin.msng.to
           paths:
@@ -691,34 +696,20 @@ app-template:
               service:
                 identifier: main
                 port: http
-        - host: &qbittorrentHost qbittorrent.msng.to
-          paths:
-            - path: /
-              pathType: Prefix
-              service:
-                identifier: downloader
-                port: qbittorrent
-        - host: &prowlarrHost prowlarr.msng.to
-          paths:
-            - path: /
-              pathType: Prefix
-              service:
-                identifier: arrs
-                port: prowlarr
-        - host: &radarrHost radarr.msng.to
-          paths:
-            - path: /
-              pathType: Prefix
-              service:
-                identifier: arrs
-                port: radarr
-        - host: &sonarrHost sonarr.msng.to
-          paths:
-            - path: /
-              pathType: Prefix
-              service:
-                identifier: arrs
-                port: sonarr
+      tls:
+        - secretName: jellyfin-tls-certificate
+          hosts:
+            - *jellyfinHost
+    jellyseerr:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/group: "Media"
+        gethomepage.dev/name: "Jellyseerr"
+        gethomepage.dev/description: "Request media"
+        gethomepage.dev/icon: "jellyseerr.svg"
+      hosts:
         - host: &jellyseerrHost jellyseerr.msng.to
           paths:
             - path: /
@@ -727,14 +718,93 @@ app-template:
                 identifier: jellyseerr
                 port: jellyseerr
       tls:
-        - secretName: jellyfin-tls-certificate
+        - secretName: jellyseerr-tls-certificate
           hosts:
-            - *jellyfinHost
-            - *qbittorrentHost
-            - *prowlarrHost
-            - *radarrHost
-            - *sonarrHost
             - *jellyseerrHost
+    qbittorrent:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/group: "Media management"
+        gethomepage.dev/name: "QBittorrent"
+        gethomepage.dev/description: "Download management"
+        gethomepage.dev/icon: "si-qbittorrent"
+      hosts:
+        - host: &qbittorrentHost qbittorrent.msng.to
+          paths:
+            - path: /
+              pathType: Prefix
+              service:
+                identifier: downloader
+                port: qbittorrent
+      tls:
+        - secretName: qbittorrent-tls-certificate
+          hosts:
+            - *qbittorrentHost
+    prowlarr:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/group: "Media management"
+        gethomepage.dev/name: "Prowlarr"
+        gethomepage.dev/description: "Indexer management"
+        gethomepage.dev/icon: "prowlarr.svg"
+      hosts:
+        - host: &prowlarrHost prowlarr.msng.to
+          paths:
+            - path: /
+              pathType: Prefix
+              service:
+                identifier: arrs
+                port: prowlarr
+      tls:
+        - secretName: prowlarr-tls-certificate
+          hosts:
+            - *prowlarrHost
+    radarr:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/group: "Media management"
+        gethomepage.dev/name: "Radarr"
+        gethomepage.dev/description: "Movie collection manager"
+        gethomepage.dev/icon: "si-radarr"
+      hosts:
+        - host: &radarrHost radarr.msng.to
+          paths:
+            - path: /
+              pathType: Prefix
+              service:
+                identifier: arrs
+                port: radarr
+      tls:
+        - secretName: radarr-tls-certificate
+          hosts:
+            - *radarrHost
+    sonarr:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/group: "Media management"
+        gethomepage.dev/name: "Sonarr"
+        gethomepage.dev/description: "TV show collection manager"
+        gethomepage.dev/icon: "si-sonarr"
+      hosts:
+        - host: &sonarrHost sonarr.msng.to
+          paths:
+            - path: /
+              pathType: Prefix
+              service:
+                identifier: arrs
+                port: sonarr
+      tls:
+        - secretName: sonarr-tls-certificate
+          hosts:
+            - *sonarrHost
   persistence:
     data:
       accessMode: ReadWriteMany

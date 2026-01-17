@@ -19,6 +19,11 @@ longhorn:
     enabled: true
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/group: "Cluster management"
+      gethomepage.dev/name: "Longhorn"
+      gethomepage.dev/description: "Distributed block storage"
+      gethomepage.dev/icon: "longhorn.svg"
     host: longhorn.msng.to
     path: /
     pathType: Prefix

@@ -11,6 +11,10 @@ gitea:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
       helm.sh/hook: post-install,post-upgrade
+      gethomepage.dev/enabled: "true"
+      gethomepage.dev/group: "Development"
+      gethomepage.dev/name: "Git"
+      gethomepage.dev/icon: "si-gitea"
     hosts:
       - host: &host git.msng.to
         paths:

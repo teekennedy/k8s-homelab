@@ -15,6 +15,11 @@ kube-prometheus-stack:
       enabled: true
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/group: "Cluster"
+        gethomepage.dev/name: "Grafana"
+        gethomepage.dev/description: "Monitoring and dashboards"
+        gethomepage.dev/icon: "si-grafana"
       hosts:
         - &host grafana.msng.to
       tls:
@@ -167,6 +172,11 @@ kube-prometheus-stack:
       pathType: Prefix
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
+        gethomepage.dev/enabled: "true"
+        gethomepage.dev/group: "Cluster"
+        gethomepage.dev/name: "Prometheus"
+        gethomepage.dev/description: "Metrics and alerting"
+        gethomepage.dev/icon: "si-prometheus"
       hosts:
         - &promHost prometheus.msng.to
       tls:

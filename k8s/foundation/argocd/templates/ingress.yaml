@@ -3,6 +3,13 @@ kind: IngressRoute
 metadata:
   name: argocd-server
   namespace: "{{ .Release.Namespace }}"
+  annotations:
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: "Cluster management"
+    gethomepage.dev/name: "ArgoCD"
+    gethomepage.dev/description: "Continuous delivery"
+    gethomepage.dev/icon: "argocd.svg"
+    gethomepage.dev/href: "https://argocd.msng.to"
 spec:
   entryPoints:
     - websecure
@@ -20,4 +27,3 @@ spec:
         - name: argocd-server
           port: 80
           scheme: h2c
-
