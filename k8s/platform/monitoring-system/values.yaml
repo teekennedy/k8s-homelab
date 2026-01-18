@@ -190,7 +190,7 @@ kube-prometheus-stack:
         gethomepage.dev/name: "Prometheus"
         gethomepage.dev/description: "Metrics and alerting"
         gethomepage.dev/icon: "si-prometheus"
-        gethomepage.dev/pod-selector: "app=kube-prometheus-stack-prometheus"
+        gethomepage.dev/pod-selector: "app.kubernetes.io/name=prometheus"
         gethomepage.dev/widget.type: "prometheus"
         gethomepage.dev/widget.url: "https://prometheus.msng.to"
       hosts:

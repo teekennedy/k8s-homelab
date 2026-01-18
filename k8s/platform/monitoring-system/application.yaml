@@ -17,21 +17,6 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
-      name: lldap-authelia-bind-user
-      namespace: auth-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: authelia-secrets
-      namespace: auth-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: gitea-admin-secret
-      namespace: gitea
-    - jsonPointers:
-        - /data
-      kind: Secret
       name: monitoring-system-grafana
       namespace: monitoring-system
     - jsonPointers:
