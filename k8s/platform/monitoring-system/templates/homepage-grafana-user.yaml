@@ -67,6 +67,46 @@ spec:
                 -X PUT \
                 -d "{\"password\":\"${HOMEPAGE_GRAFANA_PASSWORD}\"}" \
                 "${grafana_url}/api/admin/users/${user_id}/password"
+
+              role_name="homepage-server-stats"
+              role_uid=$(curl -sf -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
+                "${grafana_url}/api/access-control/roles" | jq -r ".[] | select(.name==\"${role_name}\") | .uid" | head -n1)
+
+              if [ -z "${role_uid}" ]; then
+                role_payload=$(cat <<'JSON'
+              {"name":"homepage-server-stats","description":"Homepage server stats","permissions":[{"action":"server.stats:read","scope":"*"}]}
+              JSON
+                )
+                role_uid=$(curl -sf -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
+                  -H "Content-Type: application/json" \
+                  -X POST \
+                  -d "${role_payload}" \
+                  "${grafana_url}/api/access-control/roles" | jq -r '.uid // empty')
+              fi
+
+              if [ -z "${role_uid}" ]; then
+                echo "Unable to find or create Grafana role ${role_name}" >&2
+                exit 1
+              fi
+
+              assign_code=$(curl -s -o /dev/null -w "%{http_code}" \
+                -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
+                -X POST \
+                "${grafana_url}/api/access-control/roles/${role_uid}/users/${user_id}")
+
+              if [ "${assign_code}" != "200" ] && [ "${assign_code}" != "204" ] && [ "${assign_code}" != "409" ]; then
+                assign_code=$(curl -s -o /dev/null -w "%{http_code}" \
+                  -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
+                  -H "Content-Type: application/json" \
+                  -X POST \
+                  -d "{\"roles\":[\"${role_uid}\"]}" \
+                  "${grafana_url}/api/access-control/users/${user_id}/roles")
+
+                if [ "${assign_code}" != "200" ] && [ "${assign_code}" != "204" ] && [ "${assign_code}" != "409" ]; then
+                  echo "Unable to assign Grafana role ${role_uid} to user ${user_id} (status ${assign_code})" >&2
+                  exit 1
+                fi
+              fi
           env:
             - name: GRAFANA_ADMIN_USER
               valueFrom:
