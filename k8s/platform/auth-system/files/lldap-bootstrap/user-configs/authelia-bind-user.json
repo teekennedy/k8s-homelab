@@ -12,6 +12,7 @@
   "email": "terrance@missingtoken.net",
   "displayName": "T",
   "groups": [
-    "grafana-admin"
+    "grafana-admin",
+    "argocd-admin"
   ]
 }

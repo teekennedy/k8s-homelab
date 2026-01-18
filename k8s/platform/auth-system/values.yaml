@@ -114,6 +114,32 @@ authelia:
     telemetry:
       metrics:
         enabled: false
+    identity_providers:
+      oidc:
+        enabled: true
+        enforce_pkce: always
+        hmac_secret:
+          path: identity_providers.oidc.hmac.key
+        clients:
+          - client_id: argocd
+            client_name: Argo CD
+            public: true
+            authorization_policy: one_factor
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+              - groups
+            grant_types:
+              - authorization_code
+              - refresh_token
+            response_types:
+              - code
+            redirect_uris:
+              - https://argocd.msng.to/auth/callback
+              - https://argocd.msng.to/pkce/verify
 
   pod:
     kind: Deployment

@@ -4,3 +4,6 @@
 {
   "name": "grafana-admin"
 }
+{
+  "name": "argocd-admin"
+}

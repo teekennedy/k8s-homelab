@@ -29,6 +29,27 @@ argo-cd:
       resource.customizations.ignoreResourceUpdates.all: |
         jsonPointers:
           - /status
+      oidc.config: |
+        name: Authelia
+        issuer: https://authelia.msng.to
+        clientID: argocd
+        enablePKCEAuthentication: true
+        requestedScopes:
+          - openid
+          - profile
+          - email
+          - groups
+        requestedIDTokenClaims:
+          groups:
+            essential: true
+    rbac:
+      policy.default: role:readonly
+      policy.csv: |
+        p, role:readonly, applications, get, */*, allow
+        p, role:readonly, projects, get, *, allow
+        p, role:readonly, repositories, get, *, allow
+        p, role:readonly, clusters, get, *, allow
+        g, argocd-admin, role:admin
   server:
     ingress:
       enabled: true
@@ -39,7 +60,7 @@ argo-cd:
       enabled: true
       serviceMonitor:
         enabled: true
-  # TODO integrate with authelia
+  # Authelia OIDC is configured under configs.cm.oidc.config
   dex:
     enabled: false
   controller:
