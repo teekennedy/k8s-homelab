@@ -5,5 +5,8 @@
   "name": "grafana-admin"
 }
 {
+  "name": "argocd-user"
+}
+{
   "name": "argocd-admin"
 }

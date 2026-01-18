@@ -1,0 +1,9 @@
+{
+  "id": "tkennedy",
+  "email": "terrance@missingtoken.net",
+  "displayName": "T",
+  "groups": [
+    "grafana-admin",
+    "argocd-admin"
+  ]
+}

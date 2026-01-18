@@ -1,0 +1,15 @@
+{
+  "id": "test-nobody",
+  "email": "terrance+test-nobody@missingtoken.net",
+  "displayName": "Nobody",
+  "groups": []
+}
+{
+  "id": "test-user",
+  "email": "terrance+test-user@missingtoken.net",
+  "displayName": "User",
+  "groups": [
+    "argocd-user",
+    "grafana-user"
+  ]
+}
