@@ -120,11 +120,17 @@ authelia:
         enforce_pkce: always
         hmac_secret:
           path: identity_providers.oidc.hmac.key
+        authorization_policies:
+          argocd:
+            default_policy: one_factor
+            rules:
+              - policy: two_factor
+                subject: "group:argocd-admin"
         clients:
           - client_id: argocd
             client_name: Argo CD
             public: true
-            authorization_policy: one_factor
+            authorization_policy: argocd
             require_pkce: true
             pkce_challenge_method: S256
             scopes:
