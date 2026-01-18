@@ -14,6 +14,11 @@ spec:
         - /spec/volumeName
         - /spec/storageClassName
       kind: PersistentVolumeClaim
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: homepage-secrets
+      namespace: homepage
   project: default
   source:
     path: k8s/apps/homepage
