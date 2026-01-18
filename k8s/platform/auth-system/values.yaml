@@ -132,6 +132,7 @@ authelia:
               - profile
               - email
               - groups
+              - offline_access
             grant_types:
               - authorization_code
               - refresh_token
@@ -140,6 +141,12 @@ authelia:
             redirect_uris:
               - https://argocd.msng.to/auth/callback
               - https://argocd.msng.to/pkce/verify
+        jwks:
+          - key_id: argocd
+            algorithm: RS256
+            use: sig
+            key:
+              path: /secrets/oidc-jwks/oidc.jwk.RS256.pem
 
   pod:
     kind: Deployment
@@ -193,6 +200,11 @@ authelia:
         items:
           - key: password
             path: 'notifier.smtp.password.txt'
+      authelia-oidc-jwks:
+        path: oidc-jwks
+        items:
+          - key: oidc.jwk.RS256.pem
+            path: oidc.jwk.RS256.pem
 
 
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-4.0.1/charts/library/common/values.schema.json

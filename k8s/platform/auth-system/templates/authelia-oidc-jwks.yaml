@@ -1,0 +1,82 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: authelia-oidc-jwks
+  namespace: "{{ .Release.Namespace }}"
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/hook-weight: "-2"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: authelia-oidc-jwks
+  namespace: "{{ .Release.Namespace }}"
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/hook-weight: "-1"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: authelia-oidc-jwks
+  namespace: "{{ .Release.Namespace }}"
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/hook-weight: "0"
+subjects:
+  - kind: ServiceAccount
+    name: authelia-oidc-jwks
+    namespace: "{{ .Release.Namespace }}"
+roleRef:
+  kind: Role
+  name: authelia-oidc-jwks
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: authelia-oidc-jwks
+  namespace: "{{ .Release.Namespace }}"
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/hook-weight: "1"
+    helm.sh/hook: pre-install,pre-upgrade
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: authelia-oidc-jwks
+      restartPolicy: OnFailure
+      containers:
+        - name: generate
+          image: alpine:3.22.2
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              set -euo pipefail
+              apk add --no-cache openssl kubectl
+
+              namespace="{{ .Release.Namespace }}"
+              secret_name="authelia-oidc-jwks"
+
+              if kubectl -n "${namespace}" get secret "${secret_name}" >/dev/null 2>&1; then
+                echo "Secret ${secret_name} already exists"
+                exit 0
+              fi
+
+              tmpdir="$(mktemp -d)"
+              openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${tmpdir}/oidc.jwk.RS256.pem"
+              kubectl -n "${namespace}" create secret generic "${secret_name}" \
+                --from-file=oidc.jwk.RS256.pem="${tmpdir}/oidc.jwk.RS256.pem"
