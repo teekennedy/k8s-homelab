@@ -111,13 +111,13 @@ secret-sync:
     - env: HOMEPAGE_VAR_QBITTORRENT_USERNAME
       source:
         namespace: jellyfin
-        name: qbittorrent-homepage-credentials
+        name: qbittorrent-credentials
         key: username
       optional: true
     - env: HOMEPAGE_VAR_QBITTORRENT_PASSWORD
       source:
         namespace: jellyfin
-        name: qbittorrent-homepage-credentials
+        name: qbittorrent-credentials
         key: password
       optional: true
     - env: HOMEPAGE_VAR_ARGOCD_API_KEY
