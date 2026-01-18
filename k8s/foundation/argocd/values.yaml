@@ -43,13 +43,15 @@ argo-cd:
           groups:
             essential: true
     rbac:
-      policy.default: role:readonly
+      policy.default: role:none
       policy.csv: |
         p, role:readonly, applications, get, */*, allow
         p, role:readonly, projects, get, *, allow
         p, role:readonly, repositories, get, *, allow
         p, role:readonly, clusters, get, *, allow
         g, argocd-admin, role:admin
+        g, full-admin, role:admin
+        g, argocd-user, role:readonly
   server:
     ingress:
       enabled: true

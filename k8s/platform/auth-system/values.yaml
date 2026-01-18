@@ -122,10 +122,14 @@ authelia:
           path: identity_providers.oidc.hmac.key
         authorization_policies:
           argocd:
-            default_policy: one_factor
+            default_policy: deny
             rules:
               - policy: two_factor
                 subject: "group:argocd-admin"
+              - policy: two_factor
+                subject: "group:full-admin"
+              - policy: one_factor
+                subject: "group:argocd-user"
         clients:
           - client_id: argocd
             client_name: Argo CD
