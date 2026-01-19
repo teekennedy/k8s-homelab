@@ -1,0 +1,10 @@
+ingressClass:
+  create: true
+  name: anubis
+  controller: ingress-anubis.jaredallard.github.com/ingress-anubis
+  isDefault: false
+
+ingress-anubis:
+  config:
+    INGRESS_CLASS_NAME: anubis
+    WRAPPED_INGRESS_CLASS_NAME: traefik

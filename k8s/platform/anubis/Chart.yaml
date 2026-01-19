@@ -1,0 +1,10 @@
+apiVersion: v2
+name: anubis
+description: Anubis ingress protection controller
+type: application
+version: 0.0.1
+appVersion: 1.10.1
+dependencies:
+  - name: ingress-anubis
+    version: 1.10.1
+    repository: oci://ghcr.io/jaredallard/helm-charts
