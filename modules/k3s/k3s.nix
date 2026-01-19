@@ -104,6 +104,25 @@
             global:
               checkNewVersion: false
               sendAnonymousUsage: false
+            ports:
+              webpublic:
+                port: 8001
+                expose:
+                  default: false
+                exposedPort: 80
+                protocol: TCP
+                redirections:
+                  entryPoint:
+                    to: websecurepublic
+                    scheme: https
+              websecurepublic:
+                port: 8444
+                expose:
+                  default: false
+                exposedPort: 443
+                protocol: TCP
+                tls:
+                  enabled: true
         EOF
       '';
     };

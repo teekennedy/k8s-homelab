@@ -20,3 +20,36 @@ external-dns:
     enabled: true
     serviceMonitor:
       enabled: true
+
+ddnsUpdater:
+  enabled: true
+  image:
+    repository: ghcr.io/qdm12/ddns-updater
+    tag: v2.8.0
+  initContainer:
+    image:
+      repository: busybox
+      tag: 1.37.0
+  period: 5m
+  logLevel: info
+  publicIp:
+    fetchers: http
+    ipv4HttpProviders: url:https://checkip.amazonaws.com
+  cloudflare:
+    domain: external.network.msng.to
+    ttl: 1
+    ipVersion: ipv4
+    proxied: false
+    zoneConfigMap:
+      name: cloudflare-zone
+      key: zone_id
+    tokenSecret:
+      name: cloudflare-api-token
+      key: value
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

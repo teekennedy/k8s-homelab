@@ -1,0 +1,124 @@
+{{- if .Values.ddnsUpdater.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ddns-updater-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ddns-updater
+    app.kubernetes.io/part-of: external-dns
+    app.kubernetes.io/component: ddns-updater
+    app.kubernetes.io/managed-by: Helm
+data:
+  domain: {{ required "ddnsUpdater.cloudflare.domain is required" .Values.ddnsUpdater.cloudflare.domain | quote }}
+  ttl: {{ .Values.ddnsUpdater.cloudflare.ttl | quote }}
+  ip_version: {{ .Values.ddnsUpdater.cloudflare.ipVersion | quote }}
+  proxied: {{ ternary "true" "false" .Values.ddnsUpdater.cloudflare.proxied | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ddns-updater
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ddns-updater
+    app.kubernetes.io/part-of: external-dns
+    app.kubernetes.io/component: ddns-updater
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ddns-updater
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ddns-updater
+        app.kubernetes.io/part-of: external-dns
+        app.kubernetes.io/component: ddns-updater
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      initContainers:
+        - name: render-config
+          image: {{ .Values.ddnsUpdater.initContainer.image.repository }}:{{ .Values.ddnsUpdater.initContainer.image.tag }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              token="$(cat /secrets/token)"
+              zone_id="$(cat /zone/zone_id)"
+              domain="$(cat /config/domain)"
+              ttl="$(cat /config/ttl)"
+              ip_version="$(cat /config/ip_version)"
+              proxied="$(cat /config/proxied)"
+              cat <<CONFIG > /updater/data/config.json
+              {"settings":[{"provider":"cloudflare","zone_identifier":"${zone_id}","domain":"${domain}","ttl":${ttl},"token":"${token}","ip_version":"${ip_version}","proxied":${proxied}}]}
+              CONFIG
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: updater-data
+              mountPath: /updater/data
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: cloudflare-token
+              mountPath: /secrets
+              readOnly: true
+            - name: cloudflare-zone
+              mountPath: /zone
+              readOnly: true
+      containers:
+        - name: ddns-updater
+          image: {{ .Values.ddnsUpdater.image.repository }}:{{ .Values.ddnsUpdater.image.tag }}
+          env:
+            - name: PERIOD
+              value: {{ .Values.ddnsUpdater.period | quote }}
+            - name: PUBLICIP_FETCHERS
+              value: {{ .Values.ddnsUpdater.publicIp.fetchers | quote }}
+            - name: PUBLICIPV4_HTTP_PROVIDERS
+              value: {{ .Values.ddnsUpdater.publicIp.ipv4HttpProviders | quote }}
+            - name: SERVER_ENABLED
+              value: "no"
+            - name: LOG_LEVEL
+              value: {{ .Values.ddnsUpdater.logLevel | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.ddnsUpdater.resources | nindent 12 }}
+          volumeMounts:
+            - name: updater-data
+              mountPath: /updater/data
+      volumes:
+        - name: updater-data
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: ddns-updater-config
+        - name: cloudflare-zone
+          configMap:
+            name: {{ .Values.ddnsUpdater.cloudflare.zoneConfigMap.name }}
+            items:
+              - key: {{ .Values.ddnsUpdater.cloudflare.zoneConfigMap.key }}
+                path: zone_id
+        - name: cloudflare-token
+          secret:
+            secretName: {{ .Values.ddnsUpdater.cloudflare.tokenSecret.name }}
+            items:
+              - key: {{ .Values.ddnsUpdater.cloudflare.tokenSecret.key }}
+                path: token
+{{- end }}

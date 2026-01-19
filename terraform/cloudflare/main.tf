@@ -75,6 +75,16 @@ module "external_dns_secret" {
   }
 }
 
+module "external_dns_zone_configmap" {
+  source    = "../k8s-configmap"
+  name      = "cloudflare-zone"
+  namespace = "external-dns"
+
+  data = {
+    zone_id = data.cloudflare_zones.zone.result[0].id
+  }
+}
+
 resource "cloudflare_api_token" "cert_manager" {
   name = "homelab_cert_manager"
 
