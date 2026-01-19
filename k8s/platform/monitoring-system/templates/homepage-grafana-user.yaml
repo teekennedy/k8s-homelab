@@ -69,8 +69,17 @@ spec:
                 "${grafana_url}/api/admin/users/${user_id}/password"
 
               role_name="homepage-server-stats"
-              role_uid=$(curl -sf -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
-                "${grafana_url}/api/access-control/roles" | jq -r ".[] | select(.name==\"${role_name}\") | .uid" | head -n1)
+              role_json="$(mktemp)"
+              role_code=$(curl -s -o "${role_json}" -w "%{http_code}" \
+                -u "${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}" \
+                "${grafana_url}/api/access-control/roles" || true)
+
+              if [ "${role_code}" != "200" ]; then
+                echo "Grafana access-control API unavailable (status ${role_code}); skipping role assignment"
+                exit 0
+              fi
+
+              role_uid=$(jq -r ".[] | select(.name==\"${role_name}\") | .uid" "${role_json}" | head -n1)
 
               if [ -z "${role_uid}" ]; then
                 role_payload=$(cat <<'JSON'
