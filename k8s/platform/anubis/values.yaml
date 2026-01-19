@@ -4,7 +4,12 @@ ingressClass:
   controller: ingress-anubis.jaredallard.github.com/ingress-anubis
   isDefault: false
 
+anubisKey:
+  secretName: anubis-signing-key
+
 ingress-anubis:
   config:
     INGRESS_CLASS_NAME: anubis
     WRAPPED_INGRESS_CLASS_NAME: traefik
+    ENV_FROM_SEC: anubis-signing-key
+    ENVIRONMENT_VARIABLES: "COOKIE_DOMAIN:msng.to"

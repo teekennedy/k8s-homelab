@@ -9,6 +9,7 @@ spec:
   type: LoadBalancer
   loadBalancerClass: metallb
   loadBalancerIP: 10.69.80.120
+  externalTrafficPolicy: Local
   ports:
     - name: webpublic
       port: 80

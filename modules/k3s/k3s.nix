@@ -104,6 +104,8 @@
             global:
               checkNewVersion: false
               sendAnonymousUsage: false
+            nodeSelector:
+              node-role.kubernetes.io/control-plane: "true"
             ports:
               webpublic:
                 port: 8001

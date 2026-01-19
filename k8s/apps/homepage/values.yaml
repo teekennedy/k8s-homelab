@@ -1,6 +1,7 @@
 homepage:
   ingress:
     enabled: true
+    ingressClassName: anubis
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
       traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
