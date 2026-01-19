@@ -4,6 +4,14 @@ Keeping track of the things I setup or change manually (outside of IaC) so I kno
 
 Yes, in an ideal world, this list would be empty, but not everything is worth taking the time to automate or declaratively configure.
 
+## External access
+
+2026-01-18
+
+Setup port forwarding rules in Unifi to point http and https to my MetalLB IP address 10.69.80.210.
+Also setup a DNS override in Unifi for external.network.msng.to, pointing to the same IP address.
+This way if I try to access a public-facing k8s service, I'll still access it over the LAN.
+
 ## k3s nodes
 
 2025-06-18
