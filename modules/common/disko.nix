@@ -105,11 +105,6 @@
                       };
                     };
                     mountpoint = "/partition-root";
-                    swap = {
-                      swapfile = {
-                        size = config.disko.swapFileSize;
-                      };
-                    };
                     # Create a snapshot of the empty root subvolume
                     postCreateHook = ''
                       MNTPOINT=$(mktemp -d)
