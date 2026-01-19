@@ -1,0 +1,5 @@
+metallb:
+  prometheus:
+    rbacPrometheus: false
+    serviceMonitor:
+      enabled: true

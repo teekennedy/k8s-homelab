@@ -1,0 +1,8 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: public
+  namespace: {{ .Release.Namespace }}
+spec:
+  addresses:
+    - 10.69.80.120-10.69.80.126
