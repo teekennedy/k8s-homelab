@@ -1,8 +1,8 @@
 apiVersion: v2
 name: jellyfin
-version: 0.0.9
-appVersion: v10.11.5
+version: 0.0.10
+appVersion: v10.11.6
 dependencies:
   - name: app-template
-    version: 4.6.1
+    version: 4.6.2
     repository: https://bjw-s-labs.github.io/helm-charts
