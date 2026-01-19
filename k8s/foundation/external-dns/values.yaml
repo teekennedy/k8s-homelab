@@ -25,7 +25,7 @@ ddnsUpdater:
   enabled: true
   image:
     repository: ghcr.io/qdm12/ddns-updater
-    tag: v2.8.0
+    tag: v2.9.0
   initContainer:
     image:
       repository: busybox
