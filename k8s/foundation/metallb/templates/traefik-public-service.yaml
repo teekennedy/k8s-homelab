@@ -7,6 +7,7 @@ metadata:
     metallb.universe.tf/address-pool: public
 spec:
   type: LoadBalancer
+  loadBalancerClass: metallb
   loadBalancerIP: 10.69.80.120
   ports:
     - name: webpublic

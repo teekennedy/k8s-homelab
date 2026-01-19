@@ -1,4 +1,5 @@
 metallb:
+  loadBalancerClass: metallb
   prometheus:
     rbacPrometheus: false
     serviceMonitor:
