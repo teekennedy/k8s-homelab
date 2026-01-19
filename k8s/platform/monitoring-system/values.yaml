@@ -8,6 +8,8 @@ kube-prometheus-stack:
   grafana:
     enabled: true
     defaultDashboardsEnabled: false
+    deploymentStrategy:
+      type: Recreate
     serviceMonitor:
       labels:
         release: monitoring-system
