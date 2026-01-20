@@ -12,4 +12,12 @@ ingress-anubis:
     INGRESS_CLASS_NAME: anubis
     WRAPPED_INGRESS_CLASS_NAME: traefik
     ENV_FROM_SEC: anubis-signing-key
-    ENVIRONMENT_VARIABLES: "COOKIE_DOMAIN:msng.to"
+    ENVIRONMENT_VARIABLES: "COOKIE_DOMAIN:msng.to,POLICY_FNAME:/etc/anubis/policies.yaml"
+  anubisVolumes:
+    - name: anubis-policy
+      configMap:
+        name: anubis-policy
+  anubisVolumeMounts:
+    - name: anubis-policy
+      mountPath: /etc/anubis
+      readOnly: true

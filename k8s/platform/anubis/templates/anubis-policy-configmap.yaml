@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anubis-policy
+  namespace: {{ .Release.Namespace }}
+data:
+  policies.yaml: |-
+    bots:
+      - import: (data)/meta/default-config.yaml
+      - name: homelab-internal-networks
+        action: ALLOW
+        remote_addresses:
+          - 10.69.0.0/16
+          - 10.42.0.0/16
