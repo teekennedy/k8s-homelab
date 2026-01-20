@@ -134,7 +134,7 @@ authelia:
           - client_id: argocd
             client_name: Argo CD
             # Don't ask user for consent to provide their OIDC scopes to ArgoCD
-            consent_mode: pre-configured
+            consent_mode: implicit
             public: true
             authorization_policy: argocd
             require_pkce: true
@@ -144,7 +144,6 @@ authelia:
               - profile
               - email
               - groups
-              - offline_access
             grant_types:
               - authorization_code
               - refresh_token
