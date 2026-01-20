@@ -5,6 +5,9 @@
 # direnv
 .direnv
 
+# Python virtual environments
+.venv
+
 # result is the output when building live isos
 result
 
