@@ -1,5 +1,7 @@
 locals {
-  account_id = data.aws_caller_identity.this.account_id
+  account_id                  = data.aws_caller_identity.this.account_id
+  ses_domain_identity_arn     = "arn:${data.aws_partition.this.partition}:ses:${var.aws_region}:${local.account_id}:identity/${aws_ses_domain_identity.this.domain}"
+  ses_notification_topic_name = "${replace(var.domain, ".", "-")}-ses-bounces-complaints"
   ses_dns_records = [
     {
       id      = "verification-txt"

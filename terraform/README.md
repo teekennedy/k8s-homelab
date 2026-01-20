@@ -8,6 +8,19 @@ To bootstrap, copy tfvars.sops.example.yaml to tfvars.sops.yaml and then run `so
 
 To plan / apply, run `TF_VAR_state_passphrase="$(bash -c 'sops decrypt tfvars.sops.yaml | yq .tofu_local_state_passphrase')" tofu <action>`. This passes the tofu state passphrase from the encrypted tfvars.sops.yaml into opentofu so it can read / write the encrypted state.
 
+## SES bounce/complaint notifications
+
+Set `notification_email` in `terraform/tfvars.sops.yaml` to the address that should receive SES bounce/complaint alerts.
+
+After applying, AWS SNS will send a subscription confirmation email to that address. You must click the confirmation link or SES will not publish notifications.
+
+SES account-level suppression is enabled for bounces and complaints. This automatically blocks sends to any address that hard-bounces or complains, protecting sender reputation. Remove an address from the suppression list before re-sending:
+
+```sh
+aws sesv2 list-suppressed-destinations
+aws sesv2 delete-suppressed-destination --email-address user@example.com
+```
+
 ## Getting restic-backup-user creds
 
 After applying the backup module, use the following commands to get the access keys for restic-backup-user:

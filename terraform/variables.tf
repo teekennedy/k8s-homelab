@@ -41,3 +41,8 @@ variable "environment" {
   default     = "k8s-homelab"
 }
 
+variable "notification_email" {
+  type        = string
+  description = "Email address where SES bounce / complaint notifications will be sent."
+  default     = ""
+}

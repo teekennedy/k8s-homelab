@@ -11,4 +11,5 @@ locals {
   backup_bucket_name    = coalesce(var.backup_bucket_name, data.sops_file.tfvars.data["backup_bucket_name"])
   environment           = coalesce(var.environment, try(data.sops_file.tfvars.data["environment"]))
   extra_secrets         = try(yamldecode(data.sops_file.tfvars.raw).extra_secrets, {})
+  notification_email    = coalesce(var.notification_email, try(data.sops_file.tfvars.data["notification_email"]))
 }

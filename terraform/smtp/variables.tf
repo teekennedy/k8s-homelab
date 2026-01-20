@@ -19,3 +19,8 @@ variable "pgp_key" {
   description = "PGP key reference for the smtp IAM user"
   default     = ""
 }
+
+variable "notification_email" {
+  description = "Email address for SES bounce/complaint notifications"
+  type        = string
+}
