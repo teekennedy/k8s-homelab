@@ -17,28 +17,8 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
-      name: lldap-authelia-bind-user
-      namespace: auth-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: authelia-secrets
-      namespace: auth-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: gitea-admin-secret
-      namespace: gitea
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: monitoring-system-grafana
-      namespace: monitoring-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: alertmanager-monitoring-system-kube-pro
-      namespace: monitoring-system
+      name: anubis-signing-key
+      namespace: anubis
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
   project: default
