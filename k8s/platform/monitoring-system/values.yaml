@@ -45,6 +45,14 @@ kube-prometheus-stack:
         enabled: true
       datasources:
         enabled: true
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://monitoring-system-loki:3100
+        isDefault: false
+        jsonData:
+          timeInterval: 30s
     # This used to contain Dex client secret, but currently doesn't exist.
     # Can be recreated if needed with GRAFANA_SSO_CLIENT_SECRET: (dex.grafana -> client_secret in global-secrets namespace)
     # envFromSecret: grafana-secrets
@@ -230,3 +238,79 @@ kube-prometheus-stack:
             resources:
               requests:
                 storage: 220Gi
+
+loki:
+  enabled: true
+  deploymentMode: SingleBinary
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+    schemaConfig:
+      configs:
+        - from: 2026-01-01
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+  singleBinary:
+    replicas: 1
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: longhorn
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  backend:
+    replicas: 0
+
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://monitoring-system-loki:3100/loki/api/v1/push
+    snippets:
+      extraScrapeConfigs: |
+        - job_name: systemd-journal
+          journal:
+            path: /run/log/journal
+            max_age: 24h
+            labels:
+              job: systemd-journal
+          relabel_configs:
+            - source_labels: ['__journal__systemd_unit']
+              target_label: 'systemd_unit'
+            - source_labels: ['__journal__hostname']
+              target_label: 'host'
+        - job_name: dmesg
+          journal:
+            path: /run/log/journal
+            max_age: 24h
+            matches: _TRANSPORT=kernel
+            labels:
+              job: dmesg
+          relabel_configs:
+            - source_labels: ['__journal__hostname']
+              target_label: 'host'
+  extraVolumes:
+    - name: journal
+      hostPath:
+        path: /run/log/journal
+        type: DirectoryOrCreate
+    - name: machine-id
+      hostPath:
+        path: /etc/machine-id
+        type: File
+  extraVolumeMounts:
+    - name: journal
+      mountPath: /run/log/journal
+      readOnly: true
+    - name: machine-id
+      mountPath: /etc/machine-id
+      readOnly: true
