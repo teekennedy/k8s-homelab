@@ -246,6 +246,9 @@ loki:
     auth_enabled: false
     commonConfig:
       replication_factor: 1
+    # Pattern ingester adds CPU/memory overhead; disable if it is too expensive.
+    pattern_ingester:
+      enabled: true
     storage:
       type: filesystem
     schemaConfig:
