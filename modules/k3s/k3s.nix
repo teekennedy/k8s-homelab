@@ -28,6 +28,8 @@
         2381
         # prometheus node exporter
         9100
+        # MetalLB speaker memberlist gossip
+        7946
         # Kube proxy metrics
         10249
         # Kubelet metrics
@@ -41,6 +43,10 @@
         # k3s embedded registry mirror
         5001
       ])
+    ];
+    networking.firewall.allowedUDPPorts = [
+      # MetalLB speaker memberlist gossip
+      7946
     ];
     environment.systemPackages = with pkgs; [
       k3s
