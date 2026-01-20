@@ -10,9 +10,16 @@ data:
   settings.yaml: |-
     title: "Missingtoken's Homelab"
     description: "Missingtoken's Homelab"
+    favicon: https://missingtoken.net/favicon.ico
+    theme: dark
+    providers:
+      longhorn:
+        url: https://longhorn.msng.to
   kubernetes.yaml: |-
     mode: cluster
     ingress: true
+    traefik: true
+    gateway: true
   services.yaml: |-
     []
   bookmarks.yaml: |-
@@ -34,3 +41,12 @@ data:
         label: NAS
         disk: /mnt/nas
         expanded: true
+    - longhorn:
+        # Show the expanded view
+        expanded: true
+        # Shows a node representing the aggregate values
+        total: true
+        # Shows the node names as labels
+        labels: true
+        # Show the nodes
+        nodes: true

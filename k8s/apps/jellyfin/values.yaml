@@ -692,7 +692,7 @@ app-template:
         gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Jellyfin"
         gethomepage.dev/description: "Media server"
-        gethomepage.dev/icon: "si-jellyfin"
+        gethomepage.dev/icon: "sh-jellyfin.svg"
         gethomepage.dev/pod-selector: "app.kubernetes.io/controller=main"
         gethomepage.dev/widget.type: "jellyfin"
         gethomepage.dev/widget.url: "https://jellyfin.msng.to"
@@ -717,7 +717,7 @@ app-template:
         gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Jellyseerr"
         gethomepage.dev/description: "Request media"
-        gethomepage.dev/icon: "jellyseerr.svg"
+        gethomepage.dev/icon: "sh-jellyseerr.svg"
         gethomepage.dev/pod-selector: "app.kubernetes.io/controller=jellyseerr"
         gethomepage.dev/widget.type: "jellyseerr"
         gethomepage.dev/widget.url: "https://jellyseerr.msng.to"
@@ -739,10 +739,10 @@ app-template:
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
-        gethomepage.dev/group: "Media management"
+        gethomepage.dev/group: "Media"
         gethomepage.dev/name: "QBittorrent"
         gethomepage.dev/description: "Download management"
-        gethomepage.dev/icon: "si-qbittorrent"
+        gethomepage.dev/icon: "sh-qbittorrent.svg"
         gethomepage.dev/pod-selector: "app.kubernetes.io/controller=downloader"
         gethomepage.dev/widget.type: "qbittorrent"
         gethomepage.dev/widget.url: "https://qbittorrent.msng.to"
@@ -765,10 +765,10 @@ app-template:
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
-        gethomepage.dev/group: "Media management"
+        gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Prowlarr"
         gethomepage.dev/description: "Indexer management"
-        gethomepage.dev/icon: "prowlarr.svg"
+        gethomepage.dev/icon: "sh-prowlarr.svg"
         gethomepage.dev/pod-selector: "app.kubernetes.io/controller=arrs"
         gethomepage.dev/widget.type: "prowlarr"
         gethomepage.dev/widget.url: "https://prowlarr.msng.to"
@@ -790,10 +790,10 @@ app-template:
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
-        gethomepage.dev/group: "Media management"
+        gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Radarr"
         gethomepage.dev/description: "Movie collection manager"
-        gethomepage.dev/icon: "si-radarr"
+        gethomepage.dev/icon: "sh-radarr.svg"
         gethomepage.dev/pod-selector: "app.kubernetes.io/controller=arrs"
         gethomepage.dev/widget.type: "radarr"
         gethomepage.dev/widget.url: "https://radarr.msng.to"
@@ -815,10 +815,10 @@ app-template:
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
-        gethomepage.dev/group: "Media management"
+        gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Sonarr"
         gethomepage.dev/description: "TV show collection manager"
-        gethomepage.dev/icon: "si-sonarr"
+        gethomepage.dev/icon: "sh-sonarr.svg"
         gethomepage.dev/pod-selector: "app.kubernetes.io/controller=arrs"
         gethomepage.dev/widget.type: "sonarr"
         gethomepage.dev/widget.url: "https://sonarr.msng.to"

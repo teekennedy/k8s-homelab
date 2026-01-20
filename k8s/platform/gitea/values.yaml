@@ -12,9 +12,9 @@ gitea:
       cert-manager.io/cluster-issuer: letsencrypt-prod
       helm.sh/hook: post-install,post-upgrade
       gethomepage.dev/enabled: "true"
-      gethomepage.dev/group: "Development"
-      gethomepage.dev/name: "Git"
-      gethomepage.dev/icon: "si-gitea"
+      gethomepage.dev/group: "Apps"
+      gethomepage.dev/name: "Gitea"
+      gethomepage.dev/icon: "sh-gitea.svg"
       gethomepage.dev/pod-selector: "app.kubernetes.io/name=gitea"
       gethomepage.dev/widget.type: "gitea"
       gethomepage.dev/widget.url: "https://git.msng.to"

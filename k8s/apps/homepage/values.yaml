@@ -1,4 +1,8 @@
 homepage:
+  image:
+    registry: ghcr.io
+    repository: gethomepage/homepage
+    tag: "v1.9.0"
   ingress:
     enabled: true
     ingressClassName: anubis
@@ -42,6 +46,9 @@ homepage:
     - name: nas
       persistentVolumeClaim:
         claimName: homepage-nas
+  extraEnv:
+    - name: LOG_TARGETS
+      value: stdout
   extraEnvFrom:
     - secretRef:
         name: homepage-secrets

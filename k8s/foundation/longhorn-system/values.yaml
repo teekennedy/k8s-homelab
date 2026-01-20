@@ -20,10 +20,10 @@ longhorn:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
       gethomepage.dev/enabled: "true"
-      gethomepage.dev/group: "Cluster management"
+      gethomepage.dev/group: "Cluster"
       gethomepage.dev/name: "Longhorn"
       gethomepage.dev/description: "Distributed block storage"
-      gethomepage.dev/icon: "longhorn.svg"
+      gethomepage.dev/icon: "sh-rancher-longhorn.svg"
       gethomepage.dev/pod-selector: "app=longhorn-ui"
     host: longhorn.msng.to
     path: /

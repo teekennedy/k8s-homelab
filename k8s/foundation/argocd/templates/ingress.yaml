@@ -5,12 +5,12 @@ metadata:
   namespace: "{{ .Release.Namespace }}"
   annotations:
     gethomepage.dev/enabled: "true"
-    gethomepage.dev/group: "Cluster management"
+    gethomepage.dev/group: "Cluster"
     gethomepage.dev/name: "ArgoCD"
     gethomepage.dev/description: "Continuous delivery"
-    gethomepage.dev/icon: "argocd.svg"
+    gethomepage.dev/icon: "sh-argo-cd.svg"
     gethomepage.dev/href: "https://argocd.msng.to"
-    gethomepage.dev/pod-selector: "app.kubernetes.io/name=argo-cd-server"
+    gethomepage.dev/pod-selector: "app.kubernetes.io/name=argocd-server"
     gethomepage.dev/widget.type: "argocd"
     gethomepage.dev/widget.url: "https://argocd.msng.to"
     gethomepage.dev/widget.key: {{ "{{HOMEPAGE_VAR_ARGOCD_API_KEY}}" | quote }}
