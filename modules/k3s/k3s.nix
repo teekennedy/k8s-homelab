@@ -131,6 +131,12 @@
                 protocol: TCP
                 tls:
                   enabled: true
+              metrics:
+                port: 9100
+                expose:
+                  default: true
+                exposedPort: 9100
+                protocol: TCP
         EOF
       '';
     };

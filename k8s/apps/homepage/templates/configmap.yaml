@@ -12,6 +12,10 @@ data:
     description: "Missingtoken's Homelab"
     favicon: https://missingtoken.net/favicon.ico
     theme: dark
+    hideVersion: true
+    disableUpdateCheck: true
+    # use a green dot for healthy status
+    statusStyle: "dot"
     providers:
       longhorn:
         url: https://longhorn.msng.to
@@ -38,15 +42,9 @@ data:
           memory: true
           showLabel: true
     - resources:
-        label: NAS
+        label: nas
         disk: /mnt/nas
         expanded: true
     - longhorn:
-        # Show the expanded view
         expanded: true
-        # Shows a node representing the aggregate values
         total: true
-        # Shows the node names as labels
-        labels: true
-        # Show the nodes
-        nodes: true
