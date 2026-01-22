@@ -1,0 +1,6 @@
+# Local state - do not commit
+*
+!.gitignore
+
+# Specifically ignore decrypted kubeconfig files
+kubeconfig/

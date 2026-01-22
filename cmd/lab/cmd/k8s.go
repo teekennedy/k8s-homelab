@@ -10,12 +10,57 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teekennedy/homelab/cmd/lab/config"
+	"github.com/teekennedy/homelab/cmd/lab/kubeconfig"
 )
+
+var (
+	kubeconfigMgr *kubeconfig.Manager
+)
+
+// initKubeconfig initializes the kubeconfig manager
+func initKubeconfig() *kubeconfig.Manager {
+	if kubeconfigMgr == nil {
+		configDir := getConfigDir()
+		cacheDir := getCacheDir()
+		kubeconfigMgr = kubeconfig.NewManager(configDir, cacheDir)
+	}
+	return kubeconfigMgr
+}
+
+// getCacheDir returns the path to the cache directory (.lab)
+func getCacheDir() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ".lab"
+	}
+	return filepath.Join(cwd, ".lab")
+}
+
+// setupKubeconfig sets up the kubeconfig for the given environment
+// Returns a cleanup function that must be called when done
+func setupKubeconfig(envName string) (func(), error) {
+	mgr := initKubeconfig()
+
+	// Check if kubeconfig exists for this environment
+	if !mgr.Exists(envName) {
+		return nil, fmt.Errorf("no kubeconfig found for environment %q (expected at %s)", envName, mgr.GetEncryptedPath(envName))
+	}
+
+	cleanup, err := mgr.Setup(envName)
+	if err != nil {
+		return nil, fmt.Errorf("setup kubeconfig: %w", err)
+	}
+
+	return cleanup, nil
+}
 
 var k8sCmd = &cobra.Command{
 	Use:   "k8s",
 	Short: "Kubernetes operations",
-	Long:  `Commands for managing Kubernetes resources and applications.`,
+	Long: `Commands for managing Kubernetes resources and applications.
+
+Kubeconfig files are stored encrypted per environment in config/kubeconfig/<env>.enc.yaml
+and are automatically decrypted using sops when needed.`,
 }
 
 var k8sBootstrapCmd = &cobra.Command{
@@ -41,6 +86,13 @@ After bootstrap, ArgoCD will manage all applications.`,
 		if err != nil {
 			return fmt.Errorf("load environment: %w", err)
 		}
+
+		// Setup kubeconfig for the environment
+		cleanup, err := setupKubeconfig(envName)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
 
 		if !jsonOutput {
 			fmt.Printf("Bootstrapping Kubernetes cluster for %s environment\n", envName)
@@ -138,6 +190,15 @@ Examples:
   lab k8s diff gitea              # Diff app (auto-detect tier)`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		envName, _ := cmd.Flags().GetString("env")
+
+		// Setup kubeconfig for the environment
+		cleanup, err := setupKubeconfig(envName)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+
 		target := ""
 		if len(args) > 0 {
 			target = args[0]
@@ -179,6 +240,15 @@ Examples:
   lab k8s sync gitea --argocd     # Sync via ArgoCD`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		envName, _ := cmd.Flags().GetString("env")
+
+		// Setup kubeconfig for the environment
+		cleanup, err := setupKubeconfig(envName)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+
 		target := ""
 		if len(args) > 0 {
 			target = args[0]
@@ -229,10 +299,18 @@ Examples:
 			tier = args[0]
 		}
 
+		// Check if kubeconfig exists for environment
+		mgr := initKubeconfig()
+		hasKubeconfig := mgr.Exists(envName)
+
 		if jsonOutput {
 			var output interface{}
 			if tier == "" {
-				output = env.Apps
+				output = map[string]interface{}{
+					"environment":   envName,
+					"hasKubeconfig": hasKubeconfig,
+					"apps":          env.Apps,
+				}
 			} else {
 				switch tier {
 				case "foundation":
@@ -250,7 +328,12 @@ Examples:
 			return nil
 		}
 
-		fmt.Printf("Applications for %s environment:\n", envName)
+		fmt.Printf("Applications for %s environment", envName)
+		if hasKubeconfig {
+			fmt.Println(" (kubeconfig available)")
+		} else {
+			fmt.Println(" (no kubeconfig)")
+		}
 
 		printTier := func(name string, apps []string) {
 			if tier != "" && tier != name {
@@ -281,8 +364,17 @@ var k8sStatusCmd = &cobra.Command{
 	Short: "Show cluster status",
 	Long:  `Show the status of the Kubernetes cluster and deployed applications.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		envName, _ := cmd.Flags().GetString("env")
+
+		// Setup kubeconfig for the environment
+		cleanup, err := setupKubeconfig(envName)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+
 		if !jsonOutput {
-			fmt.Println("Cluster Status:")
+			fmt.Printf("Cluster Status (%s environment):\n", envName)
 		}
 
 		// Get node status
@@ -378,6 +470,107 @@ This exports the environment configuration to formats usable by Helm charts.`,
 		}
 
 		_ = env // Used for potential future expansion
+		return nil
+	},
+}
+
+var k8sKubeconfigCmd = &cobra.Command{
+	Use:   "kubeconfig",
+	Short: "Manage kubeconfig files",
+	Long:  `Commands for managing kubeconfig files for different environments.`,
+}
+
+var k8sKubeconfigDecryptCmd = &cobra.Command{
+	Use:   "decrypt [environment]",
+	Short: "Decrypt kubeconfig for an environment",
+	Long: `Decrypt the kubeconfig for the specified environment and make it available.
+
+The decrypted kubeconfig is stored in .lab/kubeconfig/<env>.yaml`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		envName := "production"
+		if len(args) > 0 {
+			envName = args[0]
+		}
+
+		mgr := initKubeconfig()
+
+		if err := mgr.SetupPersistent(envName); err != nil {
+			return err
+		}
+
+		decPath := mgr.GetDecryptedPath(envName)
+		if !jsonOutput {
+			fmt.Printf("Kubeconfig decrypted for %s environment\n", envName)
+			fmt.Printf("Path: %s\n", decPath)
+			fmt.Printf("\nTo use:\n")
+			fmt.Printf("  export KUBECONFIG=%s\n", decPath)
+		} else {
+			result := map[string]string{
+				"environment": envName,
+				"path":        decPath,
+			}
+			out, _ := json.Marshal(result)
+			fmt.Println(string(out))
+		}
+
+		return nil
+	},
+}
+
+var k8sKubeconfigCleanupCmd = &cobra.Command{
+	Use:   "cleanup",
+	Short: "Remove decrypted kubeconfig files",
+	Long:  `Remove all decrypted kubeconfig files from the cache directory.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		mgr := initKubeconfig()
+
+		if err := mgr.CleanupAll(); err != nil {
+			return fmt.Errorf("cleanup: %w", err)
+		}
+
+		if !jsonOutput {
+			fmt.Println("Decrypted kubeconfig files cleaned up")
+		}
+
+		return nil
+	},
+}
+
+var k8sKubeconfigListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List available kubeconfig files",
+	Long:  `List all environments that have kubeconfig files available.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		mgr := initKubeconfig()
+
+		envs, err := mgr.ListEnvironments()
+		if err != nil {
+			return fmt.Errorf("list environments: %w", err)
+		}
+
+		if jsonOutput {
+			out, _ := json.Marshal(envs)
+			fmt.Println(string(out))
+			return nil
+		}
+
+		if len(envs) == 0 {
+			fmt.Println("No kubeconfig files found")
+			fmt.Printf("Expected location: %s\n", filepath.Join(getConfigDir(), "kubeconfig", "<env>.enc.yaml"))
+			return nil
+		}
+
+		fmt.Println("Available kubeconfigs:")
+		for _, env := range envs {
+			decPath := mgr.GetDecryptedPath(env)
+			status := "encrypted"
+			if _, err := os.Stat(decPath); err == nil {
+				status = "decrypted"
+			}
+			fmt.Printf("  - %s (%s)\n", env, status)
+		}
+
 		return nil
 	},
 }
@@ -553,7 +746,9 @@ func contains(slice []string, item string) bool {
 func init() {
 	rootCmd.AddCommand(k8sCmd)
 
-	k8sBootstrapCmd.Flags().String("env", "production", "Target environment")
+	// Add --env flag to k8s command for inheritance
+	k8sCmd.PersistentFlags().String("env", "production", "Target environment (determines which kubeconfig to use)")
+
 	k8sBootstrapCmd.Flags().Bool("dry-run", false, "Show what would be installed without making changes")
 	k8sBootstrapCmd.Flags().Bool("skip-argocd", false, "Skip ArgoCD installation (for debugging)")
 	k8sCmd.AddCommand(k8sBootstrapCmd)
@@ -564,12 +759,16 @@ func init() {
 	k8sSyncCmd.Flags().Bool("prune", false, "Prune resources not in the current configuration")
 	k8sCmd.AddCommand(k8sSyncCmd)
 
-	k8sListCmd.Flags().String("env", "production", "Environment to list apps from")
 	k8sCmd.AddCommand(k8sListCmd)
 
 	k8sCmd.AddCommand(k8sStatusCmd)
 
-	k8sGenerateCmd.Flags().String("env", "production", "Environment to generate config for")
 	k8sGenerateCmd.Flags().String("output", "", "Output directory (default: config/gen)")
 	k8sCmd.AddCommand(k8sGenerateCmd)
+
+	// Kubeconfig subcommands
+	k8sCmd.AddCommand(k8sKubeconfigCmd)
+	k8sKubeconfigCmd.AddCommand(k8sKubeconfigDecryptCmd)
+	k8sKubeconfigCmd.AddCommand(k8sKubeconfigCleanupCmd)
+	k8sKubeconfigCmd.AddCommand(k8sKubeconfigListCmd)
 }
