@@ -1,5 +1,5 @@
 {...}: {
   imports = [
-    ../common/laptop.nix
+    ./runner.nix
   ];
 }

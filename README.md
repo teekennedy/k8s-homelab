@@ -26,7 +26,7 @@ Then we can reference those keys in the configuration for sops-managed files:
 
 ```yaml
 creation_rules:
-  - path_regex: hosts/<host>/secrets.ya?ml
+  - path_regex: nix/hosts/<host>/secrets.ya?ml
     key_groups:
     - pgp:
       - *user_<username>
@@ -38,7 +38,7 @@ creation_rules:
 
 ### Build installer
 
-This repo's flake includes a customized installer that starts openssh and allows root login with the public keys added to ./modules/users/authorized_keys/.
+This repo's flake includes a customized installer that starts openssh and allows root login with the public keys added to ./nix/modules/users/authorized_keys/.
 
 Run `nix build .#nixosConfigurations.installIso.config.system.build.isoImage` to build the installer iso. The resulting package will by symlinked to ./result.
 
@@ -49,7 +49,7 @@ Write the image to some installation media and use it to boot the target machine
 For each host, we're going to use its ssh key to decrypt secrets.
 Sops does not support ssh directly, so the keys are converted to age keys.
 
-I created a script to generate a new SSH key for a host encrypt it with sops, and save it under `./hosts/<host>/secrets.yaml`.
+I created a script to generate a new SSH key for a host encrypt it with sops, and save it under `./nix/hosts/<host>/secrets.yaml`.
 
 ```bash
 bootstrap-host <hostname> --target-host root@<installer-ip-or-hostname>
@@ -127,15 +127,15 @@ To setup a new host, create the following config:
 
 - Generate ed25519 ssh key for the host:
   - `ssh-keygen -t ed25519 -C "root@$hostname" -f "$(pwd)/ssh_host_ed25519_key"`
-  - save private key to hosts/<hostname>/secrets.yaml under `ssh_host_private_key`
-  - save public key to hosts/<hostname>/secrets.yaml under `ssh_host_public_key`
+  - save private key to nix/hosts/<hostname>/secrets.yaml under `ssh_host_private_key`
+  - save public key to nix/hosts/<hostname>/secrets.yaml under `ssh_host_public_key`
   - convert ssh key to age with `nix-shell -p ssh-to-age --run 'ssh-to-age -i ./ssh_host_ed25519_key'` and save the public age key to .sops.yaml under `keys`.
   - run `sops updatekeys` against all current encrypted files to add the new key.
 - build the nixos installer image:
   - `nix build .#nixosConfigurations.installIso.config.system.build.isoImage`
 - write the installer image to a drive and boot the machine from it
 - generate and save facter configuration:
-  - `nixos-anywhere -- --flake .#nixosConfigurations.borg-X --generate-hardware-config nixos-facter ./hosts/borg-0/facter.json --phases '' --target-host root@<ip-addr>`
+  - `nixos-anywhere -- --flake .#nixosConfigurations.borg-X --generate-hardware-config nixos-facter ./nix/hosts/borg-0/facter.json --phases '' --target-host root@<ip-addr>`
     (NB: the `--phases ''` is important to prevent nixos-anywhere from running the full installation process including formatting your disks!)
 - Set `disko.devices.disk.main.device` to the filesystem root device, and optionally `disko.longhornDevice` to the device used for k8s longhorn.
   - Make sure to use persistent device names from `/dev/disk/by-id`. Check the generated facter.json for available device names.
@@ -143,12 +143,12 @@ To setup a new host, create the following config:
   - `bootstrap-host borg-X -- --target-host root@<ip_addr>`
   - The script will ask you for a password for the primary user interactively. This gets passed into `mkpasswd` to produce a hash which is then encrypted with sops.
   - The script also generates an SSH keypair and encrypts it with sops. It adds the public key to .sops.yaml, but does not update any of the files. You have to do the following manually:
-    - Add the missing `restic_repo_password` yaml entry to `hosts/borg-X/secrets.yaml`, set to a secure random string.
-    - Add a new entry for `hosts/borg-X/secrets\.yaml` that references the new host key.
-    - Run `sops encrypt --in-place ./hosts/borg-X/secrets.yaml` to encrypt the secrets file.
-    - Run `git add hosts/borg-X` to ensure the new sops file and any config get added to the flake eval.
-    - Add the new host key to the entry for `modules/*/.*\.enc\.yaml`.
-    - Run `sops updatekeys modules/*/*.enc.yaml` to re-encrypt shared secrets with the new keys.
+    - Add the missing `restic_repo_password` yaml entry to `nix/hosts/borg-X/secrets.yaml`, set to a secure random string.
+    - Add a new entry for `nix/hosts/borg-X/secrets\.yaml` that references the new host key.
+    - Run `sops encrypt --in-place ./nix/hosts/borg-X/secrets.yaml` to encrypt the secrets file.
+    - Run `git add nix/hosts/borg-X` to ensure the new sops file and any config get added to the flake eval.
+    - Add the new host key to the entry for `nix/modules/*/.*\.enc\.yaml`.
+    - Run `sops updatekeys nix/modules/*/*.enc.yaml` to re-encrypt shared secrets with the new keys.
   - With the manual steps out of the way, run `bootstrap-host borg-X -- --target-host root@<ip_addr>` once more. This time it should complete successfully.
 - Confirm you're able to login as your default user via SSH `ssh borg-X`
 - Update the YAML anchored list of `&nodeIPs` inside k8s/platform/monitoring-system/values.yaml. This need to be specified explicitly since they're not running as standalone pods in k3s.
@@ -162,11 +162,11 @@ If you just want to build the nixosSystem for a host (e.g. to test configuration
 
 ## Bootstrapping k3s cluster
 
-Start your first k3s server with `services.k3s.clusterInit = true;`. See modules/k3s/k3s.nix for a full example.
+Start your first k3s server with `services.k3s.clusterInit = true;`. See nix/modules/k3s/k3s.nix for a full example.
 
 Once applied, log into the host and check that k3s is running with `sudo systemctl status k3s.service`. Check the k3s logs for errors as well `sudo journalctl -fu k3s.service`.
 
-Run the helper script from the scripts directory to fetch all certificates, keys and tokens and write them encrypted with sops to ./modules/k3s/secrets.enc.yaml
+Run the helper script from the scripts directory to fetch all certificates, keys and tokens and write them encrypted with sops to ./nix/modules/k3s/secrets.enc.yaml
 
 Also copy /etc/rancher/k3s/k3s.yaml from the first node and place it in ./.devenv/state/kube/config in this repo (will be gitignored). You'll need to replace `server:` with the server's actual address (not 127.0.0.1).
 

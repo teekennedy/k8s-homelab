@@ -66,10 +66,20 @@ metadata:
 
 # Generate a single Role per secret namespace,
 # that is only allowed to manage the defined secrets in that namespace.
-{{- $users := index .Values "gitea-resources" "users" }}
+{{- $users := index .Values "gitea-resources" "users" | default (list) }}
+{{- $runners := index .Values "gitea-resources" "runners" | default (list) }}
 {{- $namespaceSecrets := dict }}
 
 {{- range $users }}
+  {{- $ns := .secretNamespace }}
+  {{- $secret := .secretName }}
+  {{- if not (hasKey $namespaceSecrets $ns) }}
+    {{- $_ := set $namespaceSecrets $ns (list $secret) }}
+  {{- else }}
+    {{- $_ := set $namespaceSecrets $ns (append (get $namespaceSecrets $ns) $secret) }}
+  {{- end }}
+{{- end }}
+{{- range $runners }}
   {{- $ns := .secretNamespace }}
   {{- $secret := .secretName }}
   {{- if not (hasKey $namespaceSecrets $ns) }}
@@ -101,10 +111,31 @@ rules:
 {{- end }}
 
 # Generate a single RoleBinding per secret namespace
-{{- $users := index .Values "gitea-resources" "users" }}
+{{- $users := index .Values "gitea-resources" "users" | default (list) }}
+{{- $runners := index .Values "gitea-resources" "runners" | default (list) }}
 {{- $seenNamespaces := dict }}
 
 {{- range $users }}
+  {{- $ns := .secretNamespace }}
+  {{- if not (hasKey $seenNamespaces $ns) }}
+    {{- $_ := set $seenNamespaces $ns true }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-resources-secret-writer-binding
+  namespace: {{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: gitea-resources-job
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: gitea-resources-secret-writer
+  apiGroup: rbac.authorization.k8s.io
+---
+  {{- end }}
+{{- end }}
+{{- range $runners }}
   {{- $ns := .secretNamespace }}
   {{- if not (hasKey $seenNamespaces $ns) }}
     {{- $_ := set $seenNamespaces $ns true }}

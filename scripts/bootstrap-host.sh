@@ -51,7 +51,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-secrets_yaml_path="./hosts/$hostname/secrets.yaml"
+secrets_yaml_path="./nix/hosts/$hostname/secrets.yaml"
 host_ssh_key_path="$temp/persistent/etc/ssh/ssh_host_ed25519_key"
 # Generate host secrets.yaml if it doesn't exist
 generate_secrets_yaml() {

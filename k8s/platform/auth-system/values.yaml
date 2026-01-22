@@ -64,7 +64,7 @@ authelia:
     notifier:
       smtp:
         enabled: true
-        address: smtp://email-smtp.us-west-1.amazonaws.com:587
+        address: smtp://email-smtp.us-west-2.amazonaws.com:587
 
         # @schema
         # required: false

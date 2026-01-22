@@ -11,35 +11,35 @@ keys:
   - &host_borg-2 age12uwv74ykhvs45aftm8d4v03ry44jdkt93nmslhktc2u4fq7j7yyqg5zdph
   - &host_borg-3 age1y8n63p4zrlzxphe9k7hlc27vhk3g3k32nz0p4eg66tz4p2pnjavq4aq3xp
 creation_rules:
-  - path_regex: hosts/borg-0/secrets\.yaml
+  - path_regex: nix/hosts/borg-0/secrets\.yaml
     key_groups:
       - pgp:
           - *user_tkennedy
         age:
           - *oxygen_age
           - *host_borg-0
-  - path_regex: hosts/borg-1/secrets\.yaml
+  - path_regex: nix/hosts/borg-1/secrets\.yaml
     key_groups:
       - pgp:
           - *user_tkennedy
         age:
           - *oxygen_age
           - *host_borg-1
-  - path_regex: hosts/borg-2/secrets\.yaml
+  - path_regex: nix/hosts/borg-2/secrets\.yaml
     key_groups:
       - pgp:
           - *user_tkennedy
         age:
           - *oxygen_age
           - *host_borg-2
-  - path_regex: hosts/borg-3/secrets\.yaml
+  - path_regex: nix/hosts/borg-3/secrets\.yaml
     key_groups:
       - pgp:
           - *user_tkennedy
         age:
           - *oxygen_age
           - *host_borg-3
-  - path_regex: modules/*/.*\.enc\.yaml
+  - path_regex: nix/modules/*/.*\.enc\.yaml
     key_groups:
       - pgp:
           - *user_tkennedy

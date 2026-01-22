@@ -8,7 +8,7 @@
     disko.url = "github:nix-community/disko?ref=master";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence?ref=master";
-    lenovo_sa120_fanspeed.url = "./modules/packages/lenovo_sa120_fanspeed";
+    lenovo_sa120_fanspeed.url = "./nix/modules/packages/lenovo_sa120_fanspeed";
     lenovo_sa120_fanspeed.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix?ref=master";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
@@ -60,7 +60,7 @@
             hostname = "borg-2";
             system = "x86_64-linux";
             modules = [
-              ./modules/samba/server.nix
+              ./nix/modules/samba/server.nix
               ({...}: {
                 disko.devices.disk.main.device = "/dev/disk/by-id/nvme-WD_BLACK_SN770_1TB_23011J801757";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FFD004T_TPBF2404020050100710";
@@ -127,12 +127,12 @@
                 };
                 modules =
                   [
-                    ./hosts/common
-                    (./hosts + "/${host.hostname}")
-                    ./modules/common
-                    ./modules/restic
-                    ./modules/k3s
-                    ./modules/users/defaultUser.nix
+                    ./nix/hosts/common
+                    (./nix/hosts + "/${host.hostname}")
+                    ./nix/modules/common
+                    ./nix/modules/restic
+                    ./nix/modules/k3s
+                    ./nix/modules/users/defaultUser.nix
                     inputs.nixos-facter-modules.nixosModules.facter
                     {
                       defaultUsername = "tkennedy";
@@ -140,13 +140,13 @@
                       # Pin nixpkgs to flake input
                       nix.registry.nixpkgs.flake = inputs.nixpkgs;
                       facter.reportPath = let
-                        facterPath = ./hosts + "/${host.hostname}" + /facter.json;
+                        facterPath = ./nix/hosts + "/${host.hostname}" + /facter.json;
                       in
                         if builtins.pathExists facterPath
                         then facterPath
                         else throw "Have you forgotten to run nixos-anywhere with `--generate-hardware-config nixos-facter ${facterPath}`?";
                       sops.defaultSopsFile = let
-                        defaultSopsPath = ./hosts + "/${host.hostname}" + /secrets.yaml;
+                        defaultSopsPath = ./nix/hosts + "/${host.hostname}" + /secrets.yaml;
                       in
                         if builtins.pathExists defaultSopsPath
                         then defaultSopsPath
@@ -174,7 +174,7 @@
                   pkgs,
                   ...
                 }: {
-                  users.users.root.openssh.authorizedKeys.keyFiles = builtins.map (s: ./modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./modules/users/authorized_keys));
+                  users.users.root.openssh.authorizedKeys.keyFiles = builtins.map (s: ./nix/modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./nix/modules/users/authorized_keys));
                   networking.hostName = "nixos-installer";
                   # Pin nixpkgs to flake input
                   nix.registry.nixpkgs.flake = inputs.nixpkgs;

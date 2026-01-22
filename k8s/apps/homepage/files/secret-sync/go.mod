@@ -2,7 +2,7 @@ module git.msng.to/teekennedy/k8s-homelab/homepage/secret-sync
 
 go 1.24.0
 
-toolchain go1.25.6
+toolchain go1.25.5
 
 require (
 	gopkg.in/yaml.v3 v3.0.1

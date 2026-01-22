@@ -102,11 +102,11 @@
         ]
       },
       "locked": {
-        "path": "./modules/packages/lenovo_sa120_fanspeed",
+        "path": "./nix/modules/packages/lenovo_sa120_fanspeed",
         "type": "path"
       },
       "original": {
-        "path": "./modules/packages/lenovo_sa120_fanspeed",
+        "path": "./nix/modules/packages/lenovo_sa120_fanspeed",
         "type": "path"
       },
       "parent": []

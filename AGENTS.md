@@ -1,8 +1,8 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `hosts/<hostname>/` holds host-specific NixOS modules, `secrets.yaml`, and facter reports; keep new nodes under `hosts/common` for shared bits.
-- `modules/` provides reusable Nix modules (e.g. `modules/k3s`, `modules/users/defaultUser.nix`) that get imported by each host; extend here before duplicating config.
+- `nix/hosts/<hostname>/` holds host-specific NixOS modules, `secrets.yaml`, and facter reports; keep new nodes under `nix/hosts/common` for shared bits.
+- `nix/modules/` provides reusable Nix modules (e.g. `nix/modules/k3s`, `nix/modules/users/defaultUser.nix`) that get imported by each host; extend here before duplicating config.
 - `k8s/foundation/`, `k8s/platform/`, and `k8s/apps/` hold Argo CD application definitions (tier app-of-apps live at `k8s/<tier>/application.yaml`).
 - `terraform/` contains infrastructure state (OpenTofu) for network storage; `scripts/` includes bootstrap helpers such as `scripts/bootstrap-host.sh`.
 

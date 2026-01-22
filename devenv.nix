@@ -31,45 +31,20 @@
   packages = with pkgs; [
     age
     argocd
+    cue
     deploy-rs
+    go
     helmfile-wrapped
     k9s
     kubecolor
     kubectl
-    kubetail
     kubernetes-helm
+    kubetail
     kustomize
     nixos-anywhere
     opentofu
     sops
-    (writeShellApplication {
-      name = "bootstrap-host";
-      runtimeInputs = [yq-go sops ssh-to-age mkpasswd];
-      text = builtins.readFile ./scripts/bootstrap-host.sh;
-    })
-    (writeShellApplication {
-      name = "deploy-diff";
-      runtimeInputs = [deploy-rs];
-      text = ''
-        if [ $# -gt 1 ]; then
-          host=$2
-        else
-          host=$1
-        fi
-        set -eou pipefail
-
-        mkfifo wait.fifo
-        trap 'rm wait.fifo' EXIT
-
-        deploy --auto-rollback false --debug-logs --skip-checks -- ".#$1" 2>&1 \
-          | tee >(grep -v DEBUG) >(grep 'activate-rs --debug-logs activate' | \
-              sed -e 's/^.*activate-rs --debug-logs activate \(.*\) --profile-user.*$/\1/' | \
-              xargs -I% bash -xc "ssh $host 'nix run --impure nixpkgs#nvd -- --color=always diff /run/current-system %'" ; echo >wait.fifo) \
-          >/dev/null
-
-        read -r <wait.fifo
-      '';
-    })
+    uv
   ];
 
   # https://devenv.sh/languages/
@@ -108,6 +83,8 @@
     terraform-format.enable = true;
     # YAML linter
     yamllint.enable = true;
+    # Python formatter
+    black.enable = true;
   };
 
   # See full reference at https://devenv.sh/reference/options/

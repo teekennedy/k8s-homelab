@@ -66,6 +66,8 @@
     directories = [
       # application cache directory (according to FHS)
       "/var/cache"
+      # Gitea actions runner state and token file
+      "/var/lib/gitea-runner"
       # containerd default metadata dir
       "/var/lib/containerd"
       # k3s data dirs
@@ -77,7 +79,6 @@
       # core dumps
       "/var/lib/systemd/coredump"
     ];
-    files = [
-    ];
+    files = [];
   };
 }

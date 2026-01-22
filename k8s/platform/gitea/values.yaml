@@ -81,7 +81,7 @@ gitea:
       service.explore:
         DISABLE_USERS_PAGE: true
       actions:
-        ENABLED: false
+        ENABLED: true
       webhook:
         ALLOWED_HOST_LIST: private
 
@@ -119,6 +119,12 @@ gitea-resources:
       secretName: tkennedy-gitea-user
       secretNamespace: gitea
       admin: true
+  runners:
+    - name: borg-3
+      secretName: gitea-runner-borg-3
+      secretNamespace: gitea
+      tokenFilePath: /var/lib/gitea-runner/token
+      tokenFileGroup: ci-runner
   organizations:
     - name: ops
       description: Operations

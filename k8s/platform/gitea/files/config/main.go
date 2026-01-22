@@ -6,13 +6,17 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"slices"
+	"strings"
 
 	"code.gitea.io/sdk/gitea"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -50,10 +54,17 @@ type User struct {
 	Admin           bool          `yaml:"admin"`
 }
 
+type Runner struct {
+	Name            string
+	SecretName      string `yaml:"secretName"`
+	SecretNamespace string `yaml:"secretNamespace"`
+}
+
 type Config struct {
 	Organizations []Organization
 	Repositories  []Repository
 	Users         []User
+	Runners       []Runner
 }
 
 const charset = "abcdefghijklmnopqrstuvwxyz" +
@@ -106,6 +117,68 @@ func getOrCreatePassword(ctx context.Context, k8sClient *kubernetes.Clientset, n
 		return string(passwordBytes[:]), nil
 	}
 	return password, err
+}
+
+func getRunnerRegistrationToken(ctx context.Context, giteaHost, giteaUser, giteaPassword string) (string, error) {
+	host := strings.TrimSuffix(giteaHost, "/")
+	endpoint := host + "/api/v1/admin/runners/registration-token"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("create runner token request: %w", err)
+	}
+	req.SetBasicAuth(giteaUser, giteaPassword)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request runner token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return "", fmt.Errorf("request runner token: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+
+	token := resp.Header.Get("Token")
+	if token == "" {
+		token = resp.Header.Get("token")
+	}
+	if token == "" {
+		return "", fmt.Errorf("runner token missing from response headers")
+	}
+	return token, nil
+}
+
+func upsertRunnerTokenSecret(ctx context.Context, k8sClient *kubernetes.Clientset, namespace, secretName, token string) error {
+	secretClient := k8sClient.CoreV1().Secrets(namespace)
+	_, err := secretClient.Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("get secret %s in %s: %w", secretName, namespace, err)
+		}
+		newSecret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: namespace,
+			},
+			StringData: map[string]string{"token": token},
+		}
+		_, err = secretClient.Create(ctx, &newSecret, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("create secret %s in %s: %w", secretName, namespace, err)
+		}
+		return nil
+	}
+
+	b64Token := base64.StdEncoding.EncodeToString([]byte(token))
+	patch := map[string]any{"data": map[string]string{"token": b64Token}}
+	patchBytes, _ := json.Marshal(patch)
+
+	_, err = secretClient.Patch(ctx, secretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("update secret %s in %s: %w", secretName, namespace, err)
+	}
+	return nil
 }
 
 func main() {
@@ -288,5 +361,30 @@ func main() {
 
 			}
 		}
+	}
+
+	for _, runner := range config.Runners {
+		secretClient := k8sClient.CoreV1().Secrets(runner.SecretNamespace)
+		secret, err := secretClient.Get(ctx, runner.SecretName, metav1.GetOptions{})
+		if err == nil {
+			if token, ok := secret.Data["token"]; ok && len(token) > 0 {
+				log.Printf("Runner token secret %s already populated, skipping", runner.SecretName)
+				continue
+			}
+		} else if !apierrors.IsNotFound(err) {
+			log.Printf("Get runner secret %s in %s: %v", runner.SecretName, runner.SecretNamespace, err)
+			continue
+		}
+
+		token, err := getRunnerRegistrationToken(ctx, giteaHost, giteaUser, giteaPassword)
+		if err != nil {
+			log.Printf("Get runner registration token for %s: %v", runner.Name, err)
+			continue
+		}
+		if err := upsertRunnerTokenSecret(ctx, k8sClient, runner.SecretNamespace, runner.SecretName, token); err != nil {
+			log.Printf("Upsert runner token secret %s in %s: %v", runner.SecretName, runner.SecretNamespace, err)
+			continue
+		}
+		log.Printf("Updated runner token secret %s for %s", runner.SecretName, runner.Name)
 	}
 }

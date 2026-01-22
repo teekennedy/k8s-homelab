@@ -1,0 +1,62 @@
+{{- $runners := index .Values "gitea-resources" "runners" | default (list) }}
+{{- range $runner := $runners }}
+{{- $tokenFilePath := $runner.tokenFilePath | default "/var/lib/gitea-runner/token" }}
+{{- $tokenFileGroup := $runner.tokenFileGroup | default "ci-runner" }}
+{{- $tokenFileDir := dir $tokenFilePath }}
+{{- $tokenFileName := base $tokenFilePath }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitea-runner-token-install-{{ $runner.name }}
+  namespace: {{ $runner.secretNamespace | default $.Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    helm.sh/hook: post-install,post-upgrade
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: {{ $runner.name | quote }}
+      containers:
+        - name: install-token
+          image: alpine:3.21
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              token="$(cat /token/token)"
+              group="{{ $tokenFileGroup }}"
+              gid="$(awk -F: -v group="$group" '$1 == group { print $3 }' /host-etc-group)"
+              if [ -z "$gid" ]; then
+                echo "Missing group $group on host" >&2
+                exit 1
+              fi
+              mkdir -p "/host{{ $tokenFileDir }}"
+              printf 'TOKEN=%s\n' "$token" >"/host{{ $tokenFileDir }}/{{ $tokenFileName }}"
+              chgrp "$gid" "/host{{ $tokenFileDir }}/{{ $tokenFileName }}"
+              chmod 0640 "/host{{ $tokenFileDir }}/{{ $tokenFileName }}"
+          volumeMounts:
+            - name: token
+              mountPath: /token
+              readOnly: true
+            - name: host-token-dir
+              mountPath: /host{{ $tokenFileDir }}
+            - name: host-etc-group
+              mountPath: /host-etc-group
+              readOnly: true
+      volumes:
+        - name: token
+          secret:
+            secretName: {{ $runner.secretName }}
+        - name: host-token-dir
+          hostPath:
+            path: {{ $tokenFileDir }}
+            type: DirectoryOrCreate
+        - name: host-etc-group
+          hostPath:
+            path: /etc/group
+            type: File
+{{- end }}
