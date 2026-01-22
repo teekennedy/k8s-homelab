@@ -8,6 +8,8 @@
     disko.url = "github:nix-community/disko?ref=master";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence?ref=master";
+    lab.url = "./cmd/lab";
+    lab.inputs.nixpkgs.follows = "nixpkgs";
     lenovo_sa120_fanspeed.url = "./nix/modules/packages/lenovo_sa120_fanspeed";
     lenovo_sa120_fanspeed.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix?ref=master";

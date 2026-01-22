@@ -3,7 +3,10 @@
   config,
   inputs,
   ...
-}: {
+}: let
+  lab = inputs.lab.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  dagger = inputs.dagger.packages.${pkgs.stdenv.hostPlatform.system}.dagger;
+in {
   cachix.enable = true;
   cachix.pull = ["pre-commit-hooks"];
 
@@ -28,24 +31,29 @@
   env.KUBECONFIG = "${config.env.DEVENV_STATE}/kube/config";
 
   # https://devenv.sh/packages/
-  packages = with pkgs; [
-    age
-    argocd
-    cue
-    deploy-rs
-    go
-    helmfile-wrapped
-    k9s
-    kubecolor
-    kubectl
-    kubernetes-helm
-    kubetail
-    kustomize
-    nixos-anywhere
-    opentofu
-    sops
-    uv
-  ];
+  packages =
+    [
+      lab
+    ]
+    ++ (with pkgs; [
+      age
+      argocd
+      cue
+      dagger
+      deploy-rs
+      go
+      helmfile-wrapped
+      k9s
+      kubecolor
+      kubectl
+      kubernetes-helm
+      kubetail
+      kustomize
+      nixos-anywhere
+      opentofu
+      sops
+      uv
+    ]);
 
   # https://devenv.sh/languages/
   # languages.rust.enable = true;
@@ -60,6 +68,16 @@
   # scripts.hello.exec = ''
   #   echo hello from $GREET
   # '';
+
+  # Shell hook to set up lab CLI completions
+  enterShell = ''
+    # Detect shell and source appropriate completions
+    if [[ -n "$ZSH_VERSION" ]]; then
+      source <(lab completion zsh)
+    elif [[ -n "$BASH_VERSION" ]]; then
+      source <(lab completion bash)
+    fi
+  '';
 
   # https://devenv.sh/tasks/
   # tasks = {
