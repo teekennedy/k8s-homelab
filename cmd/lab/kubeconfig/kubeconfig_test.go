@@ -7,17 +7,31 @@ import (
 )
 
 func TestNewManager(t *testing.T) {
-	mgr := NewManager("/config", "/cache")
-	if mgr.configDir != "/config" {
-		t.Errorf("expected configDir to be /config, got %s", mgr.configDir)
+	// Test with default XDG paths
+	mgr := NewManager()
+	if mgr.configDir == "" {
+		t.Error("expected configDir to be set")
 	}
-	if mgr.cacheDir != "/cache" {
-		t.Errorf("expected cacheDir to be /cache, got %s", mgr.cacheDir)
+	if mgr.cacheDir == "" {
+		t.Error("expected cacheDir to be set")
+	}
+}
+
+func TestNewManagerWithOptions(t *testing.T) {
+	mgr := NewManager(
+		WithConfigDir("/custom/config"),
+		WithCacheDir("/custom/cache"),
+	)
+	if mgr.configDir != "/custom/config" {
+		t.Errorf("expected configDir to be /custom/config, got %s", mgr.configDir)
+	}
+	if mgr.cacheDir != "/custom/cache" {
+		t.Errorf("expected cacheDir to be /custom/cache, got %s", mgr.cacheDir)
 	}
 }
 
 func TestGetEncryptedPath(t *testing.T) {
-	mgr := NewManager("/config", "/cache")
+	mgr := NewManager(WithConfigDir("/config"), WithCacheDir("/cache"))
 	expected := "/config/kubeconfig/production.enc.yaml"
 	got := mgr.GetEncryptedPath("production")
 	if got != expected {
@@ -26,7 +40,7 @@ func TestGetEncryptedPath(t *testing.T) {
 }
 
 func TestGetDecryptedPath(t *testing.T) {
-	mgr := NewManager("/config", "/cache")
+	mgr := NewManager(WithConfigDir("/config"), WithCacheDir("/cache"))
 	expected := "/cache/kubeconfig/production.yaml"
 	got := mgr.GetDecryptedPath("production")
 	if got != expected {
@@ -57,7 +71,7 @@ func TestExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mgr := NewManager(configDir, cacheDir)
+	mgr := NewManager(WithConfigDir(configDir), WithCacheDir(cacheDir))
 
 	// Test existing environment
 	if !mgr.Exists("production") {
@@ -96,7 +110,7 @@ func TestListEnvironments(t *testing.T) {
 		}
 	}
 
-	mgr := NewManager(configDir, cacheDir)
+	mgr := NewManager(WithConfigDir(configDir), WithCacheDir(cacheDir))
 
 	envs, err := mgr.ListEnvironments()
 	if err != nil {
@@ -147,7 +161,7 @@ func TestCleanupAll(t *testing.T) {
 		}
 	}
 
-	mgr := NewManager(configDir, cacheDir)
+	mgr := NewManager(WithConfigDir(configDir), WithCacheDir(cacheDir))
 
 	// Verify files exist before cleanup
 	entries, _ := os.ReadDir(kubeconfigCacheDir)
@@ -168,7 +182,7 @@ func TestCleanupAll(t *testing.T) {
 }
 
 func TestActiveEnvironment(t *testing.T) {
-	mgr := NewManager("/config", "/cache")
+	mgr := NewManager(WithConfigDir("/config"), WithCacheDir("/cache"))
 
 	// Initially should be empty
 	if mgr.ActiveEnvironment() != "" {
@@ -187,7 +201,7 @@ func TestDecryptMissingFile(t *testing.T) {
 	configDir := filepath.Join(tmpDir, "config")
 	cacheDir := filepath.Join(tmpDir, "cache")
 
-	mgr := NewManager(configDir, cacheDir)
+	mgr := NewManager(WithConfigDir(configDir), WithCacheDir(cacheDir))
 
 	// Try to decrypt a non-existent environment
 	_, err = mgr.Decrypt("nonexistent")
@@ -219,7 +233,7 @@ func TestSetupPersistentCreatesDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mgr := NewManager(configDir, cacheDir)
+	mgr := NewManager(WithConfigDir(configDir), WithCacheDir(cacheDir))
 
 	// This will fail at sops decrypt, but that's ok - we're testing path logic
 	_ = mgr.SetupPersistent("test")
@@ -255,7 +269,7 @@ func TestCleanup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mgr := NewManager(configDir, cacheDir)
+	mgr := NewManager(WithConfigDir(configDir), WithCacheDir(cacheDir))
 	mgr.tempFile = testFile
 	mgr.activeEnv = "test"
 

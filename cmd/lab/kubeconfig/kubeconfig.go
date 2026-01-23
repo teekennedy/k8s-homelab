@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+
+	"github.com/teekennedy/homelab/cmd/lab/internal/paths"
 )
 
 // Manager handles kubeconfig files for different environments
@@ -19,12 +21,35 @@ type Manager struct {
 	originalEnv string
 }
 
-// NewManager creates a new kubeconfig manager
-func NewManager(configDir, cacheDir string) *Manager {
-	return &Manager{
-		configDir: configDir,
-		cacheDir:  cacheDir,
+// ManagerOption is a functional option for configuring Manager
+type ManagerOption func(*Manager)
+
+// WithConfigDir sets a custom config directory
+func WithConfigDir(dir string) ManagerOption {
+	return func(m *Manager) {
+		m.configDir = dir
 	}
+}
+
+// WithCacheDir sets a custom cache directory
+func WithCacheDir(dir string) ManagerOption {
+	return func(m *Manager) {
+		m.cacheDir = dir
+	}
+}
+
+// NewManager creates a new kubeconfig manager with XDG-compliant defaults
+func NewManager(opts ...ManagerOption) *Manager {
+	m := &Manager{
+		configDir: paths.ProjectConfigDir(), // Project config is in source control
+		cacheDir:  paths.CacheDir("k8s"),    // Decrypted files go in XDG cache
+	}
+
+	for _, opt := range opts {
+		opt(m)
+	}
+
+	return m
 }
 
 // GetEncryptedPath returns the path to the encrypted kubeconfig for an environment

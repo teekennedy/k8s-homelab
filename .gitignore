@@ -13,3 +13,8 @@ result
 
 # locally generated helm charts
 *.tgz
+
+# Dagger auto-generated SDK files
+.dagger/internal/
+.dagger/dagger.gen.go
+.dagger/querybuilder/

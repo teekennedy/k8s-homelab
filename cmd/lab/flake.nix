@@ -20,7 +20,7 @@
           pname = "lab";
           version = "0.1.0";
           src = ./.;
-          vendorHash = "sha256-SOFLqMLssNBx1jgoQ40U1uOthNLS+SSwCxRzqttTYkU=";
+          vendorHash = "sha256-VPOwDrkCApsd41sAY2a7uqSHb4dD1OpCf1QWxddx7UM=";
 
           meta = with pkgs.lib; {
             description = "Unified CLI for k8s-homelab management";

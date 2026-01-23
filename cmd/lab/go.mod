@@ -1,9 +1,10 @@
 module github.com/teekennedy/homelab/cmd/lab
 
-go 1.23.0
+go 1.25.4
 
 require (
 	cuelang.org/go v0.11.1
+	github.com/adrg/xdg v0.5.3
 	github.com/spf13/cobra v1.8.1
 )
 
@@ -23,6 +24,7 @@ require (
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

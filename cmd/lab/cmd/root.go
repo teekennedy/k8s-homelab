@@ -1,10 +1,14 @@
+// Package cmd provides the CLI interface for lab
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/teekennedy/homelab/cmd/lab/internal/paths"
 )
 
 var (
@@ -35,7 +39,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 }
 
-// getConfigDir returns the path to the CUE configuration directory
+// getConfigDir returns the path to the project CUE configuration directory
+// This is for reading CUE configuration files from the project (source-controlled)
 func getConfigDir() string {
 	if dir := os.Getenv("LAB_CONFIG_DIR"); dir != "" {
 		return dir
@@ -44,7 +49,14 @@ func getConfigDir() string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not get working directory: %v\n", err)
-		return "config"
+		return paths.ProjectConfigDir()
 	}
-	return cwd + "/config"
+	return filepath.Join(cwd, paths.ProjectConfigDir())
+}
+
+// printJSON prints data as JSON to stdout
+func printJSON(v any) error {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }

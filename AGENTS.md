@@ -2,8 +2,23 @@
 
 ## Project Structure & Module Organization
 - `cmd/lab/` contains the unified `lab` CLI (Go + cobra) for managing the homelab; built via its own `flake.nix` and available in devenv.
+  - `cmd/lab/cmd/` - cobra command definitions (root, env, host, k8s, tf, config)
+  - `cmd/lab/kubeconfig/` - environment-aware kubeconfig management with sops decryption
+  - `cmd/lab/env/` - Kind-based environment management (staging, ephemeral)
+  - `cmd/lab/internal/paths/` - XDG Base Directory Specification-compliant path helpers
 - `config/` holds CUE-based environment configuration (`schema.cue`, `base.cue`, `production.cue`, `staging.cue`); use `lab config` commands to validate and export.
+  - `config/kubeconfig/` - encrypted kubeconfig files per environment (e.g., `production.enc.yaml`)
 - `.dagger/` contains Dagger CI/CD pipeline code (Go SDK) for linting, validation, and builds.
+- **CI Architecture**: See `docs/ci-architecture.md` for details on how we avoid circular dependencies.
+  - Dev shell (`devenv shell`) includes lab pre-built for convenience
+  - CI container (`containers.ci` in devenv.nix) excludes lab, allowing CI to build it from scratch
+  - This ensures `dagger call build` works even when lab's build is broken
+- **XDG Directories** (local state, follows XDG Base Directory Specification):
+  - macOS: `~/Library/Application Support/lab/`, `~/Library/Caches/lab/`
+  - Linux: `~/.config/lab/`, `~/.cache/lab/`, `~/.local/state/lab/`
+  - Each subcommand uses its own subdirectory: `lab/env/`, `lab/k8s/`, etc.
+  - Decrypted kubeconfigs: `(XDG_CACHE)/lab/k8s/kubeconfig/`
+  - Environment state: `(XDG_STATE)/lab/env/`
 - `nix/hosts/<hostname>/` holds host-specific NixOS modules, `secrets.yaml`, and facter reports; keep new nodes under `nix/hosts/common` for shared bits.
 - `nix/modules/` provides reusable Nix modules (e.g. `nix/modules/k3s`, `nix/modules/users/defaultUser.nix`) that get imported by each host; extend here before duplicating config.
 - `k8s/foundation/`, `k8s/platform/`, and `k8s/apps/` hold Argo CD application definitions (tier app-of-apps live at `k8s/<tier>/application.yaml`).
@@ -13,8 +28,14 @@
 - `devenv shell` loads the pinned toolchain (Nix, OpenTofu, yamllint, lab CLI with completions); re-run after updating `devenv.nix`.
 - `lab config list` shows available environments; `lab config show <env>` displays resolved configuration.
 - `lab config validate` validates all CUE configurations; `lab config export <env> <format>` exports to json/yaml/nix/helm/terraform.
+- `lab env list` shows all environments (production + any Kind clusters); `lab env status <name>` shows detailed status.
+- `lab env create <name>` creates a Kind-based environment; `lab env start/stop <name>` manages lifecycle.
 - `lab host list` shows configured hosts; `lab host build/deploy/diff <host>` wraps NixOS and deploy-rs commands.
+- `lab k8s --env <env> <command>` manages Kubernetes with environment-specific kubeconfig.
+- `lab k8s kubeconfig decrypt <env>` decrypts kubeconfig; `lab k8s kubeconfig cleanup` removes decrypted files.
 - `lab k8s diff/sync <app>` manages Kubernetes applications; `lab tf plan/apply <module>` wraps OpenTofu.
+- `lab ci all` runs full CI pipeline (lint, validate, build, test); `lab ci build/lint/test/validate` runs individual stages.
+- `dagger call all --source=.` runs CI pipeline directly (works even if lab is broken).
 - `nix flake check` runs deploy-rs checks to validate host expressions.
 - `nix build .#nixosConfigurations.<host>.config.system.build.toplevel` ensures a host builds successfully; swap `<host>` for `borg-0`, etc.
 - `deploy -- .#<host>` applies a configuration via deploy-rs once builds pass.

@@ -7,39 +7,33 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/teekennedy/homelab/cmd/lab/config"
+	"github.com/teekennedy/homelab/cmd/lab/internal/paths"
 	"github.com/teekennedy/homelab/cmd/lab/kubeconfig"
 )
 
 var (
-	kubeconfigMgr *kubeconfig.Manager
+	kubeconfigMgr     *kubeconfig.Manager
+	kubeconfigMgrOnce sync.Once
 )
 
-// initKubeconfig initializes the kubeconfig manager
-func initKubeconfig() *kubeconfig.Manager {
-	if kubeconfigMgr == nil {
-		configDir := getConfigDir()
-		cacheDir := getCacheDir()
-		kubeconfigMgr = kubeconfig.NewManager(configDir, cacheDir)
-	}
+// getKubeconfigManager returns the singleton kubeconfig manager
+func getKubeconfigManager() *kubeconfig.Manager {
+	kubeconfigMgrOnce.Do(func() {
+		kubeconfigMgr = kubeconfig.NewManager(
+			kubeconfig.WithConfigDir(paths.ProjectConfigDir()),
+		)
+	})
 	return kubeconfigMgr
-}
-
-// getCacheDir returns the path to the cache directory (.lab)
-func getCacheDir() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ".lab"
-	}
-	return filepath.Join(cwd, ".lab")
 }
 
 // setupKubeconfig sets up the kubeconfig for the given environment
 // Returns a cleanup function that must be called when done
 func setupKubeconfig(envName string) (func(), error) {
-	mgr := initKubeconfig()
+	mgr := getKubeconfigManager()
 
 	// Check if kubeconfig exists for this environment
 	if !mgr.Exists(envName) {
@@ -300,7 +294,7 @@ Examples:
 		}
 
 		// Check if kubeconfig exists for environment
-		mgr := initKubeconfig()
+		mgr := getKubeconfigManager()
 		hasKubeconfig := mgr.Exists(envName)
 
 		if jsonOutput {
@@ -429,8 +423,8 @@ This exports the environment configuration to formats usable by Helm charts.`,
 		}
 
 		// Create output directory
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
-			return fmt.Errorf("create output directory: %w", err)
+		if outputDirErr := os.MkdirAll(outputDir, 0o755); outputDirErr != nil {
+			return fmt.Errorf("create output directory: %w", outputDirErr)
 		}
 
 		// Generate cluster-wide Helm values
@@ -440,8 +434,8 @@ This exports the environment configuration to formats usable by Helm charts.`,
 		}
 
 		helmPath := filepath.Join(outputDir, "cluster-values.yaml")
-		if err := os.WriteFile(helmPath, []byte(helmValues), 0644); err != nil {
-			return fmt.Errorf("write helm values: %w", err)
+		if clusterValuesErr := os.WriteFile(helmPath, []byte(helmValues), 0o644); clusterValuesErr != nil {
+			return fmt.Errorf("write helm values: %w", clusterValuesErr)
 		}
 
 		// Generate Terraform tfvars
@@ -451,7 +445,7 @@ This exports the environment configuration to formats usable by Helm charts.`,
 		}
 
 		tfPath := filepath.Join(outputDir, "cluster.tfvars")
-		if err := os.WriteFile(tfPath, []byte(tfValues), 0644); err != nil {
+		if err := os.WriteFile(tfPath, []byte(tfValues), 0o644); err != nil {
 			return fmt.Errorf("write terraform values: %w", err)
 		}
 
@@ -493,7 +487,7 @@ The decrypted kubeconfig is stored in .lab/kubeconfig/<env>.yaml`,
 			envName = args[0]
 		}
 
-		mgr := initKubeconfig()
+		mgr := getKubeconfigManager()
 
 		if err := mgr.SetupPersistent(envName); err != nil {
 			return err
@@ -523,7 +517,7 @@ var k8sKubeconfigCleanupCmd = &cobra.Command{
 	Short: "Remove decrypted kubeconfig files",
 	Long:  `Remove all decrypted kubeconfig files from the cache directory.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mgr := initKubeconfig()
+		mgr := getKubeconfigManager()
 
 		if err := mgr.CleanupAll(); err != nil {
 			return fmt.Errorf("cleanup: %w", err)
@@ -542,7 +536,7 @@ var k8sKubeconfigListCmd = &cobra.Command{
 	Short: "List available kubeconfig files",
 	Long:  `List all environments that have kubeconfig files available.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mgr := initKubeconfig()
+		mgr := getKubeconfigManager()
 
 		envs, err := mgr.ListEnvironments()
 		if err != nil {
