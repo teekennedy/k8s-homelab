@@ -71,6 +71,7 @@ resource "cloudflare_dns_record" "ses_dkim" {
   proxied = false
   ttl     = 1 # Auto
 }
+
 data "external" "smtp_secret_access_key" {
   query = {
     enc_secret = aws_iam_access_key.smtp.encrypted_ses_smtp_password_v4
@@ -88,14 +89,3 @@ data "external" "smtp_secret_access_key" {
     ),
   ]
 }
-
-output "smtp_access_key_id" {
-  value     = aws_iam_access_key.smtp.id
-  sensitive = false
-}
-
-output "smtp_secret_access_key" {
-  value     = data.external.smtp_secret_access_key.result.value
-  sensitive = true
-}
-
