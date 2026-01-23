@@ -193,7 +193,7 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     global CONFIG
     try:
-        CONFIG = load_config(os.environ.__dict__)
+        CONFIG = load_config(os.environ)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)
