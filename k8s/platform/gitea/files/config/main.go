@@ -139,12 +139,15 @@ func getRunnerRegistrationToken(ctx context.Context, giteaHost, giteaUser, gitea
 		return "", fmt.Errorf("request runner token: %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 
-	token := resp.Header.Get("Token")
-	if token == "" {
-		token = resp.Header.Get("token")
+	body, _ := io.ReadAll(resp.Body)
+	responseJSON := map[string]string{}
+	if err := json.Unmarshal(body, &responseJSON); err != nil {
+		return "", fmt.Errorf("parse runner token: %w", err)
 	}
-	if token == "" {
-		return "", fmt.Errorf("runner token missing from response headers")
+
+	token, ok := responseJSON["token"]
+	if !ok {
+		return "", fmt.Errorf("runner token missing from response json")
 	}
 	return token, nil
 }
