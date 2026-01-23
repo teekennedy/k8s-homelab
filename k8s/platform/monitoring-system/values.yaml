@@ -6,6 +6,10 @@ kube-prometheus-stack:
   ## Using default values from https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
   ##
   grafana:
+    admin:
+      existingSecret: monitoring-system-grafana
+      userKey: username
+      passwordKey: password
     enabled: true
     defaultDashboardsEnabled: false
     deploymentStrategy:
