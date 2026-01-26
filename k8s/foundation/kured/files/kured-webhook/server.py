@@ -1,11 +1,13 @@
 import json
 import os
 import re
+import ssl
 import sys
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
 
@@ -116,6 +118,88 @@ def set_reboot_alert(node: str, resolved: bool) -> None:
     post_json("/api/v1/alerts", build_reboot_alert_payload(node, resolved))
 
 
+def get_k8s_auth() -> Tuple[str, str, ssl.SSLContext]:
+    """Get Kubernetes API authentication from service account."""
+    token_path = Path("/var/run/secrets/kubernetes.io/serviceaccount/token")
+    ca_path = Path("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+
+    token = token_path.read_text().strip()
+
+    ssl_context = ssl.create_default_context(cafile=str(ca_path))
+
+    api_server = os.environ.get("KUBERNETES_SERVICE_HOST", "kubernetes.default.svc")
+    api_port = os.environ.get("KUBERNETES_SERVICE_PORT", "443")
+    api_url = f"https://{api_server}:{api_port}"
+
+    return token, api_url, ssl_context
+
+
+def k8s_request(method: str, path: str, body: Optional[dict] = None) -> dict:
+    """Make a request to the Kubernetes API."""
+    token, api_url, ssl_context = get_k8s_auth()
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    url = f"{api_url}{path}"
+    data = json.dumps(body).encode("utf-8") if body else None
+
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+
+    try:
+        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        raise RuntimeError(f"K8s API error: {e.code} {error_body}")
+
+
+def evict_longhorn_node(node: str) -> None:
+    """Enable eviction for Longhorn node and all its disks."""
+    print(f"Requesting Longhorn eviction for node {node}", file=sys.stderr)
+
+    # Get the current node resource
+    path = f"/apis/longhorn.io/v1beta2/namespaces/longhorn-system/nodes/{node}"
+    node_resource = k8s_request("GET", path)
+
+    # Update node spec
+    node_resource["spec"]["allowScheduling"] = False
+    node_resource["spec"]["evictionRequested"] = True
+
+    # Update all disks to enable eviction and disable scheduling
+    for disk_name, disk_spec in node_resource["spec"]["disks"].items():
+        disk_spec["evictionRequested"] = True
+        disk_spec["allowScheduling"] = False
+
+    # Apply the update
+    k8s_request("PUT", path, node_resource)
+    print(f"Longhorn eviction enabled for node {node}", file=sys.stderr)
+
+
+def restore_longhorn_node(node: str) -> None:
+    """Disable eviction and restore scheduling for Longhorn node."""
+    print(f"Restoring Longhorn scheduling for node {node}", file=sys.stderr)
+
+    # Get the current node resource
+    path = f"/apis/longhorn.io/v1beta2/namespaces/longhorn-system/nodes/{node}"
+    node_resource = k8s_request("GET", path)
+
+    # Update node spec
+    node_resource["spec"]["allowScheduling"] = True
+    node_resource["spec"]["evictionRequested"] = False
+
+    # Update all disks to disable eviction and enable scheduling
+    for disk_name, disk_spec in node_resource["spec"]["disks"].items():
+        disk_spec["evictionRequested"] = False
+        disk_spec["allowScheduling"] = True
+
+    # Apply the update
+    k8s_request("PUT", path, node_resource)
+    print(f"Longhorn scheduling restored for node {node}", file=sys.stderr)
+
+
 def config() -> Config:
     if CONFIG is None:
         raise RuntimeError("config not initialized")
@@ -142,12 +226,28 @@ def load_config(env: dict[str, str]) -> Config:
 
 def handle_event(event: str, node: str) -> bool:
     if event == "drain":
+        # Trigger Longhorn eviction first
+        try:
+            evict_longhorn_node(node)
+        except Exception as exc:
+            print(f"Failed to evict Longhorn node {node}: {exc}", file=sys.stderr)
+            # Continue with other actions even if Longhorn eviction fails
+
+        # Silence alerts
         duration = parse_duration(config().drain_silence_duration)
         for alertname in config().drain_silence_alerts:
             create_silence(alertname, duration, node, "kured drain")
         set_reboot_alert(node, resolved=False)
         return True
     if event == "uncordon":
+        # Restore Longhorn scheduling
+        try:
+            restore_longhorn_node(node)
+        except Exception as exc:
+            print(f"Failed to restore Longhorn node {node}: {exc}", file=sys.stderr)
+            # Continue with other actions even if Longhorn restore fails
+
+        # Silence alerts
         duration = parse_duration(config().post_reboot_silence_duration)
         for alertname in config().post_reboot_silence_alerts:
             create_silence(alertname, duration, node, "kured uncordon")
@@ -166,6 +266,26 @@ def format_alert_list(items: Iterable[str]) -> str:
 
 
 class Handler(BaseHTTPRequestHandler):
+    def log_message(self, format: str, *args) -> None:
+        """Override to suppress access logs for TLS handshake errors."""
+        # Detect TLS/SSL handshake attempts (starts with \x16\x03)
+        if args and isinstance(args[0], str) and args[0].startswith("\\x16\\x03"):
+            # Silently ignore TLS handshake attempts
+            return
+        # For other errors, log to stderr
+        sys.stderr.write(f"{self.address_string()} - {format % args}\n")
+
+    def do_GET(self) -> None:
+        """Handle GET requests for health checks."""
+        if self.path in ("/health", "/healthz", "/"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"ok")
+        else:
+            self.send_response(404)
+            self.end_headers()
+
     def do_POST(self) -> None:
         body = read_body(self)
         event, node, raw = parse_message(body)
