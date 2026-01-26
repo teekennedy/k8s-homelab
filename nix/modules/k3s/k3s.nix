@@ -28,6 +28,8 @@
         2381
         # prometheus node exporter
         9100
+        # traefik metrics
+        9101
         # MetalLB speaker memberlist gossip
         7946
         # Kube proxy metrics
@@ -132,10 +134,10 @@
                 tls:
                   enabled: true
               metrics:
-                port: 9100
+                port: 9101
                 expose:
                   default: true
-                exposedPort: 9100
+                exposedPort: 9101
                 protocol: TCP
         EOF
       '';
