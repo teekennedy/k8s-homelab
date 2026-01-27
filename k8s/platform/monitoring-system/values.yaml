@@ -219,6 +219,14 @@ kube-prometheus-stack:
     prometheusSpec:
       externalUrl: https://prometheus.msng.to
 
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
       # By default, if you don't specify a selector for prometheus CRDs, it will write a selector that matches only the CRDs that are defined in this helm release
       # Disabling this to pick up all relevant CRDs
       # https://stackoverflow.com/q/68085831
