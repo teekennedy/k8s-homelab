@@ -286,7 +286,7 @@ promtail:
       extraScrapeConfigs: |
         - job_name: systemd-journal
           journal:
-            path: /var/log/journal
+            path: /run/log/journal
             max_age: 24h
             labels:
               job: systemd-journal
@@ -297,7 +297,7 @@ promtail:
               target_label: 'host'
         - job_name: dmesg
           journal:
-            path: /var/log/journal
+            path: /run/log/journal
             max_age: 24h
             matches: _TRANSPORT=kernel
             labels:
@@ -308,7 +308,7 @@ promtail:
   extraVolumes:
     - name: journal
       hostPath:
-        path: /var/log/journal
+        path: /run/log/journal
         type: DirectoryOrCreate
     - name: machine-id
       hostPath:
@@ -316,7 +316,7 @@ promtail:
         type: File
   extraVolumeMounts:
     - name: journal
-      mountPath: /var/log/journal
+      mountPath: /run/log/journal
       readOnly: true
     - name: machine-id
       mountPath: /etc/machine-id
