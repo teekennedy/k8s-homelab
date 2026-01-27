@@ -3,8 +3,8 @@ name: victoria-metrics
 description: VictoriaMetrics long-term storage for Prometheus metrics
 type: application
 version: 0.0.1
-appVersion: 1.106.1
+appVersion: 1.116.0
 dependencies:
   - name: victoria-metrics-single
-    version: 0.15.9
+    version: 0.18.0
     repository: https://victoriametrics.github.io/helm-charts/
