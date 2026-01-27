@@ -140,7 +140,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: generator
-              image: bitnami/kubectl:1.31
+              image: bitnami/kubectl:latest
               command: ["/bin/sh", "/scripts/generate-rules.sh"]
               volumeMounts:
                 - name: scripts
