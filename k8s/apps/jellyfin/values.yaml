@@ -592,10 +592,24 @@ app-template:
             TZ: America/Denver
             PUID: "1200"
             PGID: "1200"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 4Gi
         gluetun:
           image:
             repository: docker.io/qmcgaw/gluetun
             tag: v3.41.0
+          resources:
+            requests:
+              cpu: 250m
+              memory: 128Mi
+            limits:
+              cpu: 750m
+              memory: 384Mi
           env:
             TZ: America/Denver
             # Don't check for new versions
