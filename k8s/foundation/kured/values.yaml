@@ -4,7 +4,7 @@ kured:
   configuration:
     timeZone: America/Denver
     prometheusUrl: http://monitoring-system-kube-pro-prometheus.monitoring-system.svc.cluster.local:9090
-    notifyUrl: http://kured-webhook.kured.svc.cluster.local:8080
+    notifyUrl: generic+http://kured-webhook.kured.svc.cluster.local:8080
     messageTemplateDrain: "event=drain node=%s"
     messageTemplateReboot: "event=reboot node=%s"
     messageTemplateUncordon: "event=uncordon node=%s"
