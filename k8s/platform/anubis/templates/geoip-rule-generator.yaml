@@ -56,14 +56,13 @@ data:
     # Fetch GeoIP data and build rules
     GEOIP_RULES=$(cat <<EOF
     # GeoIP rules generated at $(date -u +%Y-%m-%dT%H:%M:%SZ)
-    bots:
     EOF
     )
 
     for country in $COUNTRIES; do
       echo "Fetching IPv4 ranges for $country..."
 
-      IPV4_URL="https://raw.githubusercontent.com/ipverse/geo-ip-blocks/master/country/${country}/${country}-ipv4.txt"
+      IPV4_URL="https://raw.githubusercontent.com/ipverse/country-ip-blocks/master/country/${country}/ipv4-aggregated.txt"
 
       if ! wget -q -O "/tmp/${country}-ipv4.txt" "$IPV4_URL"; then
         echo "  Warning: Failed to fetch $country IPv4 ranges, skipping..."
@@ -81,11 +80,11 @@ data:
 
       # Build the rule
       GEOIP_RULES="${GEOIP_RULES}
-      - name: geoip-${country}
-        action: WEIGH
-        weight:
-          adjust: ${WEIGHT}
-        remote_addresses:"
+    - name: geoip-${country}
+      action: WEIGH
+      weight:
+        adjust: ${WEIGHT}
+      remote_addresses:"
 
       # Add IP ranges (skip comment lines and empty lines)
       while IFS= read -r line; do
@@ -94,7 +93,7 @@ data:
           '#'*|'') continue ;;
         esac
         GEOIP_RULES="${GEOIP_RULES}
-      - ${line}"
+        - ${line}"
       done < "/tmp/${country}-ipv4.txt"
 
       rm -f "/tmp/${country}-ipv4.txt"
@@ -120,8 +119,9 @@ data:
     $(echo "$GEOIP_RULES" | sed 's/^/    /')
     EOF
 
-    # Apply the ConfigMap
-    kubectl apply -f /tmp/geoip-configmap.yaml
+    # Apply the ConfigMap using server-side apply to avoid annotation size limits
+    # Use --force-conflicts to take over management from ArgoCD
+    kubectl apply --server-side --force-conflicts -f /tmp/geoip-configmap.yaml
     rm -f /tmp/geoip-configmap.yaml
 
     echo ""
