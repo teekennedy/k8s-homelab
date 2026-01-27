@@ -1,0 +1,154 @@
+{{- if .Values.geoipRuleGenerator.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: anubis-geoip-generator
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: anubis-geoip-generator
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["anubis-geoip-policy"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: anubis-geoip-generator
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: anubis-geoip-generator
+subjects:
+  - kind: ServiceAccount
+    name: anubis-geoip-generator
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anubis-geoip-generator-script
+  namespace: {{ .Release.Namespace }}
+data:
+  generate-rules.sh: |
+    #!/bin/sh
+    set -e
+
+    COUNTRIES="{{ join " " .Values.geoipRuleGenerator.countries }}"
+    WEIGHT="{{ .Values.geoipRuleGenerator.weight }}"
+    NAMESPACE="{{ .Release.Namespace }}"
+
+    echo "=== Anubis GeoIP Rule Generator ==="
+    echo "Countries: $COUNTRIES"
+    echo "Weight adjustment: +$WEIGHT"
+    echo ""
+
+    # Fetch GeoIP data and build rules
+    GEOIP_RULES=$(cat <<EOF
+    # GeoIP rules generated at $(date -u +%Y-%m-%dT%H:%M:%SZ)
+    bots:
+    EOF
+    )
+
+    for country in $COUNTRIES; do
+      echo "Fetching IPv4 ranges for $country..."
+
+      IPV4_URL="https://raw.githubusercontent.com/ipverse/geo-ip-blocks/master/country/${country}/${country}-ipv4.txt"
+
+      if ! wget -q -O "/tmp/${country}-ipv4.txt" "$IPV4_URL"; then
+        echo "  Warning: Failed to fetch $country IPv4 ranges, skipping..."
+        continue
+      fi
+
+      # Count lines (excluding comments and empty lines)
+      COUNT=$(grep -v '^#' "/tmp/${country}-ipv4.txt" 2>/dev/null | grep -c . || echo "0")
+      echo "  Found $COUNT IPv4 ranges for $country"
+
+      if [ "$COUNT" -eq "0" ]; then
+        rm -f "/tmp/${country}-ipv4.txt"
+        continue
+      fi
+
+      # Build the rule
+      GEOIP_RULES="${GEOIP_RULES}
+      - name: geoip-${country}
+        action: WEIGH
+        weight:
+          adjust: ${WEIGHT}
+        remote_addresses:"
+
+      # Add IP ranges (skip comment lines and empty lines)
+      while IFS= read -r line; do
+        # Skip comments and empty lines
+        case "$line" in
+          '#'*|'') continue ;;
+        esac
+        GEOIP_RULES="${GEOIP_RULES}
+      - ${line}"
+      done < "/tmp/${country}-ipv4.txt"
+
+      rm -f "/tmp/${country}-ipv4.txt"
+    done
+
+    echo ""
+    echo "Updating anubis-geoip-policy ConfigMap..."
+
+    # Update the ConfigMap using kubectl patch
+    # We need to escape the policy for JSON
+    ESCAPED_POLICY=$(printf '%s' "$GEOIP_RULES" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+
+    kubectl -n "$NAMESPACE" patch configmap anubis-geoip-policy --type merge -p "{\"data\":{\"geoip-rules.yaml\":${ESCAPED_POLICY}}}"
+
+    echo ""
+    echo "Restarting anubis pods to pick up new configuration..."
+
+    # Find and restart all ia-* deployments (ingress-anubis creates these)
+    for deploy in $(kubectl -n "$NAMESPACE" get deployments -o name | grep -E "^deployment.apps/ia-"); do
+      echo "  Restarting $deploy..."
+      kubectl -n "$NAMESPACE" rollout restart "$deploy" || true
+    done
+
+    echo ""
+    echo "=== GeoIP rules updated successfully ==="
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: anubis-geoip-generator
+  namespace: {{ .Release.Namespace }}
+spec:
+  schedule: {{ .Values.geoipRuleGenerator.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        spec:
+          serviceAccountName: anubis-geoip-generator
+          restartPolicy: OnFailure
+          containers:
+            - name: generator
+              image: bitnami/kubectl:1.31
+              command: ["/bin/sh", "/scripts/generate-rules.sh"]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: scripts
+              configMap:
+                name: anubis-geoip-generator-script
+                defaultMode: 0755
+{{- end }}

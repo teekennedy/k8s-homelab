@@ -12,12 +12,32 @@ ingress-anubis:
     INGRESS_CLASS_NAME: anubis
     WRAPPED_INGRESS_CLASS_NAME: traefik
     ENV_FROM_SEC: anubis-signing-key
-    ENVIRONMENT_VARIABLES: "COOKIE_DOMAIN:msng.to,POLICY_FNAME:/etc/anubis/policies.yaml"
+    ENVIRONMENT_VARIABLES: "COOKIE_DOMAIN:msng.to,POLICY_FNAME:/etc/anubis/policies.yaml,SLOG_LEVEL:DEBUG"
   anubisVolumes:
     - name: anubis-policy
       configMap:
         name: anubis-policy
+    - name: anubis-geoip-policy
+      configMap:
+        name: anubis-geoip-policy
   anubisVolumeMounts:
     - name: anubis-policy
       mountPath: /etc/anubis
       readOnly: true
+    - name: anubis-geoip-policy
+      mountPath: /etc/anubis/geoip
+      readOnly: true
+
+# GeoIP rule generation CronJob
+geoipRuleGenerator:
+  enabled: true
+  schedule: "0 4 * * *" # Daily at 4 AM
+  # Countries known for aggressive bot traffic
+  countries:
+    - br # Brazil
+    - cn # China
+    - ru # Russia
+    - in # India
+    - id # Indonesia
+    - vn # Vietnam
+  weight: 10
