@@ -1,0 +1,14 @@
+victoria-metrics-single:
+  server:
+    retentionPeriod: "12"  # 12 months
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    persistentVolume:
+      enabled: true
+      storageClass: longhorn
+      size: 150Gi

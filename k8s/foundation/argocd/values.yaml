@@ -70,7 +70,8 @@ argo-cd:
   repoServer:
     metrics: *metrics
   redis:
-    metrics: *metrics
+    metrics:
+      enabled: false
 # https://github.com/argoproj/argo-helm/blob/main/charts/argocd-apps/values.yaml
 argocd-apps:
   applications:

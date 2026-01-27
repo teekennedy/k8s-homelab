@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: victoria-metrics-alerts
+  namespace: victoria-metrics
+spec:
+  groups:
+    - name: victoriametrics
+      interval: 30s
+      rules:
+        - alert: VictoriaMetricsHighDiskUsage
+          expr: |
+            (vm_data_size_bytes{job="victoria-metrics-single-server"} /
+             vm_available_disk_space_bytes{job="victoria-metrics-single-server"}) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "VictoriaMetrics disk usage is high"
+            description: "VictoriaMetrics is using {{ $value | humanizePercentage }} of available disk space. Consider reducing retentionPeriod."

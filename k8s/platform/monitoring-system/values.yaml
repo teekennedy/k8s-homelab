@@ -57,6 +57,13 @@ kube-prometheus-stack:
         isDefault: false
         jsonData:
           timeInterval: 30s
+      - name: VictoriaMetrics
+        type: prometheus
+        access: proxy
+        url: http://victoria-metrics-single-server.victoria-metrics.svc:8428
+        isDefault: false
+        jsonData:
+          timeInterval: 30s
     # This used to contain Dex client secret, but currently doesn't exist.
     # Can be recreated if needed with GRAFANA_SSO_CLIENT_SECRET: (dex.grafana -> client_secret in global-secrets namespace)
     # envFromSecret: grafana-secrets
@@ -149,10 +156,14 @@ kube-prometheus-stack:
   kubelet:
     enabled: true
   kubeApiServer: {}
-  kubeControllerManager: {}
-  kubeEtcd: {}
-  kubeScheduler: {}
-  kubeProxy: {}
+  kubeControllerManager:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeProxy:
+    enabled: false
 
   ## Manages Prometheus and Alertmanager components
   ##
@@ -236,8 +247,13 @@ kube-prometheus-stack:
       serviceMonitorSelectorNilUsesHelmValues: false
       scrapeConfigSelectorNilUsesHelmValues: false
 
+      # Remote write to VictoriaMetrics for long-term storage
+      remoteWrite:
+        - url: "http://victoria-metrics-single-server.victoria-metrics.svc:8428/api/v1/write"
+
       # Prometheus docs say to set this to maximum 80-85% of the volume size
       # https://prometheus.io/docs/prometheus/latest/storage/#operational-aspects
+      retention: "14d"
       retentionSize: "160GiB"
       # Set retentionTime to empty value so prometheus relies solely on retentionSize
       retrentionTime: ""
