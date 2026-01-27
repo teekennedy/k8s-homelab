@@ -25,7 +25,7 @@ type Homelab struct{}
 // Returns the linted/fixed source directory
 func (m *Homelab) All(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", ".devenv*"]
+	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", ".devenv*", "devenv.local.*"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -66,7 +66,7 @@ func (m *Homelab) All(ctx context.Context,
 // +check
 func (m *Homelab) Lint(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", ".devenv*"]
+	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", ".devenv*", "devenv.local.*"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -107,7 +107,7 @@ func (m *Homelab) Lint(ctx context.Context,
 func (m *Homelab) LintNix(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", ".devenv*"]
+	// +ignore=["*", "!**/*.nix", ".devenv*", "devenv.local.*"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -441,7 +441,7 @@ func (m *Homelab) TestGo(ctx context.Context,
 	source *dagger.Directory,
 ) (string, error) {
 	_, err := dag.Container().
-		From("golang:1.23-alpine").
+		From("golang:1.25-alpine").
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/cmd/lab").
 		WithExec([]string{"go", "test", "./...", "-v"}).
