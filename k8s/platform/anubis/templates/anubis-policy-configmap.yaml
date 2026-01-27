@@ -21,15 +21,15 @@ data:
 
     thresholds:
       # Requests with no suspicion - allow through
-      - name: no-suspicion
-        expression: weight <= 0
-        action: ALLOW
+      # - name: no-suspicion
+      #   expression: weight <= 0
+      #   action: ALLOW
 
       # Low suspicion - lightweight meta refresh challenge
       - name: low-suspicion
         expression:
           all:
-            - weight > 0
+            # - weight > 0
             - weight < 10
         action: CHALLENGE
         challenge:
