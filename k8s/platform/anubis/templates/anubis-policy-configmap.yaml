@@ -79,12 +79,4 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: Prune=false
 data:
-  geoip-rules.yaml: |-
-    # Valid anubis configuration that acts as a placeholder until this configmap is replaced by geoip-rule-generator.
-    # This rule adjusts weight by 0, effectively doing nothing
-    - name: placeholder
-      action: WEIGH
-      remote_addresses:
-        # Subnet reserved for documentation.
-        # RFC 5737 https://www.rfc-editor.org/rfc/rfc5737
-        - 192.0.2.0/24
+  geoip-rules.yaml: "[]"
