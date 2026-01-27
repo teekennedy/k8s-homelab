@@ -53,6 +53,8 @@ data:
     echo "Weight adjustment: +$WEIGHT"
     echo ""
 
+    apk add --no-cache jq
+
     # Fetch GeoIP data and build rules
     GEOIP_RULES=$(cat <<EOF
     # GeoIP rules generated at $(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -105,7 +107,7 @@ data:
 
     # Update the ConfigMap using kubectl patch
     # We need to escape the policy for JSON
-    ESCAPED_POLICY=$(printf '%s' "$GEOIP_RULES" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+    ESCAPED_POLICY=$(printf '%s' "$GEOIP_RULES" | jq -R -s .)
 
     kubectl -n "$NAMESPACE" patch configmap anubis-geoip-policy --type merge -p "{\"data\":{\"geoip-rules.yaml\":${ESCAPED_POLICY}}}"
 

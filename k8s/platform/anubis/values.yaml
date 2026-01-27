@@ -32,7 +32,7 @@ ingress-anubis:
 geoipRuleGenerator:
   enabled: true
   schedule: "0 4 * * *" # Daily at 4 AM
-  # Countries known for aggressive bot traffic
+  # Countries known for aggressive bot traffic (according to Claude)
   countries:
     - br # Brazil
     - cn # China
@@ -40,4 +40,4 @@ geoipRuleGenerator:
     - in # India
     - id # Indonesia
     - vn # Vietnam
-  weight: 10
+  weight: 20
