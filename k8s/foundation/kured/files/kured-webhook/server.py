@@ -110,11 +110,18 @@ def post_json(path: str, payload: dict | list) -> None:
 
 
 def create_silence(alertname: str, duration: timedelta, node: str, reason: str) -> None:
+    print(
+        f"Silencing {alertname} for {duration} with reason: {reason}", file=sys.stderr
+    )
     payload = build_silence_payload(alertname, duration, node, reason)
     post_json("/api/v2/silences", payload)
 
 
 def set_reboot_alert(node: str, resolved: bool) -> None:
+    print(
+        f"{"Resolving" if resolved else "Creating"} reboot alert for {node}",
+        file=sys.stderr,
+    )
     post_json("/api/v1/alerts", build_reboot_alert_payload(node, resolved))
 
 
@@ -289,6 +296,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         body = read_body(self)
         event, node, raw = parse_message(body)
+        print(f"POST request body: {raw}", file=sys.stderr)
 
         if not event or not node:
             self.send_response(400)
