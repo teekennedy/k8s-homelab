@@ -1,0 +1,151 @@
+{{- if .Values.webhook.enabled }}
+{{- $events := index .Values.webhook "events" | default dict -}}
+{{- $eventsEnabled := index $events "enabled" | default true -}}
+{{- if $eventsEnabled -}}
+{{- $eventBusName := default "kured-webhook" (index $events "eventBusName") -}}
+{{- $eventSourceName := default "kured-webhook-configmap" (index $events "eventSourceName") -}}
+{{- $sensorName := default "kured-webhook-restart" (index $events "sensorName") -}}
+{{- $eventSourceServiceAccount := default "kured-webhook-eventsource" (index $events "eventSourceServiceAccount") -}}
+{{- $sensorServiceAccount := default "kured-webhook-sensor" (index $events "sensorServiceAccount") -}}
+{{- $configMapName := default "kured-webhook" (index $events "configMapName") -}}
+{{- $deploymentName := default "kured-webhook" (index $events "deploymentName") -}}
+{{- $annotationKey := default "kured-webhook-restarted-at" (index $events "annotationKey") -}}
+{{- $eventName := default "configmap-update" (index $events "eventName") -}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $eventSourceServiceAccount }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $sensorServiceAccount }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kured-webhook-eventsource-reader
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kured-webhook-eventsource-reader
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kured-webhook-eventsource-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ $eventSourceServiceAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kured-webhook-sensor
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+    resourceNames:
+      - {{ $deploymentName }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kured-webhook-sensor
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kured-webhook-sensor
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sensorServiceAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: {{ $eventBusName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  nats:
+    native:
+      replicas: 1
+      auth: token
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: {{ $eventSourceName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  eventBusName: {{ $eventBusName }}
+  template:
+    serviceAccountName: {{ $eventSourceServiceAccount }}
+  resource:
+    {{ $eventName }}:
+      namespace: {{ .Release.Namespace }}
+      group: ""
+      version: v1
+      resource: configmaps
+      eventTypes:
+        - ADD
+        - UPDATE
+      filter:
+        fields:
+          - key: metadata.name
+            operation: "=="
+            value: {{ $configMapName }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: {{ $sensorName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  eventBusName: {{ $eventBusName }}
+  template:
+    serviceAccountName: {{ $sensorServiceAccount }}
+  dependencies:
+    - name: {{ $eventName }}
+      eventSourceName: {{ $eventSourceName }}
+      eventName: {{ $eventName }}
+  triggers:
+    - template:
+        name: kured-webhook-rollout
+        k8s:
+          group: apps
+          version: v1
+          resource: deployments
+          operation: patch
+          source:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: {{ $deploymentName }}
+                namespace: {{ .Release.Namespace }}
+              spec:
+                template:
+                  metadata:
+                    annotations:
+                      {{ $annotationKey }}: ""
+          parameters:
+            - src:
+                dependencyName: {{ $eventName }}
+                dataKey: body.metadata.resourceVersion
+              dest: spec.template.metadata.annotations.{{ $annotationKey }}
+{{- end }}
+{{- end }}
