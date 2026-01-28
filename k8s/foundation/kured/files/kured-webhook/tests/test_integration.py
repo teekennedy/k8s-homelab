@@ -6,9 +6,9 @@ import threading
 import time
 import urllib.request
 from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import patch
 
 import pytest
@@ -127,7 +127,7 @@ def test_webhook_drain_sends_silences_and_alert(alertmanager_server: tuple) -> N
     alert_requests = [
         json.loads(item["body"].decode("utf-8"))
         for item in requests
-        if item["path"] == "/api/v1/alerts"
+        if item["path"] == "/api/v2/alerts"
     ]
 
     assert len(silence_requests) == 2
@@ -174,7 +174,7 @@ def test_webhook_uncordon_sends_silences_and_resolves_alert(
     alert_requests = [
         json.loads(item["body"].decode("utf-8"))
         for item in requests
-        if item["path"] == "/api/v1/alerts"
+        if item["path"] == "/api/v2/alerts"
     ]
 
     assert len(silence_requests) == 1
@@ -257,7 +257,7 @@ def test_webhook_drain_continues_on_longhorn_failure(
         requests = list(recorder.requests)
 
     silence_requests = [item for item in requests if item["path"] == "/api/v2/silences"]
-    alert_requests = [item for item in requests if item["path"] == "/api/v1/alerts"]
+    alert_requests = [item for item in requests if item["path"] == "/api/v2/alerts"]
 
     assert len(silence_requests) == 2
     assert len(alert_requests) == 1

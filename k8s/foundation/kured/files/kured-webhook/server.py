@@ -124,7 +124,7 @@ def set_reboot_alert(node: str, resolved: bool) -> None:
         f"{"Resolving" if resolved else "Creating"} reboot alert for {node}",
         file=sys.stderr,
     )
-    post_json("/api/v1/alerts", build_reboot_alert_payload(node, resolved))
+    post_json("/api/v2/alerts", build_reboot_alert_payload(node, resolved))
 
 
 def get_k8s_auth() -> Tuple[str, str, ssl.SSLContext]:
