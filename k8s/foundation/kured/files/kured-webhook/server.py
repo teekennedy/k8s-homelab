@@ -3,7 +3,9 @@ import os
 import re
 import ssl
 import sys
+import urllib.error
 import urllib.request
+from collections import abc
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -213,7 +215,7 @@ def config() -> Config:
     return CONFIG
 
 
-def load_config(env: dict[str, str]) -> Config:
+def load_config(env: abc.Mapping) -> Config:
     alertmanager_url = env.get("ALERTMANAGER_URL", "").rstrip("/")
     if not alertmanager_url:
         raise ValueError("ALERTMANAGER_URL is required")
