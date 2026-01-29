@@ -36,12 +36,13 @@ webhook:
     deploymentName: kured-webhook
     annotationKey: kured-webhook-restarted-at
   alertmanagerUrl: http://monitoring-system-kube-pro-alertmanager.monitoring-system.svc.cluster.local:9093
-  drainSilenceDuration: 3h
+  drainSilenceDuration: 1h
   drainSilenceAlerts:
     - LonghornVolumeStatusWarning
     - LonghornVolumeActualSpaceUsedWarning
     - NodeSystemSaturation
     - NodeCPUHighUsage
+    - LonghornInstanceManagerCPUUsageWarning
   postRebootSilenceDuration: 15m
   rebootAlertTtl: 6h
   postRebootSilenceAlerts:
