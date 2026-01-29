@@ -106,10 +106,38 @@ authelia:
           # value, '{secret_name}' is the secret_name above, and '{path}' is this value.
           path: 'notifier.smtp.password.txt'
     session:
+      # session encryption secret is auto-generated in authelia-secret
+
+      # Allow sending cookie when following a cross-site link to this domain
+      # ("lax" is the default)
+      same_site: lax
+      # How long before session needs to be refreshed
+      inactivity: 12h
+      # How long before user needs to re-authenticate
+      expiration: 24h
+      # How long before user needs to re-authenticate when _Remember me_ is checked
+      remember_me: 1y
       cookies:
         - domain: 'msng.to'
           subdomain: authelia
           default_redirection_url: 'https://msng.to'
+
+      # Redis Sentinel for session storage
+      redis:
+        enabled: true
+        host: redis-sentinel.auth-system.svc.cluster.local
+        port: &sentinelPort 26379
+        database_index: 0
+        high_availability:
+          enabled: true
+          sentinel_name: mymaster
+          nodes:
+            - host: redis-0.redis-sentinel-headless.auth-system.svc.cluster.local
+              port: *sentinelPort
+            - host: redis-1.redis-sentinel-headless.auth-system.svc.cluster.local
+              port: *sentinelPort
+            - host: redis-2.redis-sentinel-headless.auth-system.svc.cluster.local
+              port: *sentinelPort
     # TODO setup metrics
     telemetry:
       metrics:
