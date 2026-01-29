@@ -25,7 +25,7 @@ type Homelab struct{}
 // Returns the linted/fixed source directory
 func (m *Homelab) All(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", ".devenv*", "devenv.local.*"]
+	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", ".devenv*", "devenv.local.*"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -66,7 +66,7 @@ func (m *Homelab) All(ctx context.Context,
 // +check
 func (m *Homelab) Lint(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", ".devenv*", "devenv.local.*"]
+	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!k8s/platform/crowdsec/files/bootstrap-middleware/**/*.py", "!k8s/platform/crowdsec/files/bootstrap-middleware/pyproject.toml", ".devenv*", "devenv.local.*"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -90,6 +90,12 @@ func (m *Homelab) Lint(ctx context.Context,
 	source, err = m.LintGo(ctx, source, fix)
 	if err != nil {
 		return nil, fmt.Errorf("go lint failed: %w", err)
+	}
+
+	// Run Python linting - supports formatting
+	source, err = m.LintPython(ctx, source, fix)
+	if err != nil {
+		return nil, fmt.Errorf("python lint failed: %w", err)
 	}
 
 	// Run YAML linting - no auto-fix support
@@ -199,6 +205,41 @@ func (m *Homelab) LintGo(ctx context.Context,
 		Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("go vet failed: %w", err)
+	}
+
+	return source, nil
+}
+
+// LintPython runs Python linting and optionally formats code with black
+// When fix=true, automatically formats with black
+// +check
+func (m *Homelab) LintPython(ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!k8s/platform/crowdsec/files/bootstrap-middleware/**/*.py", "!k8s/platform/crowdsec/files/bootstrap-middleware/pyproject.toml"]
+	source *dagger.Directory,
+	// +optional
+	// +default=false
+	fix bool,
+) (*dagger.Directory, error) {
+	container := dag.Container().
+		From("ghcr.io/astral-sh/uv:alpine").
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src/k8s/platform/crowdsec/files/bootstrap-middleware")
+
+	if fix {
+		// Auto-format with black
+		container = container.WithExec([]string{"uv", "run", "black", "."})
+
+		// Return the modified directory
+		return container.Directory("/src"), nil
+	}
+
+	// Check formatting with black
+	_, err := container.
+		WithExec([]string{"uv", "run", "black", "--check", "."}).
+		Sync(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("black format check failed: %w", err)
 	}
 
 	return source, nil
@@ -418,7 +459,7 @@ func (m *Homelab) CliNix(ctx context.Context,
 // +check
 func (m *Homelab) Test(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum"]
+	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!k8s/platform/crowdsec/files/bootstrap-middleware/**/*.py", "!k8s/platform/crowdsec/files/bootstrap-middleware/pyproject.toml"]
 	source *dagger.Directory,
 ) (string, error) {
 	results := []string{}
@@ -429,6 +470,13 @@ func (m *Homelab) Test(ctx context.Context,
 		return "", fmt.Errorf("go tests failed: %w", err)
 	}
 	results = append(results, goTestResult)
+
+	// Run Python tests
+	pythonTestResult, err := m.TestPython(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("python tests failed: %w", err)
+	}
+	results = append(results, pythonTestResult)
 
 	return joinResults(results), nil
 }
@@ -451,6 +499,26 @@ func (m *Homelab) TestGo(ctx context.Context,
 	}
 
 	return "Go tests passed", nil
+}
+
+// TestPython runs pytest for the CrowdSec bootstrap script
+// +check
+func (m *Homelab) TestPython(ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!k8s/platform/crowdsec/files/bootstrap-middleware/**/*.py", "!k8s/platform/crowdsec/files/bootstrap-middleware/pyproject.toml"]
+	source *dagger.Directory,
+) (string, error) {
+	_, err := dag.Container().
+		From("ghcr.io/astral-sh/uv:alpine").
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src/k8s/platform/crowdsec/files/bootstrap-middleware").
+		WithExec([]string{"uv", "run", "pytest", "-v"}).
+		Sync(ctx)
+	if err != nil {
+		return "", fmt.Errorf("pytest failed: %w", err)
+	}
+
+	return "Python tests passed", nil
 }
 
 // DebugDir returns the given dir. Useful for inspecting directory contents for debugging.

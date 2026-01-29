@@ -1,0 +1,112 @@
+{{- if .Values.bootstrapMiddleware.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "crowdsec.fullname" . }}-bootstrap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "crowdsec.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/sync-wave: "1"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "crowdsec.fullname" . }}-bootstrap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "crowdsec.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/sync-wave: "1"
+rules:
+  # Read and update middleware
+  - apiGroups: ["traefik.io"]
+    resources: ["middlewares"]
+    verbs: ["get", "list", "patch"]
+
+  # Exec into crowdsec-lapi to generate key
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["get", "list", "create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "crowdsec.fullname" . }}-bootstrap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "crowdsec.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/sync-wave: "1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "crowdsec.fullname" . }}-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "crowdsec.fullname" . }}-bootstrap
+    namespace: {{ .Release.Namespace }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "crowdsec.fullname" . }}-bootstrap
+  labels:
+    {{- include "crowdsec.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/sync-wave: "1"
+rules:
+  # Restart Traefik deployment in kube-system
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+    resourceNames: ["traefik"]
+
+  # Wait for rollout status
+  - apiGroups: ["apps"]
+    resources: ["deployments/status"]
+    verbs: ["get", "watch"]
+    resourceNames: ["traefik"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "crowdsec.fullname" . }}-bootstrap
+  labels:
+    {{- include "crowdsec.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    argocd.argoproj.io/sync-wave: "1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "crowdsec.fullname" . }}-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "crowdsec.fullname" . }}-bootstrap
+    namespace: {{ .Release.Namespace }}
+{{- end }}

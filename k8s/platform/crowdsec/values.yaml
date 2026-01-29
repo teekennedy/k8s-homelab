@@ -1,0 +1,121 @@
+# CrowdSec Helm Chart Values
+# https://github.com/crowdsecurity/helm-charts/blob/main/charts/crowdsec/README.md
+
+crowdsec:
+  # Container runtime used by k3s
+  container_runtime: containerd
+
+  secrets:
+    externalSecret:
+      name: crowdsec-secrets
+      csLapiSecretKey: csLapiSecret
+      registrationTokenKey: registrationToken
+
+  # LAPI (Local API) configuration
+  lapi:
+    # Resources for the LAPI pod
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+    # Persistent storage for LAPI database
+    persistentVolume:
+      data:
+        enabled: true
+        storageClassName: longhorn
+        size: 1Gi
+
+    # Environment variables for LAPI
+    env:
+      # Enable local API for agents and bouncers
+      - name: LOCAL_API_URL
+        value: "http://0.0.0.0:8080"
+
+    # Dashboard metrics
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+
+  # Agent configuration (collects logs and sends to LAPI)
+  agent:
+    # Acquire logs from Traefik pods
+    acquisition:
+      - namespace: kube-system
+        podName: traefik-*
+        program: traefik
+        poll_without_inotify: true
+
+    # Resources for agent pods
+    resources:
+      limits:
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+    # Environment variables for agent
+    env:
+      # Install collections for parsing Traefik logs
+      - name: COLLECTIONS
+        value: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/base-http-scenarios"
+      # Parse JSON format logs
+      - name: PARSERS
+        value: "crowdsecurity/traefik-logs"
+
+    # Run agent as DaemonSet to collect logs from all nodes
+    # This is needed because Traefik runs on control plane nodes
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+# Traefik bouncer middleware configuration
+traefikBouncer:
+  # Enable the Traefik middleware
+  enabled: true
+
+  # CrowdSec mode: "stream" (recommended) or "live"
+  # - stream: Decisions cached locally, updated every updateInterval seconds
+  # - live: Query LAPI for every request (higher latency but immediate updates)
+  mode: stream
+
+  # Update frequency for stream mode (seconds)
+  updateInterval: 60
+
+  # Default action: "ban" or "captcha"
+  defaultAction: ban
+
+  # Log level for the bouncer plugin: DEBUG, INFO, WARN, ERROR
+  logLevel: INFO
+
+# Bootstrap middleware job configuration
+bootstrapMiddleware:
+  # Enable the bootstrap job
+  enabled: true
+
+  # Container image for running the bootstrap script
+  image:
+    repository: ghcr.io/astral-sh/uv
+    tag: alpine
+    pullPolicy: IfNotPresent
+
+  # Resource limits for the bootstrap job
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # Security context for the bootstrap job
+  securityContext: {}
+
+  # Node selector for the bootstrap job
+  nodeSelector: {}
+
+  # Tolerations for the bootstrap job
+  tolerations: []

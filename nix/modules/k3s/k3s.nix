@@ -139,6 +139,26 @@
                   default: true
                 exposedPort: 9101
                 protocol: TCP
+
+            # Enable experimental plugins for CrowdSec bouncer
+            experimental:
+              plugins:
+                crowdsec-bouncer:
+                  moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+                  version: "v1.4.5"
+
+            # Enable access logs for CrowdSec agent to parse
+            logs:
+              access:
+                enabled: true
+                format: json
+                fields:
+                  headers:
+                    defaultMode: keep
+                    names:
+                      User-Agent: keep
+                      X-Forwarded-For: keep
+                      X-Real-IP: keep
         EOF
       '';
     };

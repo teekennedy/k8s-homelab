@@ -1,0 +1,11 @@
+# Helm ignore file
+# Patterns to ignore when building packages
+
+# Python virtual environments
+files/bootstrap-middleware/.venv/
+files/bootstrap-middleware/__pycache__/
+files/bootstrap-middleware/.pytest_cache/
+files/bootstrap-middleware/tests/__pycache__/
+*.pyc
+*.pyo
+.venv/

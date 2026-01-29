@@ -1,0 +1,65 @@
+{{- if .Values.bootstrapMiddleware.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "crowdsec.fullname" . }}-bootstrap-middleware
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "crowdsec.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "crowdsec.labels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      serviceAccountName: {{ include "crowdsec.fullname" . }}-bootstrap
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: {{ .Values.bootstrapMiddleware.image.repository }}:{{ .Values.bootstrapMiddleware.image.tag }}
+          imagePullPolicy: {{ .Values.bootstrapMiddleware.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |-
+              cp -rL /scripts/. /project/
+              cd /project
+              uv run --no-cache --link-mode copy --script bootstrap.py
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: project
+              mountPath: /project
+          {{- with .Values.bootstrapMiddleware.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.bootstrapMiddleware.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "crowdsec.fullname" . }}-bootstrap-script
+            defaultMode: 0755
+        - name: project
+          emptyDir: {}
+      {{- with .Values.bootstrapMiddleware.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.bootstrapMiddleware.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
