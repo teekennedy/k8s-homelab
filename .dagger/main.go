@@ -418,7 +418,7 @@ func (m *Homelab) CliNix(ctx context.Context,
 // +check
 func (m *Homelab) Test(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum"]
+	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!k8s/platform/auth-system/files/redis-bootstrap/**/*"]
 	source *dagger.Directory,
 ) (string, error) {
 	results := []string{}
@@ -429,6 +429,13 @@ func (m *Homelab) Test(ctx context.Context,
 		return "", fmt.Errorf("go tests failed: %w", err)
 	}
 	results = append(results, goTestResult)
+
+	// Run Python tests for Redis bootstrap
+	pyTestResult, err := m.TestPyRedis(ctx, source)
+	if err != nil {
+		return "", fmt.Errorf("python tests failed: %w", err)
+	}
+	results = append(results, pyTestResult)
 
 	return joinResults(results), nil
 }
@@ -451,6 +458,26 @@ func (m *Homelab) TestGo(ctx context.Context,
 	}
 
 	return "Go tests passed", nil
+}
+
+// TestPyRedis runs Python tests for the Redis bootstrap script
+// +check
+func (m *Homelab) TestPyRedis(ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!k8s/platform/auth-system/files/redis-bootstrap/**/*"]
+	source *dagger.Directory,
+) (string, error) {
+	_, err := dag.Container().
+		From("ghcr.io/astral-sh/uv:alpine").
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src/k8s/platform/auth-system/files/redis-bootstrap").
+		WithExec([]string{"uv", "run", "pytest", "tests/", "-v"}).
+		Sync(ctx)
+	if err != nil {
+		return "", fmt.Errorf("pytest failed: %w", err)
+	}
+
+	return "Python Redis bootstrap tests passed", nil
 }
 
 // DebugDir returns the given dir. Useful for inspecting directory contents for debugging.

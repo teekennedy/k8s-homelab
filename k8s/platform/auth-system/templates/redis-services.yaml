@@ -1,0 +1,65 @@
+---
+# Service for Sentinel discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: redis-sentinel
+spec:
+  type: ClusterIP
+  ports:
+  - port: 26379
+    targetPort: sentinel
+    protocol: TCP
+    name: sentinel
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: redis
+---
+# Headless service for StatefulSet pod DNS
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel-headless
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: redis-sentinel
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 6379
+    targetPort: redis
+    protocol: TCP
+    name: redis
+  - port: 26379
+    targetPort: sentinel
+    protocol: TCP
+    name: sentinel
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: redis
+---
+# Service for Redis data access
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: redis
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: redis
+    protocol: TCP
+    name: redis
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: redis
