@@ -19,6 +19,14 @@ authelia:
     theme: auto
     extraConfigs:
       - /config/ca-trust-store.yaml
+    # https://www.authelia.com/configuration/security/access-control/#rule-matching
+    access_control:
+      default_policy: 'deny'
+      rules:
+        - domain: msng.to
+          policy: bypass
+        - domain: argocd.msng.to
+          policy: two_factor
     # Modified from example authelia lldap config at https://github.com/lldap/lldap/blob/main/example_configs/authelia_config.yml
     authentication_backend:
       # Password reset through authelia works normally.
@@ -172,6 +180,7 @@ authelia:
               - profile
               - email
               - groups
+              - offline_access
             grant_types:
               - authorization_code
               - refresh_token
