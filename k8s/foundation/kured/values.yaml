@@ -15,6 +15,10 @@ kured:
     period: "30m0s"
     rebootCommand: "/run/current-system/sw/bin/systemctl reboot"
     alertFilterRegexp: "^(KubeVersionMismatch|LonghornVolumeActualSpaceUsedWarning|LonghornNodeStorageWarning|LonghornDiskStorageWarning)$"
+    # Give drain operation up to 30 minutes to complete (for Longhorn replica evacuation)
+    drainTimeout: "30m"
+    # Keep trying to evict pods for up to 30 minutes before giving up
+    skipWaitForDeleteTimeoutSeconds: 1800
 
 webhook:
   enabled: true
