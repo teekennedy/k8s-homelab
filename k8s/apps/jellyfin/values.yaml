@@ -628,6 +628,11 @@ app-template:
             # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/providers/protonvpn.md#wireguard-only
             - secretRef:
                 name: gluetun-wg-1
+          # https://github.com/qdm12/gluetun-wiki/blob/main/setup/advanced/kubernetes.md#adding-ipv6-rule--file-exists
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "(ip rule del table 51820; ip -6 rule del table 51820) || true"]
           securityContext:
             capabilities:
               add:
