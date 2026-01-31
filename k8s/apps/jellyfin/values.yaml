@@ -582,6 +582,21 @@ app-template:
         dnsConfig:
           nameservers:
             - 127.0.0.1
+      initContainers:
+        # Updates qBittorrent password from generated hash
+        password-updater:
+          image:
+            repository: alpine
+            tag: "3.19"
+          command:
+            - /scripts/update-password.sh
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       containers:
         # https://docs.linuxserver.io/images/docker-qbittorrent/
         qbittorrent:
@@ -637,6 +652,22 @@ app-template:
             capabilities:
               add:
                 - NET_ADMIN
+        qbittorrent-metrics:
+          image:
+            repository: ghcr.io/martabal/qbittorrent-exporter
+            tag: v1.13.2
+          env:
+            QBITTORRENT_USERNAME:
+              valueFrom:
+                secretKeyRef:
+                  name: jellyfin-qbittorrent-admin
+                  key: username
+            QBITTORRENT_PASSWORD:
+              valueFrom:
+                secretKeyRef:
+                  name: jellyfin-qbittorrent-admin
+                  key: password
+            QBITTORRENT_BASE_URL: http://localhost:8080
     configarr:
       type: cronjob
       cronjob:
@@ -701,6 +732,9 @@ app-template:
       ports:
         qbittorrent:
           port: 8080
+          protocol: HTTP
+        qbittorrent-metrics:
+          port: 8090
           protocol: HTTP
   ingress:
     jellyfin:
@@ -1049,8 +1083,28 @@ app-template:
       storageClass: longhorn
       advancedMounts:
         downloader:
+          password-updater:
+            - path: /config
           qbittorrent:
             - path: /config
+    qbittorrent-password-hash:
+      type: secret
+      name: jellyfin-qbittorrent-password-hash
+      defaultMode: 0400
+      advancedMounts:
+        downloader:
+          password-updater:
+            - path: /tmp/qbittorrent-password
+              readOnly: true
+    qbittorrent-update-script:
+      type: configMap
+      name: jellyfin-qbittorrent-update-password
+      defaultMode: 0555
+      advancedMounts:
+        downloader:
+          password-updater:
+            - path: /scripts
+              readOnly: true
     unpackerr-configs:
       type: configMap
       name: unpackerr-configs
@@ -1073,3 +1127,9 @@ app-template:
         # If you use a different length, Radarr errors out (and possibly others do too)
         secret-generator.v1.mittwald.de/length: "32"
       stringData: {}
+    qbittorrent-admin:
+      annotations:
+        secret-generator.v1.mittwald.de/autogenerate: password
+        secret-generator.v1.mittwald.de/length: "24"
+      stringData:
+        username: admin
