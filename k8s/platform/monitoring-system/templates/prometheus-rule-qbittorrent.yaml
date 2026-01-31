@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+  name: prometheus-qbittorrent-rules
+  namespace: {{ .Release.Namespace }}
+spec:
+  groups:
+  - name: qbittorrent.rules
+    rules:
+    - alert: QBittorrentVPNPortForwardingBroken
+      annotations:
+        description: QBittorrent hasn't uploaded any data in over an hour. This typically indicates VPN port forwarding has failed.
+        summary: QBittorrent upload speed is zero, possible VPN port forwarding failure
+      expr: qbittorrent_global_upload_speed_bytes == 0
+      for: 1h
+      labels:
+        issue: QBittorrent has not uploaded data for over 1 hour
+        severity: warning
+    - alert: QBittorrentMetricsDown
+      annotations:
+        description: QBittorrent metrics exporter is not responding. This could indicate the exporter or QBittorrent itself is down.
+        summary: QBittorrent metrics exporter is unavailable
+      expr: up{job="qbittorrent-metrics"} == 0
+      for: 5m
+      labels:
+        issue: QBittorrent metrics exporter is down
+        severity: critical

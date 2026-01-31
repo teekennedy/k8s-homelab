@@ -16,6 +16,10 @@ spec:
       kind: PersistentVolumeClaim
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
+    - kind: Secret
+      name: jellyfin-qbittorrent-admin
+      jsonPointers:
+        - /data
   project: default
   source:
     path: k8s/apps/jellyfin
