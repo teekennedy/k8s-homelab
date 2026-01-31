@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -275,28 +274,4 @@ hosts = {
 
 	result += "}\n"
 	return result, nil
-}
-
-// GetProjectRoot attempts to find the project root by looking for marker files
-func GetProjectRoot() (string, error) {
-	markers := []string{"flake.nix", "dagger.json", ".git"}
-	dir, err := filepath.Abs(".")
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		for _, marker := range markers {
-			if _, err := filepath.Glob(filepath.Join(dir, marker)); err == nil {
-				return dir, nil
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-
-	return "", fmt.Errorf("could not find project root (no flake.nix, dagger.json, or .git found)")
 }

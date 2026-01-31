@@ -22,6 +22,16 @@
           src = ./.;
           vendorHash = "sha256-VPOwDrkCApsd41sAY2a7uqSHb4dD1OpCf1QWxddx7UM=";
 
+          # Install shell completions
+          postInstall = ''
+            installShellCompletion --cmd lab \
+              --bash <($out/bin/lab completion bash) \
+              --zsh <($out/bin/lab completion zsh) \
+              --fish <($out/bin/lab completion fish)
+          '';
+
+          nativeBuildInputs = with pkgs; [installShellFiles];
+
           meta = with pkgs.lib; {
             description = "Unified CLI for k8s-homelab management";
             homepage = "https://github.com/teekennedy/homelab";

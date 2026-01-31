@@ -92,7 +92,7 @@ get_last_modified() {
     head -n 1
 }
 
-last_modified="$(get_last_modified "$chart_path")"
+last_modified=1
 last_successfully_modified=0
 
 # Make sure dependencies are up to date

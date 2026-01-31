@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/teekennedy/homelab/cmd/lab/config"
+	"github.com/teekennedy/homelab/cmd/lab/internal/paths"
 )
 
 var hostCmd = &cobra.Command{
@@ -28,7 +28,8 @@ var hostBuildCmd = &cobra.Command{
 		showTrace, _ := cmd.Flags().GetBool("show-trace")
 
 		// Validate host exists in config
-		if err := validateHost(hostname); err != nil {
+		repoRoot, err := validateHost(hostname)
+		if err != nil {
 			return err
 		}
 
@@ -49,6 +50,7 @@ var hostBuildCmd = &cobra.Command{
 
 		nixCmd := exec.Command("nix", nixArgs...)
 		nixCmd.Stderr = os.Stderr
+		nixCmd.Dir = repoRoot
 
 		output, err := nixCmd.Output()
 		if err != nil {
@@ -77,14 +79,15 @@ var hostDeployCmd = &cobra.Command{
 	Use:   "deploy <hostname>",
 	Short: "Deploy NixOS configuration to a host",
 	Long:  `Deploy the NixOS configuration to the specified host using deploy-rs.`,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		hostname := args[0]
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		skipChecks, _ := cmd.Flags().GetBool("skip-checks")
 
 		// Validate host exists
-		if err := validateHost(hostname); err != nil {
+		repoRoot, err := validateHost(hostname)
+		if err != nil {
 			return err
 		}
 
@@ -95,14 +98,15 @@ var hostDeployCmd = &cobra.Command{
 				fmt.Printf("Deploying to %s...\n", hostname)
 			}
 		}
+		cmd.SilenceUsage = true
 
 		// Build deploy-rs command
 		// deploy-rs expects: deploy [FLAGS] [FLAKE]
-		deployArgs := []string{"."}
+		var deployArgs []string
 		if skipChecks {
 			deployArgs = append(deployArgs, "--skip-checks")
 		}
-		deployArgs = append(deployArgs, "--", "--targets", fmt.Sprintf(".#%s", hostname))
+		deployArgs = append(deployArgs, "--targets", fmt.Sprintf(".#%s", hostname))
 		if dryRun {
 			deployArgs = append(deployArgs, "--dry-activate")
 		}
@@ -111,6 +115,7 @@ var hostDeployCmd = &cobra.Command{
 		deployCmd.Stdout = os.Stdout
 		deployCmd.Stderr = os.Stderr
 		deployCmd.Stdin = os.Stdin
+		deployCmd.Dir = repoRoot
 
 		if err := deployCmd.Run(); err != nil {
 			return fmt.Errorf("deploy failed: %w", err)
@@ -140,7 +145,8 @@ Uses nvd (nix-visualize-derivation) to show a human-readable diff.`,
 		hostname := args[0]
 
 		// Validate host exists
-		if err := validateHost(hostname); err != nil {
+		repoRoot, err := validateHost(hostname)
+		if err != nil {
 			return err
 		}
 
@@ -158,6 +164,7 @@ Uses nvd (nix-visualize-derivation) to show a human-readable diff.`,
 
 		nixCmd := exec.Command("nix", nixBuildArgs...)
 		nixCmd.Stderr = os.Stderr
+		nixCmd.Dir = repoRoot
 		newPathBytes, err := nixCmd.Output()
 		if err != nil {
 			return fmt.Errorf("failed to build new configuration: %w", err)
@@ -366,18 +373,23 @@ var hostSSHCmd = &cobra.Command{
 }
 
 // validateHost checks if a hostname exists in the flake
-func validateHost(hostname string) error {
+func validateHost(hostname string) (string, error) {
+	projectRoot, err := paths.RepoRoot()
+	if err != nil {
+		return "", err
+	}
 	// Check if the nixos configuration exists in the flake
 	evalCmd := exec.Command("nix", "eval",
 		fmt.Sprintf(".#nixosConfigurations.%s", hostname),
 		"--apply", "x: x.config.system.stateVersion",
 		"--raw")
 	evalCmd.Stderr = nil // Suppress error output for validation
+	evalCmd.Dir = projectRoot
 
 	if err := evalCmd.Run(); err != nil {
-		return fmt.Errorf("host %q not found in flake.nix nixosConfigurations", hostname)
+		return "", fmt.Errorf("host %q not found in flake.nix nixosConfigurations", hostname)
 	}
-	return nil
+	return projectRoot, nil
 }
 
 // getChangedHosts returns hosts that have changes based on git diff
@@ -477,23 +489,4 @@ func init() {
 
 	hostCmd.AddCommand(hostSSHCmd)
 	hostCmd.AddCommand(hostChangedCmd)
-}
-
-// findProjectRoot walks up from cwd to find the project root
-func findProjectRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "flake.nix")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("could not find project root (no flake.nix found)")
-		}
-		dir = parent
-	}
 }

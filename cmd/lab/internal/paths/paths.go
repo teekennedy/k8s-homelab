@@ -2,6 +2,8 @@
 package paths
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
@@ -51,4 +53,31 @@ func ProjectConfigDir() string {
 	// not XDG, since these are source-controlled files
 	// This will be overridden by LAB_CONFIG_DIR env var if set
 	return "config"
+}
+
+// RepoRoot returns the git repository root directory
+// by running `git rev-parse --show-toplevel`
+// Returns an error if not in a git repository or git command fails
+func RepoRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		gitPath := filepath.Join(dir, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			return dir, nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return "", errors.New("no .git file or directory found in any parent")
 }

@@ -2,6 +2,7 @@
   pkgs,
   config,
   inputs,
+  devenv-zsh,
   ...
 }: let
   lab = inputs.lab.packages.${pkgs.stdenv.hostPlatform.system}.default;
@@ -27,6 +28,18 @@ in {
       };
     })
   ];
+
+  # Use zsh for shell instead of bash
+  # https://github.com/mcdonc/devenv-zsh
+  imports = [devenv-zsh.plugin];
+  zsh.enable = true;
+  zsh.extraInit = ''
+    echo "Adding lab completions to current shell..."
+    # Add lab completions to FPATH for zsh
+    fpath=(${lab}/share/zsh/site-functions:$fpath)
+    autoload -Uz compinit && compinit
+  '';
+
   # https://devenv.sh/basics/
   env.KUBECONFIG = "${config.env.DEVENV_STATE}/kube/config";
   # Don't prompt me to sign up for dagger cloud
@@ -73,14 +86,19 @@ in {
   # '';
 
   # Shell hook to set up lab CLI completions
-  enterShell = ''
-    # Detect shell and source appropriate completions
-    if [[ -n "$ZSH_VERSION" ]]; then
-      source <(lab completion zsh)
-    elif [[ -n "$BASH_VERSION" ]]; then
-      source <(lab completion bash)
-    fi
-  '';
+  # enterShell = ''
+  #   echo -n "Adding lab completions to current shell..."
+  #   if [[ -n "$ZSH_VERSION" ]]; then
+  #     echo "(detected) zsh"
+  #     # Add lab completions to FPATH for zsh
+  #     fpath=(${lab}/share/zsh/site-functions:$fpath)
+  #     autoload -Uz compinit && compinit
+  #   elif [[ -n "$BASH_VERSION" ]]; then
+  #     echo "(detected) bash"
+  #     # Source bash completion for lab
+  #     source ${lab}/share/bash-completion/completions/lab.bash
+  #   fi
+  # '';
 
   # https://devenv.sh/tasks/
   # tasks = {
