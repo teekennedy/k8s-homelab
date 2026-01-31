@@ -58,6 +58,20 @@
         "type": "github"
       }
     },
+    "devenv-zsh": {
+      "locked": {
+        "lastModified": 1753131956,
+        "owner": "mcdonc",
+        "repo": "devenv-zsh",
+        "rev": "03aa5ea61b085b5779a3def3ce1e53a03d2f787a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "mcdonc",
+        "repo": "devenv-zsh",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -216,6 +230,7 @@
         "dagger": "dagger",
         "deploy-rs": "deploy-rs",
         "devenv": "devenv",
+        "devenv-zsh": "devenv-zsh",
         "git-hooks": "git-hooks",
         "lab": "lab",
         "mk-shell-bin": "mk-shell-bin",

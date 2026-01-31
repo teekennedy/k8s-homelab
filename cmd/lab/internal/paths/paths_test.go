@@ -110,3 +110,49 @@ func TestXDGCompliance(t *testing.T) {
 		t.Errorf("expected state dir to end with lab/test, got %s", stateDir)
 	}
 }
+
+func TestRepoRoot(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	originalWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	defer os.Chdir(originalWd)
+
+	// Test 1: Empty directory without .git should return an error
+	err = os.Chdir(tempDir)
+	if err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	_, err = RepoRoot()
+	if err == nil {
+		t.Error("expected error when calling RepoRoot in non-git directory, got nil")
+	}
+
+	// Test 2: Create a .git file and verify RepoRoot returns the test directory
+	gitFile := filepath.Join(tempDir, ".git")
+	if writeErr := os.WriteFile(gitFile, []byte{}, 0o644); writeErr != nil {
+		t.Fatalf("failed to create .git file: %v", writeErr)
+	}
+
+	root, err := RepoRoot()
+	if err != nil {
+		t.Errorf("expected no error with .git present, got: %v", err)
+	}
+
+	// Resolve both paths to their canonical forms to handle symlinks
+	expectedPath, err := filepath.EvalSymlinks(tempDir)
+	if err != nil {
+		t.Fatalf("failed to resolve temp directory symlinks: %v", err)
+	}
+	actualPath, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("failed to resolve root directory symlinks: %v", err)
+	}
+
+	if actualPath != expectedPath {
+		t.Errorf("expected RepoRoot to return %s, got %s", expectedPath, actualPath)
+	}
+}
