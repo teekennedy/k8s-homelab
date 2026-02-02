@@ -14,7 +14,8 @@ authelia:
     traefikCRD:
       enabled: true
       disableIngressRoute: false
-      entryPoints: ["websecure"]
+      strategy: wrr
+      entryPoints: ["websecure", "websecurepublic"]
   configMap:
     theme: auto
     extraConfigs:
