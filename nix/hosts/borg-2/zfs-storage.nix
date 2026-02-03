@@ -128,6 +128,7 @@
       storage = {
         type = "zpool";
         mode = "raidz2";
+        mountpoint = "/storage";
         rootFsOptions = {
           # enable zstd compression
           compression = "zstd";
@@ -142,21 +143,20 @@
         datasets = {
           backup = {
             type = "zfs_fs";
+            mountpoint = "/storage/backup";
           };
           nas = {
             type = "zfs_fs";
+            mountpoint = "/storage/nas";
           };
         };
         # Without zfs option mountpoint = legacy,
         # both zfs and systemd try to mount the pool during startup.
         # The legacy option tells zfs not to mount automatically.
         # https://github.com/nix-community/disko/issues/581
-        mountpoint = "/storage";
         rootFsOptions.mountpoint = "legacy";
-        datasets.nas.mountpoint = "/storage/nas";
-        datasets.nas.options.mountpoint = "legacy";
-        datasets.backup.mountpoint = "/storage/backup";
         datasets.backup.options.mountpoint = "legacy";
+        datasets.nas.options.mountpoint = "legacy";
       };
     };
   };
