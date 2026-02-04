@@ -25,6 +25,9 @@ kube-prometheus-stack:
         gethomepage.dev/name: "Grafana"
         gethomepage.dev/description: "Monitoring and dashboards"
         gethomepage.dev/icon: "sh-grafana.svg"
+        gethomepage.dev/alerts: "alertmanager"
+        # Widget version 2 is for grafana > v10.4
+        gethomepage.dev/version: "2"
         gethomepage.dev/pod-selector: "app.kubernetes.io/name=grafana"
         gethomepage.dev/widget.type: "grafana"
         gethomepage.dev/widget.url: "https://grafana.msng.to"
