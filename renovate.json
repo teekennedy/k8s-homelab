@@ -109,7 +109,7 @@
         "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
       ],
       "datasourceTemplate": "github-releases",
-      "depNameTemplate": "longhorn/charts",
+      "depNameTemplate": "longhorn/longhorn",
       "extractVersionTemplate": "^longhorn-(?<version>.*)$"
     },
     {
