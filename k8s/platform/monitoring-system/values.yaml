@@ -155,6 +155,17 @@ kube-prometheus-stack:
   # Scrape kubelet for all metrics
   kubelet:
     enabled: true
+    serviceMonitor:
+      ## MetricRelabelConfigs to apply to samples after scraping, but before ingestion.
+      ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api-reference/api.md#relabelconfig
+      ##
+      metricRelabelings:
+        # Drop excessively noisy apiserver and etcd buckets.
+        # These 7 metrics accounted for over 43% of my total series count before their removal.
+        - action: drop
+          regex: (apiserver|etcd)_(request_duration_seconds|request_sli_duration_seconds|request_body_size_bytes|response_sizes|watch_cache_read_wait_seconds|watch_events_sizes)_bucket
+          sourceLabels:
+            - __name__
   kubeApiServer: {}
   kubeControllerManager:
     enabled: false
