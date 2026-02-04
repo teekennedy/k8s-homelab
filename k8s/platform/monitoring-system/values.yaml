@@ -55,6 +55,7 @@ kube-prometheus-stack:
         access: proxy
         url: http://monitoring-system-loki:3100
         isDefault: false
+        editable: false
         jsonData:
           timeInterval: 30s
       - name: VictoriaMetrics
@@ -62,6 +63,7 @@ kube-prometheus-stack:
         access: proxy
         url: http://victoria-metrics-single-server.victoria-metrics.svc:8428
         isDefault: false
+        editable: false
         jsonData:
           timeInterval: 30s
     # This used to contain Dex client secret, but currently doesn't exist.
