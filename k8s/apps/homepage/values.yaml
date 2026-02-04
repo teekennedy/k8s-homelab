@@ -99,16 +99,6 @@ secret-sync:
         namespace: jellyfin
         name: api-keys
         key: PROWLARR_API_KEY
-    - env: HOMEPAGE_VAR_GRAFANA_USERNAME
-      source:
-        namespace: monitoring-system
-        name: homepage-grafana-credentials
-        key: username
-    - env: HOMEPAGE_VAR_GRAFANA_PASSWORD
-      source:
-        namespace: monitoring-system
-        name: homepage-grafana-credentials
-        key: password
     - env: HOMEPAGE_VAR_GITEA_API_KEY
       source:
         namespace: gitea
