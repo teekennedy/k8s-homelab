@@ -253,7 +253,7 @@ kube-prometheus-stack:
 
       # Prometheus docs say to set this to maximum 80-85% of the volume size
       # https://prometheus.io/docs/prometheus/latest/storage/#operational-aspects
-      retention: "14d"
+      retention: "10d"
       retentionSize: "160GiB"
       # Set retentionTime to empty value so prometheus relies solely on retentionSize
       retrentionTime: ""
