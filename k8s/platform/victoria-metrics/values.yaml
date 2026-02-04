@@ -1,5 +1,10 @@
 victoria-metrics-single:
   server:
+    # default server name is <namespace>-<chart name>-server, in this case "victoria-metrics-victoria-metrics-single-server"
+    fullnameOverride: victoria-metrics-server
+    image:
+      image: victoriametrics/victoria-metrics
+      tag: "v1.135.0"
     retentionPeriod: "12"  # 12 months
     resources:
       requests:

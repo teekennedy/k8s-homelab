@@ -1,8 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: victoria-metrics-alerts
-  namespace: victoria-metrics
+  namespace: {{ .Release.Namespace }}
 spec:
   groups:
     - name: victoriametrics
@@ -17,4 +19,4 @@ spec:
             severity: warning
           annotations:
             summary: "VictoriaMetrics disk usage is high"
-            description: "VictoriaMetrics is using {{ $value | humanizePercentage }} of available disk space. Consider reducing retentionPeriod."
+            description: {{ "VictoriaMetrics is using {{ $value | humanizePercentage }} of available disk space. Consider reducing retentionPeriod." | quote }}

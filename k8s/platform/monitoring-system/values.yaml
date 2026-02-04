@@ -3,8 +3,7 @@ kube-prometheus-stack:
   ## Setting to true produces cleaner resource names, but requires a data migration because the name of the persistent volume changes. Therefore this should only be set once on initial installation.
   ##
   cleanPrometheusOperatorObjectNames: true
-  ## Using default values from https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
-  ##
+  ## Grafana subchart values: https://github.com/grafana-community/helm-charts/blob/main/charts/grafana/values.yaml
   grafana:
     admin:
       existingSecret: monitoring-system-grafana
@@ -61,7 +60,7 @@ kube-prometheus-stack:
       - name: VictoriaMetrics
         type: prometheus
         access: proxy
-        url: http://victoria-metrics-single-server.victoria-metrics.svc:8428
+        url: http://victoria-metrics-server.victoria-metrics.svc:8428
         isDefault: false
         editable: false
         jsonData:
@@ -262,7 +261,7 @@ kube-prometheus-stack:
 
       # Remote write to VictoriaMetrics for long-term storage
       remoteWrite:
-        - url: "http://victoria-metrics-single-server.victoria-metrics.svc:8428/api/v1/write"
+        - url: "http://victoria-metrics-server.victoria-metrics.svc:8428/api/v1/write"
 
       # Prometheus docs say to set this to maximum 80-85% of the volume size
       # https://prometheus.io/docs/prometheus/latest/storage/#operational-aspects

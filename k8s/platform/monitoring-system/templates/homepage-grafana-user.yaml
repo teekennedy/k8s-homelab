@@ -121,12 +121,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ $grafanaService }}
-                  key: admin-user
+                  key: username
             - name: GRAFANA_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ $grafanaService }}
-                  key: admin-password
+                  key: password
             - name: HOMEPAGE_GRAFANA_USERNAME
               valueFrom:
                 secretKeyRef:
