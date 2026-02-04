@@ -10,7 +10,7 @@ app-template:
         jellyfin-debug:
           image:
             repository: alpine
-            tag: latest@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
+            tag: latest@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
           command:
             - sleep
             - infinity
@@ -503,7 +503,7 @@ app-template:
         prowlarr:
           image:
             repository: lscr.io/linuxserver/prowlarr
-            tag: 2.3.0.5236-ls135
+            tag: 2.3.0.5236-ls136
           env:
             TZ: America/Denver
             PROWLARR__AUTH__APIKEY:
@@ -515,7 +515,7 @@ app-template:
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 6.0.4.10291-ls290
+            tag: 6.0.4.10291-ls291
           env:
             # https://wiki.servarr.com/en/radarr/environment-variables
             TZ: America/Denver
@@ -587,7 +587,7 @@ app-template:
         password-updater:
           image:
             repository: alpine
-            tag: "3.19"
+            tag: "3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1"
           command:
             - /scripts/update-password.sh
           resources:
@@ -602,7 +602,7 @@ app-template:
         qbittorrent:
           image:
             repository: lscr.io/linuxserver/qbittorrent
-            tag: 5.1.4-r1-ls437
+            tag: 5.1.4-r2-ls439
           env:
             TZ: America/Denver
             PUID: "1200"
