@@ -8,6 +8,27 @@ crowdsec:
     repository: crowdsecurity/crowdsec
     tag: v1.7.0-slim
 
+  config:
+    config.yaml.local: |
+      api:
+        server:
+          auto_registration: # Activate if not using TLS for authentication
+            enabled: true
+            token: "${REGISTRATION_TOKEN}" # /!\ Do not modify this variable (auto-generated and handled by the chart)
+            allowed_ranges:
+              - "127.0.0.1/32"
+              - "10.69.0.0/16"
+              - "10.42.0.0/16"
+              - "10.43.0.0/16"
+      db_config:
+        flush:
+          agents_autodelete:
+            cert: 60m # This is TLS client authentication
+            login_password: 60m # This includes the auto registration token as well
+        type: sqlite
+        db_path: /var/lib/crowdsec/data/crowdsec.db
+        use_wal: true
+
   secrets:
     externalSecret:
       name: crowdsec-secrets
