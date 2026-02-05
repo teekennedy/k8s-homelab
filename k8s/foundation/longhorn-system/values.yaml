@@ -1,5 +1,13 @@
 # https://github.com/longhorn/charts/blob/v1.8.x/charts/longhorn/values.yaml
 longhorn:
+  # Use hotfix tags from release notes
+  # https://github.com/longhorn/longhorn/releases/tag/v1.11.0
+  image:
+    longhorn:
+      instanceManager:
+        tag: "v1.11.0-hotfix-1"
+      manager:
+        tag: "v1.11.0-hotfix-1"
   defaultSettings:
     allowCollectingLonghornUsageMetrics: false
     defaultDataLocality: best-effort
