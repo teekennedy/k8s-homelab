@@ -47,6 +47,19 @@
       "extractVersionTemplate": "^v(?<version>.*)$"
     },
     {
+      "description": "Sync Crowdsec appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "k8s/platform/crowdsec/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "crowdsecurity/crowdsec",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
       "description": "Sync Kyverno appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
@@ -215,6 +228,16 @@
         "app-template",
         "ghcr.io/donkie/spoolman",
         "Donkie/Spoolman"
+      ]
+    },
+    {
+      "groupName": "helm crowdsec",
+      "matchFileNames": [
+        "k8s/platform/crowdsec/**"
+      ],
+      "matchPackageNames": [
+        "crowdsec",
+        "crowdsecurity/crowdsec"
       ]
     },
     {

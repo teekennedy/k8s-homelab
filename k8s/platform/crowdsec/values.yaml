@@ -4,6 +4,9 @@
 crowdsec:
   # Container runtime used by k3s
   container_runtime: containerd
+  image:
+    repository: crowdsecurity/crowdsec
+    tag: v1.7.0-slim
 
   secrets:
     externalSecret:
