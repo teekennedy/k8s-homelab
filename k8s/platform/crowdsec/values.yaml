@@ -28,6 +28,8 @@ crowdsec:
         type: sqlite
         db_path: /var/lib/crowdsec/data/crowdsec.db
         use_wal: true
+        decision_bulk_size: 2000
+        max_open_conns: 50
 
   secrets:
     externalSecret:
