@@ -19,6 +19,10 @@ spec:
     parameters:
       max_connections: "300"
       shared_buffers: 512MB
+      # Reduce checkpoint frequency to lower I/O spikes (default 5min)
+      checkpoint_timeout: 15min
+      # Increase WAL size to allow less frequent checkpoints
+      max_wal_size: 2GB
   monitoring:
     enablePodMonitor: true
   # Disable pod disruption budget so that the cluster can be shut down
