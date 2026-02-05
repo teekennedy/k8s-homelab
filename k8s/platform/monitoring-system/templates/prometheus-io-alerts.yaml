@@ -1,0 +1,81 @@
+# Prometheus alerting rules for I/O monitoring
+# PrometheusRule is the proper CRD for Prometheus Operator to pick up alerting rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: io-monitoring-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: io_monitoring
+    interval: 60s
+    rules:
+
+    # Alert on high node-level disk I/O utilization
+    - alert: HighDiskIOUtilization
+      expr: rate(node_disk_io_time_seconds_total[2m]) > 0.5
+      for: 5m
+      labels:
+        severity: warning
+        component: storage
+      annotations:
+        summary: {{ "High disk I/O on {{ $labels.instance }}" | quote }}
+        description: {{ "Disk {{ $labels.device }} on {{ $labels.instance }} has >50% I/O utilization for 5+ minutes (current: {{ $value | humanizePercentage }})" | quote }}
+
+    # Alert on high CPU iowait
+    - alert: HighCPUIoWait
+      expr: rate(node_cpu_seconds_total{mode="iowait"}[2m]) > 0.15
+      for: 3m
+      labels:
+        severity: warning
+        component: cpu
+      annotations:
+        summary: {{ "High CPU iowait on {{ $labels.instance }}" | quote }}
+        description: {{ "CPU {{ $labels.cpu }} on {{ $labels.instance }} has >15% iowait for 3+ minutes (current: {{ $value | humanizePercentage }})" | quote }}
+
+    # Alert on high container write I/O (per-workload)
+    - alert: HighContainerWriteIO
+      expr: rate(container_fs_writes_bytes_total{container!=""}[2m]) > 50000000
+      for: 5m
+      labels:
+        severity: warning
+        component: container
+      annotations:
+        summary: {{ "High write I/O from {{ $labels.pod }} in {{ $labels.namespace }}" | quote }}
+        description: {{ "Container {{ $labels.container }} in pod {{ $labels.pod }} ({{ $labels.namespace }}) is writing >50MB/s for 5+ minutes on device {{ $labels.device }} (current: {{ $value | humanize }}B/s)" | quote }}
+
+    # Alert on Longhorn instance-manager high I/O
+    - alert: LonghornInstanceManagerHighIO
+      expr: rate(container_fs_writes_bytes_total{pod=~"instance-manager-.*",namespace="longhorn-system"}[2m]) > 40000000
+      for: 3m
+      labels:
+        severity: warning
+        component: longhorn
+      annotations:
+        summary: {{ "Longhorn instance-manager high I/O on {{ $labels.node }}" | quote }}
+        description: {{ "Instance-manager on {{ $labels.node }} is writing >40MB/s for 3+ minutes (current: {{ $value | humanize }}B/s). This may indicate volume snapshot/rebuild activity or high workload I/O amplification." | quote }}
+
+    # Alert on PostgreSQL checkpoint duration
+    - alert: PostgreSQLSlowCheckpoint
+      expr: increase(pg_stat_bgwriter_checkpoint_write_time[5m]) / increase(pg_stat_bgwriter_checkpoints_timed[5m]) > 15000
+      for: 2m
+      labels:
+        severity: info
+        component: postgres
+      annotations:
+        summary: {{ "Slow PostgreSQL checkpoint on {{ $labels.instance }}" | quote }}
+        description: {{ "PostgreSQL checkpoints are taking >15 seconds on average (current: {{ $value | humanizeDuration }})" | quote }}
+
+    # Alert on Longhorn volume robustness degradation
+    - alert: LonghornVolumeDegraded
+      expr: longhorn_volume_robustness < 3
+      for: 2m
+      labels:
+        severity: warning
+        component: longhorn
+      annotations:
+        summary: {{ "Longhorn volume {{ $labels.volume }} degraded" | quote }}
+        description: {{ "Volume {{ $labels.volume }} on {{ $labels.node }} has degraded robustness ({{ $labels.pvc }}/{{ $labels.pvc_namespace }}). Robustness: {{ $value }} (3=healthy, 2=degraded, 1=faulted)" | quote }}
