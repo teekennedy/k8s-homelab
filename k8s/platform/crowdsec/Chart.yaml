@@ -2,9 +2,9 @@ apiVersion: v2
 name: crowdsec
 description: CrowdSec Security Engine with Traefik bouncer integration
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "1.7.0"
 dependencies:
   - name: crowdsec
-    version: "0.20.0"
+    version: "0.22.0"
     repository: https://crowdsecurity.github.io/helm-charts
