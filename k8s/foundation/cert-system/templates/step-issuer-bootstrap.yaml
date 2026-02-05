@@ -22,10 +22,12 @@ spec:
         - name: step-bootstrap
           image: alpine/kubectl:1.35.0
           command:
-            - /bin/bash
+            - /bin/sh
             - -c
             - |
               set -euo pipefail
+
+              apk add --no-cache jq
 
               echo "Fetching and encoding CA root certificate..."
               CA_ROOT_B64=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.data['root_ca\.crt']}" configmap/step-ca-certs | base64 | tr -d '\n')
