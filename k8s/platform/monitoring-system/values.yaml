@@ -138,6 +138,9 @@ kube-prometheus-stack:
     upgradeJob:
       enabled: true
       forceConflicts: true
+      image:
+        kubectl:
+          tag: "v1.34.0"
 
   ##
   global:
