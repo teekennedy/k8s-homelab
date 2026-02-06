@@ -19,6 +19,10 @@ spec:
       port: 443
       protocol: TCP
       targetPort: websecurepublic
+    - name: terrariapublic
+      port: 7777
+      protocol: TCP
+      targetPort: terrariapublic
   selector:
     app.kubernetes.io/instance: traefik-kube-system
     app.kubernetes.io/name: traefik

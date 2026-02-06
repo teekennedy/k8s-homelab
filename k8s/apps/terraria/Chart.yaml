@@ -1,0 +1,10 @@
+apiVersion: v2
+name: terraria
+description: TShock-based Terraria server.
+type: application
+version: 0.1.0
+appVersion: "sha256-1b6af2e9741e2ea24268a553a3699a0010344f02d6fa13d099357d72dd2edba2"
+dependencies:
+  - name: app-template
+    version: 4.6.2
+    repository: https://bjw-s-labs.github.io/helm-charts

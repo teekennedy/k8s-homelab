@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: terraria
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name: in-cluster
+    namespace: terraria
+  ignoreDifferences:
+    - jsonPointers:
+        - /spec/volumeName
+        - /spec/storageClassName
+      kind: PersistentVolumeClaim
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+  project: default
+  source:
+    path: k8s/apps/terraria
+    repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true

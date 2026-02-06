@@ -133,6 +133,12 @@
                 protocol: TCP
                 tls:
                   enabled: true
+              terrariapublic:
+                port: 7777
+                expose:
+                  default: false
+                exposedPort: 7777
+                protocol: TCP
               metrics:
                 port: 9101
                 expose:
