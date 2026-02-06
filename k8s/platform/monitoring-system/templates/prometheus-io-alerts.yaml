@@ -68,14 +68,3 @@ spec:
       annotations:
         summary: {{ "Slow PostgreSQL checkpoint on {{ $labels.instance }}" | quote }}
         description: {{ "PostgreSQL checkpoints are taking >15 seconds on average (current: {{ $value | humanizeDuration }})" | quote }}
-
-    # Alert on Longhorn volume robustness degradation
-    - alert: LonghornVolumeDegraded
-      expr: longhorn_volume_robustness < 3
-      for: 2m
-      labels:
-        severity: warning
-        component: longhorn
-      annotations:
-        summary: {{ "Longhorn volume {{ $labels.volume }} degraded" | quote }}
-        description: {{ "Volume {{ $labels.volume }} on {{ $labels.node }} has degraded robustness ({{ $labels.pvc }}/{{ $labels.pvc_namespace }}). Robustness: {{ $value }} (3=healthy, 2=degraded, 1=faulted)" | quote }}
