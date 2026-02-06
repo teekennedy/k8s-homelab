@@ -7,6 +7,8 @@ longhorn:
     concurrentAutomaticEngineUpgradePerNodeLimit: "1"
     # -- Maximum number of replicas that can be concurrently rebuilt on each node. Increase this to speed up replica evacuation during node drains.
     concurrentReplicaRebuildPerNodeLimit: "10"
+    # -- Default number of replicas for new volumes. With 3 nodes and good backup coverage, 2 replicas provides better fault tolerance during node maintenance.
+    defaultReplicaCount: "2"
     # -- Timeout in seconds for communication between the engine and replica processes. Increase this to tolerate I/O spikes from applications like Prometheus compaction.
     engineReplicaTimeout: "16"
     # -- Upgrade Checker that periodically checks for new Longhorn versions. When a new version is available, a notification appears on the Longhorn UI. This setting is enabled by default
