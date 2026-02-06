@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/cert-manager.io/clusterissuer_v1.json
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-http01
+  namespace: {{ .Release.Namespace }}
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-http01
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: traefik
+          ingressTemplate:
+            metadata:
+              annotations:
+                traefik.ingress.kubernetes.io/router.entrypoints: webpublic
