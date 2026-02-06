@@ -4,6 +4,9 @@ argo-cd:
     env:
       - name: TZ
         value: America/Denver
+    logging:
+      level: debug
+
   configs:
     # argocd-cmd-params-cm configmap
     params:
