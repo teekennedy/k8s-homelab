@@ -45,13 +45,25 @@ app-template:
             - friends
           # Allow probes time for world to generate
           probes:
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                failureThreshold: 60
+                successThreshold: 1
+                initialDelaySeconds: 10
+                periodSeconds: 15
+                timeoutSeconds: 1
+                tcpSocket:
+                  port: 7777
             liveness:
               enabled: true
               custom: true
               spec:
-                failureThreshold: 12
-                initialDelaySeconds: 15
-                periodSeconds: 30
+                failureThreshold: 6
+                successThreshold: 1
+                initialDelaySeconds: 0
+                periodSeconds: 5
                 timeoutSeconds: 1
                 tcpSocket:
                   port: 7777
@@ -59,9 +71,10 @@ app-template:
               enabled: true
               custom: true
               spec:
-                failureThreshold: 12
-                initialDelaySeconds: 15
-                periodSeconds: 30
+                failureThreshold: 3
+                successThreshold: 1
+                initialDelaySeconds: 10
+                periodSeconds: 5
                 timeoutSeconds: 1
                 tcpSocket:
                   port: 7777
@@ -71,7 +84,7 @@ app-template:
         terraria-web:
           image:
             repository: ghcr.io/teekennedy/terraria-server-live-map
-            tag: "latest"
+            tag: "6713bbf"
             pullPolicy: IfNotPresent
           env:
             - name: WORLD_FILE_PATH
@@ -79,8 +92,9 @@ app-template:
                 configMapKeyRef:
                   name: server-config
                   key: WORLD_FILE_PATH
+            # turn off auto-refresh
             - name: REFRESH_INTERVAL_SECONDS
-              value: "60"
+              value: "0"
             - name: TERRARIA_SERVER_HOST
               value: terraria.terraria.svc.cluster.local
           probes:
