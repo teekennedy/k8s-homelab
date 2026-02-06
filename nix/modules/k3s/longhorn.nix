@@ -14,4 +14,8 @@
     PrivateMounts = "yes";
     BindPaths = "/run/current-system/sw/bin:/bin";
   };
+  # Symlink mount binary to /usr/bin/mount - necessary for longhorn RWX volumes which are mounted using nfs
+  systemd.tmpfiles.rules = [
+    "L /usr/bin/mount - - - - /run/current-system/sw/bin/mount"
+  ];
 }
