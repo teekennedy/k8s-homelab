@@ -34,7 +34,7 @@ gitea:
     enabled: false
 
   valkey-cluster:
-    enabled: false
+    enabled: true
     persistence:
       storageClass: longhorn-rc1
     valkey:
