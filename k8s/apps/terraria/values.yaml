@@ -86,6 +86,82 @@ app-template:
             limits:
               cpu: 4000m
               memory: 6Gi
+    discord-bot:
+      strategy: RollingUpdate
+      serviceAccount:
+        name: discord-bot
+      pod:
+        automountServiceAccountToken: true
+      containers:
+        discord-bot:
+          image:
+            repository: ghcr.io/astral-sh/uv
+            tag: alpine
+            pullPolicy: IfNotPresent
+          command:
+            - uv
+            - run
+            - --no-cache
+            - --link-mode
+            - copy
+            - --directory
+            - /app
+            - python
+            - -u
+            - server.py
+          env:
+            - name: DISCORD_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: public-key
+            - name: DISCORD_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: bot-token
+            - name: DISCORD_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: app-id
+            - name: DISCORD_CHANNEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: discord-bot-secret
+                  key: channel-id
+            - name: TERRARIA_NAMESPACE
+              value: terraria
+            - name: TERRARIA_DEPLOYMENT
+              value: terraria
+            - name: AUTO_STOP_MINUTES
+              value: "5"
+            - name: MINIMUM_RUN_MINUTES
+              value: "30"
+          probes:
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                initialDelaySeconds: 30
+                httpGet:
+                  path: /health
+                  port: 8080
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                initialDelaySeconds: 30
+                httpGet:
+                  path: /health
+                  port: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
     terraria-web:
       strategy: Recreate
       containers:
@@ -138,6 +214,12 @@ app-template:
         http:
           port: &restPort 7878
           protocol: TCP
+    discord-bot:
+      controller: discord-bot
+      ports:
+        http:
+          port: 8080
+          protocol: TCP
     terraria-web:
       controller: terraria-web
       ports:
@@ -156,6 +238,11 @@ app-template:
       hosts:
         - host: &terrariaHost terraria.msng.to
           paths:
+            - path: /discord
+              pathType: Prefix
+              service:
+                identifier: discord-bot
+                port: http
             - path: /
               pathType: Prefix
               service:
@@ -188,6 +275,18 @@ app-template:
             - path: /config
           terraria:
             - path: /config
+    discord-bot-code:
+      type: configMap
+      name: discord-bot-code
+      advancedMounts:
+        discord-bot:
+          discord-bot:
+            - path: /app/server.py
+              subPath: server.py
+              readOnly: true
+            - path: /app/pyproject.toml
+              subPath: pyproject.toml
+              readOnly: true
     server-config:
       type: configMap
       identifier: server-config
