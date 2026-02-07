@@ -8,6 +8,7 @@ app-template:
   controllers:
     terraria:
       strategy: Recreate
+      replicas: 0
       initContainers:
         config-init:
           image:
