@@ -84,6 +84,7 @@ var hostDeployCmd = &cobra.Command{
 		hostname := args[0]
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		skipChecks, _ := cmd.Flags().GetBool("skip-checks")
+		boot, _ := cmd.Flags().GetBool("boot")
 
 		// Validate host exists
 		repoRoot, err := validateHost(hostname)
@@ -109,6 +110,9 @@ var hostDeployCmd = &cobra.Command{
 		deployArgs = append(deployArgs, "--targets", fmt.Sprintf(".#%s", hostname))
 		if dryRun {
 			deployArgs = append(deployArgs, "--dry-activate")
+		}
+		if boot {
+			deployArgs = append(deployArgs, "--boot")
 		}
 
 		deployCmd := exec.Command("deploy", deployArgs...)
@@ -467,6 +471,84 @@ var hostChangedCmd = &cobra.Command{
 	},
 }
 
+var hostRebootCmd = &cobra.Command{
+	Use:   "reboot [hostname...]",
+	Short: "Reboot one or more hosts",
+	Long: `Reboot hosts by creating a sentinel file for kured to orchestrate the reboot.
+If no hostname is specified, reboot all hosts in the current environment.
+Use --now to reboot immediately instead of waiting for kured.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		now, _ := cmd.Flags().GetBool("now")
+		var hosts []string
+
+		// If no hosts specified, get all hosts from environment
+		if len(args) == 0 {
+			envName, _ := cmd.Flags().GetString("env")
+			configDir := getConfigDir()
+			env, err := config.LoadEnvironment(configDir, envName)
+			if err != nil {
+				return fmt.Errorf("load environment: %w", err)
+			}
+			for _, host := range env.Hosts {
+				hosts = append(hosts, host.Name)
+			}
+		} else {
+			hosts = args
+		}
+
+		if len(hosts) == 0 {
+			return fmt.Errorf("no hosts to reboot")
+		}
+
+		// Get host IPs from config
+		configDir := getConfigDir()
+		env, err := config.LoadEnvironment(configDir, "production")
+		if err != nil {
+			return fmt.Errorf("load environment: %w", err)
+		}
+
+		hostIPs := make(map[string]string)
+		for _, host := range env.Hosts {
+			hostIPs[host.Name] = host.IP
+		}
+
+		var rebootCmd string
+		var action string
+		if now {
+			rebootCmd = "sudo reboot"
+			action = "Rebooting"
+		} else {
+			rebootCmd = "sudo touch /var/run/reboot-required"
+			action = "Scheduling reboot for"
+		}
+
+		for _, hostname := range hosts {
+			target := hostname
+			if ip, ok := hostIPs[hostname]; ok {
+				target = ip
+			}
+
+			if !jsonOutput {
+				fmt.Printf("%s %s...\n", action, hostname)
+			}
+
+			sshCmd := exec.Command("ssh", target, rebootCmd)
+			if err := sshCmd.Run(); err != nil {
+				if !jsonOutput {
+					fmt.Fprintf(os.Stderr, "Failed to reboot %s: %v\n", hostname, err)
+				}
+				continue
+			}
+
+			if !jsonOutput && !now {
+				fmt.Printf("Created reboot sentinel for %s\n", hostname)
+			}
+		}
+
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(hostCmd)
 
@@ -475,6 +557,7 @@ func init() {
 
 	hostDeployCmd.Flags().Bool("dry-run", false, "Perform a dry run without making changes")
 	hostDeployCmd.Flags().Bool("skip-checks", false, "Skip deploy-rs checks")
+	hostDeployCmd.Flags().Bool("boot", false, "Activate the deployment on next boot")
 	hostCmd.AddCommand(hostDeployCmd)
 
 	hostCmd.AddCommand(hostDiffCmd)
@@ -489,4 +572,8 @@ func init() {
 
 	hostCmd.AddCommand(hostSSHCmd)
 	hostCmd.AddCommand(hostChangedCmd)
+
+	hostRebootCmd.Flags().Bool("now", false, "Reboot immediately instead of creating sentinel file")
+	hostRebootCmd.Flags().String("env", "production", "Environment to load hosts from (when no hostname specified)")
+	hostCmd.AddCommand(hostRebootCmd)
 }
