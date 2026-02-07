@@ -79,6 +79,13 @@ app-template:
                 timeoutSeconds: 1
                 tcpSocket:
                   port: 7777
+          resources:
+            requests:
+              cpu: 2000m
+              memory: 2Gi
+            limits:
+              cpu: 4000m
+              memory: 6Gi
     terraria-web:
       strategy: Recreate
       containers:
@@ -113,6 +120,13 @@ app-template:
                 httpGet:
                   path: /ready
                   port: 3000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 150Mi
+            limits:
+              cpu: 250m
+              memory: 250Mi
 
   service:
     terraria:
