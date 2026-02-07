@@ -4,15 +4,7 @@ set -e
 
 # Determine if this is the master pod
 POD_NAME="$(hostname)"
-
-if [ "$POD_NAME" = "redis-0" ]; then
-  echo "This is the redis master pod (redis-0)"
-  SENTINEL_MASTER_HOST="127.0.0.1"
-else
-  echo "This is a redis replica pod ($POD_NAME)"
-  # Use short hostname for Sentinel - it has stricter DNS requirements than nslookup
-  SENTINEL_MASTER_HOST="redis-0.redis-sentinel-headless"
-fi
+SENTINEL_MASTER_HOST="redis-0.redis-sentinel-headless"
 
 # Generate Redis config with password
 cat > /tmp/redis.conf <<EOF
@@ -27,9 +19,6 @@ save 60 10000
 appendonly no
 protected-mode yes
 EOF
-
-echo "Redis config generated, verifying requirepass line..."
-grep "^requirepass" /tmp/redis.conf | sed 's/requirepass .*/requirepass [REDACTED]/'
 
 echo "Generating Sentinel configuration..."
 # Generate Sentinel config with password
@@ -58,14 +47,12 @@ done
 echo "Redis started successfully"
 
 # Non-master pods wait for master DNS to be resolvable
-if [ "$POD_NAME" != "redis-0" ]; then
-  echo "Waiting for redis master to be ready before starting Sentinel..."
-  until getent hosts "$SENTINEL_MASTER_HOST" >/dev/null 2>&1; do
-    echo "Still waiting for redis master DNS to be resolvable..."
-    sleep 2
-  done
-  echo "redis-0 is resolvable"
-fi
+echo "Waiting for redis master to be ready before starting Sentinel..."
+until getent hosts "$SENTINEL_MASTER_HOST" >/dev/null 2>&1; do
+  echo "Still waiting for redis master DNS to be resolvable..."
+  sleep 2
+done
+echo "redis-0 is resolvable"
 
 # Start Sentinel
 redis-sentinel /tmp/sentinel.conf &

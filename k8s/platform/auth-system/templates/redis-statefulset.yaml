@@ -73,18 +73,20 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
+        # Redis sentinel requires DNS to connect to the master,
+        # DNS requires readiness probe to succeed.
+        # Pod must be ready before sentinel can be started
         readinessProbe:
           exec:
             command:
             - sh
             - -c
             - |
-              redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping && \
-              redis-cli -a "$REDIS_SENTINEL_PASSWORD" -p 26379 ping
-          initialDelaySeconds: 10
+              redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping
+          initialDelaySeconds: 0
           periodSeconds: 5
           timeoutSeconds: 3
-          failureThreshold: 3
+          failureThreshold: 30
         resources:
           requests:
             memory: "256Mi"
