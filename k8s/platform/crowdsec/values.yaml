@@ -6,7 +6,7 @@ crowdsec:
   container_runtime: containerd
   image:
     repository: crowdsecurity/crowdsec
-    tag: v1.7.0-slim
+    tag: v1.7.6-slim
 
   config:
     config.yaml.local: |
