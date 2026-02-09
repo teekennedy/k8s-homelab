@@ -3,6 +3,8 @@ kind: Application
 metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+    - pre-delete-finalizer.argocd.argoproj.io
+    - pre-delete-finalizer.argocd.argoproj.io/cleanup
   name: kyverno
   namespace: argocd
 spec:
