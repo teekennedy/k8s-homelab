@@ -105,9 +105,51 @@ def get_lapi_pod(core_api):
         sys.exit(1)
 
 
+def exec_in_pod(core_api, pod_name, command):
+    """
+    Execute a command in the LAPI pod and return stdout only.
+
+    Stderr is captured separately and logged to avoid corrupting stdout output
+    (e.g. when capturing an API key).
+
+    Args:
+        pod_name: Name of the LAPI pod
+        command: Command to execute as a list of strings
+
+    Returns:
+        str: stdout output (stripped)
+    """
+    resp = stream.stream(
+        core_api.connect_get_namespaced_pod_exec,
+        pod_name,
+        CROWDSEC_NAMESPACE,
+        command=command,
+        stderr=True,
+        stdin=False,
+        stdout=True,
+        tty=False,
+        _preload_content=False,
+    )
+
+    stdout = ""
+    stderr = ""
+    while resp.is_open():
+        resp.update(timeout=10)
+        if resp.peek_stdout():
+            stdout += resp.read_stdout()
+        if resp.peek_stderr():
+            stderr += resp.read_stderr()
+
+    if stderr:
+        print(f"  stderr: {stderr.strip()}")
+
+    return stdout.strip()
+
+
 def generate_bouncer_key(core_api, pod_name):
     """
     Generate a new bouncer API key by execing into the LAPI pod.
+    If the bouncer already exists, delete it first and re-create.
 
     Args:
         pod_name: Name of the LAPI pod
@@ -118,27 +160,20 @@ def generate_bouncer_key(core_api, pod_name):
     try:
         print(f"Generating bouncer key in pod {pod_name}...")
 
-        exec_command = [
-            "cscli",
-            "bouncers",
-            "add",
-            BOUNCER_NAME,
-            "-o",
-            "raw",
-        ]
-
-        resp = stream.stream(
-            core_api.connect_get_namespaced_pod_exec,
+        # Delete existing bouncer if present (ignore errors if it doesn't exist)
+        print(f"Removing existing bouncer '{BOUNCER_NAME}' if present...")
+        exec_in_pod(
+            core_api,
             pod_name,
-            CROWDSEC_NAMESPACE,
-            command=exec_command,
-            stderr=True,
-            stdin=False,
-            stdout=True,
-            tty=False,
+            ["cscli", "bouncers", "delete", BOUNCER_NAME],
         )
 
-        api_key = resp.strip()
+        # Create new bouncer and get the key
+        api_key = exec_in_pod(
+            core_api,
+            pod_name,
+            ["cscli", "bouncers", "add", BOUNCER_NAME, "-o", "raw"],
+        )
 
         if not api_key:
             print("Failed to generate bouncer key (empty response)")

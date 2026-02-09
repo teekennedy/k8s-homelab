@@ -29,8 +29,9 @@ spec:
       name: crowdsec-secrets
       namespace: crowdsec
     # Middleware changes made by bootstrap job
-    - jsonPointers:
-        - /spec/plugin/crowdsec-bouncer/CrowdsecLapiKey
+    - group: traefik.io
+      jqPathExpressions:
+        - .spec.plugin."crowdsec-bouncer".CrowdsecLapiKey
       kind: Middleware
       name: crowdsec-bouncer
       namespace: crowdsec
