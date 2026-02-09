@@ -153,6 +153,16 @@ vlans:
       enabled: true
     switch_ports: [17]
     notes: "should include poe-switch management interface but I don't think that's possible"
+  trusted:
+    name: Trusted
+    vlan_tag: 100
+    subnet: 10.69.10.0/24
+    dhcp:
+      enabled: true
+      start: 10.69.10.10
+      stop: 10.69.10.199
+    switch_ports: [] # TODO
+    notes: Fam network. Last octet of 200 and above reserved for VPN.
   okta:
     name: "Okta"
     vlan_tag: 700
@@ -220,15 +230,15 @@ vlans:
       start: 10.69.100.202
       stop: 10.69.100.222
     notes: "vlan jail for single host"
-  unifi_network:
-    vlan_tag: 1020
-    subnet: 10.69.102.0/25 # 126 usable hosts
-    switch_ports: [10, 16, 17, 19]
-    dhcp:
-      enabled: true
   unifi_protect:
     vlan_tag: 1010
     subnet: 10.69.101.0/25 # 126 usable hosts
+    switch_ports: [10, 16, 17, 19]
+    dhcp:
+      enabled: true
+  unifi_network:
+    vlan_tag: 1020
+    subnet: 10.69.102.0/25 # 126 usable hosts
     switch_ports: [10, 16, 17, 19]
     dhcp:
       enabled: true
