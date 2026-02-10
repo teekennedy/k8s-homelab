@@ -5,12 +5,11 @@ authelia:
     enabled: true
   ingress:
     enabled: true
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
+    # TLS configuration is used to encrypt traffic between traefik and authelia
     tls:
       enabled: true
-      # Secret name defaults to 'authelia-tls'
-      # secret: 'authelia-tls'
+      # secret name defaults to "authelia-tls"
+      secret: authelia-tls-certificate
     traefikCRD:
       enabled: true
       disableIngressRoute: false
@@ -344,8 +343,6 @@ app-template:
     lldap:
       forceRename: lldap
       enabled: true
-      annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
       hosts:
         - host: &lldapHost lldap.msng.to
           paths:
@@ -355,8 +352,7 @@ app-template:
                 identifier: lldap
                 port: http
       tls:
-        - secretName: lldap-https-tls-certificate
-          hosts:
+        - hosts:
             - *lldapHost
 
   persistence:
