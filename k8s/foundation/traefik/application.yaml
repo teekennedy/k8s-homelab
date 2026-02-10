@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: traefik
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    # This application is deployed to kube-system namespace for ease of transition from the k3s packaged traefik
+    namespace: kube-system
+  ignoreDifferences:
+    - jsonPointers:
+        - /spec/volumeName
+        - /spec/storageClassName
+      kind: PersistentVolumeClaim
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+  project: default
+  source:
+    path: k8s/foundation/traefik
+    repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
+    targetRevision: main
+    helm:
+      releaseName: traefik
+  syncPolicy:
+    automated:
+      prune: true
+      # selfHeal: false
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true

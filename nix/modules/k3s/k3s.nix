@@ -15,7 +15,7 @@
     # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
     networking.firewall.allowedTCPPorts = lib.mkMerge [
       [
-        # K3s's ingress controller (Traefik)
+        # Traefik ingress controller
         80
         443
         # k3s embedded registry mirror and kubernetes API server
@@ -64,6 +64,9 @@
       enable = lib.mkDefault true;
       extraFlags = lib.mkMerge [
         [
+          # Disable k3s built-in Traefik; managed by ArgoCD instead
+          "--disable"
+          "traefik"
           # enable secrets encryption
           # This _must_ be enabled when cluster is first initialized. It cannot be enabled later.
           # https://docs.k3s.io/cli/secrets-encrypt
@@ -91,82 +94,6 @@
         ])
       ];
       tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
-    };
-
-    systemd.services.k3s-packaged-components-customization = lib.mkIf config.services.k3s.clusterInit {
-      serviceConfig.Type = "oneshot";
-      wantedBy = ["k3s.service"];
-      after = ["k3s.service"];
-      script = ''
-        cat << EOF > /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
-        apiVersion: helm.cattle.io/v1
-        kind: HelmChartConfig
-        metadata:
-          name: traefik
-          namespace: kube-system
-        spec:
-          valuesContent: |-
-            providers:
-              kubernetesGateway:
-                enabled: true
-            global:
-              checkNewVersion: false
-              sendAnonymousUsage: false
-            nodeSelector:
-              node-role.kubernetes.io/control-plane: "true"
-            ports:
-              webpublic:
-                port: 8001
-                expose:
-                  default: false
-                exposedPort: 80
-                protocol: TCP
-                redirections:
-                  entryPoint:
-                    to: websecurepublic
-                    scheme: https
-              websecurepublic:
-                port: 8444
-                expose:
-                  default: false
-                exposedPort: 443
-                protocol: TCP
-                tls:
-                  enabled: true
-              terrariapublic:
-                port: 7777
-                expose:
-                  default: false
-                exposedPort: 7777
-                protocol: TCP
-              metrics:
-                port: 9101
-                expose:
-                  default: true
-                exposedPort: 9101
-                protocol: TCP
-
-            # Enable experimental plugins for CrowdSec bouncer
-            experimental:
-              plugins:
-                crowdsec-bouncer:
-                  moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-                  version: "v1.4.5"
-
-            # Enable access logs for CrowdSec agent to parse
-            logs:
-              access:
-                enabled: true
-                format: json
-                fields:
-                  headers:
-                    defaultMode: keep
-                    names:
-                      User-Agent: keep
-                      X-Forwarded-For: keep
-                      X-Real-IP: keep
-        EOF
-      '';
     };
 
     # Enable graceful shutdown
