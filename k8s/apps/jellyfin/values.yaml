@@ -740,7 +740,6 @@ app-template:
     jellyfin:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Jellyfin"
@@ -759,13 +758,11 @@ app-template:
                 identifier: main
                 port: http
       tls:
-        - secretName: jellyfin-tls-certificate
-          hosts:
+        - hosts:
             - *jellyfinHost
     jellyseerr:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Jellyseerr"
@@ -784,13 +781,11 @@ app-template:
                 identifier: jellyseerr
                 port: jellyseerr
       tls:
-        - secretName: jellyseerr-tls-certificate
-          hosts:
+        - hosts:
             - *jellyseerrHost
     qbittorrent:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Media"
         gethomepage.dev/name: "QBittorrent"
@@ -810,13 +805,11 @@ app-template:
                 identifier: downloader
                 port: qbittorrent
       tls:
-        - secretName: qbittorrent-tls-certificate
-          hosts:
+        - hosts:
             - *qbittorrentHost
     prowlarr:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Prowlarr"
@@ -835,13 +828,11 @@ app-template:
                 identifier: arrs
                 port: prowlarr
       tls:
-        - secretName: prowlarr-tls-certificate
-          hosts:
+        - hosts:
             - *prowlarrHost
     radarr:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Radarr"
@@ -860,13 +851,11 @@ app-template:
                 identifier: arrs
                 port: radarr
       tls:
-        - secretName: radarr-tls-certificate
-          hosts:
+        - hosts:
             - *radarrHost
     sonarr:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Media"
         gethomepage.dev/name: "Sonarr"
@@ -885,8 +874,7 @@ app-template:
                 identifier: arrs
                 port: sonarr
       tls:
-        - secretName: sonarr-tls-certificate
-          hosts:
+        - hosts:
             - *sonarrHost
   persistence:
     data:
