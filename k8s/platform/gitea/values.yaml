@@ -9,7 +9,6 @@ gitea:
   ingress:
     enabled: true
     annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
       helm.sh/hook: post-install,post-upgrade
       gethomepage.dev/enabled: "true"
       gethomepage.dev/group: "Apps"
@@ -25,8 +24,7 @@ gitea:
           - path: /
             pathType: Prefix
     tls:
-      - secretName: gitea-tls-certificate
-        hosts:
+      - hosts:
           - *host
   postgresql-ha:
     enabled: false

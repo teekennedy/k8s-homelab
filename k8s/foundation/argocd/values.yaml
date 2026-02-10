@@ -58,8 +58,6 @@ argo-cd:
   server:
     ingress:
       enabled: true
-      annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
       tls: true
     metrics: &metrics
       enabled: true

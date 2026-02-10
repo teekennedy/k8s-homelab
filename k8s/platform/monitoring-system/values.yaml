@@ -19,7 +19,6 @@ kube-prometheus-stack:
     ingress:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Cluster"
         gethomepage.dev/name: "Grafana"
@@ -29,8 +28,7 @@ kube-prometheus-stack:
       hosts:
         - &host grafana.msng.to
       tls:
-        - secretName: grafana-general-tls
-          hosts:
+        - hosts:
             - *host
     persistence:
       storageClassName: longhorn
@@ -220,7 +218,6 @@ kube-prometheus-stack:
       enabled: true
       pathType: Prefix
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Cluster"
         gethomepage.dev/name: "Prometheus"
@@ -232,8 +229,7 @@ kube-prometheus-stack:
       hosts:
         - &promHost prometheus.msng.to
       tls:
-        - secretName: prometheus-tls
-          hosts:
+        - hosts:
             - *promHost
     ## Settings affecting prometheusSpec
     ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api-reference/api.md#prometheusspec

@@ -73,7 +73,6 @@ app-template:
     spoolman:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-prod
         gethomepage.dev/enabled: "true"
         gethomepage.dev/group: "Apps"
         gethomepage.dev/name: "Spoolman"
@@ -90,8 +89,7 @@ app-template:
                 identifier: spoolman
                 port: http
       tls:
-        - secretName: spoolman-tls-certificate
-          hosts:
+        - hosts:
             - *spoolmanHost
 
   persistence:

@@ -231,7 +231,6 @@ app-template:
     terraria-web:
       enabled: true
       annotations:
-        cert-manager.io/cluster-issuer: letsencrypt-http01
         traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
         external-dns.alpha.kubernetes.io/target: external.network.msng.to
         external-dns.alpha.kubernetes.io/record-type: CNAME
@@ -249,8 +248,7 @@ app-template:
                 identifier: terraria-web
                 port: http
       tls:
-        - secretName: terraria-tls-certificate
-          hosts:
+        - hosts:
             - *terrariaHost
 
   persistence:

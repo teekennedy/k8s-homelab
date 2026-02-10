@@ -30,8 +30,6 @@ step-certificates:
     size: 1Gi
   ingress:
     enabled: true
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
     hosts:
       - host: &stepCAHostname ca.msng.to
         paths:
@@ -40,7 +38,6 @@ step-certificates:
     tls:
       - hosts:
           - *stepCAHostname
-        secretName: ca-tls
 
 # https://github.com/smallstep/helm-charts/tree/master/step-issuer
 step-issuer:

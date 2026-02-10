@@ -24,7 +24,6 @@ longhorn:
   ingress:
     enabled: true
     annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
       gethomepage.dev/enabled: "true"
       gethomepage.dev/group: "Cluster"
       gethomepage.dev/name: "Longhorn"
@@ -35,7 +34,6 @@ longhorn:
     path: /
     pathType: Prefix
     tls: true
-    tlsSecret: longhorn-tls-certificate
   metrics:
     serviceMonitor:
       enabled: true
