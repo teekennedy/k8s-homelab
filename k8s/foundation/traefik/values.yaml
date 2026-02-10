@@ -1,4 +1,9 @@
 traefik:
+  tlsStore:
+    default:
+      defaultCertificate:
+        secretName: wildcard-tls-certificate
+
   providers:
     kubernetesGateway:
       enabled: true
