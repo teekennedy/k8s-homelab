@@ -188,7 +188,10 @@ crowdsec:
   lapi:
     env:
       - name: ENROLL_KEY
-        value: "<your-enroll-key>"
+        valueFrom:
+          secretKeyRef:
+            name: crowdsec-secrets
+            key: enrollKey
       - name: ENROLL_INSTANCE_NAME
         value: "k8s-homelab"
 ```

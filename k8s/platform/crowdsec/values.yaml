@@ -59,6 +59,15 @@ crowdsec:
       # Enable local API for agents and bouncers
       - name: LOCAL_API_URL
         value: "http://0.0.0.0:8080"
+      - name: ENROLL_KEY
+        valueFrom:
+          secretKeyRef:
+            name: crowdsec-secrets   # your existing secrets
+            key: enrollKey
+      - name: ENROLL_INSTANCE_NAME
+        value: "k8s-homelab"
+      - name: ENROLL_TAGS
+        value: 'k8s nixos homelab'
 
     # Dashboard metrics
     metrics:
