@@ -8,7 +8,7 @@ homepage:
     ingressClassName: anubis
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
-      traefik.ingress.kubernetes.io/router.middlewares: crowdsec-crowdsec-bouncer@kubernetescrd,homepage-public-rate-limit@kubernetescrd
+      traefik.ingress.kubernetes.io/router.middlewares: homepage-public-rate-limit@kubernetescrd
       external-dns.alpha.kubernetes.io/target: external.network.msng.to
       external-dns.alpha.kubernetes.io/record-type: CNAME
     hosts:

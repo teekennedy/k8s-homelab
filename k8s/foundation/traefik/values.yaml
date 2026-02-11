@@ -43,6 +43,8 @@ traefik:
       protocol: TCP
       tls:
         enabled: true
+      middlewares:
+        - crowdsec-crowdsec-bouncer@kubernetescrd
     terrariapublic:
       port: 7777
       expose:
