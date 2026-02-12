@@ -23,10 +23,8 @@ app-template:
       replicas: 0
       pod:
         securityContext:
-          fsGroup: &gid 1000
+          fsGroup: &gid 1200
           fsGroupChangePolicy: "OnRootMismatch"
-          runAsUser: &uid 1000
-          runAsGroup: *gid
       containers:
         terraria:
           image:
@@ -41,10 +39,10 @@ app-template:
           env:
             #  The UID to run the server with
             - name: PUID
-              value: "1000"
+              value: "1200"
             #  The GID to run the server with
             - name: PGID
-              value: "1000"
+              value: "1200"
             #  The world size to autocreate if the worldname is not found
             - name: AUTOCREATE
               value: "3"
@@ -284,6 +282,14 @@ app-template:
             - *terrariaHost
 
   persistence:
+    recovery:
+      enabled: true
+      type: persistentVolumeClaim
+      existingClaim: terraria-recovery
+      advancedMounts:
+        migration:
+          shell:
+            - path: /recovery
     worlds-shared:
       accessMode: ReadWriteMany
       type: persistentVolumeClaim
