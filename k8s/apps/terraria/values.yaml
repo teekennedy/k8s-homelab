@@ -8,7 +8,7 @@ app-template:
   controllers:
     migration:
       strategy: Recreate
-      replicas: 1
+      replicas: 0
       containers:
         shell:
           image:
@@ -20,7 +20,7 @@ app-template:
 
     terraria:
       strategy: Recreate
-      replicas: 0
+      replicas: 1
       pod:
         securityContext:
           fsGroup: &gid 1200
@@ -88,11 +88,6 @@ app-template:
             #  The name of the world. This determines which world file to load
             - name: WORLDNAME
               value: "backflip"
-            - name: WORLD_FILE_PATH
-              valueFrom:
-                configMapKeyRef:
-                  name: server-config
-                  key: WORLD_FILE_PATH
 
           # Allow probes time for world to generate
           probes:
@@ -116,7 +111,7 @@ app-template:
               memory: 6Gi
     discord-bot:
       strategy: RollingUpdate
-      replicas: 0
+      replicas: 1
       serviceAccount:
         name: discord-bot
       pod:
