@@ -6,44 +6,96 @@ app-template:
     automountServiceAccountToken: false
 
   controllers:
-    terraria:
+    migration:
       strategy: Recreate
-      replicas: 0
-      initContainers:
-        config-init:
+      replicas: 1
+      containers:
+        shell:
           image:
             repository: alpine
             tag: latest@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
-            pullPolicy: IfNotPresent
-          env:
-            - name: TERRARIA_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: server-password
-                  key: password
-            - name: WORLD_FILE_PATH
-              valueFrom:
-                configMapKeyRef:
-                  name: server-config
-                  key: WORLD_FILE_PATH
           command:
-            - /bin/sh
-            - -c
-            - |
-              set -eu
-              apk add --no-cache gettext
-              envsubst < /config/serverconfig.txt.tmpl > /config/serverconfig.txt
+            - sleep
+            - infinity
+
+    terraria:
+      strategy: Recreate
+      replicas: 0
+      pod:
+        securityContext:
+          fsGroup: &gid 1000
+          fsGroupChangePolicy: "OnRootMismatch"
+          runAsUser: &uid 1000
+          runAsGroup: *gid
       containers:
         terraria:
           image:
-            repository: kaysond/docker-terraria
-            tag: "latest"
+            repository: ghcr.io/passivelemon/terraria-docker
+            tag: terraria-1.4.5.5
             pullPolicy: IfNotPresent
           args:
             # Allow steam friends to join
             - -steam
             - -lobby
             - friends
+          env:
+            #  The UID to run the server with
+            - name: PUID
+              value: "1000"
+            #  The GID to run the server with
+            - name: PGID
+              value: "1000"
+            #  The world size to autocreate if the worldname is not found
+            - name: AUTOCREATE
+              value: "3"
+            #  The difficulty level to use with autocreate
+            - name: DIFFICULTY
+              value: "0"
+            #  The seed to use with autocreate
+            # - name: SEED
+            #   value: "NA"
+            #  The file with the list of banned players
+            - name: BANLIST
+              value: "banlist.txt"
+            #  The language to use
+            - name: LANGUAGE
+              value: "en-US"
+            #  The maximum amount of players that can be on the server
+            - name: MAXPLAYERS
+              value: "8"
+            #  The message of the day
+            - name: MOTD
+              value: "We vibin'"
+            #  Helps with entity skipping
+            - name: NPCSTREAM
+              value: "15"
+            #  The password required to join the server
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: server-password
+                  key: password
+            #  The port to join the server
+            - name: PORT
+              value: "7777"
+            #  Server process priority
+            - name: PRIORITY
+              value: "1"
+            #  Cheat protection
+            - name: SECURE
+              value: "1"
+            #  Automatically forward ports with uPNP
+            - name: UPNP
+              value: "0"
+            #  The name of the world. This determines which world file to load
+            - name: WORLDNAME
+              value: "backflip"
+            - name: WORLD_FILE_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: server-config
+                  key: WORLD_FILE_PATH
+
           # Allow probes time for world to generate
           probes:
             startup:
@@ -57,37 +109,16 @@ app-template:
                 timeoutSeconds: 1
                 tcpSocket:
                   port: 7777
-            liveness:
-              enabled: true
-              custom: true
-              spec:
-                failureThreshold: 6
-                successThreshold: 1
-                initialDelaySeconds: 0
-                periodSeconds: 5
-                timeoutSeconds: 1
-                tcpSocket:
-                  port: 7777
-            readiness:
-              enabled: true
-              custom: true
-              spec:
-                failureThreshold: 3
-                successThreshold: 1
-                initialDelaySeconds: 10
-                periodSeconds: 5
-                timeoutSeconds: 1
-                tcpSocket:
-                  port: 7777
           resources:
             requests:
-              cpu: 2000m
-              memory: 2Gi
+              cpu: 4000m
+              memory: 6Gi
             limits:
               cpu: 4000m
               memory: 6Gi
     discord-bot:
       strategy: RollingUpdate
+      replicas: 0
       serviceAccount:
         name: discord-bot
       pod:
@@ -164,6 +195,10 @@ app-template:
               memory: 128Mi
     terraria-web:
       strategy: Recreate
+      pod:
+        securityContext:
+          fsGroup: &gid 1000
+          fsGroupChangePolicy: "OnRootMismatch"
       containers:
         terraria-web:
           image:
@@ -172,10 +207,7 @@ app-template:
             pullPolicy: IfNotPresent
           env:
             - name: WORLD_FILE_PATH
-              valueFrom:
-                configMapKeyRef:
-                  name: server-config
-                  key: WORLD_FILE_PATH
+              value: /worlds/backflip.wld
             # turn off auto-refresh
             - name: REFRESH_INTERVAL_SECONDS
               value: "0"
@@ -252,27 +284,31 @@ app-template:
             - *terrariaHost
 
   persistence:
+    worlds-shared:
+      accessMode: ReadWriteMany
+      type: persistentVolumeClaim
+      size: 5Gi
+      storageClass: smb
+      advancedMounts:
+        terraria:
+          terraria:
+            - path: /opt/terraria/config/Worlds
+        migration:
+          shell:
+            - path: /shared-worlds
+        terraria-web:
+          terraria-web:
+            - path: /worlds
+              readOnly: true
     worlds:
       type: persistentVolumeClaim
       accessMode: ReadWriteOnce
       size: 5Gi
       retain: true
       advancedMounts:
-        terraria:
-          terraria:
+        migration:
+          shell:
             - path: /worlds
-        terraria-web:
-          terraria-web:
-            - path: /worlds
-              readOnly: true
-    configs:
-      type: emptyDir
-      advancedMounts:
-        terraria:
-          config-init:
-            - path: /config
-          terraria:
-            - path: /config
     discord-bot-code:
       type: configMap
       name: discord-bot-code
@@ -285,132 +321,11 @@ app-template:
             - path: /app/pyproject.toml
               subPath: pyproject.toml
               readOnly: true
-    server-config:
-      type: configMap
-      identifier: server-config
-      advancedMounts:
-        terraria:
-          config-init:
-            - path: /config/serverconfig.txt.tmpl
-              subPath: serverconfig.txt.tmpl
-              readOnly: true
-
-  configMaps:
-    server-config:
-      forceRename: server-config
-      data:
-        WORLD_FILE_PATH: /worlds/backflip.wld
-        serverconfig.txt.tmpl: |
-          #this is an example config file for TerrariaServer.exe
-          #use the command 'TerrariaServer.exe -config serverconfig.txt' to use this configuration or run start-server.bat
-          #please report crashes by emailing crashlog.txt to support@terraria.org
-
-          #the following is a list of available command line parameters:
-
-          #-config <config file>				            Specifies the configuration file to use.
-          #-port <port number>				              Specifies the port to listen on.
-          #-players <number> / -maxplayers <number>	Sets the max number of players
-          #-pass <password> / -password <password>		Sets the server password
-          #-world <world file>					Load a world and automatically start the server.
-          #-autocreate <#>					Creates a world if none is found in the path specified by -world. World size is specified by: 1(small), 2(medium), and 3(large).
-          #-banlist <path>					Specifies the location of the banlist. Defaults to "banlist.txt" in the working directory.
-          #-worldname <world name>             			Sets the name of the world when using -autocreate.
-          #-secure						Adds addition cheat protection to the server.
-          #-noupnp						Disables automatic port forwarding
-          #-steam							Enables Steam Support
-          #-lobby <friends> or <private>				Allows friends to join the server or sets it to private if Steam is enabled
-          #-ip <ip address>					Sets the IP address for the server to listen on
-          #-forcepriority <priority>				Sets the process priority for this task. If this is used the "priority" setting below will be ignored.
-          #-disableannouncementbox				Disables the text announcements Announcement Box makes when pulsed from wire.
-          #-announcementboxrange <number>				Sets the announcement box text messaging range in pixels, -1 for serverwide announcements.
-          #-seed <seed>						Specifies the world seed when using -autocreate
-
-          #Load a world and automatically start the server.
-          world=${WORLD_FILE_PATH}
-
-          #Creates a new world if none is found. World size is specified by: 1(small), 2(medium), and 3(large).
-          autocreate=3
-
-          #Sets the world seed when using autocreate
-          #seed=AwesomeSeed
-
-          #Sets special seed options, overrides the seed text if enabled. 0(disabled), 1(enabled)
-          #seed_celebration=1
-          #seed_theconstant=1
-          #seed_notthebees=1
-          #seed_notraps=1
-          #seed_fortheworthy=1
-          #seed_remix=1
-          #seed_drunk=1
-          #seed_zenith=1
-
-          #Sets the name of the world when using autocreate
-          worldname=Terraria Lost World
-
-          #Sets the difficulty of the world when using autocreate 0(classic), 1(expert), 2(master), 3(journey)
-          difficulty=1
-
-          #Sets the max number of players allowed on a server.  Value must be between 1 and 255
-          maxplayers=12
-
-          #Set the port number
-          port=7777
-
-          #Set the server password
-          password=${TERRARIA_PASSWORD}
-
-          #Set the message of the day
-          motd=We vibin'
-
-          #Sets the folder where world files will be stored
-          #worldpath=C:\Users\Defaults\My Documents\My Games\Terraria\Worlds\
-
-          #Sets the number of rolling world backups to keep
-          #worldrollbackstokeep=2
-
-          #The location of the banlist. Defaults to "banlist.txt" in the working directory.
-          #banlist=banlist.txt
-
-          #Adds addition cheat protection.
-          secure=1
-
-          #Sets the server language from its language code.
-          #English = en-US, German = de-DE, Italian = it-IT, French = fr-FR, Spanish = es-ES, Russian = ru-RU, Chinese (Simplified) = zh-Hans, Portuguese = pt-BR, Polish = pl-PL, Japanese = ja-JP, Korean = ko-KR, Chinese (Traditional) = zh-Hant
-          language=en-US
-
-          #Automatically forward ports with uPNP
-          upnp=0
-
-          #Reduces enemy skipping but increases bandwidth usage. The lower the number the less skipping will happen, but more data is sent. 0 is off.
-          #npcstream=60
-
-          #Default system priority 0:Realtime, 1:High, 2:AboveNormal, 3:Normal, 4:BelowNormal, 5:Idle
-          priority=1
-
-          #Reduces maximum liquids moving at the same time. If enabled may reduce lags but liquids may take longer to settle.
-          #slowliquids=1
-
-          #Journey mode power permissions for every individual power. 0: Locked for everyone, 1: Can only be changed by host, 2: Can be changed by everyone
-          #journeypermission_time_setfrozen=2
-          #journeypermission_time_setdawn=2
-          #journeypermission_time_setnoon=2
-          #journeypermission_time_setdusk=2
-          #journeypermission_time_setmidnight=2
-          #journeypermission_godmode=2
-          #journeypermission_wind_setstrength=2
-          #journeypermission_rain_setstrength=2
-          #journeypermission_time_setspeed=2
-          #journeypermission_rain_setfrozen=2
-          #journeypermission_wind_setfrozen=2
-          #journeypermission_increaseplacementrange=2
-          #journeypermission_setdifficulty=2
-          #journeypermission_biomespread_setfrozen=2
-          #journeypermission_setspawnrate=2
 
   secrets:
     server-password:
       forceRename: server-password
       annotations:
         secret-generator.v1.mittwald.de/autogenerate: password
-        secret-generator.v1.mittwald.de/length: "24"
+        secret-generator.v1.mittwald.de/length: "16"
       stringData: {}
