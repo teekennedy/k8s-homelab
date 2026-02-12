@@ -12,18 +12,16 @@ spec:
         any:
           - resources:
               kinds: ["PersistentVolumeClaim"]
+              selector:
+                matchExpressions:
+                  - key: recurring-job-group.longhorn.io/default
+                    operator: Exists
       preconditions:
         all:
-          # A) Does the PVC have ANY non-default recurring-job group label?
-          #    (i.e., any key starting with the prefix and not exactly .../default)
+          # Does the PVC have ANY non-default recurring-job group label?
           - key: "{{ `{{ length(keys(request.object.metadata.labels)[?contains(@, 'recurring-job-group.longhorn.io/') && @ != 'recurring-job-group.longhorn.io/default']) }}` }}"
             operator: GreaterThan
             value: 0
-
-          # B) Does the PVC currently have the default group label at all?
-          - key: "{{ `{{ contains(keys(request.object.metadata.labels), 'recurring-job-group.longhorn.io/default') }}` }}"
-            operator: Equals
-            value: true
 
       mutate:
         patchesJson6902: |-
