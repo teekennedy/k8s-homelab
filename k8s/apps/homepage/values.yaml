@@ -2,7 +2,7 @@ homepage:
   image:
     registry: ghcr.io
     repository: gethomepage/homepage
-    tag: "v1.9.0"
+    tag: "v1.10.1"
   ingress:
     enabled: true
     ingressClassName: anubis
@@ -59,7 +59,7 @@ secret-sync:
   schedule: "*/30 * * * *"
   image:
     repository: golang
-    tag: 1.25.6-alpine
+    tag: 1.26.0-alpine
   events:
     enabled: true
     eventBusName: homepage-secret-sync
