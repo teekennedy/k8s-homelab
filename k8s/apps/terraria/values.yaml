@@ -89,7 +89,7 @@ app-template:
             - name: WORLDNAME
               value: "backflip"
 
-          # Allow probes time for world to generate
+          # Startup probe has a high failure threshold to give the server time to generate a world
           probes:
             startup:
               enabled: true
@@ -101,13 +101,14 @@ app-template:
                 periodSeconds: 15
                 timeoutSeconds: 1
                 tcpSocket:
-                  port: 7777
+                  port: &terrariaPort 7777
+          # CPU requests set to just over 4 to avoid running on my underpowered Intel N150 system
           resources:
             requests:
-              cpu: 4000m
+              cpu: 4001m
               memory: 6Gi
             limits:
-              cpu: 4000m
+              cpu: 4001m
               memory: 6Gi
     discord-bot:
       strategy: RollingUpdate
@@ -234,7 +235,7 @@ app-template:
       controller: terraria
       ports:
         terraria:
-          port: &terrariaPort 7777
+          port: *terrariaPort
           protocol: TCP
         http:
           port: &restPort 7878
