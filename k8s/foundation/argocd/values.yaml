@@ -1,11 +1,11 @@
 argo-cd:
   global:
     domain: argocd.msng.to
+    # logging:
+    #   level: debug
     env:
       - name: TZ
         value: America/Denver
-    logging:
-      level: debug
 
   configs:
     # argocd-cmd-params-cm configmap
