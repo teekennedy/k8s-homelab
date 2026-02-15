@@ -4,6 +4,6 @@
     ./impermanence.nix
     ./journald.nix
     ./sops-nix.nix
-    ./store.nix
+    ./nix.nix
   ];
 }
