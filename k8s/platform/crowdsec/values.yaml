@@ -42,9 +42,10 @@ crowdsec:
     # Resources for the LAPI pod
     resources:
       limits:
+        cpu: 750m
         memory: 256Mi
       requests:
-        cpu: 100m
+        cpu: 125m
         memory: 128Mi
 
     # Persistent storage for LAPI database
