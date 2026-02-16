@@ -124,7 +124,7 @@ def test_k8s_request_handles_http_error(mock_urlopen, mock_auth):
 
 
 @patch("server.k8s_request")
-def test_evict_longhorn_node(mock_k8s_request):
+def test_disable_longhorn_scheduling(mock_k8s_request):
     # Mock the GET response
     node_data = {
         "metadata": {"name": "borg-0"},
@@ -147,7 +147,7 @@ def test_evict_longhorn_node(mock_k8s_request):
     }
     mock_k8s_request.return_value = node_data
 
-    server.evict_longhorn_node("borg-0")
+    server.disable_longhorn_scheduling("borg-0")
 
     # Verify GET was called
     assert mock_k8s_request.call_args_list[0][0] == (
@@ -161,11 +161,12 @@ def test_evict_longhorn_node(mock_k8s_request):
     updated_node = put_call[0][2]
 
     assert updated_node["spec"]["allowScheduling"] is False
-    assert updated_node["spec"]["evictionRequested"] is True
     assert updated_node["spec"]["disks"]["disk-1"]["allowScheduling"] is False
-    assert updated_node["spec"]["disks"]["disk-1"]["evictionRequested"] is True
     assert updated_node["spec"]["disks"]["disk-2"]["allowScheduling"] is False
-    assert updated_node["spec"]["disks"]["disk-2"]["evictionRequested"] is True
+    # evictionRequested should NOT be set
+    assert updated_node["spec"]["evictionRequested"] is False
+    assert updated_node["spec"]["disks"]["disk-1"]["evictionRequested"] is False
+    assert updated_node["spec"]["disks"]["disk-2"]["evictionRequested"] is False
 
 
 @patch("server.k8s_request")

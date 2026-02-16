@@ -165,26 +165,24 @@ def k8s_request(method: str, path: str, body: Optional[dict] = None) -> dict:
         raise RuntimeError(f"K8s API error: {e.code} {error_body}")
 
 
-def evict_longhorn_node(node: str) -> None:
-    """Enable eviction for Longhorn node and all its disks."""
-    print(f"Requesting Longhorn eviction for node {node}", file=sys.stderr)
+def disable_longhorn_scheduling(node: str) -> None:
+    """Disable scheduling for Longhorn node and all its disks without eviction."""
+    print(f"Disabling Longhorn scheduling for node {node}", file=sys.stderr)
 
     # Get the current node resource
     path = f"/apis/longhorn.io/v1beta2/namespaces/longhorn-system/nodes/{node}"
     node_resource = k8s_request("GET", path)
 
-    # Update node spec
+    # Update node spec - disable scheduling but don't request eviction
     node_resource["spec"]["allowScheduling"] = False
-    node_resource["spec"]["evictionRequested"] = True
 
-    # Update all disks to enable eviction and disable scheduling
+    # Update all disks to disable scheduling without eviction
     for disk_name, disk_spec in node_resource["spec"]["disks"].items():
-        disk_spec["evictionRequested"] = True
         disk_spec["allowScheduling"] = False
 
     # Apply the update
     k8s_request("PUT", path, node_resource)
-    print(f"Longhorn eviction enabled for node {node}", file=sys.stderr)
+    print(f"Longhorn scheduling disabled for node {node}", file=sys.stderr)
 
 
 def restore_longhorn_node(node: str) -> None:
@@ -235,11 +233,14 @@ def load_config(env: abc.Mapping) -> Config:
 
 def handle_event(event: str, node: str) -> bool:
     if event == "drain":
-        # Trigger Longhorn eviction first
+        # Disable Longhorn scheduling (no eviction - node will be back after reboot)
         try:
-            evict_longhorn_node(node)
+            disable_longhorn_scheduling(node)
         except Exception as exc:
-            print(f"Failed to evict Longhorn node {node}: {exc}", file=sys.stderr)
+            print(
+                f"Failed to disable Longhorn scheduling for node {node}: {exc}",
+                file=sys.stderr,
+            )
             # Continue with other actions even if Longhorn eviction fails
 
         # Silence alerts

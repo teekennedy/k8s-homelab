@@ -1,5 +1,9 @@
 metallb:
   loadBalancerClass: metallb
+  # disable frr as it was causing issues with kernel 6.18
+  speaker:
+    frr:
+      enabled: false
   prometheus:
     rbacPrometheus: false
     serviceMonitor:

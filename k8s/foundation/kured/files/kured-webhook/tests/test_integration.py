@@ -191,9 +191,9 @@ def test_webhook_uncordon_sends_silences_and_resolves_alert(
     assert alert_payload["startsAt"] == alert_payload["endsAt"]
 
 
-@patch("server.evict_longhorn_node")
-def test_webhook_drain_triggers_longhorn_eviction(
-    mock_evict, alertmanager_server: tuple
+@patch("server.disable_longhorn_scheduling")
+def test_webhook_drain_disables_longhorn_scheduling(
+    mock_disable, alertmanager_server: tuple
 ) -> None:
     recorder, url, _, _ = alertmanager_server
     previous = server.CONFIG
@@ -207,8 +207,8 @@ def test_webhook_drain_triggers_longhorn_eviction(
         stop_http_server(webhook, webhook_thread)
         server.CONFIG = previous
 
-    # Verify Longhorn eviction was called
-    mock_evict.assert_called_once_with("borg-2")
+    # Verify Longhorn scheduling was disabled
+    mock_disable.assert_called_once_with("borg-2")
 
 
 @patch("server.restore_longhorn_node")
@@ -231,19 +231,19 @@ def test_webhook_uncordon_triggers_longhorn_restore(
     mock_restore.assert_called_once_with("borg-3")
 
 
-@patch("server.evict_longhorn_node")
+@patch("server.disable_longhorn_scheduling")
 def test_webhook_drain_continues_on_longhorn_failure(
-    mock_evict, alertmanager_server: tuple
+    mock_disable, alertmanager_server: tuple
 ) -> None:
-    """Test that drain event continues even if Longhorn eviction fails."""
+    """Test that drain event continues even if disabling Longhorn scheduling fails."""
     recorder, url, _, _ = alertmanager_server
     previous = server.CONFIG
     server.CONFIG = build_webhook_config(url)
     webhook, webhook_thread = start_http_server(server.Handler)
     webhook_url = f"http://127.0.0.1:{webhook.server_port}"
 
-    # Make Longhorn eviction fail
-    mock_evict.side_effect = RuntimeError("Longhorn API error")
+    # Make disabling Longhorn scheduling fail
+    mock_disable.side_effect = RuntimeError("Longhorn API error")
 
     try:
         post_webhook(webhook_url, b"event=drain node=borg-2")
