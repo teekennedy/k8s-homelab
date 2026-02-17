@@ -16,7 +16,7 @@ spec:
 
     # Alert on high node-level disk I/O utilization
     - alert: HighDiskIOUtilization
-      expr: rate(node_disk_io_time_seconds_total[2m]) > 0.5
+      expr: rate(node_disk_io_time_seconds_total[2m]) * on(instance, device) group_left node_disk_info{model!="VIRTUAL-DISK"} > 0.5
       for: 5m
       labels:
         severity: warning
@@ -38,7 +38,7 @@ spec:
 
     # Alert on high disk queue depth (weighted IO time = avg queue depth)
     - alert: HighDiskQueueDepth
-      expr: rate(node_disk_io_time_weighted_seconds_total[2m]) > 2
+      expr: rate(node_disk_io_time_weighted_seconds_total[2m]) * on(instance, device) group_left node_disk_info{model!="VIRTUAL-DISK"} > 2
       for: 3m
       labels:
         severity: warning
@@ -50,8 +50,9 @@ spec:
     # Alert on high average disk latency (>20ms per IO operation)
     - alert: HighDiskLatency
       expr: |
-        (rate(node_disk_read_time_seconds_total[2m]) + rate(node_disk_write_time_seconds_total[2m]))
-        / (rate(node_disk_reads_completed_total[2m]) + rate(node_disk_writes_completed_total[2m])) > 0.02
+        ((rate(node_disk_read_time_seconds_total[2m]) + rate(node_disk_write_time_seconds_total[2m]))
+        / (rate(node_disk_reads_completed_total[2m]) + rate(node_disk_writes_completed_total[2m])))
+        * on(instance, device) group_left node_disk_info{model!="VIRTUAL-DISK"} > 0.02
       for: 3m
       labels:
         severity: warning
