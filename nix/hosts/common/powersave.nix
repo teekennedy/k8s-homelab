@@ -10,6 +10,16 @@
 
       ${pkgs.powertop}/bin/powertop --auto-tune
 
+      # Disable SATA ALPM - powertop enables min_power which adds latency on wake
+      for policy in /sys/class/scsi_host/host*/link_power_management_policy; do
+        [ -f "$policy" ] && echo max_performance > "$policy"
+      done
+
+      # Disable NVMe APST (Autonomous Power State Transitions)
+      for ctrl in /sys/class/nvme/nvme*/power/pm_qos_latency_tolerance_us; do
+        [ -f "$ctrl" ] && echo 0 > "$ctrl"
+      done
+
       # Set CPU scaling governor to powersave mode
       echo powersave | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 

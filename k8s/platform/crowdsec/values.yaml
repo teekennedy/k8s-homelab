@@ -25,9 +25,13 @@ crowdsec:
           agents_autodelete:
             cert: 60m # This is TLS client authentication
             login_password: 60m # This includes the auto registration token as well
-        type: sqlite
-        db_path: /var/lib/crowdsec/data/crowdsec.db
-        use_wal: true
+        type: pgx
+        host: crowdsec-psql-rw.crowdsec.svc
+        port: 5432
+        user: crowdsec
+        password: "${DB_PASSWORD}"
+        db_name: crowdsec
+        sslmode: require
         decision_bulk_size: 2000
         max_open_conns: 50
 
@@ -69,6 +73,11 @@ crowdsec:
         value: "k8s-homelab"
       - name: ENROLL_TAGS
         value: 'k8s nixos homelab'
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: crowdsec-psql-app
+            key: password
 
     # Dashboard metrics
     metrics:
