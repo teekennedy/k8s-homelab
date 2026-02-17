@@ -39,7 +39,7 @@
         "name": "device",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "$datasource" },
-        "query": "label_values(node_disk_io_time_seconds_total{instance=~\"$node\"}, device)",
+        "query": "label_values(node_disk_info{instance=~\"$node\", model!=\"VIRTUAL-DISK\"}, device)",
         "includeAll": true,
         "multi": true,
         "current": { "selected": true, "text": "All", "value": "$__all" },
@@ -70,7 +70,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "$datasource" },
-          "expr": "rate(node_disk_io_time_weighted_seconds_total{instance=~\"$node\", device=~\"$device\"}[5m])",
+          "expr": "rate(node_disk_io_time_weighted_seconds_total{instance=~\"$node\", device=~\"$device\"}[5m]) * on(instance, device) group_left node_disk_info{model!=\"VIRTUAL-DISK\"}",
           "legendFormat": "{{instance}} {{device}}"
         }
       ]
@@ -91,7 +91,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "$datasource" },
-          "expr": "rate(node_disk_written_bytes_total{instance=~\"$node\", device=~\"$device\"}[5m])",
+          "expr": "rate(node_disk_written_bytes_total{instance=~\"$node\", device=~\"$device\"}[5m]) * on(instance, device) group_left node_disk_info{model!=\"VIRTUAL-DISK\"}",
           "legendFormat": "{{instance}} {{device}}"
         }
       ]
@@ -259,7 +259,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "$datasource" },
-          "expr": "rate(node_disk_io_time_weighted_seconds_total{instance=~\"$node\", device=~\"$device\"}[5m])",
+          "expr": "rate(node_disk_io_time_weighted_seconds_total{instance=~\"$node\", device=~\"$device\"}[5m]) * on(instance, device) group_left node_disk_info{model!=\"VIRTUAL-DISK\"}",
           "legendFormat": "{{instance}} {{device}}"
         }
       ]
