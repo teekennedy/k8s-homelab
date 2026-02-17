@@ -6,18 +6,6 @@ app-template:
     automountServiceAccountToken: false
 
   controllers:
-    migration:
-      strategy: Recreate
-      replicas: 0
-      containers:
-        shell:
-          image:
-            repository: alpine
-            tag: latest@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
-          command:
-            - sleep
-            - infinity
-
     terraria:
       strategy: Recreate
       replicas: 1
@@ -278,39 +266,20 @@ app-template:
             - *terrariaHost
 
   persistence:
-    recovery:
-      enabled: true
-      type: persistentVolumeClaim
-      existingClaim: terraria-recovery
-      advancedMounts:
-        migration:
-          shell:
-            - path: /recovery
     worlds-shared:
       accessMode: ReadWriteMany
       type: persistentVolumeClaim
       size: 5Gi
+      forceRename: terraria-worlds-shared
       storageClass: smb
       advancedMounts:
         terraria:
           terraria:
             - path: /opt/terraria/config/Worlds
-        migration:
-          shell:
-            - path: /shared-worlds
         terraria-web:
           terraria-web:
             - path: /worlds
               readOnly: true
-    worlds:
-      type: persistentVolumeClaim
-      accessMode: ReadWriteOnce
-      size: 5Gi
-      retain: true
-      advancedMounts:
-        migration:
-          shell:
-            - path: /worlds
     discord-bot-code:
       type: configMap
       name: discord-bot-code
