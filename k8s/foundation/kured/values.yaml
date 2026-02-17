@@ -12,7 +12,7 @@ kured:
     messageTemplateReboot: "event=reboot node=%s"
     messageTemplateUncordon: "event=uncordon node=%s"
     # How often to check for sentinel file
-    period: "30m0s"
+    period: "3m0s"
     rebootCommand: "/run/current-system/sw/bin/systemctl reboot"
     alertFilterRegexp: "^(KubeVersionMismatch|LonghornVolumeActualSpaceUsedWarning|LonghornNodeStorageWarning|LonghornDiskStorageWarning)$"
     # Give drain operation up to 30 minutes to complete (for Longhorn replica evacuation)
