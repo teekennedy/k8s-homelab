@@ -43,6 +43,8 @@ webhook:
     - NodeSystemSaturation
     - NodeCPUHighUsage
     - LonghornInstanceManagerCPUUsageWarning
+    - HighDiskLatency
+    - HighDiskQueueDepth
   postRebootSilenceDuration: 15m
   rebootAlertTtl: 6h
   postRebootSilenceAlerts:
