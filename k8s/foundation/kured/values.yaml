@@ -24,7 +24,7 @@ webhook:
   enabled: true
   image:
     repository: python
-    tag: 3.12-alpine
+    tag: 3.14-alpine
   events:
     enabled: true
     eventBusName: kured-webhook
