@@ -515,7 +515,7 @@ app-template:
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 6.0.4.10291-ls292
+            tag: 6.0.4.10291-ls293
           env:
             # https://wiki.servarr.com/en/radarr/environment-variables
             TZ: America/Denver
@@ -532,7 +532,7 @@ app-template:
         sonarr:
           image:
             repository: lscr.io/linuxserver/sonarr
-            tag: 4.0.16.2944-ls302
+            tag: 4.0.16.2944-ls303
           env:
             # https://wiki.servarr.com/en/sonarr/environment-variables
             TZ: America/Denver
@@ -602,7 +602,7 @@ app-template:
         qbittorrent:
           image:
             repository: lscr.io/linuxserver/qbittorrent
-            tag: 5.1.4-r2-ls440
+            tag: 5.1.4-r2-ls442
           env:
             TZ: America/Denver
             PUID: "1200"
