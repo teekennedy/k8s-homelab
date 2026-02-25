@@ -56,7 +56,7 @@ in {
       cue
       dagger
       deploy-rs
-      go
+      go_1_26
       helmfile-wrapped
       k9s
       kind
