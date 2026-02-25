@@ -1,8 +1,1 @@
-# Dagger SDK - auto-generated, do not commit
-internal/
-dagger.gen.go
-querybuilder/
-/internal/dagger
-/internal/querybuilder
-/internal/telemetry
 /.env
