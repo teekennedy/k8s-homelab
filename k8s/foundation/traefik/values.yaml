@@ -31,20 +31,22 @@ traefik:
         default: false
       exposedPort: 80
       protocol: TCP
-      redirections:
-        entryPoint:
-          to: websecurepublic
-          scheme: https
+      http:
+        redirections:
+          entryPoint:
+            to: websecurepublic
+            scheme: https
     websecurepublic:
       port: 8444
       expose:
         default: false
       exposedPort: 443
       protocol: TCP
-      tls:
-        enabled: true
-      middlewares:
-        - crowdsec-crowdsec-bouncer@kubernetescrd
+      http:
+        tls:
+          enabled: true
+        middlewares:
+          - crowdsec-crowdsec-bouncer@kubernetescrd
     terrariapublic:
       port: 7777
       expose:
