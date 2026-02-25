@@ -29,15 +29,15 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1767558108,
-        "owner": "szlend",
+        "lastModified": 1770019181,
+        "owner": "serokell",
         "repo": "deploy-rs",
-        "rev": "7edf1f4fd866fc5718aa5358dc720f4ee90909e3",
+        "rev": "77c906c0ba56aabdbc72041bf9111b565cdd6171",
         "type": "github"
       },
       "original": {
-        "owner": "szlend",
-        "ref": "fix-show-derivation-parsing",
+        "owner": "serokell",
+        "ref": "master",
         "repo": "deploy-rs",
         "type": "github"
       }
@@ -45,10 +45,10 @@
     "devenv": {
       "locked": {
         "dir": "src/modules",
-        "lastModified": 1771271556,
+        "lastModified": 1772049386,
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "194360aec439af647b99f69045f12b305d483699",
+        "rev": "e9f3b7808443cd3d5b492863bc9c839f357e73da",
         "type": "github"
       },
       "original": {
@@ -128,10 +128,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1770726378,
+        "lastModified": 1772024342,
         "owner": "cachix",
         "repo": "git-hooks.nix",
-        "rev": "5eaaedde414f6eb1aea8b8525c466dc37bba95ae",
+        "rev": "6e34e97ed9788b17796ee43ccdbaf871a5c2b476",
         "type": "github"
       },
       "original": {

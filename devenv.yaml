@@ -9,11 +9,8 @@ inputs:
     inputs:
       nixpkgs:
         follows: "nixpkgs"
-  # Override deploy-rs binary to nix 2.33 compatible version until it gets added to upstream
-  # See https://github.com/serokell/deploy-rs/pull/359
   deploy-rs:
-    url: "github:szlend/deploy-rs?ref=fix-show-derivation-parsing"
-    # url: "github:serokell/deploy-rs?ref=master"
+    url: "github:serokell/deploy-rs?ref=master"
     inputs:
       nixpkgs:
         follows: "nixpkgs"
