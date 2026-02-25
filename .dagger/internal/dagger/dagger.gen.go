@@ -19,8 +19,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	"dagger/homelab/internal/querybuilder"
-	"dagger/homelab/internal/telemetry"
+	"dagger.io/dagger/querybuilder"
+	"dagger.io/dagger/telemetry"
 )
 
 func Tracer() trace.Tracer {
@@ -215,6 +215,12 @@ type FunctionID string
 
 // The `GeneratedCodeID` scalar type represents an identifier for an object of type GeneratedCode.
 type GeneratedCodeID string
+
+// The `GeneratorGroupID` scalar type represents an identifier for an object of type GeneratorGroup.
+type GeneratorGroupID string
+
+// The `GeneratorID` scalar type represents an identifier for an object of type Generator.
+type GeneratorID string
 
 // The `GitRefID` scalar type represents an identifier for an object of type GitRef.
 type GitRefID string
@@ -656,6 +662,24 @@ func (r *Binding) AsFile() *File {
 	}
 }
 
+// Retrieve the binding value, as type Generator
+func (r *Binding) AsGenerator() *Generator {
+	q := r.query.Select("asGenerator")
+
+	return &Generator{
+		query: q,
+	}
+}
+
+// Retrieve the binding value, as type GeneratorGroup
+func (r *Binding) AsGeneratorGroup() *GeneratorGroup {
+	q := r.query.Select("asGeneratorGroup")
+
+	return &GeneratorGroup{
+		query: q,
+	}
+}
+
 // Retrieve the binding value, as type GitRef
 func (r *Binding) AsGitRef() *GitRef {
 	q := r.query.Select("asGitRef")
@@ -949,6 +973,14 @@ type Changeset struct {
 	isEmpty *bool
 	sync    *ChangesetID
 }
+type WithChangesetFunc func(r *Changeset) *Changeset
+
+// With calls the provided function with current Changeset.
+//
+// This is useful for reusability and readability by not breaking the calling chain.
+func (r *Changeset) With(f WithChangesetFunc) *Changeset {
+	return f(r)
+}
 
 func (r *Changeset) WithGraphQLQuery(q *querybuilder.Selection) *Changeset {
 	return &Changeset{
@@ -1111,6 +1143,61 @@ func (r *Changeset) Sync(ctx context.Context) (*Changeset, error) {
 	}, nil
 }
 
+// ChangesetWithChangesetOpts contains options for Changeset.WithChangeset
+type ChangesetWithChangesetOpts struct {
+	// What to do on a merge conflict
+	//
+	// Default: FAIL
+	OnConflict ChangesetMergeConflict
+}
+
+// Add changes to an existing changeset
+//
+// By default the operation will fail in case of conflicts, for instance a file modified in both changesets. The behavior can be adjusted using onConflict argument
+func (r *Changeset) WithChangeset(changes *Changeset, opts ...ChangesetWithChangesetOpts) *Changeset {
+	assertNotNil("changes", changes)
+	q := r.query.Select("withChangeset")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `onConflict` optional argument
+		if !querybuilder.IsZeroValue(opts[i].OnConflict) {
+			q = q.Arg("onConflict", opts[i].OnConflict)
+		}
+	}
+	q = q.Arg("changes", changes)
+
+	return &Changeset{
+		query: q,
+	}
+}
+
+// ChangesetWithChangesetsOpts contains options for Changeset.WithChangesets
+type ChangesetWithChangesetsOpts struct {
+	// What to do on a merge conflict
+	//
+	// Default: FAIL
+	OnConflict ChangesetsMergeConflict
+}
+
+// Add changes from multiple changesets using git octopus merge strategy
+//
+// This is more efficient than chaining multiple withChangeset calls when merging many changesets.
+//
+// Only FAIL and FAIL_EARLY conflict strategies are supported (octopus merge cannot use -X ours/theirs).
+func (r *Changeset) WithChangesets(changes []*Changeset, opts ...ChangesetWithChangesetsOpts) *Changeset {
+	q := r.query.Select("withChangesets")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `onConflict` optional argument
+		if !querybuilder.IsZeroValue(opts[i].OnConflict) {
+			q = q.Arg("onConflict", opts[i].OnConflict)
+		}
+	}
+	q = q.Arg("changes", changes)
+
+	return &Changeset{
+		query: q,
+	}
+}
+
 type Check struct {
 	query *querybuilder.Selection
 
@@ -1265,15 +1352,6 @@ func (r *Check) Run() *Check {
 	q := r.query.Select("run")
 
 	return &Check{
-		query: q,
-	}
-}
-
-// The module source where the check is defined (i.e., toolchains)
-func (r *Check) Source() *ModuleSource {
-	q := r.query.Select("source")
-
-	return &ModuleSource{
 		query: q,
 	}
 }
@@ -3412,6 +3490,29 @@ func (r *CurrentModule) GeneratedContextDirectory() *Directory {
 	}
 }
 
+// CurrentModuleGeneratorsOpts contains options for CurrentModule.Generators
+type CurrentModuleGeneratorsOpts struct {
+	// Only include generators matching the specified patterns
+	Include []string
+}
+
+// Return all generators defined by the module
+//
+// Experimental: This API is highly experimental and may be removed or replaced entirely.
+func (r *CurrentModule) Generators(opts ...CurrentModuleGeneratorsOpts) *GeneratorGroup {
+	q := r.query.Select("generators")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `include` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Include) {
+			q = q.Arg("include", opts[i].Include)
+		}
+	}
+
+	return &GeneratorGroup{
+		query: q,
+	}
+}
+
 // A unique identifier for this CurrentModule.
 func (r *CurrentModule) ID(ctx context.Context) (CurrentModuleID, error) {
 	if r.id != nil {
@@ -3691,6 +3792,12 @@ type DirectoryDockerBuildOpts struct {
 	//
 	// This should only be used if the user requires that their exec processes be the pid 1 process in the container. Otherwise it may result in unexpected behavior.
 	NoInit bool
+	// A socket to use for SSH authentication during the build
+	//
+	// (e.g., for Dockerfile RUN --mount=type=ssh instructions).
+	//
+	// Typically obtained via host.unixSocket() pointing to the SSH_AUTH_SOCK.
+	SSH *Socket
 }
 
 // Use Dockerfile compatibility to build a container from this directory. Only use this function for Dockerfile compatibility. Otherwise use the native Container type directly, it is feature-complete and supports all Dockerfile features.
@@ -3720,6 +3827,10 @@ func (r *Directory) DockerBuild(opts ...DirectoryDockerBuildOpts) *Container {
 		// `noInit` optional argument
 		if !querybuilder.IsZeroValue(opts[i].NoInit) {
 			q = q.Arg("noInit", opts[i].NoInit)
+		}
+		// `ssh` optional argument
+		if !querybuilder.IsZeroValue(opts[i].SSH) {
+			q = q.Arg("ssh", opts[i].SSH)
 		}
 	}
 
@@ -4690,6 +4801,41 @@ func (r *Env) WithGraphQLQuery(q *querybuilder.Selection) *Env {
 	}
 }
 
+// Return the check with the given name from the installed modules. Must match exactly one check.
+//
+// Experimental: Checks API is highly experimental and may be removed or replaced entirely.
+func (r *Env) Check(name string) *Check {
+	q := r.query.Select("check")
+	q = q.Arg("name", name)
+
+	return &Check{
+		query: q,
+	}
+}
+
+// EnvChecksOpts contains options for Env.Checks
+type EnvChecksOpts struct {
+	// Only include checks matching the specified patterns
+	Include []string
+}
+
+// Return all checks defined by the installed modules
+//
+// Experimental: Checks API is highly experimental and may be removed or replaced entirely.
+func (r *Env) Checks(opts ...EnvChecksOpts) *CheckGroup {
+	q := r.query.Select("checks")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `include` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Include) {
+			q = q.Arg("include", opts[i].Include)
+		}
+	}
+
+	return &CheckGroup{
+		query: q,
+	}
+}
+
 // A unique identifier for this Env.
 func (r *Env) ID(ctx context.Context) (EnvID, error) {
 	if r.id != nil {
@@ -5100,6 +5246,54 @@ func (r *Env) WithFileOutput(name string, description string) *Env {
 	}
 }
 
+// Create or update a binding of type GeneratorGroup in the environment
+func (r *Env) WithGeneratorGroupInput(name string, value *GeneratorGroup, description string) *Env {
+	assertNotNil("value", value)
+	q := r.query.Select("withGeneratorGroupInput")
+	q = q.Arg("name", name)
+	q = q.Arg("value", value)
+	q = q.Arg("description", description)
+
+	return &Env{
+		query: q,
+	}
+}
+
+// Declare a desired GeneratorGroup output to be assigned in the environment
+func (r *Env) WithGeneratorGroupOutput(name string, description string) *Env {
+	q := r.query.Select("withGeneratorGroupOutput")
+	q = q.Arg("name", name)
+	q = q.Arg("description", description)
+
+	return &Env{
+		query: q,
+	}
+}
+
+// Create or update a binding of type Generator in the environment
+func (r *Env) WithGeneratorInput(name string, value *Generator, description string) *Env {
+	assertNotNil("value", value)
+	q := r.query.Select("withGeneratorInput")
+	q = q.Arg("name", name)
+	q = q.Arg("value", value)
+	q = q.Arg("description", description)
+
+	return &Env{
+		query: q,
+	}
+}
+
+// Declare a desired Generator output to be assigned in the environment
+func (r *Env) WithGeneratorOutput(name string, description string) *Env {
+	q := r.query.Select("withGeneratorOutput")
+	q = q.Arg("name", name)
+	q = q.Arg("description", description)
+
+	return &Env{
+		query: q,
+	}
+}
+
 // Create or update a binding of type GitRef in the environment
 func (r *Env) WithGitRefInput(name string, value *GitRef, description string) *Env {
 	assertNotNil("value", value)
@@ -5172,9 +5366,24 @@ func (r *Env) WithJSONValueOutput(name string, description string) *Env {
 	}
 }
 
+// Sets the main module for this environment (the project being worked on)
+//
+// Contextual path arguments will be populated using the environment's workspace.
+func (r *Env) WithMainModule(module *Module) *Env {
+	assertNotNil("module", module)
+	q := r.query.Select("withMainModule")
+	q = q.Arg("module", module)
+
+	return &Env{
+		query: q,
+	}
+}
+
 // Installs a module into the environment, exposing its functions to the model
 //
 // Contextual path arguments will be populated using the environment's workspace.
+//
+// Deprecated: Use withMainModule instead
 func (r *Env) WithModule(module *Module) *Env {
 	assertNotNil("module", module)
 	q := r.query.Select("withModule")
@@ -6664,6 +6873,8 @@ type FunctionWithArgOpts struct {
 	SourceMap *SourceMap
 	// If deprecated, the reason or migration path.
 	Deprecated string
+
+	DefaultAddress string
 }
 
 // Returns the function with the provided argument
@@ -6694,6 +6905,10 @@ func (r *Function) WithArg(name string, typeDef *TypeDef, opts ...FunctionWithAr
 		// `deprecated` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Deprecated) {
 			q = q.Arg("deprecated", opts[i].Deprecated)
+		}
+		// `defaultAddress` optional argument
+		if !querybuilder.IsZeroValue(opts[i].DefaultAddress) {
+			q = q.Arg("defaultAddress", opts[i].DefaultAddress)
 		}
 	}
 	q = q.Arg("name", name)
@@ -6766,6 +6981,15 @@ func (r *Function) WithDescription(description string) *Function {
 	}
 }
 
+// Returns the function with a flag indicating it's a generator.
+func (r *Function) WithGenerator() *Function {
+	q := r.query.Select("withGenerator")
+
+	return &Function{
+		query: q,
+	}
+}
+
 // Returns the function with the given source map.
 func (r *Function) WithSourceMap(sourceMap *SourceMap) *Function {
 	assertNotNil("sourceMap", sourceMap)
@@ -6783,18 +7007,32 @@ func (r *Function) WithSourceMap(sourceMap *SourceMap) *Function {
 type FunctionArg struct {
 	query *querybuilder.Selection
 
-	defaultPath  *string
-	defaultValue *JSON
-	deprecated   *string
-	description  *string
-	id           *FunctionArgID
-	name         *string
+	defaultAddress *string
+	defaultPath    *string
+	defaultValue   *JSON
+	deprecated     *string
+	description    *string
+	id             *FunctionArgID
+	name           *string
 }
 
 func (r *FunctionArg) WithGraphQLQuery(q *querybuilder.Selection) *FunctionArg {
 	return &FunctionArg{
 		query: q,
 	}
+}
+
+// Only applies to arguments of type Container. If the argument is not set, load it from the given address (e.g. alpine:latest)
+func (r *FunctionArg) DefaultAddress(ctx context.Context) (string, error) {
+	if r.defaultAddress != nil {
+		return *r.defaultAddress, nil
+	}
+	q := r.query.Select("defaultAddress")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
 }
 
 // Only applies to arguments of type File or Directory. If the argument is not set, load it from the given path in the context directory
@@ -7306,6 +7544,301 @@ func (r *GeneratedCode) WithVCSIgnoredPaths(paths []string) *GeneratedCode {
 	q = q.Arg("paths", paths)
 
 	return &GeneratedCode{
+		query: q,
+	}
+}
+
+type Generator struct {
+	query *querybuilder.Selection
+
+	completed   *bool
+	description *string
+	id          *GeneratorID
+	isEmpty     *bool
+	name        *string
+}
+type WithGeneratorFunc func(r *Generator) *Generator
+
+// With calls the provided function with current Generator.
+//
+// This is useful for reusability and readability by not breaking the calling chain.
+func (r *Generator) With(f WithGeneratorFunc) *Generator {
+	return f(r)
+}
+
+func (r *Generator) WithGraphQLQuery(q *querybuilder.Selection) *Generator {
+	return &Generator{
+		query: q,
+	}
+}
+
+// The generated changeset
+func (r *Generator) Changes() *Changeset {
+	q := r.query.Select("changes")
+
+	return &Changeset{
+		query: q,
+	}
+}
+
+// Whether the generator complete
+func (r *Generator) Completed(ctx context.Context) (bool, error) {
+	if r.completed != nil {
+		return *r.completed, nil
+	}
+	q := r.query.Select("completed")
+
+	var response bool
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// Return the description of the generator
+func (r *Generator) Description(ctx context.Context) (string, error) {
+	if r.description != nil {
+		return *r.description, nil
+	}
+	q := r.query.Select("description")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// A unique identifier for this Generator.
+func (r *Generator) ID(ctx context.Context) (GeneratorID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response GeneratorID
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *Generator) XXX_GraphQLType() string {
+	return "Generator"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *Generator) XXX_GraphQLIDType() string {
+	return "GeneratorID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *Generator) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *Generator) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *Generator) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = *dag.LoadGeneratorFromID(GeneratorID(id))
+	return nil
+}
+
+// Wether changeset from the generator execution is empty or not
+func (r *Generator) IsEmpty(ctx context.Context) (bool, error) {
+	if r.isEmpty != nil {
+		return *r.isEmpty, nil
+	}
+	q := r.query.Select("isEmpty")
+
+	var response bool
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// Return the fully qualified name of the generator
+func (r *Generator) Name(ctx context.Context) (string, error) {
+	if r.name != nil {
+		return *r.name, nil
+	}
+	q := r.query.Select("name")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// Execute the generator
+func (r *Generator) Run() *Generator {
+	q := r.query.Select("run")
+
+	return &Generator{
+		query: q,
+	}
+}
+
+type GeneratorGroup struct {
+	query *querybuilder.Selection
+
+	id      *GeneratorGroupID
+	isEmpty *bool
+}
+type WithGeneratorGroupFunc func(r *GeneratorGroup) *GeneratorGroup
+
+// With calls the provided function with current GeneratorGroup.
+//
+// This is useful for reusability and readability by not breaking the calling chain.
+func (r *GeneratorGroup) With(f WithGeneratorGroupFunc) *GeneratorGroup {
+	return f(r)
+}
+
+func (r *GeneratorGroup) WithGraphQLQuery(q *querybuilder.Selection) *GeneratorGroup {
+	return &GeneratorGroup{
+		query: q,
+	}
+}
+
+// GeneratorGroupChangesOpts contains options for GeneratorGroup.Changes
+type GeneratorGroupChangesOpts struct {
+	// Strategy to apply on conflicts between generators
+	//
+	// Default: FAIL_EARLY
+	OnConflict ChangesetsMergeConflict
+}
+
+// The combined changes from the generators execution
+//
+// If any conflict occurs, for instance if the same file is modified by multiple generators, or if a file is both modified and deleted, an error is raised and the merge of the changesets will failed.
+//
+// Set 'continueOnConflicts' flag to force to merge the changes in a 'last write wins' strategy.
+func (r *GeneratorGroup) Changes(opts ...GeneratorGroupChangesOpts) *Changeset {
+	q := r.query.Select("changes")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `onConflict` optional argument
+		if !querybuilder.IsZeroValue(opts[i].OnConflict) {
+			q = q.Arg("onConflict", opts[i].OnConflict)
+		}
+	}
+
+	return &Changeset{
+		query: q,
+	}
+}
+
+// A unique identifier for this GeneratorGroup.
+func (r *GeneratorGroup) ID(ctx context.Context) (GeneratorGroupID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response GeneratorGroupID
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *GeneratorGroup) XXX_GraphQLType() string {
+	return "GeneratorGroup"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *GeneratorGroup) XXX_GraphQLIDType() string {
+	return "GeneratorGroupID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *GeneratorGroup) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *GeneratorGroup) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *GeneratorGroup) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = *dag.LoadGeneratorGroupFromID(GeneratorGroupID(id))
+	return nil
+}
+
+// Whether the generated changeset is empty or not
+func (r *GeneratorGroup) IsEmpty(ctx context.Context) (bool, error) {
+	if r.isEmpty != nil {
+		return *r.isEmpty, nil
+	}
+	q := r.query.Select("isEmpty")
+
+	var response bool
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// Return a list of individual generators and their details
+func (r *GeneratorGroup) List(ctx context.Context) ([]Generator, error) {
+	q := r.query.Select("list")
+
+	q = q.Select("id")
+
+	type list struct {
+		Id GeneratorID
+	}
+
+	convert := func(fields []list) []Generator {
+		out := []Generator{}
+
+		for i := range fields {
+			val := Generator{id: &fields[i].Id}
+			val.query = q.Root().Select("loadGeneratorFromID").Arg("id", fields[i].Id)
+			out = append(out, val)
+		}
+
+		return out
+	}
+	var response []list
+
+	q = q.Bind(&response)
+
+	err := q.Execute(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return convert(response), nil
+}
+
+// Execute all selected generators
+func (r *GeneratorGroup) Run() *GeneratorGroup {
+	q := r.query.Select("run")
+
+	return &GeneratorGroup{
 		query: q,
 	}
 }
@@ -8923,6 +9456,41 @@ func (r *Module) GeneratedContextDirectory() *Directory {
 	q := r.query.Select("generatedContextDirectory")
 
 	return &Directory{
+		query: q,
+	}
+}
+
+// Return the generator defined by the module with the given name. Must match to exactly one generator.
+//
+// Experimental: This API is highly experimental and may be removed or replaced entirely.
+func (r *Module) Generator(name string) *Generator {
+	q := r.query.Select("generator")
+	q = q.Arg("name", name)
+
+	return &Generator{
+		query: q,
+	}
+}
+
+// ModuleGeneratorsOpts contains options for Module.Generators
+type ModuleGeneratorsOpts struct {
+	// Only include generators matching the specified patterns
+	Include []string
+}
+
+// Return all generators defined by the module
+//
+// Experimental: This API is highly experimental and may be removed or replaced entirely.
+func (r *Module) Generators(opts ...ModuleGeneratorsOpts) *GeneratorGroup {
+	q := r.query.Select("generators")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `include` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Include) {
+			q = q.Arg("include", opts[i].Include)
+		}
+	}
+
+	return &GeneratorGroup{
 		query: q,
 	}
 }
@@ -10926,6 +11494,26 @@ func (r *Client) LoadGeneratedCodeFromID(id GeneratedCodeID) *GeneratedCode {
 	q = q.Arg("id", id)
 
 	return &GeneratedCode{
+		query: q,
+	}
+}
+
+// Load a Generator from its ID.
+func (r *Client) LoadGeneratorFromID(id GeneratorID) *Generator {
+	q := r.query.Select("loadGeneratorFromID")
+	q = q.Arg("id", id)
+
+	return &Generator{
+		query: q,
+	}
+}
+
+// Load a GeneratorGroup from its ID.
+func (r *Client) LoadGeneratorGroupFromID(id GeneratorGroupID) *GeneratorGroup {
+	q := r.query.Select("loadGeneratorGroupFromID")
+	q = q.Arg("id", id)
+
+	return &GeneratorGroup{
 		query: q,
 	}
 }
@@ -13003,6 +13591,141 @@ const (
 	CacheSharingModeLocked CacheSharingMode = "LOCKED"
 )
 
+// Strategy to use when merging changesets with conflicting changes.
+type ChangesetMergeConflict string
+
+func (ChangesetMergeConflict) IsEnum() {}
+
+func (v ChangesetMergeConflict) Name() string {
+	switch v {
+	case ChangesetMergeConflictFailEarly:
+		return "FAIL_EARLY"
+	case ChangesetMergeConflictFail:
+		return "FAIL"
+	case ChangesetMergeConflictLeaveConflictMarkers:
+		return "LEAVE_CONFLICT_MARKERS"
+	case ChangesetMergeConflictPreferOurs:
+		return "PREFER_OURS"
+	case ChangesetMergeConflictPreferTheirs:
+		return "PREFER_THEIRS"
+	default:
+		return ""
+	}
+}
+
+func (v ChangesetMergeConflict) Value() string {
+	return string(v)
+}
+
+func (v *ChangesetMergeConflict) MarshalJSON() ([]byte, error) {
+	if *v == "" {
+		return []byte(`""`), nil
+	}
+	name := v.Name()
+	if name == "" {
+		return nil, fmt.Errorf("invalid enum value %q", *v)
+	}
+	return json.Marshal(name)
+}
+
+func (v *ChangesetMergeConflict) UnmarshalJSON(dt []byte) error {
+	var s string
+	if err := json.Unmarshal(dt, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "":
+		*v = ""
+	case "FAIL":
+		*v = ChangesetMergeConflictFail
+	case "FAIL_EARLY":
+		*v = ChangesetMergeConflictFailEarly
+	case "LEAVE_CONFLICT_MARKERS":
+		*v = ChangesetMergeConflictLeaveConflictMarkers
+	case "PREFER_OURS":
+		*v = ChangesetMergeConflictPreferOurs
+	case "PREFER_THEIRS":
+		*v = ChangesetMergeConflictPreferTheirs
+	default:
+		return fmt.Errorf("invalid enum value %q", s)
+	}
+	return nil
+}
+
+const (
+	// Fail before attempting merge if file-level conflicts are detected
+	ChangesetMergeConflictFailEarly ChangesetMergeConflict = "FAIL_EARLY"
+
+	// Attempt the merge and fail if git merge fails due to conflicts
+	ChangesetMergeConflictFail ChangesetMergeConflict = "FAIL"
+
+	// Let git create conflict markers in files. For modify/delete conflicts, keeps the modified version. Fails on binary conflicts.
+	ChangesetMergeConflictLeaveConflictMarkers ChangesetMergeConflict = "LEAVE_CONFLICT_MARKERS"
+
+	// The conflict is resolved by applying the version of the calling changeset
+	ChangesetMergeConflictPreferOurs ChangesetMergeConflict = "PREFER_OURS"
+
+	// The conflict is resolved by applying the version of the other changeset
+	ChangesetMergeConflictPreferTheirs ChangesetMergeConflict = "PREFER_THEIRS"
+)
+
+// Strategy to use when merging multiple changesets with git octopus merge.
+type ChangesetsMergeConflict string
+
+func (ChangesetsMergeConflict) IsEnum() {}
+
+func (v ChangesetsMergeConflict) Name() string {
+	switch v {
+	case ChangesetsMergeConflictFailEarly:
+		return "FAIL_EARLY"
+	case ChangesetsMergeConflictFail:
+		return "FAIL"
+	default:
+		return ""
+	}
+}
+
+func (v ChangesetsMergeConflict) Value() string {
+	return string(v)
+}
+
+func (v *ChangesetsMergeConflict) MarshalJSON() ([]byte, error) {
+	if *v == "" {
+		return []byte(`""`), nil
+	}
+	name := v.Name()
+	if name == "" {
+		return nil, fmt.Errorf("invalid enum value %q", *v)
+	}
+	return json.Marshal(name)
+}
+
+func (v *ChangesetsMergeConflict) UnmarshalJSON(dt []byte) error {
+	var s string
+	if err := json.Unmarshal(dt, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "":
+		*v = ""
+	case "FAIL":
+		*v = ChangesetsMergeConflictFail
+	case "FAIL_EARLY":
+		*v = ChangesetsMergeConflictFailEarly
+	default:
+		return fmt.Errorf("invalid enum value %q", s)
+	}
+	return nil
+}
+
+const (
+	// Fail before attempting merge if file-level conflicts are detected between any changesets
+	ChangesetsMergeConflictFailEarly ChangesetsMergeConflict = "FAIL_EARLY"
+
+	// Attempt the octopus merge and fail if git merge fails due to conflicts
+	ChangesetsMergeConflictFail ChangesetsMergeConflict = "FAIL"
+)
+
 // File type.
 type ExistsType string
 
@@ -13574,10 +14297,10 @@ const (
 	// A successful execution (exit code 0)
 	ReturnTypeSuccess ReturnType = "SUCCESS"
 
-	// A failed execution (exit codes 1-127)
+	// A failed execution (exit codes 1-127 and 192-255)
 	ReturnTypeFailure ReturnType = "FAILURE"
 
-	// Any execution (exit codes 0-127)
+	// Any execution (exit codes 0-127 and 192-255)
 	ReturnTypeAny ReturnType = "ANY"
 )
 

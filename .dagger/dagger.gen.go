@@ -17,8 +17,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"dagger/homelab/internal/dagger"
-	"dagger/homelab/internal/querybuilder"
-	"dagger/homelab/internal/telemetry"
+
+	"dagger.io/dagger/querybuilder"
+	"dagger.io/dagger/telemetry"
 )
 
 var dag = dagger.Connect()
