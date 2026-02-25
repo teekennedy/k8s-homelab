@@ -655,7 +655,7 @@ app-template:
         qbittorrent-metrics:
           image:
             repository: ghcr.io/martabal/qbittorrent-exporter
-            tag: v1.13.2
+            tag: v1.13.3
           env:
             QBITTORRENT_USERNAME:
               valueFrom:
@@ -697,7 +697,7 @@ app-template:
         configarr:
           image:
             repository: ghcr.io/raydak-labs/configarr
-            tag: 1.20.0
+            tag: 1.23.0
             pullPolicy: IfNotPresent
           tty: true # for color support
           env:

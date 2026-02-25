@@ -1,6 +1,6 @@
 dependencies:
 - name: ingress-anubis
   repository: oci://ghcr.io/jaredallard/helm-charts
-  version: 1.10.1
-digest: sha256:498388ae98f92dd7387b39afe2ec91bc54d2afc8beba36a10f6ea48879dca597
-generated: "2026-01-18T23:24:05.739075-07:00"
+  version: 1.10.3
+digest: sha256:98b6822e25915ef26e91d4794f78c3d627f1fb4fc51a004d9c7821bc9d440f86
+generated: "2026-02-25T23:11:48.974762441Z"

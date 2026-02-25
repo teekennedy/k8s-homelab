@@ -2,36 +2,51 @@
 # Manual edits may be lost in future updates.
 
 provider "registry.opentofu.org/cloudflare/cloudflare" {
-  version     = "5.7.1"
+  version     = "5.17.0"
   constraints = "~> 5.7"
   hashes = [
-    "h1:1af0SiRude2KSo4HeAhdKdL89kftor+1ZhtxbBEV1DI=",
-    "zh:0bbd2eaa8210b2214dc426a2471b38cee53db9750b4916b34b0926fc9cbe4d7b",
-    "zh:0de3675e2ace7478ab0d354b2b6db4be2ae5a9a5e68b725cdd10e956131ec687",
-    "zh:4787a255919911aac5e1f8d47ed19fa45e5b90439ecf1fffbb17ff8bfb28de79",
-    "zh:4eb1e4300b3cdee3a323457ebcc8df29a735ea6bbabe3cf9cbd3dc3fb5a9172b",
-    "zh:580bbd5a727c9e3f31ae47c872df860c9a08ea998e0ff3dfe37dbac536146166",
-    "zh:6a359212678ffcf88551e2d8d0f8e52418031cf1f8077bb8ddf500171ee90f2b",
-    "zh:bec6890cb11511577c5f8ec8954e26ac51c44a114cb3e0349fea40f87930c029",
-    "zh:dbe3585510283c8e53a2b24cc7a69fab0ee9d71addae0db1be0374bc32fc6355",
+    "h1:+t1DzV6DR1idD6E+KP6ggrQtccBozxX47Adf5On1n5o=",
+    "h1:AE1sOCMGcgOiEu4g4d1hzVgLtbBKpZyhRyHenNu4Adg=",
+    "h1:N6T9tubZNTnj4KhFwEuxA8zn0GNf/pc4HUsj8MXrfPw=",
+    "h1:PzmMz6l9RmK8CgOpoA4FfY9DP7Fig1LQylPU0Piy0do=",
+    "h1:QDpQDZMMreh2Z8Pm3WxCe2I1d4NEOyvZvNGoY8+BDqo=",
+    "h1:Tv6f3GxL8OxorFRogiS2C2/WQD7CHZsZfzmy6fb5JuI=",
+    "h1:t+/wI20lL2km0lYK55zYuUllgp8tjbeq357zYyWXc/4=",
+    "h1:zaT606hJ2wIVNqD7zBpBUdZ4Am6syTa8XkeGaL7vwac=",
+    "zh:33e24de8ecccb52b5588893cdfbd2b8942c86a8a855d32892d4be04b4ca8e064",
+    "zh:37bf1f79496650dbb7f6d6241ef54fbf3e1e6f0dbbc644806c0c78acfcdbc57c",
+    "zh:5c5f10424c93f0278cc8b497b3c942e1b17f114d87ed72aa21077e6f1f1e0379",
+    "zh:68bc559574f1a32d0497d22c15f9c07a26a04a0bff17a3f3776ee647e301d3d5",
+    "zh:90c1b92209c1f6435cb5c10a67d0e43b8730624124ce427fde3e529c1ec133aa",
+    "zh:9fdc1b8824ba004aad5bd943430aed523a50f7930ad0f7f04627fdb65d476460",
+    "zh:e3e4684a581a02b76dbd64bc40db25aec6df59e5de6afb266b7178ac4f9044cd",
     "zh:f809ab383cca0a5f83072981c64208cbd7fa67e986a86ee02dd2c82333221e32",
+    "zh:fd28bd284a69c6bdd6df8e34367cfcba7eea04adc245c1c19f6909ff056d8ad4",
   ]
 }
 
 provider "registry.opentofu.org/hashicorp/aws" {
-  version     = "6.5.0"
+  version     = "6.33.0"
   constraints = "~> 6.0"
   hashes = [
-    "h1:9Pw82uPWoLJZphV7JpLbKVcovoTKFekl7EIp0+X1Km0=",
-    "zh:2d6341eaf582be3127cb5520388c9c20068b37e512597f44841f0b36cc6f56c8",
-    "zh:3571f83612eafcf4302ea02544fd869caf68f50fd421c737fe9d2835e7cff483",
-    "zh:3996109839e1007df7c2ffd64fed774b8cde964b90c6ac8fe7a69f6ab40317cd",
-    "zh:43b9447ec830749e6763258032450ea7c1028149b152bdfc9173d294937e1e1a",
-    "zh:6fa0f9b55dd3b0a09c9fea231d3b3b33106d75e11444565bcadb632b48b07293",
-    "zh:754bf2b4297fe3c0e3f513d12765318b8717d273e749f00e9d0453a7609c80f5",
-    "zh:81099818861d19f20a013205b58d8c59fdafa1bc7a0ef96eb9fded5d0ebf546a",
-    "zh:c76fac4a0a0f3194a0b6bade77f8c69777dcc4cdc10adca21a4d23c9d94656e4",
-    "zh:dd40883c30279bb9c5d95baa0a0dbda7d0f20a33374094c9cc892ebd17b6cc44",
+    "h1:+jUSXPMnNHOd4z/wRv88ecLERmNAKVKJtqy6Oku6pkI=",
+    "h1:4QWFbG9UpDjsrEQLGdekdAPQxWJ1aJmteRTPOGHzY1E=",
+    "h1:5RjkLsT3C7xVhzr4pgYDckLIaasgOJENSjH+TWyigRw=",
+    "h1:eISUuzDzEvrrDFK7V2nb5sh75VA3DwVpBOsGJ1mxDg8=",
+    "h1:etK7+eOfCglnnag69WvYS764qvXpR67Qs8lK7TJEIxY=",
+    "h1:mGEOOKjmY/prSCg92h99vgiJ6wFDXtCnkUe2hqLtK00=",
+    "h1:qTekW8bcCHr6gZqfWwcQA5rAWFD/98Rx+iMFiEWIlKw=",
+    "h1:xujmMX641xhDaK2ELzQEjJSMo1y6yssyPKcfAxwxLUY=",
+    "h1:zywQPI3g13hJVauoz7IDJ001cv+ycXYx47Fh+4dqYiI=",
+    "zh:07033866400993eb00c0978c9c29682b289b02e47b0f619fe32153cb18376495",
+    "zh:191fc26b3f7551d085bb4a1433a76b3a893e0c9e6bd27902df86a18ca65a6302",
+    "zh:2e0db77b706b249b999f7dd98da8188c54004f00722c2ad1dddd4a062acb13b8",
+    "zh:655055e6bd4924c04b4f07bc7660ba3723520fccd16831a4b8c39725dbade0d8",
+    "zh:8900b5cb164a605e5d0614216188ffa5cb77d87ecf543312459910d7bfbcee9f",
+    "zh:9c7a43da5b6f70944ff739c513f4787098bc9a85a97b73a5bcae51275d638550",
+    "zh:bc6671dc808110ce9a70437b9896dd485de12930efc72f68075b371aaff192a4",
+    "zh:d2089d28a4ee10568d453a53ff8639a0fe7ef92b6c2330649c745667d5cdd3d7",
+    "zh:ee960320d768d14c0ecc85f2ca33a8bba9697af4f56c320dbd293304af935323",
   ]
 }
 

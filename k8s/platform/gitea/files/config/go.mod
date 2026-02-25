@@ -2,7 +2,7 @@ module git.msng.to/teekennedy/k8s-homelab/gitea/config
 
 go 1.25.0
 
-toolchain go1.25.5
+toolchain go1.26.0
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2

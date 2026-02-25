@@ -23,36 +23,51 @@ provider "registry.opentofu.org/carlpett/sops" {
 }
 
 provider "registry.opentofu.org/cloudflare/cloudflare" {
-  version     = "5.15.0"
+  version     = "5.17.0"
   constraints = "~> 5.7"
   hashes = [
-    "h1:EY8mWQO1NTqXuxnZxwVppF7AiLRdx7vRLYk6O7yzgPs=",
-    "zh:20a72bdbb28435f11d165b367732369e8f8163100a214e89ad720dae03fafa0c",
-    "zh:2eabd7a51fd7aafcab9861631d85c895914857e4fcd6fe2dd80bac22e74a1f47",
-    "zh:62828afbc1ba0e0a64bbb7d5d42ae3c2fbbaabb793010b07eba770ba91bae94f",
-    "zh:6693f1021e52c34a629300fbcd91f8bd4ca386fda3b45aec746b9c200c28a42c",
-    "zh:6873a15454b289e5baecc1d36ce8997266438761386a320753c63f13407f4a6b",
-    "zh:afbf4e56b3a5e5950b35b02b553313e4a2008415920b23f536682269c64ca549",
-    "zh:db367612900bc2e5a01c6a325e4cff9b1b04960ce9de3dd41671dda5a627ca1d",
-    "zh:eb7365eafc6160c3b304a9ce6a598e5400a2e779e9e2bd27976df244f79f774f",
+    "h1:+t1DzV6DR1idD6E+KP6ggrQtccBozxX47Adf5On1n5o=",
+    "h1:AE1sOCMGcgOiEu4g4d1hzVgLtbBKpZyhRyHenNu4Adg=",
+    "h1:N6T9tubZNTnj4KhFwEuxA8zn0GNf/pc4HUsj8MXrfPw=",
+    "h1:PzmMz6l9RmK8CgOpoA4FfY9DP7Fig1LQylPU0Piy0do=",
+    "h1:QDpQDZMMreh2Z8Pm3WxCe2I1d4NEOyvZvNGoY8+BDqo=",
+    "h1:Tv6f3GxL8OxorFRogiS2C2/WQD7CHZsZfzmy6fb5JuI=",
+    "h1:t+/wI20lL2km0lYK55zYuUllgp8tjbeq357zYyWXc/4=",
+    "h1:zaT606hJ2wIVNqD7zBpBUdZ4Am6syTa8XkeGaL7vwac=",
+    "zh:33e24de8ecccb52b5588893cdfbd2b8942c86a8a855d32892d4be04b4ca8e064",
+    "zh:37bf1f79496650dbb7f6d6241ef54fbf3e1e6f0dbbc644806c0c78acfcdbc57c",
+    "zh:5c5f10424c93f0278cc8b497b3c942e1b17f114d87ed72aa21077e6f1f1e0379",
+    "zh:68bc559574f1a32d0497d22c15f9c07a26a04a0bff17a3f3776ee647e301d3d5",
+    "zh:90c1b92209c1f6435cb5c10a67d0e43b8730624124ce427fde3e529c1ec133aa",
+    "zh:9fdc1b8824ba004aad5bd943430aed523a50f7930ad0f7f04627fdb65d476460",
+    "zh:e3e4684a581a02b76dbd64bc40db25aec6df59e5de6afb266b7178ac4f9044cd",
     "zh:f809ab383cca0a5f83072981c64208cbd7fa67e986a86ee02dd2c82333221e32",
+    "zh:fd28bd284a69c6bdd6df8e34367cfcba7eea04adc245c1c19f6909ff056d8ad4",
   ]
 }
 
 provider "registry.opentofu.org/hashicorp/aws" {
-  version     = "6.28.0"
+  version     = "6.33.0"
   constraints = "~> 6.0"
   hashes = [
-    "h1:wek8vEEZpTPulbLi9xCf2wnxvc97JXAN4qcOhduSg7k=",
-    "zh:38d58305206953783c150fb96d5c4f3ea5fe0b9e0987d927c884a6b0f2adf7a9",
-    "zh:43fd483251165f98b7a44360b41b437d309b007ef2bfff818eedcf3730e3f5cb",
-    "zh:4753decc5a718cb74b08244a02d00c150f0ddd6ebf2e1227f6a985c647c03ce9",
-    "zh:5956525650554bd3fbc4b695eb5250193f0ebf94c45862a7730457ab6a315069",
-    "zh:76d98fa1146750c01f607bae4421952ee9cd14ed3a4a59deb7136749adb9e0ae",
-    "zh:792c29e5ec91356baddb6219ac7f6f1df09c251cbe4ab6e089fc25d64270b22a",
-    "zh:856424380caa7c1536dc00515d12beac2693db1a8425da654eed5530abeb17d9",
-    "zh:e8982ec2bc692efa7236e3565e7094a09f52c5b71d8860a570a36fb31a40f27f",
-    "zh:f5e7ff825dc3f7356fb80936bfe7bb1b54a728ccf429cb753cfe590932f0403b",
+    "h1:+jUSXPMnNHOd4z/wRv88ecLERmNAKVKJtqy6Oku6pkI=",
+    "h1:4QWFbG9UpDjsrEQLGdekdAPQxWJ1aJmteRTPOGHzY1E=",
+    "h1:5RjkLsT3C7xVhzr4pgYDckLIaasgOJENSjH+TWyigRw=",
+    "h1:eISUuzDzEvrrDFK7V2nb5sh75VA3DwVpBOsGJ1mxDg8=",
+    "h1:etK7+eOfCglnnag69WvYS764qvXpR67Qs8lK7TJEIxY=",
+    "h1:mGEOOKjmY/prSCg92h99vgiJ6wFDXtCnkUe2hqLtK00=",
+    "h1:qTekW8bcCHr6gZqfWwcQA5rAWFD/98Rx+iMFiEWIlKw=",
+    "h1:xujmMX641xhDaK2ELzQEjJSMo1y6yssyPKcfAxwxLUY=",
+    "h1:zywQPI3g13hJVauoz7IDJ001cv+ycXYx47Fh+4dqYiI=",
+    "zh:07033866400993eb00c0978c9c29682b289b02e47b0f619fe32153cb18376495",
+    "zh:191fc26b3f7551d085bb4a1433a76b3a893e0c9e6bd27902df86a18ca65a6302",
+    "zh:2e0db77b706b249b999f7dd98da8188c54004f00722c2ad1dddd4a062acb13b8",
+    "zh:655055e6bd4924c04b4f07bc7660ba3723520fccd16831a4b8c39725dbade0d8",
+    "zh:8900b5cb164a605e5d0614216188ffa5cb77d87ecf543312459910d7bfbcee9f",
+    "zh:9c7a43da5b6f70944ff739c513f4787098bc9a85a97b73a5bcae51275d638550",
+    "zh:bc6671dc808110ce9a70437b9896dd485de12930efc72f68075b371aaff192a4",
+    "zh:d2089d28a4ee10568d453a53ff8639a0fe7ef92b6c2330649c745667d5cdd3d7",
+    "zh:ee960320d768d14c0ecc85f2ca33a8bba9697af4f56c320dbd293304af935323",
   ]
 }
 
