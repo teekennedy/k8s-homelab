@@ -697,7 +697,7 @@ app-template:
         configarr:
           image:
             repository: ghcr.io/raydak-labs/configarr
-            tag: 1.23.0
+            tag: 1.24.0
             pullPolicy: IfNotPresent
           tty: true # for color support
           env:
