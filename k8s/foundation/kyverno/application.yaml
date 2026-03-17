@@ -15,6 +15,10 @@ spec:
     - jsonPointers:
         - /spec/volumeName
         - /spec/storageClassName
+        # Longhorn stores the expanded capacity in bytes (e.g. 10737418240) rather
+        # than the human-readable form (e.g. 10Gi), causing ArgoCD to see a diff
+        # and attempt a patch that Kubernetes rejects as reducing the storage request.
+        - /spec/resources/requests/storage
       kind: PersistentVolumeClaim
     - group: apiextensions.k8s.io
       jqPathExpressions:
