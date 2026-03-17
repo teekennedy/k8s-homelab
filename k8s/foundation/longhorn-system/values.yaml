@@ -32,6 +32,7 @@ longhorn:
   ingress:
     enabled: true
     annotations:
+      traefik.ingress.kubernetes.io/router.middlewares: longhorn-system-longhorn-basic-auth@kubernetescrd
       gethomepage.dev/enabled: "true"
       gethomepage.dev/group: "Cluster"
       gethomepage.dev/name: "Longhorn"

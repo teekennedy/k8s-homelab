@@ -1,0 +1,66 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: longhorn-basic-auth-setup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: longhorn-basic-auth-setup
+      restartPolicy: Never
+      containers:
+        - name: setup
+          image: alpine/kubectl:1.35.0
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              apk add --no-cache apache2-utils openssl >/dev/null 2>&1
+
+              CREDENTIALS_SECRET="longhorn-basic-auth"
+              HTPASSWD_SECRET="longhorn-basic-auth-htpasswd"
+              NAMESPACE="{{ .Release.Namespace }}"
+
+              # Check whether credentials have already been generated
+              if kubectl get secret "${CREDENTIALS_SECRET}" -n "${NAMESPACE}" \
+                  -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
+                echo "Secret ${CREDENTIALS_SECRET} already configured, skipping"
+                exit 0
+              fi
+
+              echo "Generating credentials..."
+
+              # Generate a 32-char random alphanumeric password
+              PASSWORD=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)
+
+              # Generate htpasswd bcrypt entry
+              HTPASSWD=$(htpasswd -nbBC 12 admin "${PASSWORD}")
+
+              # Human-readable credentials secret (username + plaintext password for retrieval)
+              kubectl create secret generic "${CREDENTIALS_SECRET}" \
+                --namespace="${NAMESPACE}" \
+                --from-literal=username=admin \
+                --from-literal=password="${PASSWORD}" \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              # Single-key htpasswd secret required by Traefik BasicAuth middleware
+              kubectl create secret generic "${HTPASSWD_SECRET}" \
+                --namespace="${NAMESPACE}" \
+                --from-literal=users="${HTPASSWD}" \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              echo "Done. Retrieve password with:"
+              echo "  kubectl get secret ${CREDENTIALS_SECRET} -n ${NAMESPACE} -o jsonpath='{.data.password}' | base64 -d"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
