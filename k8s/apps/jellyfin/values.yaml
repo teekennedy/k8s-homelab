@@ -1000,7 +1000,8 @@ app-template:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
       # As of 2025-07-22 this was using 105MB
-      size: 1Gi
+      # As of 2026-03-17 this was using 886MB
+      size: 2Gi
       storageClass: longhorn
       advancedMounts:
         arrs:

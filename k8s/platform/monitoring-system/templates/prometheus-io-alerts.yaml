@@ -36,31 +36,6 @@ spec:
         summary: {{ "High write I/O from {{ $labels.pod }} in {{ $labels.namespace }}" | quote }}
         description: {{ "Container {{ $labels.container }} in pod {{ $labels.pod }} ({{ $labels.namespace }}) is writing >50MB/s for 5+ minutes on device {{ $labels.device }} (current: {{ $value | humanize }}B/s)" | quote }}
 
-    # Alert on high disk queue depth (weighted IO time = avg queue depth)
-    - alert: HighDiskQueueDepth
-      expr: rate(node_disk_io_time_weighted_seconds_total[2m]) * on(instance, device) group_left node_disk_info{model!="VIRTUAL-DISK"} > 2
-      for: 3m
-      labels:
-        severity: warning
-        component: storage
-      annotations:
-        summary: {{ "High disk queue depth on {{ $labels.instance }}" | quote }}
-        description: {{ "Disk {{ $labels.device }} on {{ $labels.instance }} avg queue depth >2 for 3+ min (current: {{ $value }})" | quote }}
-
-    # Alert on high average disk latency (>20ms per IO operation)
-    - alert: HighDiskLatency
-      expr: |
-        ((rate(node_disk_read_time_seconds_total[2m]) + rate(node_disk_write_time_seconds_total[2m]))
-        / (rate(node_disk_reads_completed_total[2m]) + rate(node_disk_writes_completed_total[2m])))
-        * on(instance, device) group_left node_disk_info{model!="VIRTUAL-DISK"} > 0.02
-      for: 3m
-      labels:
-        severity: warning
-        component: storage
-      annotations:
-        summary: {{ "High disk latency on {{ $labels.instance }}" | quote }}
-        description: {{ "Avg IO latency >20ms on {{ $labels.device }} ({{ $labels.instance }})" | quote }}
-
     # Alert on PostgreSQL checkpoint duration
     - alert: PostgreSQLSlowCheckpoint
       expr: increase(pg_stat_bgwriter_checkpoint_write_time[5m]) / increase(pg_stat_bgwriter_checkpoints_timed[5m]) > 15000
