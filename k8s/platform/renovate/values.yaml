@@ -8,7 +8,8 @@ renovate:
         "platform": "gitea",
         "endpoint": "https://git.msng.to/api/v1",
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
-        "autodiscover": true
+        "autodiscover": true,
+        "httpCacheTtlDays": 0
       }
     persistence:
       cache:
