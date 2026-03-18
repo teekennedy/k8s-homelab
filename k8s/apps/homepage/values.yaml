@@ -5,7 +5,6 @@ homepage:
     tag: "v1.10.1"
   ingress:
     enabled: true
-    ingressClassName: anubis
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
       traefik.ingress.kubernetes.io/router.middlewares: homepage-public-rate-limit@kubernetescrd,auth-system-forwardauth-auth-system-authelia@kubernetescrd
