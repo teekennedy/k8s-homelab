@@ -33,12 +33,6 @@ longhorn:
     enabled: true
     annotations:
       traefik.ingress.kubernetes.io/router.middlewares: longhorn-system-longhorn-basic-auth@kubernetescrd
-      gethomepage.dev/enabled: "true"
-      gethomepage.dev/group: "Cluster"
-      gethomepage.dev/name: "Longhorn"
-      gethomepage.dev/description: "Distributed block storage"
-      gethomepage.dev/icon: "sh-rancher-longhorn.svg"
-      gethomepage.dev/pod-selector: "app=longhorn-ui"
     host: longhorn.msng.to
     path: /
     pathType: Prefix

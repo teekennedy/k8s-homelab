@@ -72,14 +72,6 @@ app-template:
   ingress:
     spoolman:
       enabled: true
-      annotations:
-        gethomepage.dev/enabled: "true"
-        gethomepage.dev/group: "Apps"
-        gethomepage.dev/name: "Spoolman"
-        gethomepage.dev/description: "Filament spool manager"
-        gethomepage.dev/icon: "sh-spoolman.svg"
-        gethomepage.dev/widget.type: "spoolman"
-        gethomepage.dev/widget.url: "https://spoolman.msng.to"
       hosts:
         - host: &spoolmanHost spoolman.msng.to
           paths:

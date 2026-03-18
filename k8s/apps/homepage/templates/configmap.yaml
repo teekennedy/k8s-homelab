@@ -19,13 +19,141 @@ data:
     providers:
       longhorn:
         url: https://longhorn.msng.to
+        username: '{{ "{{HOMEPAGE_VAR_LONGHORN_USERNAME}}" }}'
+        password: '{{ "{{HOMEPAGE_VAR_LONGHORN_PASSWORD}}" }}'
   kubernetes.yaml: |-
     mode: cluster
-    ingress: true
-    traefik: true
-    gateway: true
   services.yaml: |-
-    []
+    - Cluster:
+        - ArgoCD:
+            icon: sh-argo-cd.svg
+            href: https://argocd.msng.to
+            description: Continuous delivery
+            namespace: argocd
+            app: argocd-server
+            widget:
+              type: argocd
+              url: https://argocd.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_ARGOCD_API_KEY}}" }}'
+              cache: 3
+        - Longhorn:
+            icon: sh-rancher-longhorn.svg
+            href: https://longhorn.msng.to
+            description: Distributed block storage
+            namespace: longhorn-system
+            app: longhorn
+            podSelector: "app=longhorn-ui"
+        - Grafana:
+            icon: sh-grafana.svg
+            href: https://grafana.msng.to
+            description: Monitoring and dashboards
+            namespace: monitoring-system
+            app: grafana
+        - Prometheus:
+            icon: sh-prometheus.svg
+            href: https://prometheus.msng.to
+            description: Metrics and alerting
+            namespace: monitoring-system
+            app: prometheus
+            widget:
+              type: prometheus
+              url: https://prometheus.msng.to
+              cache: 3
+    - Apps:
+        - Gitea:
+            icon: sh-gitea.svg
+            href: https://git.msng.to
+            namespace: gitea
+            app: gitea
+            widget:
+              type: gitea
+              url: https://git.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_GITEA_API_KEY}}" }}'
+              cache: 3
+        - Spoolman:
+            icon: sh-spoolman.svg
+            href: https://spoolman.msng.to
+            description: Filament spool manager
+            namespace: spoolman
+            app: spoolman
+            widget:
+              type: spoolman
+              url: https://spoolman.msng.to
+              cache: 3
+    - Media:
+        - Jellyfin:
+            icon: sh-jellyfin.svg
+            href: https://jellyfin.msng.to
+            description: Media server
+            namespace: jellyfin
+            app: jellyfin
+            podSelector: "app.kubernetes.io/controller=main"
+            widget:
+              type: jellyfin
+              url: https://jellyfin.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}" }}'
+              cache: 3
+        - Jellyseerr:
+            icon: sh-jellyseerr.svg
+            href: https://jellyseerr.msng.to
+            description: Request media
+            namespace: jellyfin
+            app: jellyfin
+            podSelector: "app.kubernetes.io/controller=jellyseerr"
+            widget:
+              type: jellyseerr
+              url: https://jellyseerr.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_JELLYSEERR_API_KEY}}" }}'
+              cache: 3
+        - QBittorrent:
+            icon: sh-qbittorrent.svg
+            href: https://qbittorrent.msng.to
+            description: Download management
+            namespace: jellyfin
+            app: jellyfin
+            podSelector: "app.kubernetes.io/controller=downloader"
+            widget:
+              type: qbittorrent
+              url: https://qbittorrent.msng.to
+              username: '{{ "{{HOMEPAGE_VAR_QBITTORRENT_USERNAME}}" }}'
+              password: '{{ "{{HOMEPAGE_VAR_QBITTORRENT_PASSWORD}}" }}'
+              cache: 3
+        - Prowlarr:
+            icon: sh-prowlarr.svg
+            href: https://prowlarr.msng.to
+            description: Indexer management
+            namespace: jellyfin
+            app: jellyfin
+            podSelector: "app.kubernetes.io/controller=arrs"
+            widget:
+              type: prowlarr
+              url: https://prowlarr.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_PROWLARR_API_KEY}}" }}'
+              cache: 3
+        - Radarr:
+            icon: sh-radarr.svg
+            href: https://radarr.msng.to
+            description: Movie collection manager
+            namespace: jellyfin
+            app: jellyfin
+            podSelector: "app.kubernetes.io/controller=arrs"
+            widget:
+              type: radarr
+              url: https://radarr.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_RADARR_API_KEY}}" }}'
+              cache: 3
+        - Sonarr:
+            icon: sh-sonarr.svg
+            href: https://sonarr.msng.to
+            description: TV show collection manager
+            namespace: jellyfin
+            app: jellyfin
+            podSelector: "app.kubernetes.io/controller=arrs"
+            widget:
+              type: sonarr
+              url: https://sonarr.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_SONARR_API_KEY}}" }}'
+              cache: 3
   bookmarks.yaml: |-
     []
   widgets.yaml: |-

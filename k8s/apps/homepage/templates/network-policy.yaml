@@ -1,0 +1,73 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: homepage
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: homepage
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: homepage
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Kubelet health probes (liveness/readiness)
+    - from:
+        - ipBlock:
+            cidr: 10.69.80.0/24
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Traefik ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Anubis challenge proxy forwards traffic to homepage
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: anubis
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    # DNS resolution via CoreDNS pods
+    # (kube-proxy DNATs kube-dns ClusterIP to CoreDNS pod IPs
+    # before NetworkPolicy evaluation, so namespaceSelector is needed)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Kubernetes API server (k3s runs apiserver on host network)
+    # kube-proxy DNATs ClusterIP 10.43.0.1:443 to node-IP:6443
+    - to:
+        - ipBlock:
+            cidr: 10.69.80.0/24
+      ports:
+        - protocol: TCP
+          port: 6443
+    # Widget API calls through Traefik
+    # servicelb DNATs node-IP:443 to Traefik pod IPs, so we target
+    # the pods directly rather than the pre-DNAT node IPs
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
