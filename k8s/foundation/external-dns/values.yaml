@@ -33,6 +33,7 @@ ddnsUpdater:
       tag: 1.37.0
   period: 5m
   logLevel: info
+  timeZone: America/Denver
   publicIp:
     fetchers: http
     ipv4HttpProviders: url:https://checkip.amazonaws.com

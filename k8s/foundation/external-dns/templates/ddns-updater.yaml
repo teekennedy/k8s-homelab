@@ -45,7 +45,7 @@ spec:
         fsGroup: 1000
       initContainers:
         - name: render-config
-          image: {{ .Values.ddnsUpdater.initContainer.image.repository }}:{{ .Values.ddnsUpdater.initContainer.image.tag }}
+          image: "{{ .Values.ddnsUpdater.initContainer.image.repository }}:{{ .Values.ddnsUpdater.initContainer.image.tag }}"
           command:
             - /bin/sh
             - -c
@@ -80,7 +80,7 @@ spec:
               readOnly: true
       containers:
         - name: ddns-updater
-          image: {{ .Values.ddnsUpdater.image.repository }}:{{ .Values.ddnsUpdater.image.tag }}
+          image: "{{ .Values.ddnsUpdater.image.repository }}:{{ .Values.ddnsUpdater.image.tag }}"
           env:
             - name: PERIOD
               value: {{ .Values.ddnsUpdater.period | quote }}
@@ -92,6 +92,8 @@ spec:
               value: "no"
             - name: LOG_LEVEL
               value: {{ .Values.ddnsUpdater.logLevel | quote }}
+            - name: TZ
+              value: {{ .Values.ddnsUpdater.timeZone | quote }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
