@@ -5,6 +5,9 @@ authelia:
     enabled: true
   ingress:
     enabled: true
+    annotations:
+      external-dns.alpha.kubernetes.io/target: external.network.msng.to
+      external-dns.alpha.kubernetes.io/record-type: CNAME
     # TLS configuration is used to encrypt traffic between traefik and authelia
     tls:
       enabled: true
