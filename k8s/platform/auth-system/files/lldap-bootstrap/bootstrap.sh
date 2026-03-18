@@ -6,7 +6,6 @@ set -o pipefail
 LLDAP_URL="${LLDAP_URL:-http://localhost:17170}"
 LLDAP_ADMIN_USERNAME="${LLDAP_ADMIN_USERNAME:-admin}"
 LLDAP_ADMIN_PASSWORD="${LLDAP_ADMIN_PASSWORD:-password}"
-set -x
 USER_SCHEMAS_DIR="${USER_SCHEMAS_DIR:-/bootstrap/user-schemas}"
 GROUP_SCHEMAS_DIR="${GROUP_SCHEMAS_DIR:-/bootstrap/group-schemas}"
 USER_CONFIGS_DIR="${USER_CONFIGS_DIR:-/bootstrap/user-configs}"
