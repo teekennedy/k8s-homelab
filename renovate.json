@@ -123,7 +123,7 @@
       ],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "longhorn/longhorn",
-      "extractVersionTemplate": "^longhorn-(?<version>.*)$"
+      "extractVersionTemplate": "^v(?<version>.*)$"
     },
     {
       "description": "Sync node-feature-discovery appVersion with GitHub releases",
