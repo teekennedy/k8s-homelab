@@ -9,7 +9,7 @@ renovate:
         "endpoint": "https://git.msng.to/api/v1",
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
         "autodiscover": true,
-        "httpCacheTtlDays": 0
+        "httpCacheTtlDays": 7
       }
     persistence:
       cache:
