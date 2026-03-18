@@ -45,6 +45,8 @@ argo-cd:
         requestedIDTokenClaims:
           groups:
             essential: true
+    # create readonly account for Homepage stats
+    accounts.readonly: apiKey
     rbac:
       policy.default: role:none
       policy.csv: |
@@ -55,6 +57,7 @@ argo-cd:
         g, argocd-admin, role:admin
         g, full-admin, role:admin
         g, argocd-user, role:readonly
+        g, readonly, role:readonly
   server:
     ingress:
       enabled: true
