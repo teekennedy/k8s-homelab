@@ -25,62 +25,6 @@ data:
   kubernetes.yaml: |-
     mode: cluster
   services.yaml: |-
-    - Cluster:
-        - ArgoCD:
-            icon: sh-argo-cd.svg
-            href: https://argocd.msng.to
-            description: Continuous delivery
-            namespace: argocd
-            app: argocd-server
-            widget:
-              type: argocd
-              url: https://argocd.msng.to
-              key: '{{ "{{HOMEPAGE_VAR_ARGOCD_API_KEY}}" }}'
-              cache: 3
-        - Longhorn:
-            icon: sh-rancher-longhorn.svg
-            href: https://longhorn.msng.to
-            description: Distributed block storage
-            namespace: longhorn-system
-            app: longhorn
-            podSelector: "app=longhorn-ui"
-        - Grafana:
-            icon: sh-grafana.svg
-            href: https://grafana.msng.to
-            description: Monitoring and dashboards
-            namespace: monitoring-system
-            app: grafana
-        - Prometheus:
-            icon: sh-prometheus.svg
-            href: https://prometheus.msng.to
-            description: Metrics and alerting
-            namespace: monitoring-system
-            app: prometheus
-            widget:
-              type: prometheus
-              url: https://prometheus.msng.to
-              cache: 3
-    - Apps:
-        - Gitea:
-            icon: sh-gitea.svg
-            href: https://git.msng.to
-            namespace: gitea
-            app: gitea
-            widget:
-              type: gitea
-              url: https://git.msng.to
-              key: '{{ "{{HOMEPAGE_VAR_GITEA_API_KEY}}" }}'
-              cache: 3
-        - Spoolman:
-            icon: sh-spoolman.svg
-            href: https://spoolman.msng.to
-            description: Filament spool manager
-            namespace: spoolman
-            app: spoolman
-            widget:
-              type: spoolman
-              url: https://spoolman.msng.to
-              cache: 3
     - Media:
         - Jellyfin:
             icon: sh-jellyfin.svg
@@ -154,6 +98,62 @@ data:
               type: sonarr
               url: https://sonarr.msng.to
               key: '{{ "{{HOMEPAGE_VAR_SONARR_API_KEY}}" }}'
+              cache: 3
+    - Cluster:
+        - ArgoCD:
+            icon: sh-argo-cd.svg
+            href: https://argocd.msng.to
+            description: Continuous delivery
+            namespace: argocd
+            app: argocd-server
+            widget:
+              type: argocd
+              url: https://argocd.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_ARGOCD_API_KEY}}" }}'
+              cache: 3
+        - Longhorn:
+            icon: sh-rancher-longhorn.svg
+            href: https://longhorn.msng.to
+            description: Distributed block storage
+            namespace: longhorn-system
+            app: longhorn
+            podSelector: "app=longhorn-ui"
+        - Grafana:
+            icon: sh-grafana.svg
+            href: https://grafana.msng.to
+            description: Monitoring and dashboards
+            namespace: monitoring-system
+            app: grafana
+        - Prometheus:
+            icon: sh-prometheus.svg
+            href: https://prometheus.msng.to
+            description: Metrics and alerting
+            namespace: monitoring-system
+            app: prometheus
+            widget:
+              type: prometheus
+              url: https://prometheus.msng.to
+              cache: 3
+    - Apps:
+        - Gitea:
+            icon: sh-gitea.svg
+            href: https://git.msng.to
+            namespace: gitea
+            app: gitea
+            widget:
+              type: gitea
+              url: https://git.msng.to
+              key: '{{ "{{HOMEPAGE_VAR_GITEA_API_KEY}}" }}'
+              cache: 3
+        - Spoolman:
+            icon: sh-spoolman.svg
+            href: https://spoolman.msng.to
+            description: Filament spool manager
+            namespace: spoolman
+            app: spoolman
+            widget:
+              type: spoolman
+              url: https://spoolman.msng.to
               cache: 3
   bookmarks.yaml: |-
     []
