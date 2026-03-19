@@ -38,6 +38,7 @@ authelia:
           policy: bypass
           resources:
             - '^/api/'
+            - '^/_next/static/'
         - domain: argocd.msng.to
           policy: two_factor
         - domain:
@@ -50,7 +51,7 @@ authelia:
       password_reset:
         disable: false
       # How often authelia should check if there is a user update in LDAP
-      refresh_interval: 1m
+      refresh_interval: 5m
       ldap:
         enabled: true
         implementation: lldap
@@ -71,9 +72,11 @@ authelia:
         tls:
           minimum_version: TLS1.2
 
-        # Enable connection pooling
+        # Enable connection pooling with enough parallel connections to handle
+        # Homepage's concurrent forward-auth requests during webpage load
         pooling:
           enable: true
+          max_parallel: 20
 
         # Allow sign in with either username or email
         users_filter: "(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=person))"
