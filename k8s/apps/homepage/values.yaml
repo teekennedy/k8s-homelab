@@ -7,7 +7,7 @@ homepage:
     enabled: true
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
-      traefik.ingress.kubernetes.io/router.middlewares: homepage-public-rate-limit@kubernetescrd,auth-system-forwardauth-auth-system-authelia@kubernetescrd
+      traefik.ingress.kubernetes.io/router.middlewares: homepage-public-rate-limit@kubernetescrd
       external-dns.alpha.kubernetes.io/target: external.network.msng.to
       external-dns.alpha.kubernetes.io/record-type: CNAME
     hosts:
@@ -34,13 +34,16 @@ homepage:
     - name: homepage-config
       mountPath: /app/config/widgets.yaml
       subPath: widgets.yaml
+    - name: homepage-config
+      mountPath: /app/config/custom.js
+      subPath: custom.js
     - name: nas
       mountPath: /mnt/nas
       readOnly: true
   volumes:
     - name: homepage-config
       configMap:
-        name: homepage-config
+        name: homepage-configs
     - name: nas
       persistentVolumeClaim:
         claimName: homepage-nas
@@ -125,13 +128,3 @@ secret-sync:
         name: readonly-argocd-token
         key: token
       optional: true
-    - env: HOMEPAGE_VAR_LONGHORN_USERNAME
-      source:
-        namespace: longhorn-system
-        name: longhorn-basic-auth
-        key: username
-    - env: HOMEPAGE_VAR_LONGHORN_PASSWORD
-      source:
-        namespace: longhorn-system
-        name: longhorn-basic-auth
-        key: password

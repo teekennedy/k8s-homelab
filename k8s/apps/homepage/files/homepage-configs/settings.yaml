@@ -1,0 +1,21 @@
+title: "Missingtoken's Homelab"
+description: "Missingtoken's Homelab"
+favicon: https://missingtoken.net/favicon.ico
+theme: dark
+hideVersion: true
+disableUpdateCheck: true
+hideErrors: true
+# use a green dot for healthy status
+statusStyle: "dot"
+layout:
+  - Media:
+      useEqualHeights: true
+  - Apps:
+      useEqualHeights: true
+  - Cluster:
+      useEqualHeights: true
+providers:
+  longhorn:
+    url: https://longhorn.msng.to
+    username: "{{HOMEPAGE_VAR_LONGHORN_USERNAME}}"
+    password: "{{HOMEPAGE_VAR_LONGHORN_PASSWORD}}"

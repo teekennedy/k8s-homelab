@@ -1,0 +1,64 @@
+- Media:
+    - Jellyfin:
+        icon: sh-jellyfin.svg
+        href: https://jellyfin.msng.to
+        description: Media server
+        namespace: jellyfin
+        app: jellyfin
+        podSelector: "app.kubernetes.io/controller=main"
+        widget:
+          type: jellyfin
+          url: https://jellyfin.msng.to
+          key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
+          cache: 3
+    - Jellyseerr:
+        icon: sh-jellyseerr.svg
+        href: https://jellyseerr.msng.to
+        description: Request media
+        namespace: jellyfin
+        app: jellyfin
+        podSelector: "app.kubernetes.io/controller=jellyseerr"
+        widget:
+          type: jellyseerr
+          url: https://jellyseerr.msng.to
+          key: "{{HOMEPAGE_VAR_JELLYSEERR_API_KEY}}"
+          cache: 3
+- Apps:
+    - Gitea:
+        icon: sh-gitea.svg
+        href: https://git.msng.to
+        description: Git repository host
+        namespace: gitea
+        app: gitea
+        widget:
+          type: gitea
+          url: https://git.msng.to
+          key: "{{HOMEPAGE_VAR_GITEA_API_KEY}}"
+          cache: 3
+    - Spoolman:
+        icon: sh-spoolman.svg
+        href: https://spoolman.msng.to
+        description: Filament spool manager
+        namespace: spoolman
+        app: spoolman
+        widget:
+          type: spoolman
+          url: https://spoolman.msng.to
+          cache: 3
+- Cluster:
+    - Grafana:
+        icon: sh-grafana.svg
+        href: https://grafana.msng.to
+        description: Monitoring and dashboards
+        namespace: monitoring-system
+        app: grafana
+    - Prometheus:
+        icon: sh-prometheus.svg
+        href: https://prometheus.msng.to
+        description: Metrics and alerting
+        namespace: monitoring-system
+        app: prometheus
+        widget:
+          type: prometheus
+          url: https://prometheus.msng.to
+          cache: 3

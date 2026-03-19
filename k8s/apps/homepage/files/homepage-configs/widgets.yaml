@@ -1,0 +1,20 @@
+- greeting:
+    text_size: 2xl
+    text: MissingToken's Homelab
+- kubernetes:
+    cluster:
+      show: true
+      cpu: true
+      memory: true
+      showLabel: true
+      label: "cluster"
+    nodes:
+      show: true
+      cpu: true
+      memory: true
+      showLabel: true
+- resources:
+    label: nas
+    disk: /mnt/nas
+    expanded: true
+    refresh: 60000
