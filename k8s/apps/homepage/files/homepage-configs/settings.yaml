@@ -2,6 +2,9 @@ title: "Missingtoken's Homelab"
 description: "Missingtoken's Homelab"
 favicon: https://missingtoken.net/favicon.ico
 theme: dark
+background:
+  opacity: 0
+cardBlur: md
 hideVersion: true
 disableUpdateCheck: true
 hideErrors: true
