@@ -37,6 +37,7 @@ longhorn:
     path: /
     pathType: Prefix
     tls: true
+    tlsSecret: ""
   metrics:
     serviceMonitor:
       enabled: true

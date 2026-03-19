@@ -60,8 +60,7 @@ argo-cd:
         g, readonly, role:readonly
   server:
     ingress:
-      enabled: true
-      tls: true
+      enabled: false
     metrics: &metrics
       enabled: true
       serviceMonitor:
