@@ -71,6 +71,10 @@ authelia:
         tls:
           minimum_version: TLS1.2
 
+        # Enable connection pooling
+        pooling:
+          enable: true
+
         # Allow sign in with either username or email
         users_filter: "(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=person))"
 
