@@ -252,6 +252,27 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).BuildCliGo(&parent, ctx, source)
+		case "BuildHelm":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var source *dagger.Directory
+			if inputArgs["source"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
+				}
+			}
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).BuildHelm(&parent, ctx, source, paths)
 		case "Cli":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -427,6 +448,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).Test(&parent, ctx, source)
+		case "TestBuildHelm":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return (*Homelab).TestBuildHelm(&parent, ctx)
 		case "TestGo":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)

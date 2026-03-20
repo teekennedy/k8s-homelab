@@ -1,5 +1,0 @@
-releases:
-  - name: longhorn
-    namespace: longhorn-system
-    chart: .
-    disableValidationOnInstall: true

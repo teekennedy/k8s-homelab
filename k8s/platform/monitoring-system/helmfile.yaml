@@ -1,5 +1,0 @@
-releases:
-  - name: monitoring-system
-    namespace: monitoring-system
-    chart: .
-    disableValidationOnInstall: true

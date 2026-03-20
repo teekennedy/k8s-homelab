@@ -172,7 +172,7 @@ Also copy /etc/rancher/k3s/k3s.yaml from the first node and place it in ./.deven
 
 ### Longhorn
 
-Run `helmfile apply --skip-diff-on-install -f helmfile.d/longhorn.yaml` to install lonhorn and kyverno.
+Run `lab k8s bootstrap --env production` to install foundation components including Longhorn.
 
 # Deployment
 

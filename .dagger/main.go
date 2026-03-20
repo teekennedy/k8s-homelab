@@ -13,10 +13,20 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"strings"
 
 	"dagger/homelab/internal/dagger"
+
+	"golang.org/x/sync/errgroup"
 )
+
+//go:embed scripts/helm-template.sh
+var helmTemplateScript string
+
+//go:embed scripts/helm-lint.sh
+var helmLintScript string
 
 // Homelab is the main Dagger module for k8s-homelab CI/CD
 type Homelab struct{}
@@ -25,36 +35,91 @@ type Homelab struct{}
 // Returns the linted/fixed source directory
 func (m *Homelab) All(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", ".devenv*", "devenv.local.*"]
+	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", ".devenv*", "devenv.local.*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
 	fix bool,
 ) (*dagger.Directory, error) {
-	var err error
+	if fix {
+		// Lint modifies source, so it must run first
+		var err error
+		source, err = m.Lint(ctx, source, fix)
+		if err != nil {
+			return nil, fmt.Errorf("lint failed: %w", err)
+		}
 
-	// Run lint stage (potentially fixing issues)
-	source, err = m.Lint(ctx, source, fix)
-	if err != nil {
-		return nil, fmt.Errorf("lint failed: %w", err)
+		// Then validate, build, and test the fixed source in parallel
+		g, ctx := errgroup.WithContext(ctx)
+
+		g.Go(func() error {
+			_, err := m.Validate(ctx, source)
+			if err != nil {
+				return fmt.Errorf("validate failed: %w", err)
+			}
+			return nil
+		})
+
+		g.Go(func() error {
+			_, err := m.Build(ctx, source)
+			if err != nil {
+				return fmt.Errorf("build failed: %w", err)
+			}
+			return nil
+		})
+
+		g.Go(func() error {
+			_, err := m.Test(ctx, source)
+			if err != nil {
+				return fmt.Errorf("test failed: %w", err)
+			}
+			return nil
+		})
+
+		if err := g.Wait(); err != nil {
+			return nil, err
+		}
+
+		return source, nil
 	}
 
-	// Run validate stage
-	_, err = m.Validate(ctx, source)
-	if err != nil {
-		return nil, fmt.Errorf("validate failed: %w", err)
-	}
+	// Check-only: lint doesn't modify source, so run everything in parallel
+	g, ctx := errgroup.WithContext(ctx)
 
-	// Run build stage
-	_, err = m.Build(ctx, source)
-	if err != nil {
-		return nil, fmt.Errorf("build failed: %w", err)
-	}
+	g.Go(func() error {
+		_, err := m.Lint(ctx, source, false)
+		if err != nil {
+			return fmt.Errorf("lint failed: %w", err)
+		}
+		return nil
+	})
 
-	// Run test stage
-	_, err = m.Test(ctx, source)
-	if err != nil {
-		return nil, fmt.Errorf("test failed: %w", err)
+	g.Go(func() error {
+		_, err := m.Validate(ctx, source)
+		if err != nil {
+			return fmt.Errorf("validate failed: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		_, err := m.Build(ctx, source)
+		if err != nil {
+			return fmt.Errorf("build failed: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		_, err := m.Test(ctx, source)
+		if err != nil {
+			return fmt.Errorf("test failed: %w", err)
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
 	return source, nil
@@ -72,36 +137,96 @@ func (m *Homelab) Lint(ctx context.Context,
 	// +default=false
 	fix bool,
 ) (*dagger.Directory, error) {
-	var err error
+	if fix {
+		// When fixing, run sequentially since each step modifies source
+		var err error
 
-	// Run Nix linting (alejandra, deadnix) - supports fixing
-	source, err = m.LintNix(ctx, source, fix)
-	if err != nil {
-		return nil, fmt.Errorf("nix lint failed: %w", err)
+		source, err = m.LintNix(ctx, source, fix)
+		if err != nil {
+			return nil, fmt.Errorf("nix lint failed: %w", err)
+		}
+
+		source, err = m.LintGo(ctx, source, fix)
+		if err != nil {
+			return nil, fmt.Errorf("go lint failed: %w", err)
+		}
+
+		source, err = m.LintPython(ctx, source, fix)
+		if err != nil {
+			return nil, fmt.Errorf("python lint failed: %w", err)
+		}
+
+		// CUE and YAML don't support fix, run them in parallel on final source
+		g, ctx := errgroup.WithContext(ctx)
+
+		g.Go(func() error {
+			_, err := m.LintCue(ctx, source)
+			if err != nil {
+				return fmt.Errorf("cue lint failed: %w", err)
+			}
+			return nil
+		})
+
+		g.Go(func() error {
+			_, err := m.LintYaml(ctx, source)
+			if err != nil {
+				return fmt.Errorf("yaml lint failed: %w", err)
+			}
+			return nil
+		})
+
+		if err := g.Wait(); err != nil {
+			return nil, err
+		}
+
+		return source, nil
 	}
 
-	// Run CUE linting - no auto-fix support
-	_, err = m.LintCue(ctx, source)
-	if err != nil {
-		return nil, fmt.Errorf("cue lint failed: %w", err)
-	}
+	// Check-only mode: all linters are independent, run in parallel
+	g, ctx := errgroup.WithContext(ctx)
 
-	// Run Go linting - supports formatting
-	source, err = m.LintGo(ctx, source, fix)
-	if err != nil {
-		return nil, fmt.Errorf("go lint failed: %w", err)
-	}
+	g.Go(func() error {
+		_, err := m.LintNix(ctx, source, false)
+		if err != nil {
+			return fmt.Errorf("nix lint failed: %w", err)
+		}
+		return nil
+	})
 
-	// Run Python linting - supports formatting
-	source, err = m.LintPython(ctx, source, fix)
-	if err != nil {
-		return nil, fmt.Errorf("python lint failed: %w", err)
-	}
+	g.Go(func() error {
+		_, err := m.LintCue(ctx, source)
+		if err != nil {
+			return fmt.Errorf("cue lint failed: %w", err)
+		}
+		return nil
+	})
 
-	// Run YAML linting - no auto-fix support
-	_, err = m.LintYaml(ctx, source)
-	if err != nil {
-		return nil, fmt.Errorf("yaml lint failed: %w", err)
+	g.Go(func() error {
+		_, err := m.LintGo(ctx, source, false)
+		if err != nil {
+			return fmt.Errorf("go lint failed: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		_, err := m.LintPython(ctx, source, false)
+		if err != nil {
+			return fmt.Errorf("python lint failed: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		_, err := m.LintYaml(ctx, source)
+		if err != nil {
+			return fmt.Errorf("yaml lint failed: %w", err)
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
 	return source, nil
@@ -276,31 +401,42 @@ func (m *Homelab) LintYaml(ctx context.Context,
 // Pre-call filter includes all files needed by all validate functions
 func (m *Homelab) Validate(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!k8s/**/*", "!terraform/**/*"]
+	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!k8s/**/*", "!terraform/**/*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
 ) (string, error) {
-	results := []string{}
+	g, ctx := errgroup.WithContext(ctx)
+	results := make([]string, 3)
 
-	// Validate Nix flake
-	nixResult, err := m.ValidateNix(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("nix validation failed: %w", err)
-	}
-	results = append(results, nixResult)
+	g.Go(func() error {
+		r, err := m.ValidateNix(ctx, source)
+		if err != nil {
+			return fmt.Errorf("nix validation failed: %w", err)
+		}
+		results[0] = r
+		return nil
+	})
 
-	// Validate Helm charts
-	helmResult, err := m.ValidateHelm(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("helm validation failed: %w", err)
-	}
-	results = append(results, helmResult)
+	g.Go(func() error {
+		r, err := m.ValidateHelm(ctx, source)
+		if err != nil {
+			return fmt.Errorf("helm validation failed: %w", err)
+		}
+		results[1] = r
+		return nil
+	})
 
-	// Validate Terraform
-	tfResult, err := m.ValidateTerraform(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("terraform validation failed: %w", err)
+	g.Go(func() error {
+		r, err := m.ValidateTerraform(ctx, source)
+		if err != nil {
+			return fmt.Errorf("terraform validation failed: %w", err)
+		}
+		results[2] = r
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return "", err
 	}
-	results = append(results, tfResult)
 
 	return joinResults(results), nil
 }
@@ -325,19 +461,16 @@ func (m *Homelab) ValidateNix(ctx context.Context,
 	return "Nix flake validation passed", nil
 }
 
-// ValidateHelm runs helm lint on all charts
+// ValidateHelm runs helm lint on all charts with dependency download
 // +check
 func (m *Homelab) ValidateHelm(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!k8s/**/*"]
+	// +ignore=["*", "!k8s/**/*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
 ) (string, error) {
-	// Note: This is a simplified check - full helmfile validation requires more setup
-	_, err := dag.Container().
-		From("alpine/helm:latest").
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"sh", "-c", "find k8s -name 'Chart.yaml' -exec dirname {} \\; | xargs -I {} helm lint {} 2>/dev/null || true"}).
+	_, err := m.helmContainer(source).
+		WithNewFile("/lint.sh", helmLintScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
+		WithExec([]string{"/lint.sh"}).
 		Sync(ctx)
 	if err != nil {
 		return "", fmt.Errorf("helm lint failed: %w", err)
@@ -366,21 +499,75 @@ func (m *Homelab) ValidateTerraform(ctx context.Context,
 	return "Terraform validation passed", nil
 }
 
+// helmContainer returns a helm container with shared cache volumes mounted.
+func (m *Homelab) helmContainer(source *dagger.Directory) *dagger.Container {
+	return dag.Container().
+		From("alpine/helm:latest").
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src").
+		WithMountedCache("/root/.cache/helm/repository", dag.CacheVolume("helm-repo-cache")).
+		WithMountedCache("/root/.cache/helm/content", dag.CacheVolume("helm-content-cache")).
+		WithMountedCache("/root/.config/helm/registry", dag.CacheVolume("helm-registry-cache"))
+}
+
+// BuildHelm renders Helm templates for Kubernetes charts to verify they are valid.
+func (m *Homelab) BuildHelm(ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	source *dagger.Directory,
+	// +optional
+	paths []string,
+) (string, error) {
+	searchPaths := "k8s"
+	if len(paths) > 0 {
+		searchPaths = strings.Join(paths, " ")
+	}
+
+	_, err := m.helmContainer(source).
+		WithNewFile("/render.sh", helmTemplateScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
+		WithEnvVariable("SEARCH_PATHS", searchPaths).
+		WithExec([]string{"/render.sh"}).
+		Sync(ctx)
+	if err != nil {
+		return "", fmt.Errorf("helm template rendering failed: %w", err)
+	}
+
+	return "Helm template rendering passed", nil
+}
+
 // Build builds all artifacts
-// Pre-call filter includes all files needed by all build functions
 func (m *Homelab) Build(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!cmd/lab/**/*"]
+	// +ignore=["*", "!cmd/lab/**/*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
 ) (string, error) {
-	results := []string{}
+	g, ctx := errgroup.WithContext(ctx)
+	results := make([]string, 2)
 
-	// Build the lab CLI
-	cliResult, err := m.BuildCli(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("cli build failed: %w", err)
+	cliSource := dag.Directory().WithDirectory("cmd/lab", source.Directory("cmd/lab"))
+	k8sSource := dag.Directory().WithDirectory("k8s", source.Directory("k8s"))
+
+	g.Go(func() error {
+		r, err := m.BuildCli(ctx, cliSource)
+		if err != nil {
+			return fmt.Errorf("cli build failed: %w", err)
+		}
+		results[0] = r
+		return nil
+	})
+
+	g.Go(func() error {
+		r, err := m.BuildHelm(ctx, k8sSource, nil)
+		if err != nil {
+			return fmt.Errorf("k8s build failed: %w", err)
+		}
+		results[1] = r
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return "", err
 	}
-	results = append(results, cliResult)
 
 	return joinResults(results), nil
 }
@@ -462,21 +649,30 @@ func (m *Homelab) Test(ctx context.Context,
 	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!k8s/platform/crowdsec/files/bootstrap-middleware/**/*.py", "!k8s/platform/crowdsec/files/bootstrap-middleware/pyproject.toml"]
 	source *dagger.Directory,
 ) (string, error) {
-	results := []string{}
+	g, ctx := errgroup.WithContext(ctx)
+	results := make([]string, 2)
 
-	// Run Go tests
-	goTestResult, err := m.TestGo(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("go tests failed: %w", err)
-	}
-	results = append(results, goTestResult)
+	g.Go(func() error {
+		r, err := m.TestGo(ctx, source)
+		if err != nil {
+			return fmt.Errorf("go tests failed: %w", err)
+		}
+		results[0] = r
+		return nil
+	})
 
-	// Run Python tests
-	pythonTestResult, err := m.TestPython(ctx, source)
-	if err != nil {
-		return "", fmt.Errorf("python tests failed: %w", err)
+	g.Go(func() error {
+		r, err := m.TestPython(ctx, source)
+		if err != nil {
+			return fmt.Errorf("python tests failed: %w", err)
+		}
+		results[1] = r
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return "", err
 	}
-	results = append(results, pythonTestResult)
 
 	return joinResults(results), nil
 }

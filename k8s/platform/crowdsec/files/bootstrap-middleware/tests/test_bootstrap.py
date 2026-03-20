@@ -98,7 +98,7 @@ class TestGetLapiPod:
         assert result == "crowdsec-lapi-abc123"
         core_api.list_namespaced_pod.assert_called_once_with(
             namespace="crowdsec",
-            label_selector="app.kubernetes.io/name=crowdsec,app.kubernetes.io/component=lapi",
+            label_selector="k8s-app=crowdsec,type=lapi",
         )
 
     def test_no_pods_found(self):
@@ -137,18 +137,56 @@ class TestGenerateBouncerKey:
     def test_generate_key_success(self, mock_stream):
         """Test successful bouncer key generation."""
         core_api = Mock()
-        mock_stream.stream.return_value = "generated-api-key-123\n"
+
+        def make_ws_resp(stdout_data):
+            resp = MagicMock()
+            call_count = [0]
+
+            def is_open():
+                call_count[0] += 1
+                return call_count[0] <= 1
+
+            resp.is_open = is_open
+            resp.peek_stdout.return_value = bool(stdout_data)
+            resp.read_stdout.return_value = stdout_data
+            resp.peek_stderr.return_value = False
+            return resp
+
+        # First call (delete) returns empty, second call (add) returns the key
+        mock_stream.stream.side_effect = [
+            make_ws_resp(""),
+            make_ws_resp("generated-api-key-123\n"),
+        ]
 
         result = bootstrap.generate_bouncer_key(core_api, "crowdsec-lapi-abc123")
 
         assert result == "generated-api-key-123"
-        mock_stream.stream.assert_called_once()
+        assert mock_stream.stream.call_count == 2
 
     @patch("bootstrap.stream")
     def test_generate_key_empty_response(self, mock_stream):
         """Test when bouncer key generation returns empty response."""
         core_api = Mock()
-        mock_stream.stream.return_value = ""
+
+        def make_ws_resp(stdout_data):
+            resp = MagicMock()
+            call_count = [0]
+
+            def is_open():
+                call_count[0] += 1
+                return call_count[0] <= 1
+
+            resp.is_open = is_open
+            resp.peek_stdout.return_value = bool(stdout_data)
+            resp.read_stdout.return_value = stdout_data
+            resp.peek_stderr.return_value = False
+            return resp
+
+        # Both calls return empty
+        mock_stream.stream.side_effect = [
+            make_ws_resp(""),
+            make_ws_resp(""),
+        ]
 
         with pytest.raises(SystemExit) as exc_info:
             bootstrap.generate_bouncer_key(core_api, "crowdsec-lapi-abc123")

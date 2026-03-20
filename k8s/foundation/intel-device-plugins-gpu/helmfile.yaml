@@ -1,5 +1,0 @@
-releases:
-  - name: intel-device-plugins-gpu
-    namespace: intel-device-plugins-gpu
-    chart: .
-    disableValidationOnInstall: true
