@@ -209,7 +209,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg fix", err))
 				}
 			}
-			return (*Homelab).All(&parent, ctx, source, fix)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).All(&parent, ctx, source, fix, paths)
 		case "Build":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -223,7 +230,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).Build(&parent, ctx, source)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).Build(&parent, ctx, source, paths)
 		case "BuildCli":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -342,7 +356,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg fix", err))
 				}
 			}
-			return (*Homelab).Lint(&parent, ctx, source, fix)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).Lint(&parent, ctx, source, fix, paths)
 		case "LintCue":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -377,7 +398,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg fix", err))
 				}
 			}
-			return (*Homelab).LintGo(&parent, ctx, source, fix)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).LintGo(&parent, ctx, source, fix, paths)
 		case "LintNix":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -398,7 +426,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg fix", err))
 				}
 			}
-			return (*Homelab).LintNix(&parent, ctx, source, fix)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).LintNix(&parent, ctx, source, fix, paths)
 		case "LintPython":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -419,7 +454,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg fix", err))
 				}
 			}
-			return (*Homelab).LintPython(&parent, ctx, source, fix)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).LintPython(&parent, ctx, source, fix, paths)
 		case "LintYaml":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -433,7 +475,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).LintYaml(&parent, ctx, source)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).LintYaml(&parent, ctx, source, paths)
 		case "Test":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -447,7 +496,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).Test(&parent, ctx, source)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).Test(&parent, ctx, source, paths)
 		case "TestBuildHelm":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -468,7 +524,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).TestGo(&parent, ctx, source)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).TestGo(&parent, ctx, source, paths)
 		case "TestPython":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -482,7 +545,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).TestPython(&parent, ctx, source)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).TestPython(&parent, ctx, source, paths)
 		case "Validate":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -496,7 +566,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).Validate(&parent, ctx, source)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).Validate(&parent, ctx, source, paths)
 		case "ValidateHelm":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -510,7 +587,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).ValidateHelm(&parent, ctx, source)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).ValidateHelm(&parent, ctx, source, paths)
 		case "ValidateNix":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -538,7 +622,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).ValidateTerraform(&parent, ctx, source)
+			var paths []string
+			if inputArgs["paths"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
+				}
+			}
+			return (*Homelab).ValidateTerraform(&parent, ctx, source, paths)
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}

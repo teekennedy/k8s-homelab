@@ -1,9 +1,11 @@
 #!/bin/sh
 set -e
 
+SEARCH_PATHS="${SEARCH_PATHS:-k8s}"
+
 # Register all non-OCI helm repositories
 echo "Registering helm repositories..."
-for chart_yaml in $(find k8s -name Chart.yaml -not -path "*/charts/*" | sort); do
+for chart_yaml in $(find $SEARCH_PATHS -name Chart.yaml -not -path "*/charts/*" | sort); do
     grep 'repository:' "$chart_yaml" | awk '{print $2}' | while read -r repo_url; do
         if [ -z "$repo_url" ] || echo "$repo_url" | grep -q '^oci://'; then
             continue
@@ -18,7 +20,7 @@ echo ""
 FAILED=0
 LINTED=0
 
-for chart_yaml in $(find k8s -name Chart.yaml -not -path "*/charts/*" | sort); do
+for chart_yaml in $(find $SEARCH_PATHS -name Chart.yaml -not -path "*/charts/*" | sort); do
     chart_dir=$(dirname "$chart_yaml")
     echo "Linting $chart_dir..."
 

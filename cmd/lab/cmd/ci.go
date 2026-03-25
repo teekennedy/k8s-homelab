@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -124,11 +125,32 @@ func newCIAllCmd() *cobra.Command {
 		Short: "Run full CI pipeline (lint, validate, build, test)",
 		Long: `Run the complete CI pipeline: lint → validate → build → test.
 
-Use --fix to automatically fix linting issues during the pipeline.`,
+Use --fix to automatically fix linting issues during the pipeline.
+Use --changed to only run CI on files changed in the current git working tree.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fix, _ := cmd.Flags().GetBool("fix")
+			changed, _ := cmd.Flags().GetBool("changed")
 			cmd.SilenceUsage = true
+
 			daggerArgs := []string{"call", "all", "--source=."}
+
+			if changed {
+				paths, err := changedFiles()
+				if err != nil {
+					return fmt.Errorf("detect changes: %w", err)
+				}
+				if len(paths) == 0 {
+					fmt.Println("No changes detected")
+					return nil
+				}
+				for _, p := range paths {
+					daggerArgs = append(daggerArgs, "--paths", p)
+				}
+				if verbose {
+					fmt.Printf("Changed files: %s\n", strings.Join(paths, ", "))
+				}
+			}
+
 			if fix {
 				daggerArgs = append(daggerArgs, "--fix")
 				daggerArgs = append(daggerArgs, "export", "--path=.")
@@ -139,8 +161,22 @@ Use --fix to automatically fix linting issues during the pipeline.`,
 	}
 
 	cmd.Flags().Bool("fix", false, "Automatically fix linting issues")
+	cmd.Flags().Bool("changed", false, "Only run CI on changed files")
 
 	return cmd
+}
+
+// changedFiles returns file paths changed in the working tree relative to HEAD.
+func changedFiles() ([]string, error) {
+	out, err := exec.Command("git", "diff", "--name-only", "HEAD").Output()
+	if err != nil {
+		return nil, err
+	}
+	text := strings.TrimSpace(string(out))
+	if text == "" {
+		return nil, nil
+	}
+	return strings.Split(text, "\n"), nil
 }
 
 func runDaggerInCI(args ...string) error {
