@@ -3,28 +3,25 @@ module dagger/homelab
 go 1.25.0
 
 require (
+	github.com/99designs/gqlgen v0.17.87
 	github.com/Khan/genqlient v0.8.1
 	github.com/vektah/gqlparser/v2 v2.5.32
-	go.opentelemetry.io/otel v1.40.0
-	go.opentelemetry.io/otel/sdk v1.40.0
-	go.opentelemetry.io/otel/trace v1.40.0
+	go.opentelemetry.io/otel v1.42.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.16.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.16.0
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.40.0
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.40.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.40.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.40.0
+	go.opentelemetry.io/otel/log v0.18.0
+	go.opentelemetry.io/otel/metric v1.42.0
+	go.opentelemetry.io/otel/sdk v1.42.0
+	go.opentelemetry.io/otel/sdk/log v0.18.0
+	go.opentelemetry.io/otel/sdk/metric v1.42.0
+	go.opentelemetry.io/otel/trace v1.42.0
+	go.opentelemetry.io/proto/otlp v1.9.0
 	golang.org/x/sync v0.19.0
-)
-
-require (
-	github.com/99designs/gqlgen v0.17.87 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.16.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.16.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.40.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.40.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.40.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.40.0 // indirect
-	go.opentelemetry.io/otel/log v0.16.0 // indirect
-	go.opentelemetry.io/otel/metric v1.40.0 // indirect
-	go.opentelemetry.io/otel/sdk/log v0.16.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
-	google.golang.org/grpc v1.79.1 // indirect
+	google.golang.org/grpc v1.79.2
 )
 
 require (
@@ -46,10 +43,10 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.14.0
+replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.18.0
 
-replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.14.0
+replace go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp => go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.18.0
 
-replace go.opentelemetry.io/otel/log => go.opentelemetry.io/otel/log v0.14.0
+replace go.opentelemetry.io/otel/log => go.opentelemetry.io/otel/log v0.18.0
 
-replace go.opentelemetry.io/otel/sdk/log => go.opentelemetry.io/otel/sdk/log v0.14.0
+replace go.opentelemetry.io/otel/sdk/log => go.opentelemetry.io/otel/sdk/log v0.18.0
