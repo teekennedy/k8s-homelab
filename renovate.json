@@ -8,6 +8,19 @@
   "prHourlyLimit": 12,
   "customManagers": [
     {
+      "description": "Sync ArgoCD appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "k8s/foundation/argocd/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "argoproj/argo-cd",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
       "description": "Sync Dashy appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
