@@ -22,10 +22,6 @@ in {
           helm-git
         ];
       };
-
-      helmfile-wrapped = prev.helmfile-wrapped.override {
-        inherit (kubernetes-helm) pluginsDir;
-      };
     })
   ];
 
@@ -34,10 +30,12 @@ in {
   imports = [devenv-zsh.plugin];
   zsh.enable = true;
   zsh.extraInit = ''
-    echo "Adding lab completions to current shell..."
     # Add lab completions to FPATH for zsh
-    fpath=(${lab}/share/zsh/site-functions:$fpath)
-    autoload -Uz compinit && compinit
+    if [ -n "''${ZSH_VERSION-}" ]; then
+      echo "Adding lab completions to current shell..."
+      export FPATH="''${FPATH-}:${lab}/share/zsh/site-functions"
+      autoload -Uz compinit && compinit
+    fi
   '';
 
   # https://devenv.sh/basics/
@@ -57,7 +55,6 @@ in {
       dagger
       deploy-rs
       go_1_26
-      helmfile-wrapped
       k9s
       kind
       kubecolor
@@ -70,41 +67,6 @@ in {
       sops
       uv
     ]);
-
-  # https://devenv.sh/languages/
-  # languages.rust.enable = true;
-
-  # https://devenv.sh/processes/
-  # processes.dev.exec = "${lib.getExe pkgs.watchexec} -n -- ls -la";
-
-  # https://devenv.sh/services/
-  # services.postgres.enable = true;
-
-  # https://devenv.sh/scripts/
-  # scripts.hello.exec = ''
-  #   echo hello from $GREET
-  # '';
-
-  # Shell hook to set up lab CLI completions
-  # enterShell = ''
-  #   echo -n "Adding lab completions to current shell..."
-  #   if [[ -n "$ZSH_VERSION" ]]; then
-  #     echo "(detected) zsh"
-  #     # Add lab completions to FPATH for zsh
-  #     fpath=(${lab}/share/zsh/site-functions:$fpath)
-  #     autoload -Uz compinit && compinit
-  #   elif [[ -n "$BASH_VERSION" ]]; then
-  #     echo "(detected) bash"
-  #     # Source bash completion for lab
-  #     source ${lab}/share/bash-completion/completions/lab.bash
-  #   fi
-  # '';
-
-  # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
 
   # https://devenv.sh/git-hooks/
   git-hooks.hooks = {

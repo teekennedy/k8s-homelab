@@ -1,39 +1,32 @@
-# yaml-language-server: $schema=https://devenv.sh/devenv.schema.json
 inputs:
-  nixpkgs:
-    url: github:NixOS/nixpkgs/nixos-unstable
-  devenv-zsh:
-    url: github:mcdonc/devenv-zsh
   dagger:
-    url: "github:dagger/nix?ref=main"
+    url: github:dagger/nix?ref=main
     inputs:
       nixpkgs:
-        follows: "nixpkgs"
+        follows: nixpkgs
   deploy-rs:
-    url: "github:serokell/deploy-rs?ref=master"
+    url: github:serokell/deploy-rs?ref=master
     inputs:
       nixpkgs:
-        follows: "nixpkgs"
+        follows: nixpkgs
+  devenv-zsh:
+    url: github:teekennedy/devenv-zsh?ref=unbound-variable-guard
+  git-hooks:
+    url: github:cachix/git-hooks.nix
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
   lab:
     url: path:cmd/lab
     inputs:
       nixpkgs:
-        follows: "nixpkgs"
+        follows: nixpkgs
+  mk-shell-bin:
+    url: github:rrbutani/nix-mk-shell-bin
   nix2container:
     url: github:nlewo/nix2container
     inputs:
       nixpkgs:
-        follows: "nixpkgs"
-  mk-shell-bin:
-    url: github:rrbutani/nix-mk-shell-bin
-
-# If you're using non-OSS software, you can set allowUnfree to true.
-# allowUnfree: true
-
-# If you're willing to use a package that's vulnerable
-# permittedInsecurePackages:
-#  - "openssl-1.1.1w"
-
-# If you have more than one devenv you can merge them
-# imports:
-# - ./backend
+        follows: nixpkgs
+  nixpkgs:
+    url: github:NixOS/nixpkgs/nixos-unstable
