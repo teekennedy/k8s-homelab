@@ -10,7 +10,7 @@ inputs:
       nixpkgs:
         follows: nixpkgs
   devenv-zsh:
-    url: github:teekennedy/devenv-zsh?ref=unbound-variable-guard
+    url: github:teekennedy/devenv-zsh?ref=direnv-support
   git-hooks:
     url: github:cachix/git-hooks.nix
     inputs:

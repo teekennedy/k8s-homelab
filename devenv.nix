@@ -31,11 +31,9 @@ in {
   zsh.enable = true;
   zsh.extraInit = ''
     # Add lab completions to FPATH for zsh
-    if [ -n "''${ZSH_VERSION-}" ]; then
-      echo "Adding lab completions to current shell..."
-      export FPATH="''${FPATH-}:${lab}/share/zsh/site-functions"
-      autoload -Uz compinit && compinit
-    fi
+    export FPATH="''${FPATH-}:${lab}/share/zsh/site-functions"
+    autoload -Uz _lab
+    compdef _lab lab
   '';
 
   # https://devenv.sh/basics/
