@@ -76,7 +76,7 @@ authelia:
         # Homepage's concurrent forward-auth requests during webpage load
         pooling:
           enable: true
-          count: 20
+          count: 5
 
         # Allow sign in with either username or email
         users_filter: "(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=person))"
@@ -333,7 +333,9 @@ app-template:
                     - --config-file
                     - /data/lldap_config.toml
                 initialDelaySeconds: 5
-                periodSeconds: 5
+                periodSeconds: 10
+                timeoutSeconds: 5
+                failureThreshold: 5
             readiness:
               enabled: true
               type: TCP
