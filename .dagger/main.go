@@ -36,7 +36,7 @@ type Homelab struct{}
 // Returns the linted/fixed source directory
 func (m *Homelab) All(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", "devenv.local.*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", ".devenv/**", "devenv.local.*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -158,7 +158,7 @@ func (m *Homelab) All(ctx context.Context,
 // +check
 func (m *Homelab) Lint(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", "devenv.local.*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", ".devenv/**", "devenv.local.*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -297,7 +297,7 @@ func (m *Homelab) Lint(ctx context.Context,
 func (m *Homelab) LintNix(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", ".devenv*", "devenv.local.*"]
+	// +ignore=["*", "!**/*.nix", ".devenv*", ".devenv/**", "devenv.local.*"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -432,11 +432,11 @@ func (m *Homelab) LintPython(ctx context.Context,
 		if fix {
 			container = container.
 				WithWorkdir("/src/" + dir).
-				WithExec([]string{"uv", "run", "black", "."})
+				WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "."})
 		} else {
 			container = container.
 				WithWorkdir("/src/" + dir).
-				WithExec([]string{"uv", "run", "black", "--check", "."})
+				WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "--check", "."})
 		}
 	}
 
