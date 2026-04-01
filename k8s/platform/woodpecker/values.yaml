@@ -11,10 +11,6 @@ woodpecker:
       storageClass: longhorn
     ingress:
       enabled: true
-      annotations:
-        traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
-        external-dns.alpha.kubernetes.io/target: external.network.msng.to
-        external-dns.alpha.kubernetes.io/record-type: CNAME
       hosts:
         - host: ci.msng.to
           paths:
