@@ -25,7 +25,7 @@ for chart_yaml in $(find $SEARCH_PATHS -name Chart.yaml -not -path "*/charts/*" 
     echo "Linting $chart_dir..."
 
     if grep -q 'dependencies:' "$chart_yaml"; then
-        helm dependency build "$chart_dir" 2>/dev/null || true
+        helm dependency build --skip-refresh "$chart_dir" 2>/dev/null || true
     fi
 
     if helm lint "$chart_dir" 2>&1; then

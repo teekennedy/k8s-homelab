@@ -47,7 +47,7 @@ for chart_yaml in $(find $SEARCH_PATHS -name Chart.yaml -not -path "*/charts/*" 
 
     if grep -q 'dependencies:' "$chart_yaml"; then
         echo "  Building dependencies..."
-        if ! helm dependency build "$chart_dir" 2>&1; then
+        if ! helm dependency build --skip-refresh "$chart_dir" 2>&1; then
             echo "  ERROR: Failed to build dependencies for $chart_dir"
             FAILED=$((FAILED + 1))
             ERRORS="$ERRORS\n  - $chart_dir: dependency build failed"
