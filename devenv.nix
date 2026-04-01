@@ -64,6 +64,7 @@ in {
       opentofu
       sops
       uv
+      woodpecker-cli
     ]);
 
   # https://devenv.sh/git-hooks/

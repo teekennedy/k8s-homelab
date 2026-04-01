@@ -12,34 +12,19 @@ steps:
       kubernetes:
         serviceAccountName: dagger-pipeline
     commands:
-      - apk add --no-cache curl git kubectl
+      - apk add --no-cache curl git kubectl jq
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.20.3 BIN_DIR=/usr/local/bin sh
       - |
+        set -x
+        CHANGED=$(echo "$CI_PIPELINE_FILES" | jq -r '.[]')
+
+        if [ -z "$CHANGED" ]; then
+          echo "No changed files detected"
+          exit 0
+        fi
+
         if [ "$CI_PIPELINE_EVENT" = "pull_request" ]; then
-          git fetch origin "$CI_COMMIT_TARGET_BRANCH"
-
-          # Deepen history until the merge base is available (max 5 attempts)
-          ATTEMPTS=0
-          while ! git merge-base "origin/$CI_COMMIT_TARGET_BRANCH" HEAD >/dev/null 2>&1; do
-            ATTEMPTS=$((ATTEMPTS + 1))
-            if [ "$ATTEMPTS" -gt 5 ]; then
-              echo "Could not find merge base after deepening 5 times, falling back to full fetch"
-              git fetch --unshallow origin || true
-              break
-            fi
-            echo "Deepening clone (attempt $ATTEMPTS)..."
-            git fetch --deepen=50 origin "$CI_COMMIT_TARGET_BRANCH"
-          done
-
-          # Get all files (A)dded, (C)opied, (M)odified, (R)enamed, or had their (T)ype changed
-          CHANGED=$(git diff --name-only --diff-filter=ACMRT "origin/$CI_COMMIT_TARGET_BRANCH...HEAD")
-
-          if [ -z "$CHANGED" ]; then
-            echo "No changed files detected"
-            exit 0
-          fi
-
-          dagger call all --source=. --paths "$(echo -n "$CHANGED" | paste -sd, -)"
+          dagger call all --source=. --paths "$(echo "$CI_PIPELINE_FILES" | jq -r 'join(",")')"
         else
           dagger call all --source=.
         fi
