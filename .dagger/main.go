@@ -901,7 +901,7 @@ func (m *Homelab) TestPython(ctx context.Context,
 	for _, dir := range projectDirs {
 		container = container.
 			WithWorkdir("/src/" + dir).
-			WithExec([]string{"uv", "run", "pytest", "-v"})
+			WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest", "-v"})
 	}
 
 	_, err = container.Sync(ctx)
