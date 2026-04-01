@@ -1,5 +1,7 @@
+# https://github.com/woodpecker-ci/helm/tree/main/charts/woodpecker
 woodpecker:
   server:
+    createAgentSecret: false
     env:
       WOODPECKER_HOST: "https://ci.msng.to"
       WOODPECKER_GITEA: "true"
@@ -7,6 +9,7 @@ woodpecker:
       WOODPECKER_EXPERT_FORGE_OAUTH_HOST: "https://git.msng.to"
       WOODPECKER_ADMIN: "tkennedy"
     extraSecretNamesForEnvFrom:
+      - woodpecker-default-agent-secret
       - woodpecker-gitea-oauth2
     persistentVolume:
       storageClass: longhorn
@@ -25,6 +28,16 @@ woodpecker:
 
   agent:
     replicaCount: 1
+    extraVolumes:
+      - name: nix-daemon-socket
+        hostPath:
+          path: /nix/var/nix/daemon-socket/socket
+          type: Socket
+
+    extraVolumeMounts:
+      - name: nix-daemon-socket
+        mountPath: /nix/var/nix/daemon-socket/socket
+
     env:
       WOODPECKER_SERVER: "woodpecker-server:9000"
       WOODPECKER_BACKEND: "kubernetes"

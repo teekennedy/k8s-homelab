@@ -8,6 +8,16 @@
   "prHourlyLimit": 12,
   "customManagers": [
     {
+      "description": "Track Docker images in Dagger Go module",
+      "customType": "regex",
+      "managerFilePatterns": [
+        ".dagger/**/*.go"
+      ],
+      "matchStrings": [
+        "//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n[^\"]*\"[^:]+:(?<currentValue>[^\"]+)\""
+      ]
+    },
+    {
       "description": "Sync ArgoCD appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [

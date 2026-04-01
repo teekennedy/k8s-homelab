@@ -24,6 +24,30 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Container image constants with renovate annotations for automated updates.
+const (
+	// renovate: datasource=docker depName=ghcr.io/cachix/devenv/devenv
+	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.0.2"
+	// renovate: datasource=docker depName=nixos/nix
+	nixImage = "nixos/nix:latest"
+	// renovate: datasource=docker depName=golang
+	golangImage = "golang:1.25-alpine"
+	// renovate: datasource=docker depName=ghcr.io/astral-sh/uv
+	uvImage = "ghcr.io/astral-sh/uv:alpine"
+	// renovate: datasource=docker depName=cuelang/cue
+	cueImage = "cuelang/cue:latest"
+	// renovate: datasource=docker depName=cytopia/yamllint
+	yamllintImage = "cytopia/yamllint:latest"
+	// renovate: datasource=docker depName=ghcr.io/opentofu/opentofu
+	opentofuImage = "ghcr.io/opentofu/opentofu:latest"
+	// renovate: datasource=docker depName=woodpeckerci/woodpecker-cli
+	woodpeckerImage = "woodpeckerci/woodpecker-cli:v3"
+	// renovate: datasource=docker depName=alpine/helm
+	helmImage = "alpine/helm:latest"
+	// renovate: datasource=docker depName=alpine
+	alpineImage = "alpine:latest"
+)
+
 //go:embed scripts/helm-deps.sh
 var helmDepsScript string
 
@@ -310,7 +334,7 @@ func (m *Homelab) LintNix(
 	paths []string,
 ) (*dagger.Directory, error) {
 	container := dag.Container().
-		From("nixos/nix:latest").
+		From(nixImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix-env", "-iA", "nixpkgs.alejandra", "nixpkgs.deadnix"})
@@ -352,7 +376,7 @@ func (m *Homelab) LintCue(ctx context.Context,
 	source *dagger.Directory,
 ) (string, error) {
 	_, err := dag.Container().
-		From("cuelang/cue:latest").
+		From(cueImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/config").
 		WithExec([]string{"cue", "vet", "./..."}).
@@ -387,7 +411,7 @@ func (m *Homelab) LintGo(ctx context.Context,
 	}
 
 	container := dag.Container().
-		From("golang:1.25-alpine").
+		From(golangImage).
 		WithMountedDirectory("/src", source)
 
 	for _, dir := range moduleDirs {
@@ -450,7 +474,7 @@ func (m *Homelab) LintPython(ctx context.Context,
 	}
 
 	container := dag.Container().
-		From("ghcr.io/astral-sh/uv:alpine").
+		From(uvImage).
 		WithMountedDirectory("/src", source)
 
 	for _, dir := range projectDirs {
@@ -494,7 +518,7 @@ func (m *Homelab) LintYaml(ctx context.Context,
 	}
 
 	_, err := dag.Container().
-		From("cytopia/yamllint:latest").
+		From(yamllintImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec(args).
@@ -591,7 +615,7 @@ func (m *Homelab) ValidateNix(ctx context.Context,
 	source *dagger.Directory,
 ) (string, error) {
 	_, err := dag.Container().
-		From("nixos/nix:latest").
+		From(nixImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "flake", "check", "--no-build"}).
@@ -663,7 +687,7 @@ func (m *Homelab) ValidateTerraform(ctx context.Context,
 	}
 
 	_, err := dag.Container().
-		From("ghcr.io/opentofu/opentofu:latest").
+		From(opentofuImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/terraform").
 		WithExec([]string{"sh", "-c", script}).
@@ -691,7 +715,7 @@ func (m *Homelab) ValidateWoodpecker(ctx context.Context,
 	}
 
 	container := dag.Container().
-		From("woodpeckerci/woodpecker-cli:v3").
+		From(woodpeckerImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src")
 
@@ -714,7 +738,7 @@ func (m *Homelab) ValidateWoodpecker(ctx context.Context,
 // helmContainer returns a helm container with shared cache volumes mounted.
 func (m *Homelab) helmContainer(source *dagger.Directory) *dagger.Container {
 	return dag.Container().
-		From("alpine/helm:latest").
+		From(helmImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithMountedCache("/root/.cache/helm/repository", dag.CacheVolume("helm-repo-cache")).
@@ -825,7 +849,7 @@ func (m *Homelab) BuildCli(ctx context.Context,
 	source *dagger.Directory,
 ) (string, error) {
 	_, err := dag.Container().
-		From("nixos/nix:latest").
+		From(nixImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "build", "./cmd/lab", "--print-build-logs"}).
@@ -844,7 +868,7 @@ func (m *Homelab) BuildCliGo(ctx context.Context,
 	source *dagger.Directory,
 ) (string, error) {
 	_, err := dag.Container().
-		From("golang:1.25-alpine").
+		From(golangImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/cmd/lab").
 		WithExec([]string{"go", "build", "-o", "/out/lab", "."}).
@@ -864,7 +888,7 @@ func (m *Homelab) Cli(ctx context.Context,
 	platform dagger.Platform,
 ) *dagger.File {
 	return dag.Container().
-		From("golang:1.25-alpine").
+		From(golangImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/cmd/lab").
 		WithEnvVariable("CGO_ENABLED", "0").
@@ -879,7 +903,7 @@ func (m *Homelab) CliNix(ctx context.Context,
 	source *dagger.Directory,
 ) *dagger.File {
 	return dag.Container().
-		From("nixos/nix:latest").
+		From(nixImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "build", "./cmd/lab"}).
@@ -954,7 +978,7 @@ func (m *Homelab) TestGo(ctx context.Context,
 	}
 
 	container := dag.Container().
-		From("golang:1.25-alpine").
+		From(golangImage).
 		WithMountedDirectory("/src", source)
 
 	for _, dir := range moduleDirs {
@@ -1004,7 +1028,7 @@ func (m *Homelab) TestPython(ctx context.Context,
 	}
 
 	container := dag.Container().
-		From("ghcr.io/astral-sh/uv:alpine").
+		From(uvImage).
 		WithMountedDirectory("/src", source)
 
 	for _, dir := range projectDirs {
@@ -1019,6 +1043,82 @@ func (m *Homelab) TestPython(ctx context.Context,
 	}
 
 	return "Python tests passed", nil
+}
+
+// Devenv builds the devenv nix environment as a minimal "from scratch" container.
+// Uses `devenv container copy shell` to produce a minimal nix2container image
+// containing only the runtime closure (no build dependencies).
+// The resulting container has all dev tools (go, helm, kubectl, etc.) available on PATH.
+// The nix store is cached across runs so packages are only built once.
+func (m *Homelab) Devenv(ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!devenv.local.nix", "!devenv.local.yaml", "!cmd/lab/**/*"]
+	source *dagger.Directory,
+	// Optional host nix daemon socket for faster builds on NixOS CI hosts.
+	// When provided, the host daemon's store is used as a substituter so
+	// pre-built packages are fetched rather than rebuilt from source.
+	// Note: only works when the host and container share the same platform
+	// (e.g. Linux-to-Linux). Does not work with macOS host daemons due to
+	// cross-platform path handling differences.
+	// +optional
+	nixDaemon *dagger.Socket,
+) (*dagger.Container, error) {
+	// Cache the nix store across runs. The cache volume name includes the image
+	// tag so it auto-invalidates when the devenv image is updated (e.g. by Renovate).
+	nixCacheKey := "devenv-nix-" + devenvImage
+	baseNix := dag.Container().From(devenvImage).WithUser("root").Directory("/nix")
+
+	builder := dag.Container().
+		From(devenvImage).
+		WithUser("root").
+		// Persist the nix store so packages are only built once.
+		// Initialized from the base image on first use; reused on subsequent runs.
+		WithMountedCache("/nix", dag.CacheVolume(nixCacheKey), dagger.ContainerWithMountedCacheOpts{
+			Source: baseNix,
+		}).
+		// Suppress zsh-specific setup (compdef errors) and version nag in container context
+		WithEnvVariable("DEVENV_ZSH_DISABLE", "1").
+		WithDirectory("/devenv", source).
+		WithWorkdir("/devenv")
+
+	devenvOpts := []string{"--no-tui", "--option", "devenv.warnOnNewVersion:bool", "false"}
+	if nixDaemon != nil {
+		builder = builder.
+			WithUnixSocket("/nix/var/nix/daemon-socket/socket", nixDaemon)
+		// Use the host daemon as a substituter. The "daemon" keyword connects
+		// to the socket at the default path (/nix/var/nix/daemon-socket/socket).
+		// This works on NixOS CI hosts where architecture matches the container.
+		devenvOpts = append(devenvOpts,
+			"--nix-option", "extra-substituters", "daemon",
+			"--nix-option", "require-sigs", "false",
+		)
+	}
+
+	// Build the shell and extract PATH from devenv print-dev-env.
+	// The env script sets PATH='...' as a single-quoted assignment.
+	builder = builder.
+		WithExec(append([]string{"devenv", "build", "shell"}, devenvOpts...)).
+		WithExec([]string{"sh", "-c", strings.Join(append(append([]string{"devenv", "print-dev-env"}, devenvOpts...), "> /tmp/devenv-env.sh"), " ")})
+
+	devenvPath, err := builder.
+		WithExec([]string{"sed", "-n", "s/^PATH='\\(.*\\)'/\\1/p", "/tmp/devenv-env.sh"}).
+		Stdout(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("extracting devenv PATH: %w", err)
+	}
+
+	// Build the minimal shell container and export as docker-archive tarball.
+	// devenv container copy uses nix2container + skopeo under the hood.
+	// The --registry flag accepts any skopeo transport, including docker-archive.
+	// The container name ("shell") is appended to the registry path by devenv,
+	// so "docker-archive:/tmp/" produces the file "/tmp/shell".
+	tarball := builder.
+		WithExec(append([]string{"devenv", "container", "copy", "shell", "--registry", "docker-archive:/tmp/"}, devenvOpts...)).
+		File("/tmp/shell")
+
+	return dag.Container().Import(tarball).
+		WithEnvVariable("PATH", strings.TrimSpace(devenvPath)).
+		WithWorkdir("/src"), nil
 }
 
 // DebugDir returns the given dir. Useful for inspecting directory contents for debugging.

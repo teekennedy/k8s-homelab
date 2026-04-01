@@ -48,7 +48,7 @@ var (
 // If paths is empty, returns all discovered projects.
 func findPythonProjects(ctx context.Context, source *dagger.Directory, paths []string) ([]string, error) {
 	out, err := dag.Container().
-		From("alpine:latest").
+		From(alpineImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{
@@ -80,7 +80,7 @@ func findPythonProjects(ctx context.Context, source *dagger.Directory, paths []s
 // If paths is empty, returns all discovered modules.
 func findGoModules(ctx context.Context, source *dagger.Directory, paths []string) ([]string, error) {
 	out, err := dag.Container().
-		From("alpine:latest").
+		From(alpineImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"find", ".", "-name", "go.mod"}).
@@ -123,7 +123,7 @@ func findHelmChartDirs(ctx context.Context, source *dagger.Directory, paths []st
 
 	// Find all Chart.yaml files to determine chart boundaries
 	out, err := dag.Container().
-		From("alpine:latest").
+		From(alpineImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"find", "k8s", "-name", "Chart.yaml", "-not", "-path", "*/charts/*"}).
