@@ -15,7 +15,6 @@ steps:
       - apk add --no-cache curl git kubectl jq
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.20.3 BIN_DIR=/usr/local/bin sh
       - |
-        set -x
         CHANGED=$(echo "$CI_PIPELINE_FILES" | jq -r '.[]')
 
         if [ -z "$CHANGED" ]; then
@@ -23,8 +22,4 @@ steps:
           exit 0
         fi
 
-        if [ "$CI_PIPELINE_EVENT" = "pull_request" ]; then
-          dagger call all --source=. --paths "$(echo "$CI_PIPELINE_FILES" | jq -r 'join(",")')"
-        else
-          dagger call all --source=.
-        fi
+        dagger call all --source=. --paths "$(echo "$CI_PIPELINE_FILES" | jq -r 'join(",")')"
