@@ -3,13 +3,15 @@ when:
 
 steps:
   - name: ci
-    image: ghcr.io/dagger/engine:v0.20.3
+    image: alpine:3
     environment:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine"
     backend_options:
       kubernetes:
         serviceAccountName: dagger-pipeline
     commands:
+      - apk add --no-cache curl git
+      - curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.20.3 BIN_DIR=/usr/local/bin sh
       - |
         if [ "$CI_PIPELINE_EVENT" = "pull_request" ]; then
           git fetch origin "$CI_COMMIT_TARGET_BRANCH"
