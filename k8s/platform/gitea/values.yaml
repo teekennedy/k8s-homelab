@@ -70,6 +70,8 @@ gitea:
         DISABLED_REPO_UNITS: repo.wiki,repo.projects,repo.packages
         DISABLE_STARS: true
         DEFAULT_BRANCH: main
+      service:
+        DISABLE_REGISTRATION: true
       service.explore:
         DISABLE_USERS_PAGE: true
       actions:
