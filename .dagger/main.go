@@ -23,6 +23,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+//go:embed scripts/helm-deps.sh
+var helmDepsScript string
+
 //go:embed scripts/helm-template.sh
 var helmTemplateScript string
 
@@ -574,9 +577,7 @@ func (m *Homelab) ValidateHelm(ctx context.Context,
 	// +optional
 	paths []string,
 ) (string, error) {
-	container := m.helmContainer(source).
-		WithNewFile("/lint.sh", helmLintScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755})
-
+	searchPaths := "k8s"
 	if len(paths) > 0 {
 		chartDirs, err := findHelmChartDirs(ctx, source, paths)
 		if err != nil {
@@ -585,10 +586,14 @@ func (m *Homelab) ValidateHelm(ctx context.Context,
 		if len(chartDirs) == 0 {
 			return "Helm validation skipped (no matching charts)", nil
 		}
-		container = container.WithEnvVariable("SEARCH_PATHS", strings.Join(chartDirs, " "))
+		searchPaths = strings.Join(chartDirs, " ")
 	}
 
-	_, err := container.
+	preparedSource := m.helmSourceWithDeps(source, searchPaths)
+
+	_, err := m.helmContainer(preparedSource).
+		WithNewFile("/lint.sh", helmLintScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
+		WithEnvVariable("SEARCH_PATHS", searchPaths).
 		WithExec([]string{"/lint.sh"}).
 		Sync(ctx)
 	if err != nil {
@@ -645,6 +650,18 @@ func (m *Homelab) helmContainer(source *dagger.Directory) *dagger.Container {
 		WithMountedCache("/root/.config/helm/registry", dag.CacheVolume("helm-registry-cache"))
 }
 
+// helmSourceWithDeps registers helm repos and builds chart dependencies,
+// returning the source directory with dependency tarballs populated in charts/ dirs.
+// When called with the same inputs from multiple consumers (e.g. ValidateHelm and BuildHelm),
+// Dagger deduplicates the work and executes the dependency build only once.
+func (m *Homelab) helmSourceWithDeps(source *dagger.Directory, searchPaths string) *dagger.Directory {
+	return m.helmContainer(source).
+		WithNewFile("/deps.sh", helmDepsScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
+		WithEnvVariable("SEARCH_PATHS", searchPaths).
+		WithExec([]string{"/deps.sh"}).
+		Directory("/src")
+}
+
 // BuildHelm renders Helm templates for Kubernetes charts to verify they are valid.
 // When paths are provided, only charts matching the paths are rendered.
 func (m *Homelab) BuildHelm(ctx context.Context,
@@ -666,7 +683,9 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 		searchPaths = strings.Join(chartDirs, " ")
 	}
 
-	_, err := m.helmContainer(source).
+	preparedSource := m.helmSourceWithDeps(source, searchPaths)
+
+	_, err := m.helmContainer(preparedSource).
 		WithNewFile("/render.sh", helmTemplateScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
 		WithEnvVariable("SEARCH_PATHS", searchPaths).
 		WithExec([]string{"/render.sh"}).

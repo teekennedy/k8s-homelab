@@ -16,11 +16,11 @@ var (
 	LintYamlPatterns   = []string{"**/*.yaml", "**/*.yml", ".yamllint.yaml"}
 
 	ValidateNixPatterns  = []string{"**/*.nix", "flake.lock", "nix/**"}
-	ValidateHelmPatterns = []string{"k8s/**", "config/**/*.cue"}
+	ValidateHelmPatterns = []string{"k8s/**", "config/**/*.cue", ".dagger/scripts/helm-lint.sh"}
 	ValidateTfPatterns   = []string{"terraform/**"}
 
 	BuildCliPatterns  = []string{"cmd/lab/**"}
-	BuildHelmPatterns = []string{"k8s/**", "config/**/*.cue"}
+	BuildHelmPatterns = []string{"k8s/**", "config/**/*.cue", ".dagger/scripts/helm-template.sh"}
 
 	TestGoPatterns     = []string{"**/*.go", "**/go.mod", "**/go.sum"}
 	TestPythonPatterns = []string{"**/*.py", "**/pyproject.toml", "**/uv.lock"}

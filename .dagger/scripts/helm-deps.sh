@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+SEARCH_PATHS="${SEARCH_PATHS:-k8s}"
+
+# Register all non-OCI helm repositories
+echo "Registering helm repositories..."
+for chart_yaml in $(find $SEARCH_PATHS -name Chart.yaml -not -path "*/charts/*" | sort); do
+    grep 'repository:' "$chart_yaml" | awk '{print $2}' | while read -r repo_url; do
+        if [ -z "$repo_url" ] || echo "$repo_url" | grep -q '^oci://'; then
+            continue
+        fi
+        repo_name="repo-$(echo "$repo_url" | md5sum | cut -c1-8)"
+        helm repo add "$repo_name" "$repo_url" 2>/dev/null || true
+    done
+done
+helm repo update 2>/dev/null || true
+echo ""
+
+# Build dependencies for all charts
+for chart_yaml in $(find $SEARCH_PATHS -name Chart.yaml -not -path "*/charts/*" | sort); do
+    chart_dir=$(dirname "$chart_yaml")
+    if grep -q 'dependencies:' "$chart_yaml"; then
+        echo "Building dependencies for $chart_dir..."
+        helm dependency build --skip-refresh "$chart_dir" 2>/dev/null || true
+    fi
+done
+echo "Dependencies built."
