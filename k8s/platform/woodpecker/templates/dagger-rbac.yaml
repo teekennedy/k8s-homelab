@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dagger-pipeline
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dagger-pipeline-exec
+  namespace: dagger-engine
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dagger-pipeline-exec-binding
+  namespace: dagger-engine
+subjects:
+  - kind: ServiceAccount
+    name: dagger-pipeline
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: dagger-pipeline-exec
+  apiGroup: rbac.authorization.k8s.io

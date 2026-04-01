@@ -112,6 +112,12 @@ gitea-resources:
       secretNamespace: gitea
       admin: true
   runners: []
+  oauth2Apps:
+    - name: woodpecker
+      redirectURIs:
+        - https://ci.msng.to/authorize
+      secretName: woodpecker-gitea-oauth2
+      secretNamespace: woodpecker
   organizations:
     - name: ops
       description: Operations

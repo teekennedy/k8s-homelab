@@ -1,0 +1,14 @@
+dagger-helm:
+  engine:
+    kind: StatefulSet
+    hostPath:
+      dataVolume:
+        enabled: false
+    statefulSet:
+      persistentVolumeClaim:
+        enabled: true
+        storageClassName: longhorn
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 20Gi

@@ -60,11 +60,19 @@ type Runner struct {
 	SecretNamespace string `yaml:"secretNamespace"`
 }
 
+type OAuth2App struct {
+	Name            string
+	RedirectURIs    []string `yaml:"redirectURIs"`
+	SecretName      string   `yaml:"secretName"`
+	SecretNamespace string   `yaml:"secretNamespace"`
+}
+
 type Config struct {
 	Organizations []Organization
 	Repositories  []Repository
 	Users         []User
 	Runners       []Runner
+	OAuth2Apps    []OAuth2App `yaml:"oauth2Apps"`
 }
 
 const charset = "abcdefghijklmnopqrstuvwxyz" +
@@ -389,5 +397,82 @@ func main() {
 			continue
 		}
 		log.Printf("Updated runner token secret %s for %s", runner.SecretName, runner.Name)
+	}
+
+	for _, app := range config.OAuth2Apps {
+		log.Printf("Processing OAuth2 app %s", app.Name)
+
+		// Check if secret already has credentials populated
+		secretClient := k8sClient.CoreV1().Secrets(app.SecretNamespace)
+		secret, err := secretClient.Get(ctx, app.SecretName, metav1.GetOptions{})
+		if err == nil {
+			if clientID, ok := secret.Data["WOODPECKER_GITEA_CLIENT"]; ok && len(clientID) > 0 {
+				if clientSecret, ok := secret.Data["WOODPECKER_GITEA_SECRET"]; ok && len(clientSecret) > 0 {
+					log.Printf("OAuth2 app secret %s already populated, skipping", app.SecretName)
+					continue
+				}
+			}
+		} else if !apierrors.IsNotFound(err) {
+			log.Printf("Get OAuth2 app secret %s in %s: %v", app.SecretName, app.SecretNamespace, err)
+			continue
+		}
+
+		// Check if the OAuth2 app already exists in Gitea
+		existingApps, _, err := client.ListOauth2(gitea.ListOauth2Option{})
+		if err != nil {
+			log.Printf("List OAuth2 apps: %v", err)
+			continue
+		}
+
+		for _, existing := range existingApps {
+			if existing.Name == app.Name {
+				log.Printf("OAuth2 app %s already exists (ID %d) but secret is not populated, recreating", app.Name, existing.ID)
+				_, err = client.DeleteOauth2(existing.ID)
+				if err != nil {
+					log.Printf("Delete existing OAuth2 app %s: %v", app.Name, err)
+				}
+				break
+			}
+		}
+
+		newApp, _, err := client.CreateOauth2(gitea.CreateOauth2Option{
+			Name:               app.Name,
+			ConfidentialClient: true,
+			RedirectURIs:       app.RedirectURIs,
+		})
+		if err != nil {
+			log.Printf("Create OAuth2 app %s: %v", app.Name, err)
+			continue
+		}
+
+		// Store credentials in K8s secret
+		newSecret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      app.SecretName,
+				Namespace: app.SecretNamespace,
+			},
+			StringData: map[string]string{
+				"WOODPECKER_GITEA_CLIENT": newApp.ClientID,
+				"WOODPECKER_GITEA_SECRET": newApp.ClientSecret,
+			},
+		}
+
+		if apierrors.IsNotFound(err) || secret == nil {
+			_, err = secretClient.Create(ctx, &newSecret, metav1.CreateOptions{})
+		} else {
+			b64ClientID := base64.StdEncoding.EncodeToString([]byte(newApp.ClientID))
+			b64ClientSecret := base64.StdEncoding.EncodeToString([]byte(newApp.ClientSecret))
+			patch := map[string]any{"data": map[string]string{
+				"WOODPECKER_GITEA_CLIENT": b64ClientID,
+				"WOODPECKER_GITEA_SECRET": b64ClientSecret,
+			}}
+			patchBytes, _ := json.Marshal(patch)
+			_, err = secretClient.Patch(ctx, app.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+		}
+		if err != nil {
+			log.Printf("Store OAuth2 credentials for %s: %v", app.Name, err)
+			continue
+		}
+		log.Printf("Created OAuth2 app %s and stored credentials in secret %s/%s", app.Name, app.SecretNamespace, app.SecretName)
 	}
 }

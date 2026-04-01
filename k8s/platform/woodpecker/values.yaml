@@ -1,0 +1,36 @@
+woodpecker:
+  server:
+    env:
+      WOODPECKER_HOST: "https://ci.msng.to"
+      WOODPECKER_GITEA: "true"
+      WOODPECKER_GITEA_URL: "http://gitea-http.gitea:3000"
+      WOODPECKER_ADMIN: "tkennedy"
+    extraSecretNamesForEnvFrom:
+      - woodpecker-gitea-oauth2
+    persistentVolume:
+      storageClass: longhorn
+    ingress:
+      enabled: true
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
+        external-dns.alpha.kubernetes.io/target: external.network.msng.to
+        external-dns.alpha.kubernetes.io/record-type: CNAME
+      hosts:
+        - host: ci.msng.to
+          paths:
+            - path: /
+              backend:
+                serviceName: woodpecker-server
+                servicePort: 80
+      tls:
+        - hosts:
+            - ci.msng.to
+
+  agent:
+    replicaCount: 1
+    env:
+      WOODPECKER_SERVER: "woodpecker-server:9000"
+      WOODPECKER_BACKEND: "kubernetes"
+      WOODPECKER_BACKEND_K8S_NAMESPACE: "woodpecker"
+      WOODPECKER_BACKEND_K8S_STORAGE_CLASS: "longhorn"
+      WOODPECKER_BACKEND_K8S_VOLUME_SIZE: "1G"

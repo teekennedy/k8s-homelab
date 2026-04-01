@@ -1,0 +1,33 @@
+when:
+  event: [push, pull_request]
+
+steps:
+  - name: ci
+    image: ghcr.io/dagger/cli:0.20.3
+    environment:
+      _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine"
+    backend_options:
+      kubernetes:
+        serviceAccountName: dagger-pipeline
+    commands:
+      - |
+        if [ "$CI_PIPELINE_EVENT" = "pull_request" ]; then
+          git fetch origin "$CI_COMMIT_TARGET_BRANCH"
+          CHANGED=$(git diff --name-only "origin/$CI_COMMIT_TARGET_BRANCH"...HEAD)
+        elif [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+          CHANGED=$(git diff --name-only "$CI_COMMIT_BEFORE_SHA" HEAD)
+        else
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+        fi
+
+        if [ -z "$CHANGED" ]; then
+          echo "No changed files detected"
+          exit 0
+        fi
+
+        PATHS_ARGS=""
+        for f in $CHANGED; do
+          PATHS_ARGS="$PATHS_ARGS --paths $f"
+        done
+
+        dagger call all --source=. $PATHS_ARGS
