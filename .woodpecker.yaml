@@ -3,7 +3,7 @@ when:
 
 steps:
   - name: ci
-    image: ghcr.io/dagger/cli:0.20.3
+    image: ghcr.io/dagger/engine:v0.20.3
     environment:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine"
     backend_options:
