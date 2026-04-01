@@ -18,6 +18,19 @@ steps:
         if [ "$CI_PIPELINE_EVENT" = "pull_request" ]; then
           git fetch origin "$CI_COMMIT_TARGET_BRANCH"
 
+          # Deepen history until the merge base is available (max 5 attempts)
+          ATTEMPTS=0
+          while ! git merge-base "origin/$CI_COMMIT_TARGET_BRANCH" HEAD >/dev/null 2>&1; do
+            ATTEMPTS=$((ATTEMPTS + 1))
+            if [ "$ATTEMPTS" -gt 5 ]; then
+              echo "Could not find merge base after deepening 5 times, falling back to full fetch"
+              git fetch --unshallow origin || true
+              break
+            fi
+            echo "Deepening clone (attempt $ATTEMPTS)..."
+            git fetch --deepen=50 origin "$CI_COMMIT_TARGET_BRANCH"
+          done
+
           # Get all files (A)dded, (C)opied, (M)odified, (R)enamed, or had their (T)ype changed
           CHANGED=$(git diff --name-only --diff-filter=ACMRT "origin/$CI_COMMIT_TARGET_BRANCH...HEAD")
 
