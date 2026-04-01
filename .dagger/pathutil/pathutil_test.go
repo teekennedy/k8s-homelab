@@ -161,9 +161,9 @@ func TestGoPackagePaths(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GoPackagePaths(tt.paths)
+			got := GoPackagePaths(tt.paths, "cmd/lab")
 			if len(got) != len(tt.want) {
-				t.Fatalf("GoPackagePaths(%v) = %v, want %v", tt.paths, got, tt.want)
+				t.Fatalf("GoPackagePaths(%v, \"cmd/lab\") = %v, want %v", tt.paths, got, tt.want)
 			}
 			for i := range tt.want {
 				if got[i] != tt.want[i] {

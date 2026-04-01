@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"dagger/homelab/internal/dagger"
+	"dagger/homelab/pathutil"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -39,7 +40,7 @@ type Homelab struct{}
 // Returns the linted/fixed source directory
 func (m *Homelab) All(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", ".devenv/**", "devenv.local.*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!**/*.go", "!**/go.mod", "!**/go.sum", "**/vendor/**", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", ".devenv/**", "devenv.local.*", ".dagger/**", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -161,7 +162,7 @@ func (m *Homelab) All(ctx context.Context,
 // +check
 func (m *Homelab) Lint(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", ".devenv/**", "devenv.local.*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!**/*.go", "!**/go.mod", "!**/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", ".devenv/**", "devenv.local.*", ".dagger/**", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -365,10 +366,11 @@ func (m *Homelab) LintCue(ctx context.Context,
 
 // LintGo runs Go linting and optionally formats code
 // When fix=true, automatically formats with go fmt
+// Discovers and iterates over all Go modules with go.mod
 // +check
 func (m *Homelab) LintGo(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum"]
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
 	source *dagger.Directory,
 	// +optional
 	// +default=false
@@ -376,28 +378,48 @@ func (m *Homelab) LintGo(ctx context.Context,
 	// +optional
 	paths []string,
 ) (*dagger.Directory, error) {
+	moduleDirs, err := findGoModules(ctx, source, paths)
+	if err != nil {
+		return nil, err
+	}
+	if len(moduleDirs) == 0 {
+		return source, nil
+	}
+
 	container := dag.Container().
 		From("golang:1.25-alpine").
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src/cmd/lab")
+		WithMountedDirectory("/src", source)
 
-	// Determine package targets
-	targets := []string{"./..."}
-	if len(paths) > 0 {
-		pkgs := goPackagePaths(paths)
-		if len(pkgs) > 0 {
-			targets = pkgs
+	for _, dir := range moduleDirs {
+		targets := []string{"./..."}
+		if len(paths) > 0 {
+			pkgs := pathutil.GoPackagePaths(paths, dir)
+			if len(pkgs) > 0 {
+				targets = pkgs
+			}
+		}
+
+		workdir := "/src/" + dir
+		if dir == "." {
+			workdir = "/src"
+		}
+
+		if fix {
+			container = container.
+				WithWorkdir(workdir).
+				WithExec(append([]string{"go", "fmt"}, targets...))
+		} else {
+			container = container.
+				WithWorkdir(workdir).
+				WithExec(append([]string{"go", "vet"}, targets...))
 		}
 	}
 
 	if fix {
-		container = container.WithExec(append([]string{"go", "fmt"}, targets...))
 		return container.Directory("/src"), nil
 	}
 
-	_, err := container.
-		WithExec(append([]string{"go", "vet"}, targets...)).
-		Sync(ctx)
+	_, err = container.Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("go vet failed: %w", err)
 	}
@@ -869,7 +891,7 @@ func (m *Homelab) CliNix(ctx context.Context,
 // +check
 func (m *Homelab) Test(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "**/vendor/**", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!.dagger/scripts/*.sh", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,
@@ -913,30 +935,48 @@ func (m *Homelab) Test(ctx context.Context,
 	return joinResults(results), nil
 }
 
-// TestGo runs Go tests for the lab CLI
-// When paths are provided, only matching packages are tested
+// TestGo runs Go tests for all discovered Go modules
+// When paths are provided, only matching modules/packages are tested
 // +check
 func (m *Homelab) TestGo(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum"]
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "**/vendor/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,
 ) (string, error) {
-	targets := []string{"./..."}
-	if len(paths) > 0 {
-		pkgs := goPackagePaths(paths)
-		if len(pkgs) > 0 {
-			targets = pkgs
-		}
+	moduleDirs, err := findGoModules(ctx, source, paths)
+	if err != nil {
+		return "", err
+	}
+	if len(moduleDirs) == 0 {
+		return "Go tests skipped (no modules found)", nil
 	}
 
-	_, err := dag.Container().
+	container := dag.Container().
 		From("golang:1.25-alpine").
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src/cmd/lab").
-		WithExec(append([]string{"go", "test", "-v"}, targets...)).
-		Sync(ctx)
+		WithMountedDirectory("/src", source)
+
+	for _, dir := range moduleDirs {
+		targets := []string{"./..."}
+		if len(paths) > 0 {
+			pkgs := pathutil.GoPackagePaths(paths, dir)
+			if len(pkgs) > 0 {
+				targets = pkgs
+			}
+		}
+
+		workdir := "/src/" + dir
+		if dir == "." {
+			workdir = "/src"
+		}
+
+		container = container.
+			WithWorkdir(workdir).
+			WithExec(append([]string{"go", "test", "-v"}, targets...))
+	}
+
+	_, err = container.Sync(ctx)
 	if err != nil {
 		return "", fmt.Errorf("go test failed: %w", err)
 	}

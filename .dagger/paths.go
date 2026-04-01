@@ -38,9 +38,8 @@ var (
 
 // Delegate to pathutil for pure functions.
 var (
-	filterPaths       = pathutil.FilterPaths
-	excludeDevenvPaths = pathutil.ExcludeDevenvPaths
-	goPackagePaths    = pathutil.GoPackagePaths
+	filterPaths         = pathutil.FilterPaths
+	excludeDevenvPaths  = pathutil.ExcludeDevenvPaths
 	terraformModuleDirs = pathutil.TerraformModuleDirs
 )
 
@@ -52,9 +51,11 @@ func findPythonProjects(ctx context.Context, source *dagger.Directory, paths []s
 		From("alpine:latest").
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
-		WithExec([]string{"find", ".", "-name", "pyproject.toml",
+		WithExec([]string{
+			"find", ".", "-name", "pyproject.toml",
 			"-not", "-path", "*/.venv/*",
-			"-not", "-path", "*/.dagger/*"}).
+			"-not", "-path", "*/.dagger/*",
+		}).
 		Stdout(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("finding Python projects: %w", err)
@@ -72,6 +73,32 @@ func findPythonProjects(ctx context.Context, source *dagger.Directory, paths []s
 	sort.Strings(allDirs)
 
 	return pathutil.MatchPythonProjects(paths, allDirs), nil
+}
+
+// findGoModules discovers Go module directories containing go.mod.
+// If paths is non-empty, returns only modules containing matching files.
+// If paths is empty, returns all discovered modules.
+func findGoModules(ctx context.Context, source *dagger.Directory, paths []string) ([]string, error) {
+	out, err := dag.Container().
+		From("alpine:latest").
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"find", ".", "-name", "go.mod"}).
+		Stdout(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("finding Go modules: %w", err)
+	}
+
+	var allDirs []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line != "" {
+			dir := filepath.Dir(strings.TrimPrefix(line, "./"))
+			allDirs = append(allDirs, dir)
+		}
+	}
+	sort.Strings(allDirs)
+
+	return pathutil.MatchGoModules(paths, allDirs), nil
 }
 
 // findHelmChartDirs discovers Helm chart directories matching the given paths.

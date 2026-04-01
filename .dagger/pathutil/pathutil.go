@@ -11,7 +11,7 @@ import (
 var (
 	LintNixPatterns    = []string{"**/*.nix"}
 	LintCuePatterns    = []string{"config/**/*.cue"}
-	LintGoPatterns     = []string{"cmd/lab/**/*.go", "cmd/lab/go.mod", "cmd/lab/go.sum"}
+	LintGoPatterns     = []string{"**/*.go", "**/go.mod", "**/go.sum"}
 	LintPythonPatterns = []string{"**/*.py", "**/pyproject.toml", "**/uv.lock"}
 	LintYamlPatterns   = []string{"**/*.yaml", "**/*.yml", ".yamllint.yaml"}
 
@@ -120,13 +120,14 @@ func ExcludeDevenvPaths(paths []string) []string {
 	return result
 }
 
-// GoPackagePaths converts Go file paths to unique package paths relative to cmd/lab/.
-// Example: "cmd/lab/internal/helm/changed.go" → "./internal/helm/..."
-func GoPackagePaths(paths []string) []string {
+// GoPackagePaths converts Go file paths to unique package paths relative to the given module directory.
+// Example: GoPackagePaths(paths, "cmd/lab") with "cmd/lab/internal/helm/changed.go" → "./internal/helm/..."
+func GoPackagePaths(paths []string, moduleDir string) []string {
+	prefix := moduleDir + "/"
 	seen := map[string]bool{}
 	var result []string
 	for _, p := range paths {
-		rel := strings.TrimPrefix(p, "cmd/lab/")
+		rel := strings.TrimPrefix(p, prefix)
 		if rel == p {
 			continue
 		}
@@ -221,6 +222,31 @@ func MatchPythonProjects(paths []string, allDirs []string) []string {
 	for _, p := range paths {
 		for _, dir := range allDirs {
 			if strings.HasPrefix(p, dir+"/") {
+				matched[dir] = true
+			}
+		}
+	}
+
+	var result []string
+	for _, dir := range allDirs {
+		if matched[dir] {
+			result = append(result, dir)
+		}
+	}
+	return result
+}
+
+// MatchGoModules matches changed paths against known Go module directories.
+// If paths is empty, returns all module dirs.
+func MatchGoModules(paths []string, allDirs []string) []string {
+	if len(paths) == 0 {
+		return allDirs
+	}
+
+	matched := map[string]bool{}
+	for _, p := range paths {
+		for _, dir := range allDirs {
+			if strings.HasPrefix(p, dir+"/") || (dir == "." && !strings.Contains(p, "/")) {
 				matched[dir] = true
 			}
 		}
