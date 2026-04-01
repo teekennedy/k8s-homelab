@@ -446,7 +446,7 @@ func main() {
 		}
 
 		// Store credentials in K8s secret
-		newSecret := corev1.Secret{
+		oauthSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      app.SecretName,
 				Namespace: app.SecretNamespace,
@@ -457,9 +457,8 @@ func main() {
 			},
 		}
 
-		if apierrors.IsNotFound(err) || secret == nil {
-			_, err = secretClient.Create(ctx, &newSecret, metav1.CreateOptions{})
-		} else {
+		_, createErr := secretClient.Create(ctx, &oauthSecret, metav1.CreateOptions{})
+		if apierrors.IsAlreadyExists(createErr) {
 			b64ClientID := base64.StdEncoding.EncodeToString([]byte(newApp.ClientID))
 			b64ClientSecret := base64.StdEncoding.EncodeToString([]byte(newApp.ClientSecret))
 			patch := map[string]any{"data": map[string]string{
@@ -467,10 +466,10 @@ func main() {
 				"WOODPECKER_GITEA_SECRET": b64ClientSecret,
 			}}
 			patchBytes, _ := json.Marshal(patch)
-			_, err = secretClient.Patch(ctx, app.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+			_, createErr = secretClient.Patch(ctx, app.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		}
-		if err != nil {
-			log.Printf("Store OAuth2 credentials for %s: %v", app.Name, err)
+		if createErr != nil {
+			log.Printf("Store OAuth2 credentials for %s: %v", app.Name, createErr)
 			continue
 		}
 		log.Printf("Created OAuth2 app %s and stored credentials in secret %s/%s", app.Name, app.SecretNamespace, app.SecretName)
