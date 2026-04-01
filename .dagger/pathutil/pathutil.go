@@ -15,9 +15,10 @@ var (
 	LintPythonPatterns = []string{"**/*.py", "**/pyproject.toml", "**/uv.lock"}
 	LintYamlPatterns   = []string{"**/*.yaml", "**/*.yml", ".yamllint.yaml"}
 
-	ValidateNixPatterns  = []string{"**/*.nix", "flake.lock", "nix/**"}
-	ValidateHelmPatterns = []string{"k8s/**", "config/**/*.cue", ".dagger/scripts/helm-lint.sh"}
-	ValidateTfPatterns   = []string{"terraform/**"}
+	ValidateNixPatterns        = []string{"**/*.nix", "flake.lock", "nix/**"}
+	ValidateHelmPatterns       = []string{"k8s/**", "config/**/*.cue", ".dagger/scripts/helm-lint.sh"}
+	ValidateTfPatterns         = []string{"terraform/**"}
+	ValidateWoodpeckerPatterns = []string{".woodpecker/*.yaml"}
 
 	BuildCliPatterns  = []string{"cmd/lab/**"}
 	BuildHelmPatterns = []string{"k8s/**", "config/**/*.cue", ".dagger/scripts/helm-template.sh"}
@@ -29,7 +30,7 @@ var (
 // Composite pattern sets for orchestrator functions.
 var (
 	AllLintPatterns     = ConcatPatterns(LintNixPatterns, LintCuePatterns, LintGoPatterns, LintPythonPatterns, LintYamlPatterns)
-	AllValidatePatterns = ConcatPatterns(ValidateNixPatterns, ValidateHelmPatterns, ValidateTfPatterns)
+	AllValidatePatterns = ConcatPatterns(ValidateNixPatterns, ValidateHelmPatterns, ValidateTfPatterns, ValidateWoodpeckerPatterns)
 	AllBuildPatterns    = ConcatPatterns(BuildCliPatterns, BuildHelmPatterns)
 	AllTestPatterns     = ConcatPatterns(TestGoPatterns, TestPythonPatterns)
 )

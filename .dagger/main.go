@@ -489,7 +489,7 @@ func (m *Homelab) LintYaml(ctx context.Context,
 // Pre-call filter includes all files needed by all validate functions
 func (m *Homelab) Validate(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!k8s/**/*", "!terraform/**/*", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!k8s/**/*", "!terraform/**/*", "!.woodpecker/*.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,
@@ -532,6 +532,20 @@ func (m *Homelab) Validate(ctx context.Context,
 			r, err := m.ValidateTerraform(ctx, source, tfPaths)
 			if err != nil {
 				return fmt.Errorf("terraform validation failed: %w", err)
+			}
+			mu.Lock()
+			results = append(results, r)
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	wpPaths := filterPaths(paths, validateWoodpeckerPatterns)
+	if len(paths) == 0 || len(wpPaths) > 0 {
+		g.Go(func() error {
+			r, err := m.ValidateWoodpecker(ctx, source, wpPaths)
+			if err != nil {
+				return fmt.Errorf("woodpecker validation failed: %w", err)
 			}
 			mu.Lock()
 			results = append(results, r)
@@ -637,6 +651,42 @@ func (m *Homelab) ValidateTerraform(ctx context.Context,
 	}
 
 	return "Terraform validation passed", nil
+}
+
+// ValidateWoodpecker lints Woodpecker CI pipeline configuration files
+// When paths are provided, only matching files are linted
+// +check
+func (m *Homelab) ValidateWoodpecker(ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!.woodpecker/*.yaml"]
+	source *dagger.Directory,
+	// +optional
+	paths []string,
+) (string, error) {
+	targets := filterPaths(paths, validateWoodpeckerPatterns)
+	if len(paths) > 0 && len(targets) == 0 {
+		return "Woodpecker validation skipped (no matching files)", nil
+	}
+
+	container := dag.Container().
+		From("woodpeckerci/woodpecker-cli:v3").
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src")
+
+	if len(targets) > 0 {
+		for _, f := range targets {
+			container = container.WithExec([]string{"woodpecker-cli", "lint", "--strict", f})
+		}
+	} else {
+		container = container.WithExec([]string{"woodpecker-cli", "lint", "--strict", ".woodpecker/"})
+	}
+
+	_, err := container.Sync(ctx)
+	if err != nil {
+		return "", fmt.Errorf("woodpecker lint failed: %w", err)
+	}
+
+	return "Woodpecker validation passed", nil
 }
 
 // helmContainer returns a helm container with shared cache volumes mounted.

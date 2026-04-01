@@ -19,9 +19,10 @@ var (
 	lintPythonPatterns = pathutil.LintPythonPatterns
 	lintYamlPatterns   = pathutil.LintYamlPatterns
 
-	validateNixPatterns  = pathutil.ValidateNixPatterns
-	validateHelmPatterns = pathutil.ValidateHelmPatterns
-	validateTfPatterns   = pathutil.ValidateTfPatterns
+	validateNixPatterns        = pathutil.ValidateNixPatterns
+	validateHelmPatterns       = pathutil.ValidateHelmPatterns
+	validateTfPatterns         = pathutil.ValidateTfPatterns
+	validateWoodpeckerPatterns = pathutil.ValidateWoodpeckerPatterns
 
 	buildCliPatterns  = pathutil.BuildCliPatterns
 	buildHelmPatterns = pathutil.BuildHelmPatterns
