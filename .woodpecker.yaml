@@ -15,21 +15,16 @@ steps:
       - |
         if [ "$CI_PIPELINE_EVENT" = "pull_request" ]; then
           git fetch origin "$CI_COMMIT_TARGET_BRANCH"
-          CHANGED=$(git diff --name-only "origin/$CI_COMMIT_TARGET_BRANCH"...HEAD)
-        elif [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
-          CHANGED=$(git diff --name-only "$CI_COMMIT_BEFORE_SHA" HEAD)
+
+          # Get all files (A)dded, (C)opied, (M)odified, (R)enamed, or had their (T)ype changed
+          CHANGED=$(git diff --name-only --diff-filter=ACMRT "origin/$CI_COMMIT_TARGET_BRANCH...HEAD")
+
+          if [ -z "$CHANGED" ]; then
+            echo "No changed files detected"
+            exit 0
+          fi
+
+          dagger call all --source=. --paths "$(echo -n "$CHANGED" | paste -sd, -)"
         else
-          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          dagger call all --source=.
         fi
-
-        if [ -z "$CHANGED" ]; then
-          echo "No changed files detected"
-          exit 0
-        fi
-
-        PATHS_ARGS=""
-        for f in $CHANGED; do
-          PATHS_ARGS="$PATHS_ARGS --paths $f"
-        done
-
-        dagger call all --source=. $PATHS_ARGS
