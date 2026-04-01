@@ -4,7 +4,7 @@ woodpecker:
       WOODPECKER_HOST: "https://ci.msng.to"
       WOODPECKER_GITEA: "true"
       WOODPECKER_GITEA_URL: "http://gitea-http.gitea:3000"
-      WOODPECKER_GITEA_OAUTH_URL: "https://git.msng.to"
+      WOODPECKER_EXPERT_FORGE_OAUTH_HOST: "https://git.msng.to"
       WOODPECKER_ADMIN: "tkennedy"
     extraSecretNamesForEnvFrom:
       - woodpecker-gitea-oauth2
