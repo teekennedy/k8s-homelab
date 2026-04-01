@@ -1,5 +1,13 @@
 dagger-helm:
   engine:
+    # https://docs.dagger.io/reference/configuration/engine/
+    # insecureRootCapabilities: effectively equivalent to running actions with `docker run --privileged`
+    configJson: |
+      {
+        "security": {
+          "insecureRootCapabilities": false
+        }
+      }
     kind: StatefulSet
     hostPath:
       dataVolume:
