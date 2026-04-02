@@ -15,16 +15,6 @@ dagger-helm:
       dataVolume:
         enabled: false
 
-    volumes:
-      - name: nix-daemon-socket
-        hostPath:
-          path: /nix/var/nix/daemon-socket/socket
-          type: Socket
-
-    volumeMounts:
-      - name: nix-daemon-socket
-        mountPath: /nix/var/nix/daemon-socket/socket
-
     statefulSet:
       persistentVolumeClaim:
         enabled: true
