@@ -28,16 +28,6 @@ woodpecker:
 
   agent:
     replicaCount: 1
-    extraVolumes:
-      - name: nix-daemon-socket
-        hostPath:
-          path: /nix/var/nix/daemon-socket/socket
-          type: Socket
-
-    extraVolumeMounts:
-      - name: nix-daemon-socket
-        mountPath: /nix/var/nix/daemon-socket/socket
-
     env:
       WOODPECKER_SERVER: "woodpecker-server:9000"
       WOODPECKER_BACKEND: "kubernetes"
