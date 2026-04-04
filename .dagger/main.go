@@ -14,7 +14,6 @@ package main
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -40,8 +39,7 @@ type Homelab struct {
 
 // GoModule is a go module directory.
 type GoModule struct {
-	Source *dagger.Directory
-	Path   string
+	Path string
 }
 
 func New(ctx context.Context, ws dagger.Workspace) *Homelab {
@@ -57,16 +55,15 @@ func New(ctx context.Context, ws dagger.Workspace) *Homelab {
 	for _, path := range goModFiles {
 		dir := filepath.Dir(path)
 		modules = append(modules, &GoModule{
-			Source: ws.Directory(dir),
-			Path:   dir,
+			Path: dir,
 		})
 	}
 
 	return &Homelab{GoModules: modules}
 }
 
-// LintNix runs Nix-specific linting (alejandra formatting, deadnix dead code removal)
-// Returns a changeset with formatted Nix files. Use dagger check --auto-apply to apply.
+// LintNix validates Nix formatting (alejandra) and dead code (deadnix).
+// Fails if any files need formatting. Use `dagger call format-nix --auto-apply` to fix.
 // +check
 func (m *Homelab) LintNix(
 	ctx context.Context,
@@ -75,23 +72,51 @@ func (m *Homelab) LintNix(
 	source *dagger.Directory,
 	// +optional
 	paths []string,
-) (*dagger.Directory, error) {
+) (string, error) {
+	formatted := m.nixFormat(source, paths)
+
+	changeset := formatted.Changes(source)
+	empty, err := changeset.IsEmpty(ctx)
+	if err != nil {
+		return "", fmt.Errorf("checking for nix formatting changes: %w", err)
+	}
+
+	if !empty {
+		modified, _ := changeset.ModifiedPaths(ctx)
+		return "", fmt.Errorf("nix files need formatting: %s\nRun `dagger call format-nix --auto-apply` to fix", strings.Join(modified, ", "))
+	}
+
+	return "Nix lint passed", nil
+}
+
+// FormatNix formats Nix files with alejandra and removes dead code with deadnix.
+// Returns a changeset. Use `dagger call format-nix --auto-apply` to apply.
+func (m *Homelab) FormatNix(
+	// +defaultPath="/"
+	// +ignore=["*", "!**/*.nix", ".devenv*", ".devenv/**", "devenv.local.*"]
+	source *dagger.Directory,
+	// +optional
+	paths []string,
+) *dagger.Changeset {
+	return m.nixFormat(source, paths).Changes(source)
+}
+
+// nixFormat runs alejandra and deadnix on source, returning the formatted directory.
+func (m *Homelab) nixFormat(source *dagger.Directory, paths []string) *dagger.Directory {
 	container := nixContainer().
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix-env", "-iA", "nixpkgs.alejandra", "nixpkgs.deadnix"})
 
-	// Determine targets: specific files or all
 	targets := []string{"."}
 	if len(paths) > 0 {
 		targets = paths
 	}
 
-	container = container.
+	return container.
+		WithExec(append([]string{"deadnix", "--edit"}, targets...)).
 		WithExec(append([]string{"alejandra"}, targets...)).
-		WithExec(append([]string{"deadnix", "--edit"}, targets...))
-
-	return container.Directory("/src"), nil
+		Directory("/src")
 }
 
 // LintCue validates CUE configuration
@@ -116,17 +141,48 @@ func (m *Homelab) LintCue(ctx context.Context,
 	return "CUE validation passed", nil
 }
 
-// LintGo runs Go linting (go vet) and formatting (go fmt)
-// Returns a changeset with formatted Go files. Use dagger check --auto-apply to apply.
-// Discovers and iterates over all Go modules with go.mod
+// LintGo runs Go linting (go vet) and formatting (go fmt).
+// Fails if any files need formatting. Use `dagger call format-go --auto-apply` to fix.
 // +check
 func (m *Homelab) LintGo(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
 	source *dagger.Directory,
-) (*dagger.Directory, error) {
+) (string, error) {
 	if len(m.GoModules) == 0 {
-		return source, nil
+		return "Go lint skipped (no modules found)", nil
+	}
+
+	formatted := m.goFormat(source)
+
+	changeset := formatted.Changes(source)
+	empty, err := changeset.IsEmpty(ctx)
+	if err != nil {
+		return "", fmt.Errorf("checking for go formatting changes: %w", err)
+	}
+
+	if !empty {
+		modified, _ := changeset.ModifiedPaths(ctx)
+		return "", fmt.Errorf("go files need formatting: %s\nRun `dagger call format-go --auto-apply` to fix", strings.Join(modified, ", "))
+	}
+
+	return "Go lint passed", nil
+}
+
+// FormatGo formats Go files with go fmt across all discovered modules.
+// Returns a changeset. Use `dagger call format-go --auto-apply` to apply.
+func (m *Homelab) FormatGo(
+	// +defaultPath="/"
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
+	source *dagger.Directory,
+) *dagger.Changeset {
+	return m.goFormat(source).Changes(source)
+}
+
+// goFormat runs go vet and go fmt on all Go modules, returning the formatted directory.
+func (m *Homelab) goFormat(source *dagger.Directory) *dagger.Directory {
+	if len(m.GoModules) == 0 {
+		return source
 	}
 
 	container := golangContainer().
@@ -136,19 +192,17 @@ func (m *Homelab) LintGo(ctx context.Context,
 		targets := []string{"./..."}
 		workdir := "/src/" + module.Path
 
-		// Validate with go vet, then format with go fmt for the changeset
 		container = container.
 			WithWorkdir(workdir).
 			WithExec(append([]string{"go", "vet"}, targets...)).
 			WithExec(append([]string{"go", "fmt"}, targets...))
 	}
 
-	return container.Directory("/src"), nil
+	return container.Directory("/src")
 }
 
-// LintPython runs Python formatting with black
-// Returns a changeset with formatted Python files. Use dagger check --auto-apply to apply.
-// Discovers and iterates over all Python projects with pyproject.toml
+// LintPython runs Python formatting validation with black.
+// Fails if any files need formatting. Use `dagger call format-python --auto-apply` to fix.
 // +check
 func (m *Homelab) LintPython(ctx context.Context,
 	// +defaultPath="/"
@@ -156,7 +210,45 @@ func (m *Homelab) LintPython(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
-) (*dagger.Directory, error) {
+) (string, error) {
+	formatted, err := m.pythonFormat(ctx, source, paths)
+	if err != nil {
+		return "", err
+	}
+
+	changeset := formatted.Changes(source)
+	empty, err := changeset.IsEmpty(ctx)
+	if err != nil {
+		return "", fmt.Errorf("checking for python formatting changes: %w", err)
+	}
+
+	if !empty {
+		modified, _ := changeset.ModifiedPaths(ctx)
+		return "", fmt.Errorf("python files need formatting: %s\nRun `dagger call format-python --auto-apply` to fix", strings.Join(modified, ", "))
+	}
+
+	return "Python lint passed", nil
+}
+
+// FormatPython formats Python files with black across all discovered projects.
+// Returns a changeset. Use `dagger call format-python --auto-apply` to apply.
+func (m *Homelab) FormatPython(
+	ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
+	source *dagger.Directory,
+	// +optional
+	paths []string,
+) (*dagger.Changeset, error) {
+	formatted, err := m.pythonFormat(ctx, source, paths)
+	if err != nil {
+		return nil, err
+	}
+	return formatted.Changes(source), nil
+}
+
+// pythonFormat runs black on all Python projects, returning the formatted directory.
+func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, paths []string) (*dagger.Directory, error) {
 	projectDirs, err := findPythonProjects(ctx, source, paths)
 	if err != nil {
 		return nil, err
@@ -471,54 +563,42 @@ func (m *Homelab) CliNix(ctx context.Context,
 // +check
 func (m *Homelab) TestGo(
 	ctx context.Context,
-	ws dagger.Workspace,
+	// +defaultPath="/"
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", ".dagger/dagger.gen.go", ".dagger/internal/**"]
+	source *dagger.Directory,
 ) (string, error) {
 	if len(m.GoModules) == 0 {
 		return "Go tests skipped (no modules found)", nil
 	}
 
-	container := golangContainer()
+	container := golangContainer().
+		WithMountedDirectory("/src", source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"})
 
 	g := new(errgroup.Group)
 	for _, module := range m.GoModules {
 		g.Go(func() error {
-			_, err := m.testGoModule(ctx, module, container)
-			return err
+			testPkg := "./..."
+			// .dagger module requires generated SDK that is excluded from source
+			// to keep directory contents stable for caching; test only pure Go packages
+			if module.Path == ".dagger" {
+				testPkg = "./pathutil/..."
+			}
+
+			_, err := container.
+				WithWorkdir("/src/" + module.Path).
+				WithExec([]string{"go", "test", "-v", testPkg}).
+				Sync(ctx)
+			if err != nil {
+				return fmt.Errorf("go test failed in %s: %w", module.Path, err)
+			}
+			return nil
 		})
 	}
 
-	err := g.Wait()
-	if err != nil {
+	if err := g.Wait(); err != nil {
 		return "", fmt.Errorf("go test failed: %w", err)
 	}
 
-	return "Go tests passed", nil
-}
-
-func (m *Homelab) testGoModule(ctx context.Context,
-	module *GoModule,
-	container *dagger.Container,
-) (string, error) {
-	if container == nil {
-		return "", errors.New("Missing required argument container")
-	}
-
-	// Dagger go module requires user to run `dagger develop --sdk=go` to generate code for complete module
-	if module.Path == ".dagger" {
-		if exists, err := module.Source.Exists(ctx, "dagger.gen.go", dagger.DirectoryExistsOpts{}); err == nil && !exists {
-			return "", errors.New("Missing dagger sdk")
-		}
-	}
-
-	workdir := "/src/" + module.Path
-	_, err := container.
-		WithMountedDirectory(workdir, module.Source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"}).
-		WithWorkdir(workdir).
-		WithExec([]string{"go", "test", "-v", "./..."}).
-		Sync(ctx)
-	if err != nil {
-		return "", fmt.Errorf("go test failed: %w", err)
-	}
 	return "Go tests passed", nil
 }
 

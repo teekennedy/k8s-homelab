@@ -43,28 +43,28 @@ in {
   env.DAGGER_NO_NAG = "1";
 
   # https://devenv.sh/packages/
-  packages = (with pkgs; [
-      cacert
-      age
-      argocd
-      cue
-      dagger
-      deploy-rs
-      go_1_26
-      k9s
-      kind
-      kubecolor
-      kubectl
-      kubernetes-helm
-      kubetail
-      kustomize
-      lab
-      nixos-anywhere
-      opentofu
-      sops
-      uv
-      woodpecker-cli
-    ]);
+  packages = with pkgs; [
+    cacert
+    age
+    argocd
+    cue
+    dagger
+    deploy-rs
+    go_1_26
+    k9s
+    kind
+    kubecolor
+    kubectl
+    kubernetes-helm
+    kubetail
+    kustomize
+    lab
+    nixos-anywhere
+    opentofu
+    sops
+    uv
+    woodpecker-cli
+  ];
 
   # https://devenv.sh/git-hooks/
   git-hooks.hooks = {

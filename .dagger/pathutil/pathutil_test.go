@@ -82,14 +82,14 @@ func TestFilterPaths(t *testing.T) {
 		patterns []string
 		want     int
 	}{
-		{"go files", LintGoPatterns, 3},      // main.go, changed.go, go.mod
-		{"python", LintPythonPatterns, 1},    // bootstrap.py
-		{"cue", LintCuePatterns, 1},          // cluster.cue
-		{"yaml", LintYamlPatterns, 2},        // Chart.yaml, .yamllint.yaml
-		{"helm", ValidateHelmPatterns, 3},    // Chart.yaml, bootstrap.py (k8s/**), cluster.cue
-		{"terraform", ValidateTfPatterns, 1}, // main.tf
+		{"go files", LintGoPatterns, 3},          // main.go, changed.go, go.mod
+		{"python", LintPythonPatterns, 1},        // bootstrap.py
+		{"cue", LintCuePatterns, 1},              // cluster.cue
+		{"yaml", LintYamlPatterns, 2},            // Chart.yaml, .yamllint.yaml
+		{"helm", ValidateHelmPatterns, 3},        // Chart.yaml, bootstrap.py (k8s/**), cluster.cue
+		{"terraform", ValidateTfPatterns, 1},     // main.tf
 		{"nix validate", ValidateNixPatterns, 1}, // flake.lock
-		{"build cli", BuildCliPatterns, 3},   // main.go, changed.go, go.mod
+		{"build cli", BuildCliPatterns, 3},       // main.go, changed.go, go.mod
 	}
 
 	for _, tt := range tests {
@@ -195,9 +195,9 @@ func TestTerraformModuleDirs(t *testing.T) {
 
 func TestMatchHelmChartDirs(t *testing.T) {
 	chartDirs := map[string]bool{
-		"k8s/apps/terraria":                     true,
-		"k8s/platform/crowdsec":                 true,
-		"k8s/foundation/kured":                  true,
+		"k8s/apps/terraria":     true,
+		"k8s/platform/crowdsec": true,
+		"k8s/foundation/kured":  true,
 	}
 
 	tests := []struct {
@@ -231,7 +231,7 @@ func TestMatchHelmChartDirs(t *testing.T) {
 			want:  nil,
 		},
 		{
-			name:  "multiple charts",
+			name: "multiple charts",
 			paths: []string{
 				"k8s/apps/terraria/Chart.yaml",
 				"k8s/foundation/kured/files/kured-webhook/server.py",

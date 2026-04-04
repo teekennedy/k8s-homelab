@@ -26,27 +26,16 @@ var (
 // If paths is non-empty, returns only projects containing matching files.
 // If paths is empty, returns all discovered projects.
 func findPythonProjects(ctx context.Context, source *dagger.Directory, paths []string) ([]string, error) {
-	out, err := dag.Container().
-		From(alpineImage).
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{
-			"find", ".", "-name", "pyproject.toml",
-			"-not", "-path", "*/.venv/*",
-			"-not", "-path", "*/.dagger/*",
-		}).
-		Stdout(ctx)
+	pyprojects, err := source.Glob(ctx, "**/pyproject.toml")
 	if err != nil {
 		return nil, fmt.Errorf("finding Python projects: %w", err)
 	}
 
 	var allDirs []string
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if line != "" {
-			dir := filepath.Dir(strings.TrimPrefix(line, "./"))
-			if dir != "." {
-				allDirs = append(allDirs, dir)
-			}
+	for _, path := range pyprojects {
+		dir := filepath.Dir(path)
+		if dir != "." {
+			allDirs = append(allDirs, dir)
 		}
 	}
 	sort.Strings(allDirs)
