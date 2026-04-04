@@ -14,38 +14,14 @@ package main
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
-	"sync"
 
 	"dagger/homelab/internal/dagger"
-	"dagger/homelab/pathutil"
 
 	"golang.org/x/sync/errgroup"
-)
-
-// Container image constants with renovate annotations for automated updates.
-const (
-	// renovate: datasource=docker depName=ghcr.io/cachix/devenv/devenv
-	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.0.2"
-	// renovate: datasource=docker depName=nixos/nix
-	nixImage = "nixos/nix:latest"
-	// renovate: datasource=docker depName=golang
-	golangImage = "golang:1.25-alpine"
-	// renovate: datasource=docker depName=ghcr.io/astral-sh/uv
-	uvImage = "ghcr.io/astral-sh/uv:alpine"
-	// renovate: datasource=docker depName=cuelang/cue
-	cueImage = "cuelang/cue:latest"
-	// renovate: datasource=docker depName=cytopia/yamllint
-	yamllintImage = "cytopia/yamllint:latest"
-	// renovate: datasource=docker depName=ghcr.io/opentofu/opentofu
-	opentofuImage = "ghcr.io/opentofu/opentofu:latest"
-	// renovate: datasource=docker depName=woodpeckerci/woodpecker-cli
-	woodpeckerImage = "woodpeckerci/woodpecker-cli:v3"
-	// renovate: datasource=docker depName=alpine/helm
-	helmImage = "alpine/helm:latest"
-	// renovate: datasource=docker depName=alpine
-	alpineImage = "alpine:latest"
 )
 
 //go:embed scripts/helm-deps.sh
@@ -58,269 +34,39 @@ var helmTemplateScript string
 var helmLintScript string
 
 // Homelab is the main Dagger module for k8s-homelab CI/CD
-type Homelab struct{}
-
-// All runs the complete CI pipeline
-// Returns the linted/fixed source directory
-func (m *Homelab) All(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!**/flake.lock", "!nix/**/*", "!config/**/*.cue", "!**/*.go", "!**/go.mod", "!**/go.sum", "**/vendor/**", "!cmd/lab/**/*", "!terraform/**/*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", ".devenv/**", "devenv.local.*", ".dagger/**", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
-	source *dagger.Directory,
-	// +optional
-	// +default=false
-	fix bool,
-	// +optional
-	paths []string,
-) (*dagger.Directory, error) {
-	if fix {
-		// Lint modifies source, so it must run first
-		lintPaths := filterPaths(paths, allLintPatterns)
-		if len(paths) == 0 || len(lintPaths) > 0 {
-			var err error
-			source, err = m.Lint(ctx, source, fix, lintPaths)
-			if err != nil {
-				return nil, fmt.Errorf("lint failed: %w", err)
-			}
-		}
-
-		// Then validate, build, and test the fixed source in parallel
-		g, ctx := errgroup.WithContext(ctx)
-
-		valPaths := filterPaths(paths, allValidatePatterns)
-		if len(paths) == 0 || len(valPaths) > 0 {
-			g.Go(func() error {
-				_, err := m.Validate(ctx, source, valPaths)
-				if err != nil {
-					return fmt.Errorf("validate failed: %w", err)
-				}
-				return nil
-			})
-		}
-
-		buildPaths := filterPaths(paths, allBuildPatterns)
-		if len(paths) == 0 || len(buildPaths) > 0 {
-			g.Go(func() error {
-				_, err := m.Build(ctx, source, buildPaths)
-				if err != nil {
-					return fmt.Errorf("build failed: %w", err)
-				}
-				return nil
-			})
-		}
-
-		testPaths := filterPaths(paths, allTestPatterns)
-		if len(paths) == 0 || len(testPaths) > 0 {
-			g.Go(func() error {
-				_, err := m.Test(ctx, source, testPaths)
-				if err != nil {
-					return fmt.Errorf("test failed: %w", err)
-				}
-				return nil
-			})
-		}
-
-		if err := g.Wait(); err != nil {
-			return nil, err
-		}
-
-		return source, nil
-	}
-
-	// Check-only: run everything in parallel
-	g, ctx := errgroup.WithContext(ctx)
-
-	lintPaths := filterPaths(paths, allLintPatterns)
-	if len(paths) == 0 || len(lintPaths) > 0 {
-		g.Go(func() error {
-			_, err := m.Lint(ctx, source, false, lintPaths)
-			if err != nil {
-				return fmt.Errorf("lint failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	valPaths := filterPaths(paths, allValidatePatterns)
-	if len(paths) == 0 || len(valPaths) > 0 {
-		g.Go(func() error {
-			_, err := m.Validate(ctx, source, valPaths)
-			if err != nil {
-				return fmt.Errorf("validate failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	buildPaths := filterPaths(paths, allBuildPatterns)
-	if len(paths) == 0 || len(buildPaths) > 0 {
-		g.Go(func() error {
-			_, err := m.Build(ctx, source, buildPaths)
-			if err != nil {
-				return fmt.Errorf("build failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	testPaths := filterPaths(paths, allTestPatterns)
-	if len(paths) == 0 || len(testPaths) > 0 {
-		g.Go(func() error {
-			_, err := m.Test(ctx, source, testPaths)
-			if err != nil {
-				return fmt.Errorf("test failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	return source, nil
+type Homelab struct {
+	GoModules []*GoModule
 }
 
-// Lint runs all linting checks and optionally fixes issues
-// Returns the (potentially modified) source directory
-// Pre-call filter includes all files needed by all lint functions
-// +check
-func (m *Homelab) Lint(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", "!config/**/*.cue", "!**/*.go", "!**/go.mod", "!**/go.sum", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", ".devenv*", ".devenv/**", "devenv.local.*", ".dagger/**", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
-	source *dagger.Directory,
-	// +optional
-	// +default=false
-	fix bool,
-	// +optional
-	paths []string,
-) (*dagger.Directory, error) {
-	if fix {
-		// When fixing, run fixable linters sequentially since each modifies source
-		var err error
-
-		nixPaths := excludeDevenvPaths(filterPaths(paths, lintNixPatterns))
-		if len(paths) == 0 || len(nixPaths) > 0 {
-			source, err = m.LintNix(ctx, source, fix, nixPaths)
-			if err != nil {
-				return nil, fmt.Errorf("nix lint failed: %w", err)
-			}
-		}
-
-		goPaths := filterPaths(paths, lintGoPatterns)
-		if len(paths) == 0 || len(goPaths) > 0 {
-			source, err = m.LintGo(ctx, source, fix, goPaths)
-			if err != nil {
-				return nil, fmt.Errorf("go lint failed: %w", err)
-			}
-		}
-
-		pyPaths := filterPaths(paths, lintPythonPatterns)
-		if len(paths) == 0 || len(pyPaths) > 0 {
-			source, err = m.LintPython(ctx, source, fix, pyPaths)
-			if err != nil {
-				return nil, fmt.Errorf("python lint failed: %w", err)
-			}
-		}
-
-		// CUE and YAML don't support fix, run them in parallel on final source
-		g, ctx := errgroup.WithContext(ctx)
-
-		cuePaths := filterPaths(paths, lintCuePatterns)
-		if len(paths) == 0 || len(cuePaths) > 0 {
-			g.Go(func() error {
-				_, err := m.LintCue(ctx, source)
-				if err != nil {
-					return fmt.Errorf("cue lint failed: %w", err)
-				}
-				return nil
-			})
-		}
-
-		yamlPaths := filterPaths(paths, lintYamlPatterns)
-		if len(paths) == 0 || len(yamlPaths) > 0 {
-			g.Go(func() error {
-				_, err := m.LintYaml(ctx, source, yamlPaths)
-				if err != nil {
-					return fmt.Errorf("yaml lint failed: %w", err)
-				}
-				return nil
-			})
-		}
-
-		if err := g.Wait(); err != nil {
-			return nil, err
-		}
-
-		return source, nil
-	}
-
-	// Check-only mode: all linters are independent, run in parallel
-	g, ctx := errgroup.WithContext(ctx)
-
-	nixPaths := excludeDevenvPaths(filterPaths(paths, lintNixPatterns))
-	if len(paths) == 0 || len(nixPaths) > 0 {
-		g.Go(func() error {
-			_, err := m.LintNix(ctx, source, false, nixPaths)
-			if err != nil {
-				return fmt.Errorf("nix lint failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	cuePaths := filterPaths(paths, lintCuePatterns)
-	if len(paths) == 0 || len(cuePaths) > 0 {
-		g.Go(func() error {
-			_, err := m.LintCue(ctx, source)
-			if err != nil {
-				return fmt.Errorf("cue lint failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	goPaths := filterPaths(paths, lintGoPatterns)
-	if len(paths) == 0 || len(goPaths) > 0 {
-		g.Go(func() error {
-			_, err := m.LintGo(ctx, source, false, goPaths)
-			if err != nil {
-				return fmt.Errorf("go lint failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	pyPaths := filterPaths(paths, lintPythonPatterns)
-	if len(paths) == 0 || len(pyPaths) > 0 {
-		g.Go(func() error {
-			_, err := m.LintPython(ctx, source, false, pyPaths)
-			if err != nil {
-				return fmt.Errorf("python lint failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	yamlPaths := filterPaths(paths, lintYamlPatterns)
-	if len(paths) == 0 || len(yamlPaths) > 0 {
-		g.Go(func() error {
-			_, err := m.LintYaml(ctx, source, yamlPaths)
-			if err != nil {
-				return fmt.Errorf("yaml lint failed: %w", err)
-			}
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	return source, nil
+// GoModule is a go module directory.
+type GoModule struct {
+	Source *dagger.Directory
+	Path   string
 }
 
-// LintNix runs Nix-specific linting (alejandra format check, deadnix)
-// When fix=true, automatically formats with alejandra and removes dead code with deadnix
+func New(ctx context.Context, ws dagger.Workspace) *Homelab {
+	// Find all Go modules in the workspace
+	goModFiles, err := ws.Directory(".", dagger.WorkspaceDirectoryOpts{
+		Gitignore: true,
+	}).Glob(ctx, "**/go.mod")
+	if err != nil {
+		return nil
+	}
+
+	var modules []*GoModule
+	for _, path := range goModFiles {
+		dir := filepath.Dir(path)
+		modules = append(modules, &GoModule{
+			Source: ws.Directory(dir),
+			Path:   dir,
+		})
+	}
+
+	return &Homelab{GoModules: modules}
+}
+
+// LintNix runs Nix-specific linting (alejandra formatting, deadnix dead code removal)
+// Returns a changeset with formatted Nix files. Use dagger check --auto-apply to apply.
 // +check
 func (m *Homelab) LintNix(
 	ctx context.Context,
@@ -328,13 +74,9 @@ func (m *Homelab) LintNix(
 	// +ignore=["*", "!**/*.nix", ".devenv*", ".devenv/**", "devenv.local.*"]
 	source *dagger.Directory,
 	// +optional
-	// +default=false
-	fix bool,
-	// +optional
 	paths []string,
 ) (*dagger.Directory, error) {
-	container := dag.Container().
-		From(nixImage).
+	container := nixContainer().
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix-env", "-iA", "nixpkgs.alejandra", "nixpkgs.deadnix"})
@@ -345,27 +87,11 @@ func (m *Homelab) LintNix(
 		targets = paths
 	}
 
-	if fix {
-		container = container.WithExec(append([]string{"alejandra"}, targets...))
-		container = container.WithExec(append([]string{"deadnix", "--edit"}, targets...))
-		return container.Directory("/src"), nil
-	}
+	container = container.
+		WithExec(append([]string{"alejandra"}, targets...)).
+		WithExec(append([]string{"deadnix", "--edit"}, targets...))
 
-	_, err := container.
-		WithExec(append([]string{"alejandra", "--check"}, targets...)).
-		Sync(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("alejandra format check failed: %w", err)
-	}
-
-	_, err = container.
-		WithExec(append([]string{"deadnix", "--fail"}, targets...)).
-		Sync(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("deadnix check failed: %w", err)
-	}
-
-	return source, nil
+	return container.Directory("/src"), nil
 }
 
 // LintCue validates CUE configuration
@@ -374,6 +100,8 @@ func (m *Homelab) LintCue(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!config/**/*.cue"]
 	source *dagger.Directory,
+	// +optional
+	paths []string,
 ) (string, error) {
 	_, err := dag.Container().
 		From(cueImage).
@@ -388,80 +116,44 @@ func (m *Homelab) LintCue(ctx context.Context,
 	return "CUE validation passed", nil
 }
 
-// LintGo runs Go linting and optionally formats code
-// When fix=true, automatically formats with go fmt
+// LintGo runs Go linting (go vet) and formatting (go fmt)
+// Returns a changeset with formatted Go files. Use dagger check --auto-apply to apply.
 // Discovers and iterates over all Go modules with go.mod
 // +check
 func (m *Homelab) LintGo(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
 	source *dagger.Directory,
-	// +optional
-	// +default=false
-	fix bool,
-	// +optional
-	paths []string,
 ) (*dagger.Directory, error) {
-	moduleDirs, err := findGoModules(ctx, source, paths)
-	if err != nil {
-		return nil, err
-	}
-	if len(moduleDirs) == 0 {
+	if len(m.GoModules) == 0 {
 		return source, nil
 	}
 
-	container := dag.Container().
-		From(golangImage).
+	container := golangContainer().
 		WithMountedDirectory("/src", source)
 
-	for _, dir := range moduleDirs {
+	for _, module := range m.GoModules {
 		targets := []string{"./..."}
-		if len(paths) > 0 {
-			pkgs := pathutil.GoPackagePaths(paths, dir)
-			if len(pkgs) > 0 {
-				targets = pkgs
-			}
-		}
+		workdir := "/src/" + module.Path
 
-		workdir := "/src/" + dir
-		if dir == "." {
-			workdir = "/src"
-		}
-
-		if fix {
-			container = container.
-				WithWorkdir(workdir).
-				WithExec(append([]string{"go", "fmt"}, targets...))
-		} else {
-			container = container.
-				WithWorkdir(workdir).
-				WithExec(append([]string{"go", "vet"}, targets...))
-		}
+		// Validate with go vet, then format with go fmt for the changeset
+		container = container.
+			WithWorkdir(workdir).
+			WithExec(append([]string{"go", "vet"}, targets...)).
+			WithExec(append([]string{"go", "fmt"}, targets...))
 	}
 
-	if fix {
-		return container.Directory("/src"), nil
-	}
-
-	_, err = container.Sync(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("go vet failed: %w", err)
-	}
-
-	return source, nil
+	return container.Directory("/src"), nil
 }
 
-// LintPython runs Python linting and optionally formats code with black
-// When fix=true, automatically formats with black
+// LintPython runs Python formatting with black
+// Returns a changeset with formatted Python files. Use dagger check --auto-apply to apply.
 // Discovers and iterates over all Python projects with pyproject.toml
 // +check
 func (m *Homelab) LintPython(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
 	source *dagger.Directory,
-	// +optional
-	// +default=false
-	fix bool,
 	// +optional
 	paths []string,
 ) (*dagger.Directory, error) {
@@ -478,27 +170,12 @@ func (m *Homelab) LintPython(ctx context.Context,
 		WithMountedDirectory("/src", source)
 
 	for _, dir := range projectDirs {
-		if fix {
-			container = container.
-				WithWorkdir("/src/" + dir).
-				WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "."})
-		} else {
-			container = container.
-				WithWorkdir("/src/" + dir).
-				WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "--check", "."})
-		}
+		container = container.
+			WithWorkdir("/src/" + dir).
+			WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "."})
 	}
 
-	if fix {
-		return container.Directory("/src"), nil
-	}
-
-	_, err = container.Sync(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("black format check failed: %w", err)
-	}
-
-	return source, nil
+	return container.Directory("/src"), nil
 }
 
 // LintYaml runs YAML linting
@@ -531,91 +208,16 @@ func (m *Homelab) LintYaml(ctx context.Context,
 	return "YAML linting passed", nil
 }
 
-// Validate runs validation checks
-// Pre-call filter includes all files needed by all validate functions
-func (m *Homelab) Validate(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!k8s/**/*", "!terraform/**/*", "!.woodpecker/*.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
-	source *dagger.Directory,
-	// +optional
-	paths []string,
-) (string, error) {
-	g, ctx := errgroup.WithContext(ctx)
-	var mu sync.Mutex
-	var results []string
-
-	nixPaths := filterPaths(paths, validateNixPatterns)
-	if len(paths) == 0 || len(nixPaths) > 0 {
-		g.Go(func() error {
-			r, err := m.ValidateNix(ctx, source)
-			if err != nil {
-				return fmt.Errorf("nix validation failed: %w", err)
-			}
-			mu.Lock()
-			results = append(results, r)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	helmPaths := filterPaths(paths, validateHelmPatterns)
-	if len(paths) == 0 || len(helmPaths) > 0 {
-		g.Go(func() error {
-			r, err := m.ValidateHelm(ctx, source, helmPaths)
-			if err != nil {
-				return fmt.Errorf("helm validation failed: %w", err)
-			}
-			mu.Lock()
-			results = append(results, r)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	tfPaths := filterPaths(paths, validateTfPatterns)
-	if len(paths) == 0 || len(tfPaths) > 0 {
-		g.Go(func() error {
-			r, err := m.ValidateTerraform(ctx, source, tfPaths)
-			if err != nil {
-				return fmt.Errorf("terraform validation failed: %w", err)
-			}
-			mu.Lock()
-			results = append(results, r)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	wpPaths := filterPaths(paths, validateWoodpeckerPatterns)
-	if len(paths) == 0 || len(wpPaths) > 0 {
-		g.Go(func() error {
-			r, err := m.ValidateWoodpecker(ctx, source, wpPaths)
-			if err != nil {
-				return fmt.Errorf("woodpecker validation failed: %w", err)
-			}
-			mu.Lock()
-			results = append(results, r)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return "", err
-	}
-
-	return joinResults(results), nil
-}
-
 // ValidateNix runs nix flake check
 // +check
 func (m *Homelab) ValidateNix(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock"]
 	source *dagger.Directory,
+	// +optional
+	paths []string,
 ) (string, error) {
-	_, err := dag.Container().
-		From(nixImage).
+	_, err := nixContainer().
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "flake", "check", "--no-build"}).
@@ -760,6 +362,7 @@ func (m *Homelab) helmSourceWithDeps(source *dagger.Directory, searchPaths strin
 
 // BuildHelm renders Helm templates for Kubernetes charts to verify they are valid.
 // When paths are provided, only charts matching the paths are rendered.
+// +check
 func (m *Homelab) BuildHelm(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
@@ -793,63 +396,17 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 	return "Helm template rendering passed", nil
 }
 
-// Build builds all artifacts
-func (m *Homelab) Build(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!cmd/lab/**/*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
-	source *dagger.Directory,
-	// +optional
-	paths []string,
-) (string, error) {
-	g, ctx := errgroup.WithContext(ctx)
-	var mu sync.Mutex
-	var results []string
-
-	cliPaths := filterPaths(paths, buildCliPatterns)
-	if len(paths) == 0 || len(cliPaths) > 0 {
-		cliSource := dag.Directory().WithDirectory("cmd/lab", source.Directory("cmd/lab"))
-		g.Go(func() error {
-			r, err := m.BuildCli(ctx, cliSource)
-			if err != nil {
-				return fmt.Errorf("cli build failed: %w", err)
-			}
-			mu.Lock()
-			results = append(results, r)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	helmPaths := filterPaths(paths, buildHelmPatterns)
-	if len(paths) == 0 || len(helmPaths) > 0 {
-		g.Go(func() error {
-			r, err := m.BuildHelm(ctx, source, helmPaths)
-			if err != nil {
-				return fmt.Errorf("k8s build failed: %w", err)
-			}
-			mu.Lock()
-			results = append(results, r)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return "", err
-	}
-
-	return joinResults(results), nil
-}
-
 // BuildCli builds the lab CLI binary using Nix
 // This ensures the build uses the exact same process as production
+// +check
 func (m *Homelab) BuildCli(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
+	// +optional
+	paths []string,
 ) (string, error) {
-	_, err := dag.Container().
-		From(nixImage).
+	_, err := nixContainer().
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "build", "./cmd/lab", "--print-build-logs"}).
@@ -902,109 +459,66 @@ func (m *Homelab) CliNix(ctx context.Context,
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
 ) *dagger.File {
-	return dag.Container().
-		From(nixImage).
+	return nixContainer().
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "build", "./cmd/lab"}).
 		File("/src/result/bin/lab")
 }
 
-// Test runs all tests
-// Pre-call filter includes all files needed by all test functions
-// +check
-func (m *Homelab) Test(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "**/vendor/**", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!.dagger/scripts/*.sh", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
-	source *dagger.Directory,
-	// +optional
-	paths []string,
-) (string, error) {
-	g, ctx := errgroup.WithContext(ctx)
-	var mu sync.Mutex
-	var results []string
-
-	goPaths := filterPaths(paths, testGoPatterns)
-	if len(paths) == 0 || len(goPaths) > 0 {
-		g.Go(func() error {
-			r, err := m.TestGo(ctx, source, goPaths)
-			if err != nil {
-				return fmt.Errorf("go tests failed: %w", err)
-			}
-			mu.Lock()
-			results = append(results, r)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	pyPaths := filterPaths(paths, testPythonPatterns)
-	if len(paths) == 0 || len(pyPaths) > 0 {
-		g.Go(func() error {
-			r, err := m.TestPython(ctx, source, pyPaths)
-			if err != nil {
-				return fmt.Errorf("python tests failed: %w", err)
-			}
-			mu.Lock()
-			results = append(results, r)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return "", err
-	}
-
-	return joinResults(results), nil
-}
-
 // TestGo runs Go tests for all discovered Go modules
 // When paths are provided, only matching modules/packages are tested
 // +check
-func (m *Homelab) TestGo(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "**/vendor/**"]
-	source *dagger.Directory,
-	// +optional
-	paths []string,
+func (m *Homelab) TestGo(
+	ctx context.Context,
+	ws dagger.Workspace,
 ) (string, error) {
-	moduleDirs, err := findGoModules(ctx, source, paths)
-	if err != nil {
-		return "", err
-	}
-	if len(moduleDirs) == 0 {
+	if len(m.GoModules) == 0 {
 		return "Go tests skipped (no modules found)", nil
 	}
 
-	container := dag.Container().
-		From(golangImage).
-		WithMountedDirectory("/src", source)
+	container := golangContainer()
 
-	for _, dir := range moduleDirs {
-		targets := []string{"./..."}
-		if len(paths) > 0 {
-			pkgs := pathutil.GoPackagePaths(paths, dir)
-			if len(pkgs) > 0 {
-				targets = pkgs
-			}
-		}
-
-		workdir := "/src/" + dir
-		if dir == "." {
-			workdir = "/src"
-		}
-
-		container = container.
-			WithWorkdir(workdir).
-			WithExec(append([]string{"go", "test", "-v"}, targets...))
+	g := new(errgroup.Group)
+	for _, module := range m.GoModules {
+		g.Go(func() error {
+			_, err := m.testGoModule(ctx, module, container)
+			return err
+		})
 	}
 
-	_, err = container.Sync(ctx)
+	err := g.Wait()
 	if err != nil {
 		return "", fmt.Errorf("go test failed: %w", err)
 	}
 
+	return "Go tests passed", nil
+}
+
+func (m *Homelab) testGoModule(ctx context.Context,
+	module *GoModule,
+	container *dagger.Container,
+) (string, error) {
+	if container == nil {
+		return "", errors.New("Missing required argument container")
+	}
+
+	// Dagger go module requires user to run `dagger develop --sdk=go` to generate code for complete module
+	if module.Path == ".dagger" {
+		if exists, err := module.Source.Exists(ctx, "dagger.gen.go", dagger.DirectoryExistsOpts{}); err == nil && !exists {
+			return "", errors.New("Missing dagger sdk")
+		}
+	}
+
+	workdir := "/src/" + module.Path
+	_, err := container.
+		WithMountedDirectory(workdir, module.Source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"}).
+		WithWorkdir(workdir).
+		WithExec([]string{"go", "test", "-v", "./..."}).
+		Sync(ctx)
+	if err != nil {
+		return "", fmt.Errorf("go test failed: %w", err)
+	}
 	return "Go tests passed", nil
 }
 
@@ -1045,15 +559,14 @@ func (m *Homelab) TestPython(ctx context.Context,
 	return "Python tests passed", nil
 }
 
-// Devenv builds the devenv nix environment as a minimal "from scratch" container.
+// DevenvContainer builds the devenv nix environment as a minimal "from scratch" container.
 // Uses `devenv container copy shell` to produce a minimal nix2container image
 // containing only the runtime closure (no build dependencies).
 // The resulting container has all dev tools (go, helm, kubectl, etc.) available on PATH.
 // The nix store is cached across runs so packages are only built once.
-func (m *Homelab) Devenv(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!devenv.local.nix", "!devenv.local.yaml", "!cmd/lab/**/*"]
-	source *dagger.Directory,
+func (m *Homelab) DevenvContainer(
+	ctx context.Context,
+	ws dagger.Workspace,
 	// Optional host nix daemon socket for faster builds on NixOS CI hosts.
 	// When provided, the host daemon's store is used as a substituter so
 	// pre-built packages are fetched rather than rebuilt from source.
@@ -1063,6 +576,11 @@ func (m *Homelab) Devenv(ctx context.Context,
 	// +optional
 	nixDaemon *dagger.Socket,
 ) (*dagger.Container, error) {
+	source := ws.Directory(".", dagger.WorkspaceDirectoryOpts{
+		Gitignore: true,
+		Include:   []string{"devenv.*", "cmd/lab/**"},
+	})
+
 	// Cache the nix store across runs. The cache volume name includes the image
 	// tag so it auto-invalidates when the devenv image is updated (e.g. by Renovate).
 	nixCacheKey := "devenv-nix-" + devenvImage
@@ -1124,15 +642,4 @@ func (m *Homelab) Devenv(ctx context.Context,
 // DebugDir returns the given dir. Useful for inspecting directory contents for debugging.
 func (m *Homelab) DebugDir(ctx context.Context, dir *dagger.Directory) *dagger.Directory {
 	return dir
-}
-
-func joinResults(results []string) string {
-	result := ""
-	for i, r := range results {
-		if i > 0 {
-			result += "\n"
-		}
-		result += "  - " + r
-	}
-	return result
 }

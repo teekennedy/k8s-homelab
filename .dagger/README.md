@@ -50,18 +50,21 @@ dagger develop
 ### Direct Dagger Calls
 
 ```bash
-# Full CI pipeline
-dagger call all --source=.
+# Run all checks
+dagger check
 
-# With auto-fix enabled (exports fixed source)
-dagger call all --source=. --fix export --path=.
+# Run checks by category
+dagger check 'lint*'
+dagger check 'build*'
+dagger check 'test*'
+dagger check 'validate*'
 
-# Individual stages
-dagger call lint --source=.
-dagger call lint --source=. --fix export --path=.  # Auto-fix and export
-dagger call validate --source=.
-dagger call build --source=.
-dagger call test --source=.
+# Run a specific check
+dagger check lint-nix
+dagger check build-helm
+
+# Auto-apply formatting fixes from lint changesets
+dagger check 'lint*' --auto-apply
 
 # Build lab CLI
 dagger call build-cli --source=.        # Using Nix (production)
@@ -74,54 +77,58 @@ dagger call cli-nix --source=. export --path=./lab
 ### Via lab CLI
 
 ```bash
-lab ci all           # Full pipeline
-lab ci all --fix     # Full pipeline with auto-fix
-lab ci build         # Build all components
-lab ci lint          # Run linters (check only)
-lab ci lint --fix    # Run linters and auto-fix issues
-lab ci test          # Run tests
-lab ci validate      # Validate configs
+lab ci               # Run all checks
+lab ci lint          # Run all lint* checks
+lab ci lint --fix    # Run lint checks, auto-apply formatting fixes
+lab ci build         # Run all build* checks
+lab ci test          # Run all test* checks
+lab ci validate      # Run all validate* checks
 ```
 
 ## Available Functions
 
-All functions use pre-call filtering for optimal caching. Only relevant files are included:
+All check functions use pre-call filtering for optimal caching. Only relevant files are included.
+Functions annotated with `// +check` can be run via `dagger check`.
 
-- `All(source, fix)` - Run complete CI pipeline (lint → validate → build → test)
-  - `fix`: Auto-fix linting issues (default: false)
-- `Lint(source, fix)` - Run all linters (Nix, Go, CUE, YAML)
-  - `fix`: Auto-fix issues where possible (default: false)
-- `LintNix(source, fix)` - Nix linting and formatting
+### Checks
+
+#### Lint Checks
+- `LintNix(source, paths)` - Nix formatting and dead code removal (returns changeset)
   - Filters: `**/*.nix`
-  - Check: `alejandra --check`, `deadnix --fail`
-  - Fix: `alejandra .`, `deadnix --edit .`
-- `LintGo(source, fix)` - Go linting and formatting
-  - Filters: `cmd/lab/**/*.go`, `cmd/lab/go.mod`, `cmd/lab/go.sum`
-  - Check: `go vet`
-  - Fix: `go fmt`
-- `LintCue(source)` - CUE validation (no auto-fix)
+  - Tools: `alejandra`, `deadnix --edit`
+- `LintGo(source, paths)` - Go linting and formatting (returns changeset)
+  - Tools: `go vet`, `go fmt`
+- `LintCue(source, paths)` - CUE validation
   - Filters: `config/**/*.cue`
-- `LintYaml(source)` - YAML linting (no auto-fix)
+- `LintPython(source, paths)` - Python formatting with black (returns changeset)
+  - Tools: `black`
+- `LintYaml(source, paths)` - YAML linting
   - Filters: `**/*.yaml`, `**/*.yml`, `.yamllint.yaml`
-- `Validate(source)` - Run all validation checks
+
+#### Validate Checks
 - `ValidateNix(source)` - Nix flake check
-  - Filters: `flake.nix`, `flake.lock`, `nix/**/*`, `cmd/lab/flake.nix`, `cmd/lab/flake.lock`
-- `ValidateHelm(source)` - Helm chart validation
+  - Filters: `flake.nix`, `flake.lock`, `nix/**/*`
+- `ValidateHelm(source, paths)` - Helm chart validation
   - Filters: `k8s/**/*`
-- `ValidateTerraform(source)` - Terraform/OpenTofu validation
+- `ValidateTerraform(source, paths)` - Terraform/OpenTofu validation
   - Filters: `terraform/**/*`
-- `Build(source)` - Build all artifacts
+- `ValidateWoodpecker(source, paths)` - Woodpecker CI pipeline validation
+  - Filters: `.woodpecker/*.yaml`
+
+#### Build Checks
 - `BuildCli(source)` - Build lab CLI (using Nix)
   - Filters: `cmd/lab/**/*`
+- `BuildHelm(source, paths)` - Render Helm templates
+  - Filters: `k8s/**/*`
+
+#### Test Checks
+- `TestGo(source, paths)` - Run Go tests
+- `TestPython(source, paths)` - Run Python tests with pytest
+
+### Other Functions
 - `BuildCliGo(source)` - Build lab CLI (using Go, faster)
-  - Filters: `cmd/lab/**/*.go`, `cmd/lab/go.mod`, `cmd/lab/go.sum`
-- `Test(source)` - Run all tests
-- `TestGo(source)` - Run Go tests
-  - Filters: `cmd/lab/**/*.go`, `cmd/lab/go.mod`, `cmd/lab/go.sum`
 - `Cli(source, platform)` - Get lab binary (Go build)
-  - Filters: `cmd/lab/**/*.go`, `cmd/lab/go.mod`, `cmd/lab/go.sum`
 - `CliNix(source)` - Get lab binary (Nix build)
-  - Filters: `cmd/lab/**/*`
 
 ## Caching & Performance
 
@@ -148,16 +155,16 @@ All functions use `+ignore` annotations to filter the source directory before ex
 ### Cache Behavior
 
 ```bash
-# First run - builds everything
-dagger call all --source=.
+# First run - runs all checks
+dagger check
 
-# Change a .nix file - only Nix checks run
+# Change a .nix file - only Nix checks re-run
 echo "# comment" >> nix/hosts/common/default.nix
-dagger call all --source=.  # Only LintNix + ValidateNix run
+dagger check  # Only LintNix + ValidateNix re-run
 
-# Change Go code - only Go checks run
+# Change Go code - only Go checks re-run
 echo "// comment" >> cmd/lab/main.go
-dagger call all --source=.  # Only LintGo + BuildCli + TestGo run
+dagger check  # Only LintGo + BuildCli + TestGo re-run
 ```
 
 ## Development

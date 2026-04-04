@@ -12,7 +12,7 @@
 - **CI Architecture**: See `docs/ci-architecture.md` for details on how we avoid circular dependencies.
   - Dev shell (`devenv shell`) includes lab pre-built for convenience
   - CI container (`containers.ci` in devenv.nix) excludes lab, allowing CI to build it from scratch
-  - This ensures `dagger call build` works even when lab's build is broken
+  - This ensures `dagger check 'build*'` works even when lab's build is broken
 - **XDG Directories** (local state, follows XDG Base Directory Specification):
   - macOS: `~/Library/Application Support/lab/`, `~/Library/Caches/lab/`
   - Linux: `~/.config/lab/`, `~/.cache/lab/`, `~/.local/state/lab/`
@@ -34,19 +34,19 @@
 - `lab k8s --env <env> <command>` manages Kubernetes with environment-specific kubeconfig.
 - `lab k8s kubeconfig decrypt <env>` decrypts kubeconfig; `lab k8s kubeconfig cleanup` removes decrypted files.
 - `lab k8s diff/sync <app>` manages Kubernetes applications; `lab tf plan/apply <module>` wraps OpenTofu.
-- `lab ci all` runs full CI pipeline (lint, validate, build, test); `lab ci build/lint/test/validate` runs individual stages.
-- `dagger call all --source=.` runs CI pipeline directly (works even if lab is broken).
+- `lab ci` runs all CI checks; `lab ci lint/build/test/validate` runs checks by category.
+- `dagger check` runs all CI checks directly (works even if lab is broken).
 - `nix flake check` runs deploy-rs checks to validate host expressions.
 - `nix build .#nixosConfigurations.<host>.config.system.build.toplevel` ensures a host builds successfully; swap `<host>` for `borg-0`, etc.
 - `deploy -- .#<host>` applies a configuration via deploy-rs once builds pass.
 - `tofu -chdir=terraform plan` reviews infra changes; pair with `tofu apply` only after plan review.
-- `dagger call all --source=.` runs the full CI pipeline (lint, validate, build) via Dagger.
+- `dagger check` runs the full CI pipeline (lint, validate, build, test) via Dagger.
 
 ## Coding Style & Naming Conventions
 Use two-space indentation in Nix files and rely on `alejandra` plus `deadnix` (via pre-commit) to format and prune unused definitions. YAML should stay lowercase-kebab keys, validated with `yamllint --strict`. Terraform modules are formatted with `tofu fmt`. CUE files use tabs for indentation and follow the schema definitions in `config/schema.cue`; validate with `lab config validate` or `cue vet`. Go code in `cmd/lab/` follows standard `go fmt` and `go vet`. Follow existing naming patterns (`borg-*` hosts, `*-system` namespaces, Helm release dirs matching namespaces). Favor explicit attribute sets and keep secrets references under `sops` blocks.
 
 ## Testing & Validation
-Run `nix flake check` and `lab config validate` before every push. Make sure any untracked nix or cue files are staged or nix/cue commands will not be able to read them. For host changes, capture `nix build` output or `deploy -- --dry-activate .#<host>` when validating deployments. Infrastructure tweaks require `terraform fmt -check` and a recorded `plan` in the PR discussion. Helm modifications should be diffed with `scripts/helm-diff-live.sh <env> <release>`. Run `dagger call lint --source=.` to check all linting locally before pushing.
+Run `nix flake check` and `lab config validate` before every push. Make sure any untracked nix or cue files are staged or nix/cue commands will not be able to read them. For host changes, capture `nix build` output or `deploy -- --dry-activate .#<host>` when validating deployments. Infrastructure tweaks require `terraform fmt -check` and a recorded `plan` in the PR discussion. Helm modifications should be diffed with `scripts/helm-diff-live.sh <env> <release>`. Run `dagger check 'lint*'` to check all linting locally before pushing.
 
 ## Commit & Pull Request Guidelines
 Commit subjects stay imperative and concise (see `git log` entries like “Add longhorn recurring jobs”); include relevant scope tags when obvious (e.g. `k3s:`). Squash noisy work-in-progress commits locally. PRs should link the motivating issue or change ticket, summarize affected hosts or services, and note verification commands run (`nix flake check`, `terraform plan`). Attach screenshots or logs when touching user-facing apps or dashboards.

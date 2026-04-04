@@ -66,14 +66,14 @@ lab host deploy borg-0
 # CI runs in containers.ci environment (no lab pre-installed)
 # Dagger pipeline builds lab as first step
 
-# Option 1: Direct dagger call
-dagger call build --source=.
+# Option 1: Direct dagger check
+dagger check 'build*'
 
 # Option 2: Using lab ci (if lab is already working)
 lab ci build
 lab ci lint
 lab ci test
-lab ci all
+lab ci
 ```
 
 ### Fixing a Broken Lab Build
@@ -137,23 +137,36 @@ dagger call fix-lab-vendor-hash --source=.
 
 ### lab ci Commands
 ```bash
-# Run full CI pipeline
-lab ci all
+# Run all checks
+lab ci
 
-# Individual stages
-lab ci lint       # Run all linters
-lab ci validate   # Validate all configs
-lab ci build      # Build all components
-lab ci test       # Run all tests
+# Run checks by category
+lab ci lint           # Run all lint* checks
+lab ci validate       # Run all validate* checks
+lab ci build          # Run all build* checks
+lab ci test           # Run all test* checks
 
-# Build specific components
-lab ci build lab         # Build just lab CLI
-lab ci build nix         # Build NixOS configs
-lab ci build --changed   # Build only changed components
+# With options
+lab ci --fix          # Auto-apply formatting fixes
+lab ci lint --fix     # Auto-apply lint formatting fixes
+lab ci --changed      # Run checks only on changed files
 ```
 
-### Dagger Functions
+### Dagger Checks
 ```bash
+# Run all checks
+dagger check
+
+# Run checks by category
+dagger check 'lint*'
+dagger check 'build*'
+dagger check 'test*'
+dagger check 'validate*'
+
+# Run a specific check
+dagger check lint-nix
+dagger check build-cli
+
 # Build lab using Nix (production build)
 dagger call build-cli --source=.
 
@@ -162,15 +175,6 @@ dagger call build-cli-go --source=.
 
 # Get built binary
 dagger call cli-nix --source=. export --path=./lab
-
-# Full pipeline
-dagger call all --source=.
-
-# Individual stages
-dagger call lint --source=.
-dagger call validate --source=.
-dagger call build --source=.
-dagger call test --source=.
 ```
 
 ## Benefits

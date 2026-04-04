@@ -13,33 +13,12 @@ import (
 
 // Re-export pattern sets for use in main.go.
 var (
-	lintNixPatterns    = pathutil.LintNixPatterns
-	lintCuePatterns    = pathutil.LintCuePatterns
-	lintGoPatterns     = pathutil.LintGoPatterns
-	lintPythonPatterns = pathutil.LintPythonPatterns
-	lintYamlPatterns   = pathutil.LintYamlPatterns
-
-	validateNixPatterns        = pathutil.ValidateNixPatterns
-	validateHelmPatterns       = pathutil.ValidateHelmPatterns
-	validateTfPatterns         = pathutil.ValidateTfPatterns
 	validateWoodpeckerPatterns = pathutil.ValidateWoodpeckerPatterns
-
-	buildCliPatterns  = pathutil.BuildCliPatterns
-	buildHelmPatterns = pathutil.BuildHelmPatterns
-
-	testGoPatterns     = pathutil.TestGoPatterns
-	testPythonPatterns = pathutil.TestPythonPatterns
-
-	allLintPatterns     = pathutil.AllLintPatterns
-	allValidatePatterns = pathutil.AllValidatePatterns
-	allBuildPatterns    = pathutil.AllBuildPatterns
-	allTestPatterns     = pathutil.AllTestPatterns
 )
 
 // Delegate to pathutil for pure functions.
 var (
 	filterPaths         = pathutil.FilterPaths
-	excludeDevenvPaths  = pathutil.ExcludeDevenvPaths
 	terraformModuleDirs = pathutil.TerraformModuleDirs
 )
 

@@ -38,15 +38,13 @@ in {
 
   # https://devenv.sh/basics/
   env.KUBECONFIG = "${config.env.DEVENV_STATE}/kube/config";
+  env.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
   # Don't prompt me to sign up for dagger cloud
   env.DAGGER_NO_NAG = "1";
 
   # https://devenv.sh/packages/
-  packages =
-    [
-      lab
-    ]
-    ++ (with pkgs; [
+  packages = (with pkgs; [
+      cacert
       age
       argocd
       cue
@@ -60,6 +58,7 @@ in {
       kubernetes-helm
       kubetail
       kustomize
+      lab
       nixos-anywhere
       opentofu
       sops
