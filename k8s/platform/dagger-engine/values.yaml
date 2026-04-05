@@ -5,11 +5,19 @@ dagger-helm:
     # insecureRootCapabilities: effectively equivalent to running actions with `docker run --privileged`
     configJson: |
       {
+        "logLevel": "info",
         "security": {
           "insecureRootCapabilities": false
         }
       }
     kind: StatefulSet
+    resources:
+      limits:
+        cpu: "1"
+        memory: 2Gi
+      requests:
+        cpu: "1"
+        memory: 2Gi
     # use PVC instead of host path for data volume
     hostPath:
       dataVolume:
