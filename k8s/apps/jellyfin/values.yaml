@@ -405,7 +405,7 @@ app-template:
         jellyfin:
           image:
             repository: ghcr.io/jellyfin/jellyfin
-            tag: 10.11.7
+            tag: 10.11.8
           env:
             TZ: America/Denver
             JELLYFIN_DATA_DIR: "/data"
@@ -515,7 +515,7 @@ app-template:
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 6.1.1.10360-ls297
+            tag: 6.1.1.10360-ls298
           env:
             # https://wiki.servarr.com/en/radarr/environment-variables
             TZ: America/Denver
@@ -602,7 +602,7 @@ app-template:
         qbittorrent:
           image:
             repository: lscr.io/linuxserver/qbittorrent
-            tag: 5.1.4-r2-ls447
+            tag: 5.1.4-r2-ls448
           env:
             TZ: America/Denver
             PUID: "1200"
