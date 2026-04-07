@@ -5,14 +5,12 @@ CrowdSec is a free, open-source security engine that detects and blocks maliciou
 ## Architecture
 
 ```
-Internet → Traefik (CrowdSec Plugin) → Anubis → Backend
+Internet → Traefik (CrowdSec Plugin) → Backend
            ↓
            CrowdSec LAPI ← CrowdSec Agent (reads Traefik logs)
 ```
 
-**Defense in Depth**:
-1. **CrowdSec**: Blocks known bad IPs at Traefik (fast, binary decision)
-2. **Anubis**: Handles behavioral bot detection for traffic that passes CrowdSec
+**How it works**: CrowdSec blocks known bad IPs at Traefik (fast, binary decision)
 
 ## How It Works
 
