@@ -6,27 +6,6 @@ data "cloudflare_api_token_permission_groups_list" "all" {
   scope = "com.cloudflare.api.account.zone"
 }
 
-resource "random_password" "tunnel_secret" {
-  length  = 64
-  special = false
-}
-
-resource "cloudflare_zero_trust_tunnel_cloudflared" "homelab" {
-  account_id    = var.cloudflare_account_id
-  name          = "homelab"
-  tunnel_secret = random_password.tunnel_secret.result
-}
-
-# Not proxied, not accessible. Just a record for auto-created CNAMEs by external-dns.
-resource "cloudflare_dns_record" "tunnel" {
-  zone_id = data.cloudflare_zones.zone.result[0].id
-  type    = "CNAME"
-  name    = "homelab-tunnel.${var.cloudflare_domain}"
-  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
-  proxied = false
-  ttl     = 1 # Auto
-}
-
 # static, internal only DNS records for borg hosts
 resource "cloudflare_dns_record" "k8s_host_ipv4" {
   for_each = var.k8s_hosts
@@ -36,21 +15,6 @@ resource "cloudflare_dns_record" "k8s_host_ipv4" {
   content  = each.value.ipv4
   proxied  = false
   ttl      = 1 # Auto
-}
-
-module "cloudflared_credentials_secret" {
-  source    = "../k8s-secret"
-  name      = "cloudflared-credentials"
-  namespace = "cloudflared"
-
-  data = {
-    "credentials.json" = jsonencode({
-      AccountTag   = var.cloudflare_account_id
-      TunnelName   = cloudflare_zero_trust_tunnel_cloudflared.homelab.name
-      TunnelID     = cloudflare_zero_trust_tunnel_cloudflared.homelab.id
-      TunnelSecret = random_password.tunnel_secret.result
-    })
-  }
 }
 
 resource "cloudflare_api_token" "external_dns" {
@@ -72,16 +36,6 @@ module "external_dns_secret" {
 
   data = {
     "value" = cloudflare_api_token.external_dns.value
-  }
-}
-
-module "external_dns_zone_configmap" {
-  source    = "../k8s-configmap"
-  name      = "cloudflare-zone"
-  namespace = "external-dns"
-
-  data = {
-    zone_id = data.cloudflare_zones.zone.result[0].id
   }
 }
 

@@ -2,18 +2,126 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: ddns-updater-config
+  name: ddns-public-ip
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: ddns-updater
     app.kubernetes.io/part-of: external-dns
-    app.kubernetes.io/component: ddns-updater
     app.kubernetes.io/managed-by: Helm
 data:
-  domain: {{ required "ddnsUpdater.cloudflare.domain is required" .Values.ddnsUpdater.cloudflare.domain | quote }}
-  ttl: {{ .Values.ddnsUpdater.cloudflare.ttl | quote }}
-  ip_version: {{ .Values.ddnsUpdater.cloudflare.ipVersion | quote }}
-  proxied: {{ ternary "true" "false" .Values.ddnsUpdater.cloudflare.proxied | quote }}
+  ip: "0.0.0.0"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ddns-updater
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ddns-updater
+    app.kubernetes.io/part-of: external-dns
+    app.kubernetes.io/managed-by: Helm
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ddns-updater
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ddns-updater
+    app.kubernetes.io/part-of: external-dns
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ddns-updater
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ddns-updater
+    app.kubernetes.io/part-of: external-dns
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: ddns-updater
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: ddns-updater
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ddns-updater-script
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ddns-updater
+    app.kubernetes.io/part-of: external-dns
+    app.kubernetes.io/managed-by: Helm
+data:
+  update.sh: |
+    #!/bin/sh
+    set -eu
+
+    NAMESPACE="$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)"
+    TOKEN_FILE="/var/run/secrets/kubernetes.io/serviceaccount/token"
+    CACERT="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    API="https://kubernetes.default.svc"
+    CURRENT_IP=""
+
+    kube_api() {
+      METHOD="$1"
+      ENDPOINT="$2"
+      shift 2
+      curl -sf --cacert "$CACERT" \
+        -H "Authorization: Bearer $(cat "$TOKEN_FILE")" \
+        -X "$METHOD" \
+        "$API$ENDPOINT" \
+        "$@"
+    }
+
+    echo "Starting DDNS updater (period={{ .Values.ddnsUpdater.period }}s, provider={{ .Values.ddnsUpdater.publicIpProvider }})"
+
+    while true; do
+      NEW_IP="$(curl -sf {{ .Values.ddnsUpdater.publicIpProvider | quote }} | tr -d '[:space:]')" || {
+        echo "ERROR: Failed to fetch public IP"
+        sleep {{ .Values.ddnsUpdater.period }}
+        continue
+      }
+
+      if [ -z "$NEW_IP" ]; then
+        echo "ERROR: Empty IP response"
+        sleep {{ .Values.ddnsUpdater.period }}
+        continue
+      fi
+
+      if [ "$NEW_IP" != "$CURRENT_IP" ]; then
+        echo "IP changed from ${CURRENT_IP:-<none>} to ${NEW_IP}"
+
+        # Patch the ConfigMap with the new IP
+        kube_api PATCH "/api/v1/namespaces/$NAMESPACE/configmaps/ddns-public-ip" \
+          -H "Content-Type: application/merge-patch+json" \
+          -d "{\"data\":{\"ip\":\"$NEW_IP\"}}" > /dev/null
+
+        # Rollout restart external-dns so it picks up the new default target
+        RESTART_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        kube_api PATCH "/apis/apps/v1/namespaces/$NAMESPACE/deployments/external-dns" \
+          -H "Content-Type: application/strategic-merge-patch+json" \
+          -d "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$RESTART_AT\"}}}}}" > /dev/null
+
+        CURRENT_IP="$NEW_IP"
+        echo "ConfigMap patched and external-dns restarted"
+      fi
+
+      sleep {{ .Values.ddnsUpdater.period }}
+    done
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -37,63 +145,15 @@ spec:
         app.kubernetes.io/part-of: external-dns
         app.kubernetes.io/component: ddns-updater
     spec:
-      automountServiceAccountToken: false
+      serviceAccountName: ddns-updater
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
-        fsGroup: 1000
-      initContainers:
-        - name: render-config
-          image: "{{ .Values.ddnsUpdater.initContainer.image.repository }}:{{ .Values.ddnsUpdater.initContainer.image.tag }}"
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -eu
-              token="$(cat /secrets/token)"
-              zone_id="$(cat /zone/zone_id)"
-              domain="$(cat /config/domain)"
-              ttl="$(cat /config/ttl)"
-              ip_version="$(cat /config/ip_version)"
-              proxied="$(cat /config/proxied)"
-              cat <<CONFIG > /updater/data/config.json
-              {"settings":[{"provider":"cloudflare","zone_identifier":"${zone_id}","domain":"${domain}","ttl":${ttl},"token":"${token}","ip_version":"${ip_version}","proxied":${proxied}}]}
-              CONFIG
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          volumeMounts:
-            - name: updater-data
-              mountPath: /updater/data
-            - name: config
-              mountPath: /config
-              readOnly: true
-            - name: cloudflare-token
-              mountPath: /secrets
-              readOnly: true
-            - name: cloudflare-zone
-              mountPath: /zone
-              readOnly: true
       containers:
         - name: ddns-updater
           image: "{{ .Values.ddnsUpdater.image.repository }}:{{ .Values.ddnsUpdater.image.tag }}"
-          env:
-            - name: PERIOD
-              value: {{ .Values.ddnsUpdater.period | quote }}
-            - name: PUBLICIP_FETCHERS
-              value: {{ .Values.ddnsUpdater.publicIp.fetchers | quote }}
-            - name: PUBLICIPV4_HTTP_PROVIDERS
-              value: {{ .Values.ddnsUpdater.publicIp.ipv4HttpProviders | quote }}
-            - name: SERVER_ENABLED
-              value: "no"
-            - name: LOG_LEVEL
-              value: {{ .Values.ddnsUpdater.logLevel | quote }}
-            - name: TZ
-              value: {{ .Values.ddnsUpdater.timeZone | quote }}
+          command: ["/bin/sh", "/scripts/update.sh"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -103,24 +163,11 @@ spec:
           resources:
             {{- toYaml .Values.ddnsUpdater.resources | nindent 12 }}
           volumeMounts:
-            - name: updater-data
-              mountPath: /updater/data
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
       volumes:
-        - name: updater-data
-          emptyDir: {}
-        - name: config
+        - name: scripts
           configMap:
-            name: ddns-updater-config
-        - name: cloudflare-zone
-          configMap:
-            name: {{ .Values.ddnsUpdater.cloudflare.zoneConfigMap.name }}
-            items:
-              - key: {{ .Values.ddnsUpdater.cloudflare.zoneConfigMap.key }}
-                path: zone_id
-        - name: cloudflare-token
-          secret:
-            secretName: {{ .Values.ddnsUpdater.cloudflare.tokenSecret.name }}
-            items:
-              - key: {{ .Values.ddnsUpdater.cloudflare.tokenSecret.key }}
-                path: token
+            name: ddns-updater-script
 {{- end }}

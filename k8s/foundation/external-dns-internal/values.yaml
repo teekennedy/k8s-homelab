@@ -1,0 +1,42 @@
+external-dns:
+  fullnameOverride: external-dns-internal
+  provider:
+    name: webhook
+    webhook:
+      image:
+        repository: ghcr.io/kashalls/external-dns-unifi-webhook
+        tag: v0.4.3
+      env:
+        - name: UNIFI_HOST
+          value: "https://10.69.80.1"
+        - name: UNIFI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: unifi-api-key
+              key: api-key
+        - name: UNIFI_SKIP_TLS_VERIFY
+          value: "true"
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: http-webhook
+        initialDelaySeconds: 10
+        periodSeconds: 10
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: http-webhook
+        initialDelaySeconds: 5
+        periodSeconds: 10
+  txtOwnerId: homelab-internal
+  sources:
+    - service
+    - ingress
+    - gateway-httproute
+    - traefik-proxy # Traefik IngressRoute CRDs
+  interval: 5m
+  triggerLoopOnEvent: true
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true

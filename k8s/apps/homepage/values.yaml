@@ -8,8 +8,6 @@ homepage:
     annotations:
       traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
       traefik.ingress.kubernetes.io/router.middlewares: homepage-public-rate-limit@kubernetescrd
-      external-dns.alpha.kubernetes.io/target: external.network.msng.to
-      external-dns.alpha.kubernetes.io/record-type: CNAME
     hosts:
       - host: &homepageHost msng.to
         paths:

@@ -247,8 +247,6 @@ app-template:
       className: traefik
       annotations:
         traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
-        external-dns.alpha.kubernetes.io/target: external.network.msng.to
-        external-dns.alpha.kubernetes.io/record-type: CNAME
       hosts:
         - host: &terrariaHost terraria.msng.to
           paths:

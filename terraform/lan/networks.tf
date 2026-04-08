@@ -1,21 +1,17 @@
-resource "unifi_network" "wan" {
-  name    = "Primary (WAN1)"
-  purpose = "wan"
+resource "unifi_wan" "primary" {
+  name = "Primary (WAN1)"
 
-  wan_networkgroup    = "WAN"
-  wan_type            = "dhcp"
-  wan_type_v6         = "dhcpv6"
-  wan_prefixlen       = 56
-  wan_dhcp_v6_pd_size = 56
-  wan_dns = [
-    "1.0.0.1",
-    "1.1.1.1",
-  ]
-  # TODO this setting does not yet exist in the provider - has been set manually
-  # wan_ipv6_dns = [
-  #   "2606:4700:4700::1001",
-  #   "2606:4700:4700::1111",
-  # ]
+  type    = "dhcp"
+  type_v6 = "dhcpv6"
+  dhcpv6 = {
+    pd_size = 56
+  }
+  dns = {
+    primary        = "1.0.0.1"
+    secondary      = "1.1.1.1"
+    ipv6_primary   = "2606:4700:4700::1001",
+    ipv6_secondary = "2606:4700:4700::1111",
+  }
 }
 
 # TODO I've matched this to the existing config as closely as possible,
@@ -28,7 +24,6 @@ resource "unifi_network" "wan" {
 #   domain_name    = "lan"
 #   vlan_id        = 1 # NB: the API shows vlan id 0 for this network.
 #   dhcp_enabled   = false
-#   ipv6_ra_enable = false
 #   multicast_dns  = true
 #
 #   dhcp_start = "10.69.0.11"
@@ -39,22 +34,30 @@ locals {
   managed_vlans = {
     for vlan_name, vlan in lookup(local.inventory, "vlans", {}) :
     vlan_name => {
-      name         = coalesce(try(vlan.name, null), vlan_name)
-      purpose      = coalesce(try(vlan.purpose, null), "corporate")
-      subnet       = try(vlan.subnet, null)
-      vlan_id      = try(vlan.vlan_tag, null)
-      dhcp_enabled = try(vlan.dhcp.enabled, false)
-      dhcp_start = try(vlan.dhcp.enabled, false) ? coalesce(
-        try(vlan.dhcp.start, null),
-        try(vlan.subnet, null) != null ? cidrhost(vlan.subnet, 8) : null,
-      ) : null
-      dhcp_stop = try(vlan.dhcp.enabled, false) ? coalesce(
-        try(vlan.dhcp.stop, null),
-        try(vlan.subnet, null) != null ? cidrhost(vlan.subnet, -2) : null,
-      ) : null
-      multicast_dns                = try(vlan.multicast_dns, false)
-      ipv6_ra_enable               = try(vlan.ipv6_ra_enable, false)
-      intra_network_access_enabled = try(vlan.intra_network_access_enabled, false)
+      name   = coalesce(try(vlan.name, null), vlan_name)
+      subnet = try(vlan.subnet, null) != null ? join("", [cidrhost(vlan.subnet, 1), regex("/\\d+$", vlan.subnet)]) : null
+      vlan   = try(vlan.vlan_tag, null)
+      dhcp_server = try(vlan.dhcp.enabled, false) ? {
+        enabled         = vlan.dhcp.enabled
+        gateway_enabled = try(vlan.dhcp.gateway_enabled, false)
+        dns_enabled     = try(vlan.dhcp.dns_enabled, true)
+        # NB: I had to explicitly set this or tofu would error out saying the provider produced an inconsistent result.
+        boot = {
+          enabled = false
+        }
+        start = coalesce(
+          try(vlan.dhcp.start, null),
+          try(vlan.subnet, null) != null ? cidrhost(vlan.subnet, 8) : null,
+        )
+        stop = coalesce(
+          try(vlan.dhcp.stop, null),
+          try(vlan.subnet, null) != null ? cidrhost(vlan.subnet, -2) : null,
+        )
+      } : null
+      multicast_dns     = try(vlan.multicast_dns, false)
+      network_isolation = try(vlan.network_isolation, false)
+      auto_scale        = try(vlan.auto_scale, false)
+      lte_lan           = try(vlan.lte_lan, false)
     }
     if vlan_name != "default"
   }
@@ -63,18 +66,16 @@ locals {
 resource "unifi_network" "vlans" {
   for_each = local.managed_vlans
 
-  name    = each.value.name
-  purpose = each.value.purpose
+  name = each.value.name
 
   multicast_dns = each.value.multicast_dns
 
-  subnet  = each.value.subnet
-  vlan_id = each.value.vlan_id
+  subnet = each.value.subnet
+  vlan   = each.value.vlan
 
-  dhcp_start   = each.value.dhcp_start
-  dhcp_stop    = each.value.dhcp_stop
-  dhcp_enabled = each.value.dhcp_enabled
-
-  ipv6_ra_enable               = each.value.ipv6_ra_enable
-  intra_network_access_enabled = each.value.intra_network_access_enabled
+  dhcp_server        = each.value.dhcp_server
+  setting_preference = "manual"
+  network_isolation  = each.value.network_isolation
+  auto_scale         = each.value.auto_scale
+  lte_lan            = each.value.lte_lan
 }

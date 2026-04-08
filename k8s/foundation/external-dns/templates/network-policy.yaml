@@ -1,0 +1,101 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: external-dns
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: external-dns
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: external-dns
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Prometheus metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring-system
+      ports:
+        - protocol: TCP
+          port: 7979
+  egress:
+    # DNS resolution via CoreDNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Kubernetes API server (k3s runs apiserver on host network)
+    - to:
+        - ipBlock:
+            cidr: 10.69.80.0/24
+      ports:
+        - protocol: TCP
+          port: 6443
+    # CloudFlare API (internet HTTPS)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+{{- if .Values.ddnsUpdater.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ddns-updater
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: ddns-updater
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ddns-updater
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    # DNS resolution via CoreDNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Kubernetes API server (for ConfigMap patch + Deployment restart)
+    - to:
+        - ipBlock:
+            cidr: 10.69.80.0/24
+      ports:
+        - protocol: TCP
+          port: 6443
+    # Public IP check endpoint (internet HTTPS)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

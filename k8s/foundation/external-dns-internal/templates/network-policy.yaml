@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: external-dns-internal
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: external-dns-internal
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: external-dns
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Prometheus metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring-system
+      ports:
+        - protocol: TCP
+          port: 7979
+  egress:
+    # DNS resolution via CoreDNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Kubernetes API server (k3s runs apiserver on host network)
+    - to:
+        - ipBlock:
+            cidr: 10.69.80.0/24
+      ports:
+        - protocol: TCP
+          port: 6443
+    # Unifi controller (default gateway)
+    - to:
+        - ipBlock:
+            cidr: 10.69.80.1/32
+      ports:
+        - protocol: TCP
+          port: 443

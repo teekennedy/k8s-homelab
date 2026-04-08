@@ -10,7 +10,11 @@ ntfy:
     topic: ENC[AES256_GCM,data:GqR7FYo1jbcvoGp9ggPqbg==,iv:58WySHO4oaXxH0i+Vkovf7lokz79V8X2JuWksftzEjw=,tag:+vhsplaf7XWcR8q6n7Nl2Q==,type:str]
 environment: ENC[AES256_GCM,data:t2cN5FxwWUGz8go=,iv:WcbnOVI4gIj0tW4BJgI8duRveo9XmuE7jtCNxGvcILo=,tag:PwAYpIM+XOCyH+mfUPFXjQ==,type:str]
 backup_bucket_name: ENC[AES256_GCM,data:aReIBq7TbXgjxdYWn3E=,iv:oRGBZ5hkAvBTpwCFIZQdKVi0YsV+GfRl1RhnR/q8DJw=,tag:qIwNZPQ9jO3QDbwn3LSqRg==,type:str]
-extra_secrets: {}
+extra_secrets:
+    unifi-api-key:
+        data:
+            api-key: ENC[AES256_GCM,data:w7/HOUvxcvYtT7I174k1xxHAC1ZFOFyJOma5GyO/IGs=,iv:+5Y8HDJlqvY4p+56VgHNfCVN0bylwnFRc72CC6DGUJ4=,tag:oNtJNIty6/6U8MPFtji89Q==,type:str]
+        namespace: ENC[AES256_GCM,data:UhC/r4AU4jBkPruD5op9ZbEOh2PO,iv:YN50Asmg/YNLptxudHHaYUpX1MFM0DnQlgtQfNVs/IY=,tag:X5GfE9i0GRDPaEgKckmDMQ==,type:str]
 sops:
     age:
         - recipient: age1ux6jahdtqlrcf3q5n0050vm2sr5qh66m388nfaamct6s643cspdqz8c40f
@@ -22,8 +26,8 @@ sops:
             cTNoWVM3ZEJBWEE4R01GcGxIQlR5WlkKuCetV8JZ9kk2heP504+m3V+xmqqgU65C
             X8lRgHS/BeTOWxMEcqQDfWlc8Gzm2+hqPSh0EaIuSzhdWGG8XXCh0w==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-01-20T04:24:03Z"
-    mac: ENC[AES256_GCM,data:uzjhz6LoiLyt00Z0y6pk/D11VttM2rd+gMFa5cB2WzIFt5v/tSYmIbgja+2iASX1CqvHYuWy+Sn5LSOP5b0+fRaZUShq7Au+OI7DW4Ub5mZaB0+I2f0qf4g9+Im5EFNsozPnny1xoban0XYmU6D4CYXURFZWIQYvyvnARWhSYcE=,iv:hRyaiz+iejM4sZORRPGlhizlKiqMh7moO/W4cDEalEI=,tag:vNHjz13p8PyJNdfMOSS0OA==,type:str]
+    lastmodified: "2026-04-08T04:08:49Z"
+    mac: ENC[AES256_GCM,data:JW5o1D4IDYdO+RkVFdtqIvSwwLrqrYdsR/mQadinHCXoNNzpGMgzsu63rvkz4/fRjVQdmsiWvDftbyYWQi66JrLKtdE4d086nnWn6t8fei1eRjrvXRWh13gNqwfdbAEOBwLCpDl14InriH4eKby3YHon61H2V8aD9O2E/wREK/I=,iv:cAy1unNKh4N60WRoLxlD0sXzWRVDAC9T7RoOdT9j1/U=,tag:skK1Cx1ss4dZh5swZCgFlg==,type:str]
     pgp:
         - created_at: "2024-12-02T02:33:51Z"
           enc: |-
@@ -37,4 +41,4 @@ sops:
             -----END PGP MESSAGE-----
           fp: FD5B1635F2218760E010601F4A6E1024D7BBE968
     unencrypted_suffix: _unencrypted
-    version: 3.11.0
+    version: 3.12.2

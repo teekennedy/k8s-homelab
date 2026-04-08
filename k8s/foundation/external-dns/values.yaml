@@ -8,8 +8,15 @@ external-dns:
         secretKeyRef:
           name: cloudflare-api-token
           key: value
+    - name: DEFAULT_TARGET
+      valueFrom:
+        configMapKeyRef:
+          name: ddns-public-ip
+          key: ip
   extraArgs:
-    - --annotation-filter=external-dns.alpha.kubernetes.io/exclude notin (true)
+    - "--default-targets=$(DEFAULT_TARGET)"
+    - "--force-default-targets"
+    - "--annotation-filter=traefik.ingress.kubernetes.io/router.entrypoints in (websecurepublic)"
   sources:
     - service
     - ingress
@@ -25,33 +32,14 @@ external-dns:
 ddnsUpdater:
   enabled: true
   image:
-    repository: ghcr.io/qdm12/ddns-updater
-    tag: v2.9.0
-  initContainer:
-    image:
-      repository: busybox
-      tag: 1.37.0
-  period: 5m
-  logLevel: info
-  timeZone: America/Denver
-  publicIp:
-    fetchers: http
-    ipv4HttpProviders: url:https://checkip.amazonaws.com
-  cloudflare:
-    domain: external.network.msng.to
-    ttl: 1
-    ipVersion: ipv4
-    proxied: false
-    zoneConfigMap:
-      name: cloudflare-zone
-      key: zone_id
-    tokenSecret:
-      name: cloudflare-api-token
-      key: value
+    repository: alpine/curl
+    tag: "8.12.1"
+  period: "300" # seconds
+  publicIpProvider: https://checkip.amazonaws.com
   resources:
     requests:
       cpu: 10m
-      memory: 64Mi
+      memory: 32Mi
     limits:
-      cpu: 125m
-      memory: 128Mi
+      cpu: 50m
+      memory: 64Mi

@@ -166,7 +166,7 @@ vlans:
   okta:
     name: "Okta"
     vlan_tag: 700
-    isolate_network: true
+    network_isolation: true
     subnet: 10.69.70.0/26 # 62 usable hosts
     dhcp:
       enabled: true
@@ -199,7 +199,7 @@ vlans:
       stop: 10.69.100.19
   roombas:
     name: "IoT Roombas"
-    isolate_network: true
+    network_isolation: true
     vlan_tag: 1004
     wifi_networks: ["kennedy_iot"]
     subnet: 10.69.100.128/27 # 30 usable hosts
