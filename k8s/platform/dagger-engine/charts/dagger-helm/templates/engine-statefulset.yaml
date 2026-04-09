@@ -1,0 +1,273 @@
+{{- if eq .Values.engine.kind "StatefulSet" -}}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "dagger.fullname" . }}-engine
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "dagger.labels" . | nindent 4 }}
+spec:
+  # DO NOT RUN MORE THAN 1 REPLICA IF USING HOSTPATH.
+  # Only one (1) Engine is able to hold the lock, other replicas will not be able to start.
+  # If using persistent volumes, this is not an issue. Use more than 1 replica if you know that you need it.
+  replicas: 1
+  podManagementPolicy: {{ .Values.engine.statefulSet.podManagementPolicy }}
+  selector:
+    matchLabels:
+      name: {{ include "dagger.fullname" . }}-engine
+  {{- if and .Values.engine.statefulSet.persistentVolumeClaim.enabled .Values.engine.statefulSet.persistentVolumeClaimRetentionPolicy }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ .Values.engine.statefulSet.persistentVolumeClaimRetentionPolicy.whenDeleted }}
+    whenScaled: {{ .Values.engine.statefulSet.persistentVolumeClaimRetentionPolicy.whenScaled }}
+  {{- end }}
+  template:
+    metadata:
+      {{- if (or .Values.engine.config .Values.engine.configJson .Values.magicache.enabled .Values.engine.annotations) }}
+      annotations:
+        {{- if (or .Values.engine.config .Values.engine.configJson) }}
+        checksum/config: {{ include (print $.Template.BasePath "/engine-config.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.magicache.enabled }}
+        checksum/secret: {{ include (print $.Template.BasePath "/magicache-secret.yaml") . | sha256sum }}
+        {{- end }}
+      {{- with .Values.engine.annotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      labels:
+        name: {{ include "dagger.fullname" . }}-engine
+        {{- include "dagger.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.engine.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.engine.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.engine.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 1001
+        fsGroup: 1001
+        fsGroupChangePolicy: "OnRootMismatch"
+      {{- if .Values.engine.shareProcessNamespace }}
+      shareProcessNamespace: true
+      {{- end }}
+      serviceAccountName: {{ include "dagger.serviceAccountName" . }}
+      {{- if .Values.engine.priorityClassName }}
+      priorityClassName: {{ .Values.engine.priorityClassName }}
+      {{- end }}
+      {{- with .Values.engine.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: dagger-engine
+          image: {{ if .Values.engine.image.ref }}{{ .Values.engine.image.ref }}{{ else }}registry.dagger.io/engine:v{{ .Chart.Version }}{{ end }}
+          imagePullPolicy: {{ .Values.engine.image.pullPolicy }}
+          # LOCAL PATCH: wrap the entrypoint to nest BuildKit child cgroups
+          # under the engine pod's own cgroup. K3s does not give privileged
+          # pods their own cgroup namespace, so the upstream dind-style
+          # cgroup setup in dagger-entrypoint.sh ends up touching the host
+          # root cgroup and runc creates child cgroups at /sys/fs/cgroup/buildkit/<id>,
+          # escaping the kubepods.slice memory limit.
+          # See https://github.com/dagger/dagger/discussions/12703
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              ENGINE_CGROUP=$(awk -F: '$1=="0"{print $3}' /proc/self/cgroup)
+              if [ -n "$ENGINE_CGROUP" ] && [ "$ENGINE_CGROUP" != "/" ] && [ -d "/sys/fs/cgroup$ENGINE_CGROUP" ]; then
+                POD_DIR="/sys/fs/cgroup$ENGINE_CGROUP"
+                echo "dagger-cgroup-fix: nesting buildkit children under $ENGINE_CGROUP" >&2
+                mkdir -p "$POD_DIR/init"
+                # Move existing processes (this shell, soon-to-be dagger) into the
+                # init leaf so the parent scope can have controllers in subtree_control.
+                while read -r pid; do
+                  [ -n "$pid" ] && echo "$pid" > "$POD_DIR/init/cgroup.procs" 2>/dev/null || true
+                done < "$POD_DIR/cgroup.procs"
+                sed -e 's/ / +/g' -e 's/^/+/' < "$POD_DIR/cgroup.controllers" \
+                  > "$POD_DIR/cgroup.subtree_control" 2>/dev/null || true
+                # Generate a config that points dagger at the pod scope as the
+                # buildkit cgroup parent. Spawned containers then end up at
+                # <pod-scope>/buildkit/<id> and inherit the pod memory.max.
+                mkdir -p /tmp/dagger-cgroup-fix
+                if [ -s /etc/dagger/engine.toml ]; then
+                  cp /etc/dagger/engine.toml /tmp/dagger-cgroup-fix/engine.toml
+                else
+                  : > /tmp/dagger-cgroup-fix/engine.toml
+                fi
+                printf '\n[worker.oci]\n  defaultCgroupParent = "%s"\n' "$ENGINE_CGROUP" \
+                  >> /tmp/dagger-cgroup-fix/engine.toml
+                CFG=/tmp/dagger-cgroup-fix/engine.toml
+              else
+                # cgroupns is in effect (or no cgroup v2). Fall back to the
+                # standard dind setup that the upstream entrypoint does.
+                if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+                  mkdir -p /sys/fs/cgroup/init
+                  xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+                  sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers \
+                    > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
+                fi
+                CFG=/etc/dagger/engine.toml
+              fi
+              ulimit -n 1048576 || echo "cannot increase open FDs with ulimit, ignoring" >&2
+              exec /usr/local/bin/dagger-engine --config "$CFG" "$@"
+            - dagger-engine
+          {{- if or .Values.engine.port .Values.engine.args }}
+          args:
+            {{- if .Values.engine.port }}
+            - "--addr"
+            - "tcp://0.0.0.0:{{ .Values.engine.port }}"
+            - "--addr"
+            - "unix:///run/dagger/engine.sock"
+            {{- end }}
+            {{- if .Values.engine.args }}
+            {{- toYaml .Values.engine.args | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if (or .Values.engine.env .Values.magicache.enabled) }}
+          env:
+            {{- if .Values.engine.env }}
+            {{- toYaml .Values.engine.env | nindent 12 }}
+            {{- end }}
+            {{- if .Values.magicache.enabled }}
+            - name: _EXPERIMENTAL_DAGGER_CACHESERVICE_URL
+              value: {{ required "A magicache url is required" .Values.magicache.url }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.magicache.enabled }}
+          envFrom:
+            - secretRef:
+              {{- if .Values.magicache.secretName }}
+              name: {{ .Values.magicache.secretName }}
+              {{- else }}
+              name: {{ include "dagger.fullname" . }}-magicache-token
+              {{- end }}
+          {{- end }}
+          {{- if or .Values.engine.containerPorts .Values.engine.port }}
+          ports:
+            {{- if .Values.engine.containerPorts }}
+            {{- range .Values.engine.containerPorts }}
+            - name: {{ .name }}
+              containerPort: {{ .containerPort }}
+              protocol: {{ .protocol | default "TCP" }}
+              {{- if .hostPort }}
+              hostPort: {{ .hostPort }}
+              {{- end }}
+            {{- end }}
+            {{- else if .Values.engine.port }}
+            - name: dagger
+              containerPort: {{ .Values.engine.port }}
+              protocol: TCP
+              {{- if .Values.engine.hostPort }}
+              hostPort: {{ .Values.engine.hostPort }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - ALL
+          resources: {{- toYaml .Values.engine.resources | nindent 12 }}
+          {{- if .Values.engine.lifecycle }}
+          lifecycle:
+            {{- if .Values.engine.lifecycle.preStop }}
+            preStop:
+              {{- toYaml .Values.engine.lifecycle.preStop | nindent 14 }}
+            {{- end }}
+          {{- end }}
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -exc
+                - |-
+                  dagger core version
+            {{- if .Values.engine.readinessProbeSettings }}
+            {{- toYaml .Values.engine.readinessProbeSettings | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -exc
+                - |-
+                  dagger core version
+            {{- if .Values.engine.livenessProbeSettings }}
+            {{- toYaml .Values.engine.livenessProbeSettings | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/dagger
+            {{- if .Values.engine.hostPath.runVolume.enabled }}
+            - name: run
+              mountPath: /run/dagger
+            {{- end }}
+            {{- if .Values.engine.config }}
+            - name: config
+              mountPath: /etc/dagger/engine.toml
+              subPath: engine.toml
+            {{- end }}
+            {{- if .Values.engine.configJson }}
+            - name: config
+              mountPath: /etc/dagger/engine.json
+              subPath: engine.json
+            {{- end }}
+            {{- with .Values.engine.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- with .Values.engine.sidecars }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.engine.terminationGracePeriodSeconds }}
+      volumes:
+        {{- if .Values.engine.hostPath.dataVolume.enabled }}
+        - name: data
+          hostPath:
+            path: /var/lib/dagger-{{ include "dagger.fullname" . }}
+        {{- end }}
+        {{- if .Values.engine.hostPath.runVolume.enabled }}
+        - name: run
+          hostPath:
+            path: /run/dagger-{{ include "dagger.fullname" . }}
+        {{- end }}
+        {{- if (or .Values.engine.config .Values.engine.configJson) }}
+        - name: config
+          configMap:
+            name: {{ include "dagger.fullname" . }}-engine-config
+            items:
+              {{- if .Values.engine.config }}
+              - key: engine.toml
+                path: engine.toml
+              {{- end }}
+              {{- if .Values.engine.configJson }}
+              - key: engine.json
+                path: engine.json
+              {{- end }}
+        {{- end }}
+        {{- with .Values.engine.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+  {{- if .Values.engine.statefulSet.persistentVolumeClaim.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      {{- with .Values.engine.statefulSet.persistentVolumeClaim.storageClassName }}
+      storageClassName: {{ . }}
+      {{- end }}
+      accessModes:
+        {{- toYaml .Values.engine.statefulSet.persistentVolumeClaim.accessModes | nindent 8 }}
+      resources:
+        {{- toYaml .Values.engine.statefulSet.persistentVolumeClaim.resources | nindent 8 }}
+  {{- end }}
+{{- end }}

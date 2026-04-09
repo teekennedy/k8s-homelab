@@ -4,6 +4,7 @@ ignore: |
   *.enc.yaml
   *.sops.yaml
   k8s/**/templates/**/*.yaml
+  k8s/**/charts/**
 extends: default
 rules:
   truthy:
