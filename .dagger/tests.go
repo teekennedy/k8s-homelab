@@ -91,3 +91,37 @@ func (m *Homelab) TestBuildHelmWithDeps(ctx context.Context) (string, error) {
 
 	return "BuildHelmWithDeps integration test passed: " + result, nil
 }
+
+// TestHelmChartValidate tests per-chart validation.
+func (m *Homelab) TestHelmChartValidate(ctx context.Context) (string, error) {
+	source := testChartSource()
+
+	hc := &HelmChart{
+		Path:   "k8s/apps/test-app",
+		Source: source.Directory("k8s/apps/test-app"),
+	}
+
+	result, err := hc.Validate(ctx)
+	if err != nil {
+		return "", fmt.Errorf("HelmChart.Validate test failed: %w", err)
+	}
+
+	return "HelmChart.Validate test passed: " + result, nil
+}
+
+// TestHelmChartBuild tests per-chart template rendering.
+func (m *Homelab) TestHelmChartBuild(ctx context.Context) (string, error) {
+	source := testChartSource()
+
+	hc := &HelmChart{
+		Path:   "k8s/apps/test-app",
+		Source: source.Directory("k8s/apps/test-app"),
+	}
+
+	result, err := hc.Build(ctx)
+	if err != nil {
+		return "", fmt.Errorf("HelmChart.Build test failed: %w", err)
+	}
+
+	return "HelmChart.Build test passed: " + result, nil
+}

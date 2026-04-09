@@ -11,6 +11,39 @@ This module is **independent of the lab CLI** to avoid circular dependencies:
 
 See `../docs/ci-architecture.md` for details.
 
+### Per-Project Module Pattern
+
+Language-specific checks are organized into **per-project module structs** that
+maximize cache granularity. Each struct (GoModule, PythonProject, HelmChart,
+TerraformModule) carries a scoped source directory containing only its project's
+files. This enables two levels of caching:
+
+- **Layer 2 (Dagger function call cache)**: `dagger check test-go` caches the
+  entire TestGo result. If the filtered source (all `**/*.go` files) hasn't
+  changed, the check returns instantly (~0.5s).
+
+- **Layer 1 (BuildKit content-addressed cache)**: Within the per-module calls
+  (`dagger call go-modules test`), each module's Test() runs against a scoped
+  subdirectory. Unchanged modules hit the BuildKit exec cache while only changed
+  modules re-run.
+
+The combination means:
+- `dagger check` re-runs the fewest checks possible for any given file change
+- `dagger call <type> <method>` re-tests only the changed projects within a type
+
+### File Organization
+
+| File | Contents |
+|---|---|
+| `main.go` | Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions |
+| `golang.go` | GoModule struct, per-module Test/Lint, aggregate LintGo/TestGo/FormatGo |
+| `python.go` | PythonProject struct, per-project Test/Lint, aggregate LintPython/TestPython/FormatPython |
+| `helm.go` | HelmChart struct, per-chart Validate/Build, aggregate ValidateHelm/BuildHelm |
+| `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
+| `containers.go` | Container image constants and helpers |
+| `paths.go` | Path filtering utilities |
+| `tests.go` | Integration tests |
+
 ## Setup
 
 ### First Time Setup
@@ -30,10 +63,10 @@ See `../docs/ci-architecture.md` for details.
    # List available functions
    dagger functions
 
-   # Should show: build-cli, lint, validate, etc.
+   # Should show: build-cli, go-modules, python-projects, helm-charts, etc.
    ```
 
-### After Updating main.go
+### After Updating Go Files
 
 Run `dagger develop` to regenerate SDK bindings.
 
@@ -62,6 +95,21 @@ dagger check 'validate*'
 # Run a specific check
 dagger check lint-nix
 dagger check build-helm
+
+# Per-project operations (maximum cache granularity)
+dagger call go-modules test           # Test each Go module independently
+dagger call go-modules lint           # Lint each Go module independently
+dagger call python-projects test      # Test each Python project independently
+dagger call python-projects lint      # Lint each Python project independently
+dagger call helm-charts validate      # Validate each Helm chart independently
+dagger call helm-charts build         # Render each Helm chart independently
+dagger call terraform-modules validate # Validate each Terraform module independently
+
+# List discovered projects
+dagger call go-modules                # Show all Go modules
+dagger call python-projects           # Show all Python projects
+dagger call helm-charts               # Show all Helm charts
+dagger call terraform-modules         # Show all Terraform modules
 
 # Auto-apply formatting fixes (use format-* functions, not check)
 dagger call format-nix --auto-apply
@@ -92,19 +140,43 @@ lab ci validate      # Run all validate* checks
 All check functions use pre-call filtering for optimal caching. Only relevant files are included.
 Functions annotated with `// +check` can be run via `dagger check`.
 
-### Checks
+### Per-Project Module Types
+
+#### GoModule
+Discovered automatically from `go.mod` files. Each module gets a scoped source directory.
+- `Test()` - Run `go test` for this module (`+check`)
+- `Lint()` - Run `go vet` and `go fmt` for this module (`+check`)
+
+#### PythonProject
+Discovered automatically from `pyproject.toml` files.
+- `Test()` - Run `pytest` for this project (`+check`)
+- `Lint()` - Run `black --check` for this project (`+check`)
+- `Format()` - Format with `black`, returning the formatted directory
+
+#### HelmChart
+Discovered automatically from `Chart.yaml` files under `k8s/`.
+- `Validate()` - Run `helm lint` for this chart (`+check`)
+- `Build()` - Run `helm template` for this chart (`+check`)
+
+#### TerraformModule
+Discovered automatically from `.tf` files under `terraform/`.
+Uses the full `terraform/` directory as source since modules can reference
+siblings via relative paths (e.g., `../k8s-secret`).
+- `Validate()` - Run `tofu init` + `tofu validate` for this module (`+check`)
+
+### Top-Level Checks
 
 #### Lint Checks
 - `LintNix(source, paths)` - Nix formatting and dead code validation
   - Filters: `**/*.nix`
   - Tools: `deadnix`, `alejandra`
   - Fix: `dagger call format-nix --auto-apply`
-- `LintGo(source)` - Go linting and formatting validation
+- `LintGo(source)` - Go linting and formatting validation (delegates to GoModule.Lint)
   - Tools: `go vet`, `go fmt`
   - Fix: `dagger call format-go --auto-apply`
 - `LintCue(source, paths)` - CUE validation
   - Filters: `config/**/*.cue`
-- `LintPython(source, paths)` - Python formatting validation
+- `LintPython(source, paths)` - Python formatting validation (delegates to PythonProject.Lint)
   - Tools: `black`
   - Fix: `dagger call format-python --auto-apply`
 - `LintYaml(source, paths)` - YAML linting
@@ -113,9 +185,9 @@ Functions annotated with `// +check` can be run via `dagger check`.
 #### Validate Checks
 - `ValidateNix(source)` - Nix flake check
   - Filters: `flake.nix`, `flake.lock`, `nix/**/*`
-- `ValidateHelm(source, paths)` - Helm chart validation
+- `ValidateHelm(source, paths)` - Helm chart validation (delegates to HelmChart.Validate)
   - Filters: `k8s/**/*`
-- `ValidateTerraform(source, paths)` - Terraform/OpenTofu validation
+- `ValidateTerraform(source, paths)` - Terraform/OpenTofu validation (delegates to TerraformModule.Validate)
   - Filters: `terraform/**/*`
 - `ValidateWoodpecker(source, paths)` - Woodpecker CI pipeline validation
   - Filters: `.woodpecker/*.yaml`
@@ -123,12 +195,12 @@ Functions annotated with `// +check` can be run via `dagger check`.
 #### Build Checks
 - `BuildCli(source)` - Build lab CLI (using Nix)
   - Filters: `cmd/lab/**/*`
-- `BuildHelm(source, paths)` - Render Helm templates
+- `BuildHelm(source, paths)` - Render Helm templates (delegates to HelmChart.Build)
   - Filters: `k8s/**/*`
 
 #### Test Checks
-- `TestGo(source, paths)` - Run Go tests
-- `TestPython(source, paths)` - Run Python tests with pytest
+- `TestGo(source, paths)` - Run Go tests (delegates to GoModule.Test)
+- `TestPython(source, paths)` - Run Python tests (delegates to PythonProject.Test)
 
 ### Format Functions (auto-apply)
 - `FormatNix(source, paths)` - Format Nix files (`dagger call format-nix --auto-apply`)
@@ -141,6 +213,43 @@ Functions annotated with `// +check` can be run via `dagger check`.
 - `CliNix(source)` - Get lab binary (Nix build)
 
 ## Caching & Performance
+
+### Two-Layer Caching Model
+
+Dagger provides two layers of caching that work together:
+
+**Layer 2 — Dagger function call cache**: Caches the return value of a Dagger
+function based on the function identity and its arguments (including source
+directory content hash). When `dagger check test-go` runs and the filtered Go
+source hasn't changed, the entire TestGo result is returned from cache (~0.5s).
+
+**Layer 1 — BuildKit content-addressed cache**: Caches individual container
+operations (exec, mount, copy) based on the content of their inputs. When
+`dagger call go-modules test` runs, each GoModule.Test() independently checks
+the BuildKit cache. Modules with unchanged source directories hit the cache
+while only changed modules re-execute.
+
+### How Caching Interacts with the Module Pattern
+
+The per-project module pattern maximizes cache efficiency:
+
+```
+dagger check test-go
+├─ Layer 2 cache hit? → Return cached result (0.5s)
+└─ Layer 2 cache miss → TestGo() runs:
+   ├─ GoModule{.dagger}.Test()       → Layer 1 cache hit (unchanged)
+   ├─ GoModule{cmd/lab}.Test()       → Layer 1 cache MISS (file changed)
+   ├─ GoModule{homepage/...}.Test()  → Layer 1 cache hit (unchanged)
+   └─ GoModule{gitea/...}.Test()     → Layer 1 cache hit (unchanged)
+```
+
+```
+dagger call go-modules test
+├─ GoModule{.dagger}.Test()       → Layer 1 cache hit (unchanged)
+├─ GoModule{cmd/lab}.Test()       → Layer 1 cache MISS (file changed)
+├─ GoModule{homepage/...}.Test()  → Layer 1 cache hit (unchanged)
+└─ GoModule{gitea/...}.Test()     → Layer 1 cache hit (unchanged)
+```
 
 ### Pre-Call Filtering (`+ignore`)
 
@@ -164,8 +273,20 @@ an unrelated file and verifying the check uses its cache.
 - ✅ `BuildCli()` cache invalidates (includes `cmd/lab/**/*`)
 - ❌ `LintNix()` cache remains valid (only includes `**/*.nix`)
 - ❌ `LintYaml()` cache remains valid (only includes `**/*.yaml`)
+- And within LintGo(), only the `cmd/lab` GoModule re-lints (Layer 1)
 
-### Cache Behavior
+### Per-Project Source Scoping
+
+Each module type scopes its source differently based on project characteristics:
+
+| Type | Source Scope | Reason |
+|---|---|---|
+| GoModule | Per-module directory | Go modules are self-contained |
+| PythonProject | Per-project directory | Python projects are self-contained |
+| HelmChart | Per-chart directory | Charts are self-contained (deps fetched from registries) |
+| TerraformModule | Full `terraform/` directory | Modules reference siblings via relative paths |
+
+### Cache Behavior Examples
 
 ```bash
 # First run - runs all checks
@@ -175,9 +296,13 @@ dagger check
 echo "# comment" >> nix/hosts/common/default.nix
 dagger check  # Only LintNix + ValidateNix re-run
 
-# Change Go code - only Go checks re-run
+# Change Go code in one module - only that module re-tests
 echo "// comment" >> cmd/lab/main.go
-dagger check  # Only LintGo + BuildCli + TestGo re-run
+dagger check  # LintGo + TestGo re-run, but only cmd/lab module actually re-executes
+
+# Change a Python file in one project
+echo "# comment" >> k8s/foundation/kured/files/kured-webhook/server.py
+dagger call python-projects test  # Only kured-webhook project re-tests
 ```
 
 ## Development
@@ -265,6 +390,39 @@ remove code) before cosmetic tools (that reformat):
 Same principle applies to other language stacks: run linters that modify structure
 before formatters that fix style.
 
+### Per-Project Module Pattern
+
+When adding a new language/tool type, follow this pattern:
+
+1. **Define the struct** with `Path` and `Source` fields:
+   ```go
+   type FooProject struct {
+       Path   string
+       Source *dagger.Directory
+   }
+   ```
+
+2. **Add a discovery method** on Homelab that returns scoped instances:
+   ```go
+   func (m *Homelab) FooProjects(source *dagger.Directory) []*FooProject {
+       // Use source.Directory(path) to scope each project
+   }
+   ```
+
+3. **Add per-project methods** with `+check`:
+   ```go
+   func (fp *FooProject) Test(ctx context.Context) (string, error) { ... }
+   ```
+
+4. **Add aggregate top-level methods** for `dagger check`:
+   ```go
+   func (m *Homelab) TestFoo(ctx context.Context, source *dagger.Directory) (string, error) {
+       // Iterate and delegate to per-project methods with errgroup
+   }
+   ```
+
+5. **Update the constructor** to discover projects at init time.
+
 ### Validation-Only Pattern
 
 For checks that only validate without modifying files (e.g., `go vet`, `helm lint`,
@@ -286,7 +444,7 @@ func (m *Homelab) ValidateFoo(ctx context.Context, source *dagger.Directory) (st
 
 ### Adding New Functions
 
-1. Add function to `main.go` with appropriate filters:
+1. Add function to the appropriate file with `+ignore` filters:
    ```go
    func (m *Homelab) MyNewFunction(
        ctx context.Context,
@@ -344,9 +502,25 @@ Ensure Docker is running:
 docker info
 ```
 
+### Terraform validation failures
+Some Terraform modules may fail validation due to:
+- Lock file version mismatches (fix with `tofu init -upgrade` locally)
+- Missing variable declarations
+- Cross-module reference issues
+
+These are surfaced honestly now — the previous implementation suppressed all
+Terraform errors with `|| true`.
+
 ## Files
 
-- `main.go` - Main module implementation
+- `main.go` - Main module: Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions
+- `golang.go` - GoModule struct and Go-specific functions
+- `python.go` - PythonProject struct and Python-specific functions
+- `helm.go` - HelmChart struct and Helm-specific functions
+- `terraform.go` - TerraformModule struct and Terraform-specific functions
+- `containers.go` - Container image constants and helpers
+- `paths.go` - Path filtering utilities
+- `tests.go` - Integration tests
 - `go.mod` - Go module dependencies (Dagger SDK)
 - `internal/` - Auto-generated Dagger SDK (gitignored)
 - `dagger.gen.go` - Auto-generated type definitions (gitignored)
