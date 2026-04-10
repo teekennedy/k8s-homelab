@@ -13,10 +13,10 @@ dagger-helm:
     kind: StatefulSet
     resources:
       limits:
-        cpu: "4"
+        cpu: "6"
         memory: 8Gi
       requests:
-        cpu: "4"
+        cpu: "6"
         memory: 8Gi
     # use PVC instead of host path for data volume
     hostPath:
