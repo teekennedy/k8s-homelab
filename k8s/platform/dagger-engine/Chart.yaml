@@ -1,8 +1,8 @@
 apiVersion: v2
 name: dagger-engine
-version: 0.0.1
+version: 0.0.2
 appVersion: 0.20.3
 dependencies:
   - name: dagger-helm
-    version: 0.20.3
+    version: 0.20.5
     repository: oci://registry.dagger.io
