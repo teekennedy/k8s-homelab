@@ -19,7 +19,7 @@ spec:
       expr: qbittorrent_global_upload_speed_bytes == 0
       for: 24h
       labels:
-        issue: QBittorrent has not uploaded data for over 1 hour
+        issue: QBittorrent has not uploaded data for over 1 day
         severity: warning
     - alert: QBittorrentMetricsDown
       annotations:
