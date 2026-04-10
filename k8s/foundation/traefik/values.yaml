@@ -15,6 +15,57 @@ traefik:
     podDisruptionBudget:
       enabled: true
       minAvailable: 1
+    # Fetch the CrowdSec bouncer plugin into a local volume at pod startup so
+    # Traefik doesn't need to download it from plugins.traefik.io on every
+    # start. A cold cluster restart caused plugins.traefik.io to be unreachable
+    # for 2/3 traefik pods, which disabled plugins for the pod's lifetime and
+    # broke every router on the websecurepublic entrypoint (the bouncer is its
+    # default middleware).
+    additionalVolumes:
+      - name: plugins-local
+        emptyDir: {}
+      # Writable /tmp for the plugin-fetch initContainer (its rootfs is RO)
+      - name: plugin-fetch-tmp
+        emptyDir: {}
+    initContainers:
+      - name: fetch-crowdsec-bouncer-plugin
+        image: alpine/git:2.47.2
+        # HOME defaults to /root which we can't write to (non-root user + RO rootfs).
+        # Point git at /tmp (a writable emptyDir) for its config dotfiles.
+        env:
+          - name: HOME
+            value: /tmp
+        command:
+          - sh
+          - -c
+          - |
+            set -eu
+            PLUGIN_VERSION=v1.5.0
+            PLUGIN_DIR=/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+            for attempt in 1 2 3 4 5; do
+              rm -rf "$PLUGIN_DIR"
+              mkdir -p "$(dirname "$PLUGIN_DIR")"
+              if git clone --depth 1 --branch "$PLUGIN_VERSION" \
+                   https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin.git \
+                   "$PLUGIN_DIR"; then
+                echo "plugin cloned on attempt $attempt"
+                exit 0
+              fi
+              echo "clone attempt $attempt failed, retrying in 5s..."
+              sleep 5
+            done
+            echo "failed to clone crowdsec-bouncer plugin after 5 attempts" >&2
+            exit 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          readOnlyRootFilesystem: true
+        volumeMounts:
+          - name: plugins-local
+            mountPath: /plugins-local
+          - name: plugin-fetch-tmp
+            mountPath: /tmp
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname
@@ -22,6 +73,17 @@ traefik:
       labelSelector:
         matchLabels:
           app.kubernetes.io/name: traefik
+  # Required so the non-root plugin-fetch initContainer can write to its
+  # emptyDir volumes (plugins-local and /tmp). The chart's default
+  # podSecurityContext runs everything as uid/gid 65532 but doesn't set
+  # fsGroup, leaving added emptyDirs owned root:root.
+  podSecurityContext:
+    runAsGroup: 65532
+    runAsNonRoot: true
+    runAsUser: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
   nodeSelector:
     node-role.kubernetes.io/control-plane: "true"
   ports:
@@ -60,12 +122,19 @@ traefik:
       exposedPort: 9101
       protocol: TCP
 
-  # Enable experimental plugins for CrowdSec bouncer
+  # Use local plugin mode for the CrowdSec bouncer. The plugin source is
+  # fetched by the `fetch-crowdsec-bouncer-plugin` initContainer above into a
+  # shared emptyDir volume (`plugins-local`), which the chart auto-mounts on
+  # the Traefik container via the `type: localPath` config below. Traefik
+  # then reads the plugin source from /plugins-local/src/<moduleName> instead
+  # of downloading from plugins.traefik.io on every startup.
   experimental:
-    plugins:
+    localPlugins:
       crowdsec-bouncer:
+        type: localPath
         moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-        version: "v1.5.0"
+        volumeName: plugins-local
+        mountPath: /plugins-local
 
   # Enable access logs for CrowdSec agent to parse
   logs:
