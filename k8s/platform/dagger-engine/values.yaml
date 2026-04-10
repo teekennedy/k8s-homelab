@@ -30,4 +30,4 @@ dagger-helm:
         accessModes: [ReadWriteOnce]
         resources:
           requests:
-            storage: 20Gi
+            storage: 80Gi
