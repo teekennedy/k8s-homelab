@@ -15,10 +15,15 @@ kured:
     period: "3m0s"
     rebootCommand: "/run/current-system/sw/bin/systemctl reboot"
     alertFilterRegexp: "^(KubeVersionMismatch|LonghornVolumeActualSpaceUsedWarning|LonghornNodeStorageWarning|LonghornDiskStorageWarning|CPUThrottlingHigh)$"
+    # Only firing alerts should block reboot
+    alertFiringOnly: true
     # Give drain operation up to 30 minutes to complete (for Longhorn replica evacuation)
     drainTimeout: "30m"
-    # Keep trying to evict pods for up to 30 minutes before giving up
+    # Keep trying to evict pods for up to 30 minutes before timeout
     skipWaitForDeleteTimeoutSeconds: 1800
+    # If a drain fails or times out, force a reboot instead of giving up.
+    # This prevents the node from continuing to run when it has been marked unschedulable in Longhorn.
+    forceReboot: true
 
 webhook:
   enabled: true
