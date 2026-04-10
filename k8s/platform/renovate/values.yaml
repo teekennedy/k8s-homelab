@@ -18,7 +18,7 @@ renovate:
         # -- Storage class of the cache PVC
         storageClass: longhorn
         # -- Storage size of the cache PVC
-        storageSize: "10Gi"
+        storageSize: "20Gi"
         # -- Labels to set on the cache PVC
         labels:
           recurring-job.longhorn.io/source: "enabled"
