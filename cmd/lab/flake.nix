@@ -20,7 +20,7 @@
           pname = "lab";
           version = "0.1.0";
           src = ./.;
-          vendorHash = "sha256-D5eo2VtFMFuvN9v9IoeObSvwEFac1nHrg6ZVqCB0FXs=";
+          vendorHash = "sha256-koZgyB7azdYFzZvIGF8K45/g8MN/jS91pYWCjX+7Cl4=";
 
           # Install shell completions
           postInstall = ''
