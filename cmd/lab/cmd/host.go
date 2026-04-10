@@ -211,7 +211,7 @@ Uses nvd (nix-visualize-derivation) to show a human-readable diff.`,
 				if !jsonOutput {
 					fmt.Println("No changes - system is up to date")
 				} else {
-					result := map[string]interface{}{
+					result := map[string]any{
 						"host":    hostname,
 						"changed": false,
 					}
@@ -219,6 +219,19 @@ Uses nvd (nix-visualize-derivation) to show a human-readable diff.`,
 					fmt.Println(string(out))
 				}
 				return nil
+			}
+
+			if !jsonOutput {
+				fmt.Printf("Fetching current system closure from %s...\n", hostname)
+			}
+			copyCmd := exec.Command("nix", "copy",
+				"--from", "ssh://"+hostname,
+				"--no-check-sigs",
+				currentPath)
+			copyCmd.Stdout = os.Stderr
+			copyCmd.Stderr = os.Stderr
+			if err := copyCmd.Run(); err != nil {
+				return fmt.Errorf("copy current system closure from %s: %w", hostname, err)
 			}
 
 			if !jsonOutput {

@@ -2,7 +2,7 @@
   description = "teekennedy's homelab";
   inputs = {
     deploy-rs.url = "github:serokell/deploy-rs?ref=master";
-    deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
+    # deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules?ref=main";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     disko.url = "github:nix-community/disko?ref=master";
