@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubernetes-api-lb
+  namespace: kube-system
+  annotations:
+    metallb.universe.tf/address-pool: internal
+spec:
+  type: LoadBalancer
+  loadBalancerClass: metallb
+  loadBalancerIP: 10.69.80.101
+  ports:
+    - name: https
+      port: 6443
+      protocol: TCP
+      targetPort: 6443
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: kubernetes-api-lb-1
+  namespace: kube-system
+  labels:
+    kubernetes.io/service-name: kubernetes-api-lb
+addressType: IPv4
+endpoints:
+  - addresses:
+      - 10.69.80.10
+    conditions:
+      ready: true
+  - addresses:
+      - 10.69.80.12
+    conditions:
+      ready: true
+  - addresses:
+      - 10.69.80.13
+    conditions:
+      ready: true
+ports:
+  - name: https
+    port: 6443
+    protocol: TCP

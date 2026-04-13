@@ -15,9 +15,6 @@
     # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
     networking.firewall.allowedTCPPorts = lib.mkMerge [
       [
-        # Traefik ingress controller
-        80
-        443
         # k3s embedded registry mirror and kubernetes API server
         6443
         # k3s, etcd clients: required if using a "High Availability Embedded etcd" configuration
@@ -28,8 +25,6 @@
         2381
         # prometheus node exporter
         9100
-        # traefik metrics
-        9101
         # MetalLB speaker memberlist gossip
         7946
         # Kube proxy metrics
@@ -67,6 +62,12 @@
           # Disable k3s built-in Traefik; managed by ArgoCD instead
           "--disable"
           "traefik"
+          # Disable k3s built-in ServiceLB; MetalLB handles all load balancing
+          "--disable"
+          "servicelb"
+          # Add the MetalLB API VIP to the API server TLS certificate
+          "--tls-san"
+          "10.69.80.101"
           # enable secrets encryption
           # This _must_ be enabled when cluster is first initialized. It cannot be enabled later.
           # https://docs.k3s.io/cli/secrets-encrypt

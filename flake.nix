@@ -80,7 +80,7 @@
 
                 services.k3s = {
                   role = "server";
-                  serverAddr = "https://10.69.80.10:6443";
+                  serverAddr = "https://10.69.80.101:6443";
                 };
               })
             ];
@@ -107,7 +107,7 @@
 
                 services.k3s = {
                   role = "server";
-                  serverAddr = "https://10.69.80.10:6443";
+                  serverAddr = "https://10.69.80.101:6443";
                 };
               })
             ];
