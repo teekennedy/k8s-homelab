@@ -8,8 +8,12 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   podSelector:
-    matchLabels:
-      app.kubernetes.io/name: external-dns
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - external-dns
+          - external-dns-public
   policyTypes:
     - Ingress
     - Egress
