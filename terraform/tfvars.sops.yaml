@@ -14,7 +14,7 @@ extra_secrets:
     unifi-api-key:
         data:
             api-key: ENC[AES256_GCM,data:w7/HOUvxcvYtT7I174k1xxHAC1ZFOFyJOma5GyO/IGs=,iv:+5Y8HDJlqvY4p+56VgHNfCVN0bylwnFRc72CC6DGUJ4=,tag:oNtJNIty6/6U8MPFtji89Q==,type:str]
-        namespace: ENC[AES256_GCM,data:UhC/r4AU4jBkPruD5op9ZbEOh2PO,iv:YN50Asmg/YNLptxudHHaYUpX1MFM0DnQlgtQfNVs/IY=,tag:X5GfE9i0GRDPaEgKckmDMQ==,type:str]
+        namespace: ENC[AES256_GCM,data:oWwC/vfPSWcENqFM,iv:4T6kiuU1pCg0UtCfaGysRdqnZnSwhE5zGAo0Xn2nByc=,tag:soUVEEx606ExjJmTnUSzWg==,type:str]
 sops:
     age:
         - recipient: age1ux6jahdtqlrcf3q5n0050vm2sr5qh66m388nfaamct6s643cspdqz8c40f
@@ -26,8 +26,8 @@ sops:
             cTNoWVM3ZEJBWEE4R01GcGxIQlR5WlkKuCetV8JZ9kk2heP504+m3V+xmqqgU65C
             X8lRgHS/BeTOWxMEcqQDfWlc8Gzm2+hqPSh0EaIuSzhdWGG8XXCh0w==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-04-08T04:08:49Z"
-    mac: ENC[AES256_GCM,data:JW5o1D4IDYdO+RkVFdtqIvSwwLrqrYdsR/mQadinHCXoNNzpGMgzsu63rvkz4/fRjVQdmsiWvDftbyYWQi66JrLKtdE4d086nnWn6t8fei1eRjrvXRWh13gNqwfdbAEOBwLCpDl14InriH4eKby3YHon61H2V8aD9O2E/wREK/I=,iv:cAy1unNKh4N60WRoLxlD0sXzWRVDAC9T7RoOdT9j1/U=,tag:skK1Cx1ss4dZh5swZCgFlg==,type:str]
+    lastmodified: "2026-04-14T03:17:22Z"
+    mac: ENC[AES256_GCM,data:u9NHzlozVVM4Aop5iGWtdYTxfrYicy3W2tMU4UuVz7B8O+oMt2vnIGKWod7pivQ/Fjbo9DwcxnBwYXIgdSR9xomPJMazgG0ROFjFuN7mrtpcMmfwRin0khYl6xx1ryRORI+QaNFqFTw7pUWLTEg/2uo+YE3cceY2LZ76j8g8010=,iv:5SFMoH7oAm8tGI7EPkHUsl/r+P6MWLD3XVr47F+ZPGQ=,tag:4KOvw1UU0ThhfvomUv8nRA==,type:str]
     pgp:
         - created_at: "2024-12-02T02:33:51Z"
           enc: |-
