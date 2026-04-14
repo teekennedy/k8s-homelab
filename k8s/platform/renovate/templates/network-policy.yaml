@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: renovate
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: renovate
+  policyTypes:
+    - Ingress
+    - Egress
+  # No ingress needed - renovate is a batch job
+  ingress: []
+  egress:
+    # DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # HTTPS egress to registries, APIs, and Gitea
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

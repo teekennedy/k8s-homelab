@@ -1,6 +1,6 @@
 apiVersion: v2
 name: renovate
-version: 0.0.25
+version: 0.1.0
 dependencies:
   - name: renovate
     version: 46.106.8

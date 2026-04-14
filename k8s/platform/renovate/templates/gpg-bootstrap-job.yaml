@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: renovate-gpg-bootstrap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: renovate-gpg-bootstrap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: renovate-gpg-bootstrap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+subjects:
+  - kind: ServiceAccount
+    name: renovate-gpg-bootstrap
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: renovate-gpg-bootstrap
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: renovate-gpg-bootstrap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: renovate-gpg-bootstrap
+      restartPolicy: Never
+      containers:
+        - name: gpg-bootstrap
+          image: alpine/k8s:1.32.3
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+
+              SECRET_NAME="renovate-gpg-key"
+
+              # Check if the secret already exists
+              if kubectl get secret "$SECRET_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+                echo "Secret $SECRET_NAME already exists, skipping GPG key generation"
+                exit 0
+              fi
+
+              echo "Generating GPG key for Renovate commit signing..."
+
+              # Install gpg
+              apk add --no-cache gnupg >/dev/null 2>&1
+
+              # Generate GPG key (non-interactive)
+              cat > /tmp/gpg-batch <<EOF
+              %no-protection
+              Key-Type: RSA
+              Key-Length: 4096
+              Subkey-Type: RSA
+              Subkey-Length: 4096
+              Name-Real: Renovate Bot
+              Name-Email: bot@renovateapp.com
+              Expire-Date: 0
+              EOF
+
+              gpg --batch --gen-key /tmp/gpg-batch
+
+              # Export the private key (ASCII armored)
+              GPG_PRIVATE_KEY=$(gpg --armor --export-secret-keys bot@renovateapp.com)
+
+              # Create the k8s secret
+              kubectl create secret generic "$SECRET_NAME" \
+                -n "$NAMESPACE" \
+                --from-literal=GPG_PRIVATE_KEY="$GPG_PRIVATE_KEY"
+
+              echo "GPG key generated and stored in secret $SECRET_NAME"
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace

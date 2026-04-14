@@ -21,6 +21,10 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
+      name: renovate-gpg-key
+    - jsonPointers:
+        - /data
+      kind: Secret
       name: lldap-authelia-bind-user
       namespace: auth-system
     - jsonPointers:

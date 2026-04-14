@@ -2,6 +2,8 @@ renovate:
   cronjob:
     schedule: '0 9 * * *'  # Everyday at 09:00
     ttlSecondsAfterFinished: 259200 # 3 days
+    concurrencyPolicy: Forbid
+    jobBackoffLimit: 1
   renovate:
     config: |
       {
@@ -15,14 +17,20 @@ renovate:
       cache:
         # -- Allow the cache to persist between runs
         enabled: true
-        # -- Storage class of the cache PVC
-        storageClass: longhorn
+        # -- Storage class of the cache PVC (single replica is fine for cache)
+        storageClass: longhorn-rc1
         # -- Storage size of the cache PVC
         storageSize: "20Gi"
         # -- Labels to set on the cache PVC
         labels:
           recurring-job.longhorn.io/source: "enabled"
           recurring-job-group.longhorn.io/ephemeral: "enabled"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
   env:
     LOG_LEVEL: debug
   envList:
@@ -41,3 +49,10 @@ renovate:
         secretKeyRef:
           name: renovate-gitea-user
           key: token
+    # GPG commit signing key (bootstrapped by gpg-bootstrap-job)
+    - name: RENOVATE_GIT_PRIVATE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: renovate-gpg-key
+          key: GPG_PRIVATE_KEY
+          optional: true

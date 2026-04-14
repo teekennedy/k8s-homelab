@@ -5,6 +5,8 @@
     "security:openssf-scorecard"
   ],
   "bumpVersion": "patch",
+  "minimumReleaseAge": "7 days",
+  "rebaseWhen": "behind-base-branch",
   "prHourlyLimit": 12,
   "customManagers": [
     {
@@ -29,19 +31,6 @@
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "argoproj/argo-cd",
       "extractVersionTemplate": "^v(?<version>.*)$"
-    },
-    {
-      "description": "Sync Dashy appVersion with GitHub releases",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "k8s/apps/dashy/Chart.yaml"
-      ],
-      "matchStrings": [
-        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "lissy93/dashy",
-      "extractVersionTemplate": "^(?<version>.*)$"
     },
     {
       "description": "Sync Jellyfin appVersion with GitHub releases",
@@ -514,6 +503,54 @@
       "sourceUrl": "https://github.com/qbittorrent/qBittorrent",
       "matchPackageNames": [
         "/^(?:gh|ls)cr\\.io/linuxserver/qbittorrent$/"
+      ]
+    },
+    {
+      "description": "Automerge minor/patch updates for trusted packages",
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchPackageNames": [
+        "renovate",
+        "ghcr.io/donkie/spoolman",
+        "Donkie/Spoolman",
+        "homepage",
+        "ghcr.io/gethomepage/homepage",
+        "intel-device-plugins-operator",
+        "intel-device-plugins-gpu",
+        "intel/intel-device-plugins-for-kubernetes",
+        "kured",
+        "kubereboot/kured",
+        "cert-manager",
+        "trust-manager",
+        "step-certificates",
+        "step-issuer",
+        "cr.step.sm/smallstep/step-ca",
+        "cr.step.sm/smallstep/step-issuer",
+        "external-dns",
+        "ghcr.io/kashalls/external-dns-unifi-webhook",
+        "node-feature-discovery",
+        "kubernetes-sigs/node-feature-discovery",
+        "dagger-helm",
+        "kube-prometheus-stack",
+        "ghcr.io/teekennedy/prometheus-operator",
+        "woodpecker",
+        "victoria-metrics-single",
+        "ghcr.io/passivelemon/terraria-docker",
+        "app-template",
+        "ghcr.io/jellyfin/jellyfin",
+        "jellyfin/jellyfin",
+        "docker.io/fallenbagel/jellyseerr",
+        "lscr.io/linuxserver/prowlarr",
+        "lscr.io/linuxserver/radarr",
+        "lscr.io/linuxserver/sonarr",
+        "ghcr.io/unpackerr/unpackerr",
+        "lscr.io/linuxserver/qbittorrent",
+        "docker.io/qmcgaw/gluetun",
+        "ghcr.io/raydak-labs/configarr"
       ]
     }
   ]
