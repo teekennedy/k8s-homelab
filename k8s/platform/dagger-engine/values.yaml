@@ -28,6 +28,9 @@ dagger-helm:
         enabled: true
         storageClassName: longhorn-rc1
         accessModes: [ReadWriteOnce]
+        labels:
+          recurring-job.longhorn.io/source: "enabled"
+          recurring-job-group.longhorn.io/ephemeral: "enabled"
         resources:
           requests:
             storage: 80Gi

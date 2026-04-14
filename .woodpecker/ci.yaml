@@ -8,7 +8,7 @@ steps:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"
       # Don't prompt for dagger cloud sign up
       DAGGER_NO_NAG: "1"
-      DAGGER_VERSION: "0.20.3"
+      DAGGER_VERSION: "0.20.5"
     backend_options:
       kubernetes:
         serviceAccountName: dagger-pipeline
