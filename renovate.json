@@ -17,7 +17,7 @@
       ],
       "matchStrings": [
         "//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n[^\"]*\"[^:]+:(?<currentValue>[^\"]+)\""
-      ]
+      ],
     },
     {
       "description": "Sync ArgoCD appVersion with GitHub releases",
@@ -424,7 +424,7 @@
         "alpine"
       ],
       "allowedVersions": "/^latest$/",
-      "pinDigests": true
+      "pinDigests": false
     },
     {
       "matchDatasources": [

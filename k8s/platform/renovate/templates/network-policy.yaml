@@ -24,9 +24,27 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # HTTPS egress to registries, APIs, and Gitea
-    - ports:
-        - protocol: TCP
-          port: 443
+    # git.msng.to API calls through Traefik
+    # the load balancer DNATs node-IP:443 to Traefik pod IPs, so we target
+    # the pods directly rather than the pre-DNAT node IPs
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+    - to:
+        # Public internet addresses (to check for package updates)
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
         - protocol: TCP
           port: 80
+        - protocol: TCP
+          port: 443
+

@@ -4,6 +4,12 @@ renovate:
     ttlSecondsAfterFinished: 259200 # 3 days
     concurrencyPolicy: Forbid
     jobBackoffLimit: 1
+  # pod-level securityContext
+  securityContext:
+    runAsUser: 12021
+    # fsGroup: 1000 is added by default when persistent cache is enabled
+    fsGroup: 1000
+    fsGroupChangePolicy: "OnRootMismatch"
   renovate:
     config: |
       {
