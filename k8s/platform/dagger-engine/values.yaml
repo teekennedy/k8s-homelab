@@ -1,6 +1,8 @@
 # https://github.com/dagger/dagger/blob/main/helm/dagger/values.yaml
 dagger-helm:
   engine:
+    image:
+      ref: registry.dagger.io/engine:v0.20.5
     # https://docs.dagger.io/reference/configuration/engine/
     # insecureRootCapabilities: effectively equivalent to running actions with `docker run --privileged`
     configJson: |
