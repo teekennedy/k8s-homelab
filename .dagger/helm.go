@@ -221,8 +221,12 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 		return "Helm template rendering skipped (no matching charts)", nil
 	}
 
-	// Check for cluster-values.yaml
-	clusterValues := source.File("config/gen/cluster-values.yaml")
+	// Check for cluster-values.yaml (File() is lazy, so check existence via Stat)
+	var clusterValues *dagger.File
+	cv := source.File("config/gen/cluster-values.yaml")
+	if _, err := cv.Sync(ctx); err == nil {
+		clusterValues = cv
+	}
 
 	g := new(errgroup.Group)
 	for _, chartPath := range chartPaths {
