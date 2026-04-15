@@ -58,7 +58,7 @@ func (gm *GoModule) Test(ctx context.Context) (string, error) {
 	_, err := golangContainer().
 		WithMountedDirectory("/src", gm.Source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"}).
 		WithWorkdir("/src").
-		WithExec([]string{"go", "test", "-v", testPkg}).
+		WithExec([]string{"go", "test", testPkg}).
 		Sync(ctx)
 	if err != nil {
 		return "", fmt.Errorf("go test failed in %s: %w", gm.Path, err)
