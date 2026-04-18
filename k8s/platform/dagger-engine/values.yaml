@@ -12,11 +12,6 @@ dagger-helm:
           "insecureRootCapabilities": false
         }
       }
-    # BuildKit TOML config for settings not exposed in configJson
-    # https://github.com/moby/buildkit/blob/master/cmd/buildkitd/config/config.go
-    config: |
-      [worker.oci]
-        max-parallelism = 8
     kind: StatefulSet
     resources:
       limits:
