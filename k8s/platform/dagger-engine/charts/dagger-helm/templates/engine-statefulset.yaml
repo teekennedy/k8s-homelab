@@ -95,17 +95,25 @@ spec:
                 done < "$POD_DIR/cgroup.procs"
                 sed -e 's/ / +/g' -e 's/^/+/' < "$POD_DIR/cgroup.controllers" \
                   > "$POD_DIR/cgroup.subtree_control" 2>/dev/null || true
-                # Generate a config that points dagger at the pod scope as the
-                # buildkit cgroup parent. Spawned containers then end up at
-                # <pod-scope>/buildkit/<id> and inherit the pod memory.max.
+                # Merge defaultCgroupParent into the engine TOML config so spawned
+                # containers end up at <pod-scope>/buildkit/<id> and inherit
+                # the pod memory.max. If [worker.oci] already exists in the
+                # config, insert the key under it; otherwise append a new section.
                 mkdir -p /tmp/dagger-cgroup-fix
                 if [ -s /etc/dagger/engine.toml ]; then
                   cp /etc/dagger/engine.toml /tmp/dagger-cgroup-fix/engine.toml
                 else
                   : > /tmp/dagger-cgroup-fix/engine.toml
                 fi
-                printf '\n[worker.oci]\n  defaultCgroupParent = "%s"\n' "$ENGINE_CGROUP" \
-                  >> /tmp/dagger-cgroup-fix/engine.toml
+                TOML=/tmp/dagger-cgroup-fix/engine.toml
+                SETTING="  defaultCgroupParent = \"$ENGINE_CGROUP\""
+                if grep -q '^\[worker\.oci\]' "$TOML"; then
+                  # Insert the setting on the line after [worker.oci]
+                  sed -i "/^\[worker\.oci\]/a\\
+                $SETTING" "$TOML"
+                else
+                  printf '\n[worker.oci]\n%s\n' "$SETTING" >> "$TOML"
+                fi
                 CFG=/tmp/dagger-cgroup-fix/engine.toml
               else
                 # cgroupns is in effect (or no cgroup v2). Fall back to the
