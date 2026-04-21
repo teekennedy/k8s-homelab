@@ -827,29 +827,20 @@ app-template:
             - path: /data
         main:
           jellyfin:
-            - path: /media/movies
+            - path: /media
               readOnly: true
-              subPath: movies
-            - path: /media/shows
-              readOnly: true
-              subPath: shows
+              subPath: media
         arrs:
           radarr:
-            - path: /downloads/complete
-              subPath: qbittorrent/downloads/complete
-            - path: /movies
-              subPath: movies
+            - path: /data
           sonarr:
-            - path: /downloads/complete
-              subPath: qbittorrent/downloads/complete
-            - path: /shows
-              subPath: shows
+            - path: /data
         unpackerr:
           unpackerr:
-            - path: /downloads/complete
-              subPath: qbittorrent/downloads/complete
+            - path: /data
         downloader:
           qbittorrent:
+            - path: /data
             - path: /downloads
               subPath: qbittorrent/downloads
     jellyfin-data:
