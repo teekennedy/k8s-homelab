@@ -36,10 +36,15 @@ hosts:
     dhcp: false
     vlan: k8s
     notes: Interface eno1 is static, eno2 is DHCP for debugging purposes
-  borg-1: # decommissioned
+  borg-1:
     hostname: borg-1
-    switch_port: 13
-    mac_address: 10:dd:b1:de:b8:19
+    switch_port: 9
+    mac_addresses:
+      - 00:f0:cb:fe:c0:7e # enp1s0
+      - 00:f0:cb:fe:c0:7f # enp2s0
+      - 00:f0:cb:fe:c0:80 # enp4s0
+      - 00:f0:cb:fe:c2:20 # enp5s0f0
+      - 00:f0:cb:fe:c2:21 # enp5s0f0
     ip_address: 10.69.80.11
     dhcp: false
     vlan: k8s
@@ -51,7 +56,7 @@ hosts:
     dhcp: false
     vlan: k8s
   borg-3:
-    hostname: borg-2
+    hostname: borg-3
     switch_port: ??
     mac_addresses:
       - 8c:ae:4c:dd:71:00 # enp127s0u2

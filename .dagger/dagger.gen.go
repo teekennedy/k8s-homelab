@@ -57,34 +57,16 @@ func convertSlice[I any, O any](in []I, f func(I) O) []O {
 }
 
 func (r Homelab) MarshalJSON() ([]byte, error) {
-	var concrete struct {
-		GoModulePaths        []string
-		PythonProjectPaths   []string
-		HelmChartPaths       []string
-		TerraformModulePaths []string
-	}
-	concrete.GoModulePaths = r.GoModulePaths
-	concrete.PythonProjectPaths = r.PythonProjectPaths
-	concrete.HelmChartPaths = r.HelmChartPaths
-	concrete.TerraformModulePaths = r.TerraformModulePaths
+	var concrete struct{}
 	return json.Marshal(&concrete)
 }
 
 func (r *Homelab) UnmarshalJSON(bs []byte) error {
-	var concrete struct {
-		GoModulePaths        []string
-		PythonProjectPaths   []string
-		HelmChartPaths       []string
-		TerraformModulePaths []string
-	}
+	var concrete struct{}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
 		return err
 	}
-	r.GoModulePaths = concrete.GoModulePaths
-	r.PythonProjectPaths = concrete.PythonProjectPaths
-	r.HelmChartPaths = concrete.HelmChartPaths
-	r.TerraformModulePaths = concrete.TerraformModulePaths
 	return nil
 }
 
@@ -488,7 +470,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).FormatGo(&parent, source), nil
+			return (*Homelab).FormatGo(&parent, ctx, source), nil
 		case "FormatNix":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -544,7 +526,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).GoModules(&parent, source), nil
+			return (*Homelab).GoModules(&parent, ctx, source), nil
 		case "HelmCharts":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -558,7 +540,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).HelmCharts(&parent, source), nil
+			return (*Homelab).HelmCharts(&parent, ctx, source), nil
 		case "LintCue":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -670,7 +652,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).PythonProjects(&parent, source), nil
+			return (*Homelab).PythonProjects(&parent, ctx, source), nil
 		case "TerraformModules":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -684,7 +666,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Homelab).TerraformModules(&parent, source), nil
+			return (*Homelab).TerraformModules(&parent, ctx, source), nil
 		case "TestBuildHelm":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -810,14 +792,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			var paths []string
-			if inputArgs["paths"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
-				}
-			}
-			return (*Homelab).ValidateTerraform(&parent, ctx, source, paths)
+			return (*Homelab).ValidateTerraform(&parent, ctx, source)
 		case "ValidateWoodpecker":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -839,20 +814,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).ValidateWoodpecker(&parent, ctx, source, paths)
-		case "":
-			var parent Homelab
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return New(ctx, ws), nil
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}

@@ -18,7 +18,7 @@
         default = self.packages.${system}.lab;
         lab = pkgs.buildGoModule {
           pname = "lab";
-          version = "0.1.0";
+          version = "0.2.0";
           src = ./.;
           vendorHash = "sha256-koZgyB7azdYFzZvIGF8K45/g8MN/jS91pYWCjX+7Cl4=";
 

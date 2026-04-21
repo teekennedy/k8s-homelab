@@ -3,12 +3,28 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
+
+// discoverPythonProjectPaths finds all Python project directories in source.
+func discoverPythonProjectPaths(ctx context.Context, source *dagger.Directory) []string {
+	pyprojectFiles, _ := source.Glob(ctx, "**/pyproject.toml")
+	var paths []string
+	for _, f := range pyprojectFiles {
+		dir := filepath.Dir(f)
+		if dir != "." {
+			paths = append(paths, dir)
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
 
 // PythonProject is a Python project with a scoped source directory.
 // Each PythonProject carries only the files for its project, enabling
@@ -26,12 +42,13 @@ type PythonProject struct {
 // Each project's Source is a subdirectory of the +defaultPath source, so
 // Directory IDs are stable across sessions and cache independently.
 func (m *Homelab) PythonProjects(
+	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
 	source *dagger.Directory,
 ) []*PythonProject {
 	var projects []*PythonProject
-	for _, projPath := range m.PythonProjectPaths {
+	for _, projPath := range discoverPythonProjectPaths(ctx, source) {
 		projects = append(projects, &PythonProject{
 			Path:   projPath,
 			Source: source.Directory(projPath),
@@ -110,16 +127,16 @@ func (m *Homelab) LintPython(ctx context.Context,
 	// +optional
 	paths []string,
 ) (string, error) {
-	projectPaths := m.PythonProjectPaths
+	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
 	if len(paths) > 0 {
-		projectPaths = matchProjectPaths(paths, projectPaths)
+		pythonProjectPaths = matchProjectPaths(paths, pythonProjectPaths)
 	}
-	if len(projectPaths) == 0 {
+	if len(pythonProjectPaths) == 0 {
 		return "Python lint skipped (no projects found)", nil
 	}
 
 	g := new(errgroup.Group)
-	for _, projPath := range projectPaths {
+	for _, projPath := range pythonProjectPaths {
 		pp := &PythonProject{
 			Path:   projPath,
 			Source: source.Directory(projPath),
@@ -156,11 +173,11 @@ func (m *Homelab) FormatPython(
 
 // pythonFormat runs black on all Python projects, returning the formatted directory.
 func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, paths []string) (*dagger.Directory, error) {
-	projectPaths := m.PythonProjectPaths
+	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
 	if len(paths) > 0 {
-		projectPaths = matchProjectPaths(paths, projectPaths)
+		pythonProjectPaths = matchProjectPaths(paths, pythonProjectPaths)
 	}
-	if len(projectPaths) == 0 {
+	if len(pythonProjectPaths) == 0 {
 		return source, nil
 	}
 
@@ -168,7 +185,7 @@ func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, pa
 		From(uvImage).
 		WithMountedDirectory("/src", source)
 
-	for _, dir := range projectPaths {
+	for _, dir := range pythonProjectPaths {
 		container = container.
 			WithWorkdir("/src/" + dir).
 			WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "."})
@@ -188,16 +205,16 @@ func (m *Homelab) TestPython(ctx context.Context,
 	// +optional
 	paths []string,
 ) (string, error) {
-	projectPaths := m.PythonProjectPaths
+	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
 	if len(paths) > 0 {
-		projectPaths = matchProjectPaths(paths, projectPaths)
+		pythonProjectPaths = matchProjectPaths(paths, pythonProjectPaths)
 	}
-	if len(projectPaths) == 0 {
+	if len(pythonProjectPaths) == 0 {
 		return "Python tests skipped (no projects found)", nil
 	}
 
 	g := new(errgroup.Group)
-	for _, projPath := range projectPaths {
+	for _, projPath := range pythonProjectPaths {
 		pp := &PythonProject{
 			Path:   projPath,
 			Source: source.Directory(projPath),

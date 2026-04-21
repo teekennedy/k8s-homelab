@@ -4,155 +4,17 @@ This is the repo I use to manage the bare metal k8s cluster I setup at home out 
 
 # Setup
 
-## Bootstrapping Secrets
+## Bootstrapping a NixOS Host
 
-This repo uses [sops-nix](https://github.com/Mic92/sops-nix) to manage sensitive data. There are many ways to encrypt secrets in sops, and many existing guides for setting up and managing those keys, so I won't repeat them here.
-For a more in depth guide, refer to [MuSigma's guide](https://musigma.blog/2021/05/09/gpg-ssh-ed25519.html) or [drduh's guide](https://github.com/drduh/YubiKey-Guide?tab=readme-ov-file#prepare-gnupg)
+See [docs/nix-host-bootstrap.md](docs/nix-host-bootstrap.md) for the full guide.
 
-I'm using a Yubikey-backed ed25519 GPG key to encrypt secrets on my development machine, and each host's SSH key to decrypt them on deployment.
+Quick start:
 
-### Sops-nix setup
+1. Add the host to `flake.nix` in the `borgHosts` list
+2. Build and boot the installer ISO: `nix build .#nixosConfigurations.installIso.config.system.build.isoImage`
+3. Run: `lab host bootstrap <hostname> --ip <installer-ip>`
 
-Now that we have the keys, we'll add the key identifier (GPG fingerprint, age public key) to `.sops.yaml` at the root of the repo:
-
-```yaml
----
-keys:
-  - &user_<username> <GPG Fingerprint>
-  - &host_<host> <age public key>
-```
-
-Then we can reference those keys in the configuration for sops-managed files:
-
-```yaml
-creation_rules:
-  - path_regex: nix/hosts/<host>/secrets.ya?ml
-    key_groups:
-    - pgp:
-      - *user_<username>
-      age:
-      - *host_<host>
-```
-
-## Bootstrapping a host
-
-### Build installer
-
-This repo's flake includes a customized installer that starts openssh and allows root login with the public keys added to ./nix/modules/users/authorized_keys/.
-
-Run `nix build .#nixosConfigurations.installIso.config.system.build.isoImage` to build the installer iso. The resulting package will by symlinked to ./result.
-
-Write the image to some installation media and use it to boot the target machine.
-
-### Perform initial installation
-
-For each host, we're going to use its ssh key to decrypt secrets.
-Sops does not support ssh directly, so the keys are converted to age keys.
-
-I created a script to generate a new SSH key for a host encrypt it with sops, and save it under `./nix/hosts/<host>/secrets.yaml`.
-
-```bash
-bootstrap-host <hostname> --target-host root@<installer-ip-or-hostname>
-```
-
-Note that you'll
-
-### Adding secrets
-
-With sops configuration in place, one can simply run `sops edit path/to/secrets.yaml`.
-This will create or decrypt the file and open it in the editor defined in `$EDITOR`.
-
-### Referencing secrets
-
-First add the sops import and configuration to your configuration.nix:
-
-```nix
-imports = [ <sops-nix/modules/sops> ];
-
-sops = {
-  defaultSopsFile = ./path/to/secrets.yaml;
-  # This will automatically import SSH keys as age keys
-  age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-};
-
-```
-
-Then you can add individual secret attributes that reference specific fields in secrets.yaml.
-Sub-fields can be accessed using `/` as a separator between field names.
-
-The following snippet has an example secret with common options documented in comments.
-See the [sops-nix](https://github.com/Mic92/sops-nix) README for more examples and options.
-
-<details>
-<summary>sops.secret</summary>
-
-```nix
-sops.secrets.my_secret = {
-  # The sops file can be overwritten per secret...
-  # sopsFile = ./other-secrets.json;
-  # The format of the sops file. Defaults to "yaml" but you can also use "json" or "binary"
-  # format = "yaml"
-
-  # Permission modes are in octal representation (same as chmod)
-  # mode = "0440";
-  # Either a user id or group name representation of the secret owner
-  # It is recommended to get the user name from `config.users.users.<?name>.name` to avoid misconfiguration
-  # owner = config.users.users.nobody.name;
-  # Either the group id or group name representation of the secret group
-  # It is recommended to get the group name from `config.users.users.<?name>.group` to avoid misconfiguration
-  # group = config.users.users.nobody.group;
-
-  # It is possible to restart or reload units when a secret changes or is newly initialized.
-  # restartUnits = [ "home-assistant.service" ];
-  # there is also `reloadUnits` which acts like a `reloadTrigger` in a NixOS systemd service
-
-  # Users are normally setup before secrets are resolved.
-  # Set this to true if the secret is needed to setup users.
-  # neededForUsers = true;
-
-  # Some services might expect files in certain locations. Using the path option a symlink to this directory can be created:
-  # path = "/var/lib/hass/secrets.yaml";
-};
-```
-
-</details>
-
-These secrets will be decrypted under `/run/secrets` (or `/run/secrets-for-users` if the secret is `neededForUsers`).
-You can reference the secret's path from elsewhere in the config using the `.path` attribute,
-e.g. `users.users.my-user.hashedPasswordFile = config.sops.secrets.my-password.path;`.
-
-## Setting up a new host
-
-To setup a new host, create the following config:
-
-- Generate ed25519 ssh key for the host:
-  - `ssh-keygen -t ed25519 -C "root@$hostname" -f "$(pwd)/ssh_host_ed25519_key"`
-  - save private key to nix/hosts/<hostname>/secrets.yaml under `ssh_host_private_key`
-  - save public key to nix/hosts/<hostname>/secrets.yaml under `ssh_host_public_key`
-  - convert ssh key to age with `nix-shell -p ssh-to-age --run 'ssh-to-age -i ./ssh_host_ed25519_key'` and save the public age key to .sops.yaml under `keys`.
-  - run `sops updatekeys` against all current encrypted files to add the new key.
-- build the nixos installer image:
-  - `nix build .#nixosConfigurations.installIso.config.system.build.isoImage`
-- write the installer image to a drive and boot the machine from it
-- generate and save facter configuration:
-  - `nixos-anywhere -- --flake .#nixosConfigurations.borg-X --generate-hardware-config nixos-facter ./nix/hosts/borg-0/facter.json --phases '' --target-host root@<ip-addr>`
-    (NB: the `--phases ''` is important to prevent nixos-anywhere from running the full installation process including formatting your disks!)
-- Set `disko.devices.disk.main.device` to the filesystem root device, and optionally `disko.longhornDevice` to the device used for k8s longhorn.
-  - Make sure to use persistent device names from `/dev/disk/by-id`. Check the generated facter.json for available device names.
-- bootstrap the host:
-  - `bootstrap-host borg-X -- --target-host root@<ip_addr>`
-  - The script will ask you for a password for the primary user interactively. This gets passed into `mkpasswd` to produce a hash which is then encrypted with sops.
-  - The script also generates an SSH keypair and encrypts it with sops. It adds the public key to .sops.yaml, but does not update any of the files. You have to do the following manually:
-    - Add the missing `restic_repo_password` yaml entry to `nix/hosts/borg-X/secrets.yaml`, set to a secure random string.
-    - Add a new entry for `nix/hosts/borg-X/secrets\.yaml` that references the new host key.
-    - Run `sops encrypt --in-place ./nix/hosts/borg-X/secrets.yaml` to encrypt the secrets file.
-    - Run `git add nix/hosts/borg-X` to ensure the new sops file and any config get added to the flake eval.
-    - Add the new host key to the entry for `nix/modules/*/.*\.enc\.yaml`.
-    - Run `sops updatekeys nix/modules/*/*.enc.yaml` to re-encrypt shared secrets with the new keys.
-  - With the manual steps out of the way, run `bootstrap-host borg-X -- --target-host root@<ip_addr>` once more. This time it should complete successfully.
-- Confirm you're able to login as your default user via SSH `ssh borg-X`
-- Update the YAML anchored list of `&nodeIPs` inside k8s/platform/monitoring-system/values.yaml. This need to be specified explicitly since they're not running as standalone pods in k3s.
-- (optional) Add an external dns entry for the new host by updating the `k8s_hosts` input to the `cloudflare` module in terraform/main.tf.
+The bootstrap command handles secrets generation, sops configuration, hardware detection, NixOS build verification, and installation automatically.
 
 ## Deploying updates
 

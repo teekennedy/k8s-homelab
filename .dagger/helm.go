@@ -5,12 +5,26 @@ import (
 	_ "embed"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
+
+// discoverHelmChartPaths finds all Helm chart directories in source.
+func discoverHelmChartPaths(ctx context.Context, source *dagger.Directory) []string {
+	chartFiles, _ := source.Glob(ctx, "k8s/**/Chart.yaml")
+	var paths []string
+	for _, f := range chartFiles {
+		if !strings.Contains(f, "/charts/") {
+			paths = append(paths, filepath.Dir(f))
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
 
 //go:embed scripts/helm-deps.sh
 var helmDepsScript string
@@ -40,6 +54,7 @@ type HelmChart struct {
 // Each chart's Source is a subdirectory of the +defaultPath source, so
 // Directory IDs are stable across sessions and cache independently.
 func (m *Homelab) HelmCharts(
+	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
@@ -49,7 +64,7 @@ func (m *Homelab) HelmCharts(
 	// Check for cluster-values.yaml (used by template rendering)
 	clusterValues := source.File("config/gen/cluster-values.yaml")
 
-	for _, chartPath := range m.HelmChartPaths {
+	for _, chartPath := range discoverHelmChartPaths(ctx, source) {
 		charts = append(charts, &HelmChart{
 			Path:          chartPath,
 			Source:        source.Directory(chartPath),
@@ -174,16 +189,16 @@ func (m *Homelab) ValidateHelm(ctx context.Context,
 	// +optional
 	paths []string,
 ) (string, error) {
-	chartPaths := m.HelmChartPaths
+	helmChartPaths := discoverHelmChartPaths(ctx, source)
 	if len(paths) > 0 {
-		chartPaths = matchChartPaths(paths, chartPaths)
+		helmChartPaths = matchChartPaths(paths, helmChartPaths)
 	}
-	if len(chartPaths) == 0 {
+	if len(helmChartPaths) == 0 {
 		return "Helm validation skipped (no matching charts)", nil
 	}
 
 	g := new(errgroup.Group)
-	for _, chartPath := range chartPaths {
+	for _, chartPath := range helmChartPaths {
 		hc := &HelmChart{
 			Path:   chartPath,
 			Source: source.Directory(chartPath),
@@ -213,11 +228,11 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 	// +optional
 	paths []string,
 ) (string, error) {
-	chartPaths := m.HelmChartPaths
+	helmChartPaths := discoverHelmChartPaths(ctx, source)
 	if len(paths) > 0 {
-		chartPaths = matchChartPaths(paths, chartPaths)
+		helmChartPaths = matchChartPaths(paths, helmChartPaths)
 	}
-	if len(chartPaths) == 0 {
+	if len(helmChartPaths) == 0 {
 		return "Helm template rendering skipped (no matching charts)", nil
 	}
 
@@ -229,7 +244,7 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 	}
 
 	g := new(errgroup.Group)
-	for _, chartPath := range chartPaths {
+	for _, chartPath := range helmChartPaths {
 		hc := &HelmChart{
 			Path:          chartPath,
 			Source:        source.Directory(chartPath),

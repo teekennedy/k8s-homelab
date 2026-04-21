@@ -1,4 +1,3 @@
----
 keys:
   # My GPG encryption subkey fingerprint
   - &user_tkennedy FD5B1635F2218760E010601F4A6E1024D7BBE968
@@ -7,9 +6,9 @@ keys:
   # ssh-ed25519 host keys converted to age
   # `nix-shell -p ssh-to-age --run 'ssh-keyscan <host> | grep ssh-ed25519 | ssh-to-age'`
   - &host_borg-0 age134rsuzlwf7fqzl3zluzjmheez6y4x5mmakfsejpjenr6qy3st3rs3rd5l9
-  - &host_borg-1 age1sytxxylgnjkdev2qjds6zdwn6ynt73tn4u7lvg27cjdwj97lj4xs75ycyf
   - &host_borg-2 age12uwv74ykhvs45aftm8d4v03ry44jdkt93nmslhktc2u4fq7j7yyqg5zdph
   - &host_borg-3 age1y8n63p4zrlzxphe9k7hlc27vhk3g3k32nz0p4eg66tz4p2pnjavq4aq3xp
+  - &host_borg-1 age1d92s35w98m826ppl8sdj3gw4pm26u6nxm8srv63v4s222c28my4sm3js4x
 creation_rules:
   - path_regex: nix/hosts/borg-0/secrets\.yaml
     key_groups:
@@ -18,13 +17,6 @@ creation_rules:
         age:
           - *oxygen_age
           - *host_borg-0
-  - path_regex: nix/hosts/borg-1/secrets\.yaml
-    key_groups:
-      - pgp:
-          - *user_tkennedy
-        age:
-          - *oxygen_age
-          - *host_borg-1
   - path_regex: nix/hosts/borg-2/secrets\.yaml
     key_groups:
       - pgp:
@@ -39,6 +31,13 @@ creation_rules:
         age:
           - *oxygen_age
           - *host_borg-3
+  - path_regex: nix/hosts/borg-1/secrets\.yaml
+    key_groups:
+      - pgp:
+          - *user_tkennedy
+        age:
+          - *oxygen_age
+          - *host_borg-1
   - path_regex: nix/modules/*/.*\.enc\.yaml
     key_groups:
       - pgp:

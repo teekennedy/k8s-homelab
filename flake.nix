@@ -2,7 +2,7 @@
   description = "teekennedy's homelab";
   inputs = {
     deploy-rs.url = "github:serokell/deploy-rs?ref=master";
-    # deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
+    determinate.url = "github:DeterminateSystems/determinate";
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules?ref=main";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     disko.url = "github:nix-community/disko?ref=master";
@@ -50,6 +50,32 @@
                   role = "server";
                   # Leave true for first node in cluster
                   clusterInit = true;
+                };
+              })
+            ];
+          }
+          {
+            hostname = "borg-1";
+            system = "x86_64-linux";
+            modules = [
+              ({...}: {
+                disko.devices.disk.main.device = "/dev/disk/by-id/nvme-WD_BLACK_SN770_1TB_23011J802382";
+                system.stateVersion = "26.05";
+                systemd.network.networks."10-ethernet-static" = {
+                  matchConfig = {
+                    Type = "ether";
+                    Kind = "!*"; # exclude all "special" network devices, e.g. tunnel, bridge, virtual.
+                  };
+                  networkConfig = {
+                    Address = "10.69.80.11/25";
+                    Gateway = ["10.69.80.1"];
+                  };
+                };
+                hardware.cpu.intel.updateMicrocode = true;
+
+                services.k3s = {
+                  role = "server";
+                  serverAddr = "https://10.69.80.101:6443";
                 };
               })
             ];
@@ -143,6 +169,7 @@
                     ./nix/modules/restic
                     ./nix/modules/k3s
                     ./nix/modules/users/defaultUser.nix
+                    inputs.determinate.nixosModules.default
                     inputs.nixos-facter-modules.nixosModules.facter
                     {
                       defaultUsername = "tkennedy";
@@ -179,6 +206,8 @@
               system = "x86_64-linux";
               modules = [
                 "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
+                # Nix caches and settings
+                ./nix/modules/common/nix.nix
                 ({
                   lib,
                   pkgs,

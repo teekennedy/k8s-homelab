@@ -3,12 +3,30 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
+
+// discoverTerraformModulePaths finds all Terraform module directories in source.
+func discoverTerraformModulePaths(ctx context.Context, source *dagger.Directory) []string {
+	tfFiles, _ := source.Glob(ctx, "terraform/*/*.tf")
+	seen := map[string]bool{}
+	var paths []string
+	for _, f := range tfFiles {
+		dir := filepath.Dir(f)
+		if !seen[dir] {
+			seen[dir] = true
+			paths = append(paths, dir)
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
 
 // TerraformModule is a Terraform/OpenTofu module with a scoped source directory.
 // Unlike Go/Python/Helm modules, Terraform modules can reference siblings via
@@ -31,13 +49,14 @@ type TerraformModule struct {
 // modules can reference siblings. The Path field identifies which module
 // to validate.
 func (m *Homelab) TerraformModules(
+	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!terraform/**/*"]
 	source *dagger.Directory,
 ) []*TerraformModule {
 	tfDir := source.Directory("terraform")
 	var modules []*TerraformModule
-	for _, modPath := range m.TerraformModulePaths {
+	for _, modPath := range discoverTerraformModulePaths(ctx, source) {
 		name := modPath
 		if strings.HasPrefix(name, "terraform/") {
 			name = strings.TrimPrefix(name, "terraform/")
@@ -83,7 +102,7 @@ func (m *Homelab) ValidateTerraform(ctx context.Context,
 	// +ignore=["*", "!terraform/**/*"]
 	source *dagger.Directory,
 ) (string, error) {
-	modulePaths := m.TerraformModulePaths
+	modulePaths := discoverTerraformModulePaths(ctx, source)
 	if len(modulePaths) == 0 {
 		return "Terraform validation skipped (no matching modules)", nil
 	}

@@ -14,79 +14,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"sort"
 	"strings"
 
 	"dagger/homelab/internal/dagger"
 )
 
 // Homelab is the main Dagger module for k8s-homelab CI/CD
-type Homelab struct {
-	// +private
-	GoModulePaths []string
-	// +private
-	PythonProjectPaths []string
-	// +private
-	HelmChartPaths []string
-	// +private
-	TerraformModulePaths []string
-}
-
-func New(ctx context.Context, ws dagger.Workspace) *Homelab {
-	source := ws.Directory(".", dagger.WorkspaceDirectoryOpts{
-		Gitignore: true,
-	})
-
-	// Find all Go modules
-	goModFiles, _ := source.Glob(ctx, "**/go.mod")
-	var goModPaths []string
-	for _, path := range goModFiles {
-		goModPaths = append(goModPaths, filepath.Dir(path))
-	}
-	sort.Strings(goModPaths)
-
-	// Find all Python projects
-	pyprojectFiles, _ := source.Glob(ctx, "**/pyproject.toml")
-	var pythonPaths []string
-	for _, path := range pyprojectFiles {
-		dir := filepath.Dir(path)
-		if dir != "." {
-			pythonPaths = append(pythonPaths, dir)
-		}
-	}
-	sort.Strings(pythonPaths)
-
-	// Find all Helm charts (Chart.yaml not in charts/ subdirs)
-	chartFiles, _ := source.Glob(ctx, "k8s/**/Chart.yaml")
-	var helmPaths []string
-	for _, path := range chartFiles {
-		if !strings.Contains(path, "/charts/") {
-			helmPaths = append(helmPaths, filepath.Dir(path))
-		}
-	}
-	sort.Strings(helmPaths)
-
-	// Find all Terraform modules
-	tfFiles, _ := source.Glob(ctx, "terraform/*/*.tf")
-	tfSeen := map[string]bool{}
-	var tfPaths []string
-	for _, path := range tfFiles {
-		dir := filepath.Dir(path)
-		if !tfSeen[dir] {
-			tfSeen[dir] = true
-			tfPaths = append(tfPaths, dir)
-		}
-	}
-	sort.Strings(tfPaths)
-
-	return &Homelab{
-		GoModulePaths:        goModPaths,
-		PythonProjectPaths:   pythonPaths,
-		HelmChartPaths:       helmPaths,
-		TerraformModulePaths: tfPaths,
-	}
-}
+type Homelab struct{}
 
 // LintNix validates Nix formatting (alejandra) and dead code (deadnix).
 // Fails if any files need formatting. Use `dagger call format-nix --auto-apply` to fix.

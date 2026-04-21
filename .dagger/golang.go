@@ -3,12 +3,30 @@ package main
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
+
+// discoverGoModulePaths finds all Go module directories in source,
+// excluding vendored modules (which may be excluded by nested .gitignore
+// files not honored by +defaultPath).
+func discoverGoModulePaths(ctx context.Context, source *dagger.Directory) []string {
+	goModFiles, _ := source.Glob(ctx, "**/go.mod")
+	var paths []string
+	for _, f := range goModFiles {
+		if strings.Contains(f, "/vendor/") || strings.HasPrefix(f, "vendor/") {
+			continue
+		}
+		paths = append(paths, filepath.Dir(f))
+	}
+	sort.Strings(paths)
+	return paths
+}
 
 // GoModule is a Go module with a scoped source directory.
 // Each GoModule carries only the files for its module, enabling
@@ -27,12 +45,13 @@ type GoModule struct {
 // Each module's Source is a subdirectory of the +defaultPath source, so
 // Directory IDs are stable across sessions and cache independently.
 func (m *Homelab) GoModules(
+	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", ".dagger/dagger.gen.go", ".dagger/internal/**"]
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
 	source *dagger.Directory,
 ) []*GoModule {
 	var modules []*GoModule
-	for _, modPath := range m.GoModulePaths {
+	for _, modPath := range discoverGoModulePaths(ctx, source) {
 		modules = append(modules, &GoModule{
 			Path:   modPath,
 			Source: source.Directory(modPath),
@@ -48,17 +67,10 @@ func (gm *GoModule) Test(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("GoModule %s has no source directory; call GoModules() first", gm.Path)
 	}
 
-	testPkg := "./..."
-	// .dagger module requires generated SDK that is excluded from source
-	// to keep directory contents stable for caching; test only pure Go packages
-	if gm.Path == ".dagger" {
-		testPkg = "./pathutil/..."
-	}
-
 	_, err := golangContainer().
 		WithMountedDirectory("/src", gm.Source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"}).
 		WithWorkdir("/src").
-		WithExec([]string{"go", "test", testPkg}).
+		WithExec([]string{"go", "test", "./..."}).
 		Sync(ctx)
 	if err != nil {
 		return "", fmt.Errorf("go test failed in %s: %w", gm.Path, err)
@@ -73,18 +85,11 @@ func (gm *GoModule) Lint(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("GoModule %s has no source directory; call GoModules() first", gm.Path)
 	}
 
-	// .dagger module's root package imports generated SDK which is excluded
-	// from source to keep directory contents stable; only lint pure Go packages
-	vetPkg := "./..."
-	if gm.Path == ".dagger" {
-		vetPkg = "./pathutil/..."
-	}
-
 	formatted := golangContainer().
 		WithMountedDirectory("/src", gm.Source).
 		WithWorkdir("/src").
-		WithExec([]string{"go", "vet", vetPkg}).
-		WithExec([]string{"go", "fmt", vetPkg}).
+		WithExec([]string{"go", "vet", "./..."}).
+		WithExec([]string{"go", "fmt", "./..."}).
 		Directory("/src")
 
 	changeset := formatted.Changes(gm.Source)
@@ -111,12 +116,13 @@ func (m *Homelab) LintGo(ctx context.Context,
 	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
 	source *dagger.Directory,
 ) (string, error) {
-	if len(m.GoModulePaths) == 0 {
+	goModulePaths := discoverGoModulePaths(ctx, source)
+	if len(goModulePaths) == 0 {
 		return "Go lint skipped (no modules found)", nil
 	}
 
 	g := new(errgroup.Group)
-	for _, modPath := range m.GoModulePaths {
+	for _, modPath := range goModulePaths {
 		gm := &GoModule{
 			Path:   modPath,
 			Source: source.Directory(modPath),
@@ -137,23 +143,25 @@ func (m *Homelab) LintGo(ctx context.Context,
 // FormatGo formats Go files with go fmt across all discovered modules.
 // Returns a changeset. Use `dagger call format-go --auto-apply` to apply.
 func (m *Homelab) FormatGo(
+	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
 	source *dagger.Directory,
 ) *dagger.Changeset {
-	return m.goFormat(source).Changes(source)
+	return m.goFormat(ctx, source).Changes(source)
 }
 
 // goFormat runs go vet and go fmt on all Go modules, returning the formatted directory.
-func (m *Homelab) goFormat(source *dagger.Directory) *dagger.Directory {
-	if len(m.GoModulePaths) == 0 {
+func (m *Homelab) goFormat(ctx context.Context, source *dagger.Directory) *dagger.Directory {
+	goModulePaths := discoverGoModulePaths(ctx, source)
+	if len(goModulePaths) == 0 {
 		return source
 	}
 
 	container := golangContainer().
 		WithMountedDirectory("/src", source)
 
-	for _, modPath := range m.GoModulePaths {
+	for _, modPath := range goModulePaths {
 		targets := []string{"./..."}
 		workdir := "/src/" + modPath
 
@@ -173,15 +181,16 @@ func (m *Homelab) goFormat(source *dagger.Directory) *dagger.Directory {
 func (m *Homelab) TestGo(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", ".dagger/dagger.gen.go", ".dagger/internal/**"]
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
 	source *dagger.Directory,
 ) (string, error) {
-	if len(m.GoModulePaths) == 0 {
+	goModulePaths := discoverGoModulePaths(ctx, source)
+	if len(goModulePaths) == 0 {
 		return "Go tests skipped (no modules found)", nil
 	}
 
 	g := new(errgroup.Group)
-	for _, modPath := range m.GoModulePaths {
+	for _, modPath := range goModulePaths {
 		gm := &GoModule{
 			Path:   modPath,
 			Source: source.Directory(modPath),
