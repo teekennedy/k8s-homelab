@@ -121,7 +121,7 @@ def create_silence(alertname: str, duration: timedelta, node: str, reason: str) 
 
 def set_reboot_alert(node: str, resolved: bool) -> None:
     print(
-        f"{"Resolving" if resolved else "Creating"} reboot alert for {node}",
+        f"{'Resolving' if resolved else 'Creating'} reboot alert for {node}",
         file=sys.stderr,
     )
     post_json("/api/v2/alerts", build_reboot_alert_payload(node, resolved))
@@ -165,48 +165,6 @@ def k8s_request(method: str, path: str, body: Optional[dict] = None) -> dict:
         raise RuntimeError(f"K8s API error: {e.code} {error_body}")
 
 
-def disable_longhorn_scheduling(node: str) -> None:
-    """Disable scheduling for Longhorn node and all its disks without eviction."""
-    print(f"Disabling Longhorn scheduling for node {node}", file=sys.stderr)
-
-    # Get the current node resource
-    path = f"/apis/longhorn.io/v1beta2/namespaces/longhorn-system/nodes/{node}"
-    node_resource = k8s_request("GET", path)
-
-    # Update node spec - disable scheduling but don't request eviction
-    node_resource["spec"]["allowScheduling"] = False
-
-    # Update all disks to disable scheduling without eviction
-    for disk_name, disk_spec in node_resource["spec"]["disks"].items():
-        disk_spec["allowScheduling"] = False
-
-    # Apply the update
-    k8s_request("PUT", path, node_resource)
-    print(f"Longhorn scheduling disabled for node {node}", file=sys.stderr)
-
-
-def restore_longhorn_node(node: str) -> None:
-    """Disable eviction and restore scheduling for Longhorn node."""
-    print(f"Restoring Longhorn scheduling for node {node}", file=sys.stderr)
-
-    # Get the current node resource
-    path = f"/apis/longhorn.io/v1beta2/namespaces/longhorn-system/nodes/{node}"
-    node_resource = k8s_request("GET", path)
-
-    # Update node spec
-    node_resource["spec"]["allowScheduling"] = True
-    node_resource["spec"]["evictionRequested"] = False
-
-    # Update all disks to disable eviction and enable scheduling
-    for disk_name, disk_spec in node_resource["spec"]["disks"].items():
-        disk_spec["evictionRequested"] = False
-        disk_spec["allowScheduling"] = True
-
-    # Apply the update
-    k8s_request("PUT", path, node_resource)
-    print(f"Longhorn scheduling restored for node {node}", file=sys.stderr)
-
-
 def config() -> Config:
     if CONFIG is None:
         raise RuntimeError("config not initialized")
@@ -233,16 +191,6 @@ def load_config(env: abc.Mapping) -> Config:
 
 def handle_event(event: str, node: str) -> bool:
     if event == "drain":
-        # Disable Longhorn scheduling (no eviction - node will be back after reboot)
-        try:
-            disable_longhorn_scheduling(node)
-        except Exception as exc:
-            print(
-                f"Failed to disable Longhorn scheduling for node {node}: {exc}",
-                file=sys.stderr,
-            )
-            # Continue with other actions even if Longhorn eviction fails
-
         # Silence alerts
         duration = parse_duration(config().drain_silence_duration)
         for alertname in config().drain_silence_alerts:
@@ -250,13 +198,6 @@ def handle_event(event: str, node: str) -> bool:
         set_reboot_alert(node, resolved=False)
         return True
     if event == "uncordon":
-        # Restore Longhorn scheduling
-        try:
-            restore_longhorn_node(node)
-        except Exception as exc:
-            print(f"Failed to restore Longhorn node {node}: {exc}", file=sys.stderr)
-            # Continue with other actions even if Longhorn restore fails
-
         # Silence alerts
         duration = parse_duration(config().post_reboot_silence_duration)
         for alertname in config().post_reboot_silence_alerts:
