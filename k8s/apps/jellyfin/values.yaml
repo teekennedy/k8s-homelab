@@ -5,7 +5,7 @@ app-template:
     automountServiceAccountToken: false
   controllers:
     debug:
-      replicas: 0
+      replicas: 1
       containers:
         jellyfin-debug:
           image:
@@ -16,7 +16,7 @@ app-template:
             - infinity
 
     main:
-      replicas: 1
+      replicas: 0
       pod:
         securityContext:
           fsGroup: &gid 1200
@@ -822,6 +822,9 @@ app-template:
       size: 50Ti
       storageClass: smb
       advancedMounts:
+        debug:
+          jellyfin-debug:
+            - path: /data
         main:
           jellyfin:
             - path: /media/movies
@@ -859,9 +862,6 @@ app-template:
         main:
           jellyfin:
             - path: /data
-        debug:
-          jellyfin-debug:
-            - path: /jellyfin/data
     jellyfin-cache:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -875,9 +875,6 @@ app-template:
         main:
           jellyfin:
             - path: /data/cache
-        debug:
-          jellyfin-debug:
-            - path: /jellyfin/cache
     jellyfin-configs:
       type: configMap
       name: jellyfin-configs
