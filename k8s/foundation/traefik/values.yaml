@@ -35,7 +35,7 @@ traefik:
         emptyDir: {}
     initContainers:
       - name: fetch-crowdsec-bouncer-plugin
-        image: alpine/git:2.47.2
+        image: alpine/git:v2.52.0
         # HOME defaults to /root which we can't write to (non-root user + RO rootfs).
         # Point git at /tmp (a writable emptyDir) for its config dotfiles.
         env:
