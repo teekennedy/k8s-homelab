@@ -467,7 +467,8 @@
       "matchPackageNames": [
         "ghcr.io/jellyfin/jellyfin"
       ],
-      "sourceUrl": "https://github.com/jellyfin/jellyfin"
+      "sourceUrl": "https://github.com/jellyfin/jellyfin",
+      "versioning": "semver"
     },
     {
       "matchDatasources": [
@@ -506,7 +507,7 @@
       ]
     },
     {
-      "description": "Automerge minor/patch updates for trusted packages",
+      "description": "Automerge all minor/patch updates (excluding 0.x)",
       "automerge": true,
       "automergeType": "pr",
       "matchUpdateTypes": [
@@ -514,44 +515,9 @@
         "patch"
       ],
       "matchPackageNames": [
-        "renovate",
-        "ghcr.io/donkie/spoolman",
-        "Donkie/Spoolman",
-        "homepage",
-        "ghcr.io/gethomepage/homepage",
-        "intel-device-plugins-operator",
-        "intel-device-plugins-gpu",
-        "intel/intel-device-plugins-for-kubernetes",
-        "kured",
-        "kubereboot/kured",
-        "cert-manager",
-        "trust-manager",
-        "step-certificates",
-        "step-issuer",
-        "cr.step.sm/smallstep/step-ca",
-        "cr.step.sm/smallstep/step-issuer",
-        "external-dns",
-        "ghcr.io/kashalls/external-dns-unifi-webhook",
-        "node-feature-discovery",
-        "kubernetes-sigs/node-feature-discovery",
-        "dagger-helm",
-        "kube-prometheus-stack",
-        "ghcr.io/teekennedy/prometheus-operator",
-        "woodpecker",
-        "victoria-metrics-single",
-        "ghcr.io/passivelemon/terraria-docker",
-        "app-template",
-        "ghcr.io/jellyfin/jellyfin",
-        "jellyfin/jellyfin",
-        "docker.io/fallenbagel/jellyseerr",
-        "lscr.io/linuxserver/prowlarr",
-        "lscr.io/linuxserver/radarr",
-        "lscr.io/linuxserver/sonarr",
-        "ghcr.io/unpackerr/unpackerr",
-        "lscr.io/linuxserver/qbittorrent",
-        "docker.io/qmcgaw/gluetun",
-        "ghcr.io/raydak-labs/configarr"
-      ]
+        "*"
+      ],
+      "matchCurrentValue": "!/^v?0\\./"
     }
   ]
 }

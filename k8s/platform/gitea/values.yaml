@@ -126,8 +126,11 @@ gitea-resources:
       teams:
         - name: Owners
           members:
-            - renovate
             - tkennedy
+        - name: Bots
+          permission: write
+          members:
+            - renovate
   repositories:
     - name: k8s-homelab
       owner: ops

@@ -23,9 +23,16 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+type Team struct {
+	Name       string
+	Permission string
+	Members    []string
+}
+
 type Organization struct {
 	Name        string
 	Description string
+	Teams       []Team
 }
 
 type Repository struct {
@@ -242,6 +249,56 @@ func main() {
 			})
 			if err != nil {
 				log.Printf("Edit organization %s: %v", org.Name, err)
+			}
+		}
+
+		for _, team := range org.Teams {
+			existingTeams, _, err := client.ListOrgTeams(org.Name, gitea.ListTeamsOptions{})
+			if err != nil {
+				log.Printf("List teams for org %s: %v", org.Name, err)
+				continue
+			}
+
+			var giteaTeam *gitea.Team
+			for _, t := range existingTeams {
+				if t.Name == team.Name {
+					giteaTeam = t
+					break
+				}
+			}
+
+			if giteaTeam == nil {
+				perm := gitea.AccessModeOwner
+				if team.Permission != "" {
+					perm = gitea.AccessMode(team.Permission)
+				}
+				giteaTeam, _, err = client.CreateTeam(org.Name, gitea.CreateTeamOption{
+					Name:                    team.Name,
+					Permission:              perm,
+					IncludesAllRepositories: true,
+					Units: []gitea.RepoUnitType{
+						gitea.RepoUnitCode,
+						gitea.RepoUnitIssues,
+						gitea.RepoUnitPulls,
+					},
+				})
+				if err != nil {
+					log.Printf("Create team %s in org %s: %v", team.Name, org.Name, err)
+					continue
+				}
+				log.Printf("Created team %s in org %s", team.Name, org.Name)
+			}
+
+			for _, member := range team.Members {
+				_, _, err := client.GetTeamMember(giteaTeam.ID, member)
+				if err != nil {
+					_, err = client.AddTeamMember(giteaTeam.ID, member)
+					if err != nil {
+						log.Printf("Add member %s to team %s: %v", member, team.Name, err)
+					} else {
+						log.Printf("Added member %s to team %s", member, team.Name)
+					}
+				}
 			}
 		}
 	}
