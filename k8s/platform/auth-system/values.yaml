@@ -286,6 +286,7 @@ authelia:
 app-template:
   controllers:
     lldap:
+      replicas: 1
       suffix: lldap
       strategy: Recreate
       containers:
@@ -385,9 +386,10 @@ app-template:
 
   persistence:
     lldap-data:
-      accessMode: ReadWriteMany
+      accessMode: ReadWriteOnce
       type: persistentVolumeClaim
       size: 100Mi
+      storageClass: longhorn
       globalMounts:
         - path: /data
     lldap-tls:
