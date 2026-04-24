@@ -4,11 +4,11 @@ metadata:
   name: traefik-public
   namespace: kube-system
   annotations:
-    metallb.universe.tf/address-pool: public
+    metallb.io/address-pool: public
+    metallb.io/loadBalancerIPs: 10.69.80.120
 spec:
   type: LoadBalancer
   loadBalancerClass: metallb
-  loadBalancerIP: 10.69.80.120
   externalTrafficPolicy: Local
   ports:
     - name: webpublic

@@ -47,9 +47,8 @@
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
                 system.stateVersion = "25.05";
                 services.k3s = {
-                  role = "server";
-                  # Leave true for first node in cluster
-                  clusterInit = true;
+                  role = "agent";
+                  serverAddr = "https://10.69.80.101:6443";
                 };
               })
             ];
@@ -106,7 +105,8 @@
 
                 services.k3s = {
                   role = "server";
-                  serverAddr = "https://10.69.80.101:6443";
+                  # Cluster init node is responsible for bootstrapping the cluster
+                  clusterInit = true;
                 };
               })
             ];
