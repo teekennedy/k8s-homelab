@@ -3,6 +3,8 @@ longhorn:
   defaultSettings:
     allowCollectingLonghornUsageMetrics: false
     defaultDataLocality: best-effort
+    # Only nodes that have the label node.longhorn.io/create-default-disk=true will get a disk added at /var/lib/longhorn
+    createDefaultDiskLabeledNodes: true
     # -- Maximum number of engines that are allowed to concurrently upgrade on each node after Longhorn Manager is upgraded. When the value is "0", Longhorn does not automatically upgrade volume engines to the new default engine image version.
     concurrentAutomaticEngineUpgradePerNodeLimit: "1"
     # -- Maximum number of replicas that can be concurrently rebuilt on each node. Increase this to speed up replica evacuation during node drains.
