@@ -72,20 +72,6 @@
       "extractVersionTemplate": "^v(?<version>.*)$"
     },
     {
-      "description": "Sync Kyverno appVersion with GitHub releases",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "k8s/foundation/kyverno/Chart.yaml"
-      ],
-      "matchStrings": [
-        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "kyverno/kyverno",
-      "extractVersionTemplate": "^(?<version>.*)$",
-      "versioningTemplate": "loose"
-    },
-    {
       "description": "Sync CloudNativePG appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
@@ -313,16 +299,6 @@
         "intel-device-plugins-operator",
         "intel-device-plugins-gpu",
         "intel/intel-device-plugins-for-kubernetes"
-      ]
-    },
-    {
-      "groupName": "helm kyverno",
-      "matchFileNames": [
-        "k8s/foundation/kyverno/**"
-      ],
-      "matchPackageNames": [
-        "kyverno",
-        "kyverno/kyverno"
       ]
     },
     {

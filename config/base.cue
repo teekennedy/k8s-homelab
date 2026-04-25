@@ -20,7 +20,6 @@ _productionApps: {
 			"cnpg-system",
 			"external-dns",
 			"kured",
-			"kyverno",
 			"longhorn-system",
 			"metallb",
 			"node-feature-discovery",
