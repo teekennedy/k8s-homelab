@@ -105,6 +105,7 @@ traefik:
     websecure:
       http3:
         enabled: true
+        advertisedPort: 443
     webpublic:
       port: 8001
       expose:
@@ -135,6 +136,7 @@ traefik:
           - crowdsec-crowdsec-bouncer@kubernetescrd
       http3:
         enabled: true
+        advertisedPort: 443
     terrariapublic:
       port: 7777
       expose:
