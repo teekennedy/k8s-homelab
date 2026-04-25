@@ -251,6 +251,10 @@ kube-prometheus-stack:
 
       storageSpec:
         volumeClaimTemplate:
+          metadata:
+            labels:
+              recurring-job.longhorn.io/source: "enabled"
+              recurring-job-group.longhorn.io/ephemeral: "enabled"
           spec:
             storageClassName: longhorn
             accessModes: ["ReadWriteOnce"]
@@ -285,6 +289,9 @@ loki:
       enabled: true
       size: 50Gi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
   read:
     replicas: 0
   write:
