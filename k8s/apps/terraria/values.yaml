@@ -246,7 +246,7 @@ app-template:
       enabled: true
       className: traefik
       annotations:
-        traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
+        traefik.ingress.kubernetes.io/router.entrypoints: wspublic
       hosts:
         - host: &terrariaHost terraria.msng.to
           paths:

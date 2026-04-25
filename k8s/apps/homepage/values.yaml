@@ -6,7 +6,7 @@ homepage:
   ingress:
     enabled: true
     annotations:
-      traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
+      traefik.ingress.kubernetes.io/router.entrypoints: wspublic
       traefik.ingress.kubernetes.io/router.middlewares: homepage-public-rate-limit@kubernetescrd
     hosts:
       - host: &homepageHost msng.to

@@ -9,21 +9,21 @@ All three instances run in the `external-dns` namespace.
 ### CloudFlare instance (public DNS)
 
 - **Provider:** CloudFlare
-- **Scope:** Only services annotated with `traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic`
+- **Scope:** Only services annotated with `traefik.ingress.kubernetes.io/router.entrypoints: wspublic`
 - **Record type:** A records pointing to the home network's public IP
 - **How it works:** The DDNS updater periodically checks the public IP and writes it to the `ddns-public-ip` ConfigMap. External-dns reads this as `--default-targets` and creates A records in CloudFlare for all discovered external services.
 
 ### Internal instance (Unifi DNS -- non-public services)
 
 - **Provider:** Unifi DNS via [external-dns-unifi-webhook](https://github.com/kashalls/external-dns-unifi-webhook)
-- **Scope:** Services _not_ annotated with `websecurepublic` (annotation filter: `notin`)
+- **Scope:** Services _not_ annotated with `wspublic` (annotation filter: `notin`)
 - **Record type:** A records pointing to the actual cluster/MetalLB IPs (auto-discovered from load balancer resources)
 - **How it works:** The Unifi webhook sidecar creates DNS records in the Unifi controller. Internal clients resolve directly to cluster IPs.
 
 ### Public-internal instance (Unifi DNS -- public services)
 
 - **Provider:** Unifi DNS via the same webhook
-- **Scope:** Only services annotated with `websecurepublic` (annotation filter: `in`)
+- **Scope:** Only services annotated with `wspublic` (annotation filter: `in`)
 - **Record type:** A records pointing to the public MetalLB VIP (`10.69.80.120`) via `--default-targets` / `--force-default-targets`
 - **How it works:** Creates Unifi DNS records for public services so LAN clients reach them via the MetalLB VIP instead of going through NAT reflection.
 
@@ -60,14 +60,14 @@ Add this annotation to your Ingress or IngressRoute:
 
 ```yaml
 annotations:
-  traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
+  traefik.ingress.kubernetes.io/router.entrypoints: wspublic
 ```
 
 This tells Traefik to route via the public entrypoint. The CloudFlare instance creates a public A record, and the public-internal Unifi instance creates an internal A record pointing to the MetalLB VIP.
 
 ### Internal-only service
 
-No special annotations needed. The internal Unifi instance discovers all non-`websecurepublic` services automatically and creates A records pointing to the cluster IPs.
+No special annotations needed. The internal Unifi instance discovers all non-`wspublic` services automatically and creates A records pointing to the cluster IPs.
 
 ## IPv6
 

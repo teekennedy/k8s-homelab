@@ -34,7 +34,7 @@ traefik:
     # Traefik doesn't need to download it from plugins.traefik.io on every
     # start. A cold cluster restart caused plugins.traefik.io to be unreachable
     # for 2/3 traefik pods, which disabled plugins for the pod's lifetime and
-    # broke every router on the websecurepublic entrypoint (the bouncer is its
+    # broke every router on the wspublic entrypoint (the bouncer is its
     # default middleware).
     additionalVolumes:
       - name: plugins-local
@@ -114,9 +114,15 @@ traefik:
       http:
         redirections:
           entryPoint:
-            to: websecurepublic
+            to: wspublic
             scheme: https
-    websecurepublic:
+    # Entrypoint name kept ≤9 chars so the chart's auto-generated http3
+    # container port (`wspublic-http3`, 14 chars) doesn't collide with the
+    # TCP port name after the chart's 15-char truncation in
+    # `traefik.portname`. The previous name `websecurepublic` was already
+    # 15 chars, so the http3 variant truncated back to the same string and
+    # produced a duplicate container port in the Deployment.
+    wspublic:
       port: 8444
       expose:
         default: false

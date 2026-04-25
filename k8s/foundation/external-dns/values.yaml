@@ -16,7 +16,7 @@ external-dns:
   extraArgs:
     - "--default-targets=$(DEFAULT_TARGET)"
     - "--force-default-targets"
-    - "--annotation-filter=traefik.ingress.kubernetes.io/router.entrypoints in (websecurepublic)"
+    - "--annotation-filter=traefik.ingress.kubernetes.io/router.entrypoints in (wspublic)"
   sources:
     - service
     - ingress
@@ -29,7 +29,7 @@ external-dns:
     serviceMonitor:
       enabled: true
 
-# Internal instance: resolves non-websecurepublic resources to cluster IPs
+# Internal instance: resolves non-wspublic resources to cluster IPs
 # in Unifi DNS so internal clients avoid NAT reflection.
 external-dns-internal:
   fullnameOverride: external-dns-internal
@@ -67,7 +67,7 @@ external-dns-internal:
     - ingress
     - gateway-httproute
     - traefik-proxy
-  annotationFilter: "traefik.ingress.kubernetes.io/router.entrypoints notin (websecurepublic)"
+  annotationFilter: "traefik.ingress.kubernetes.io/router.entrypoints notin (wspublic)"
   interval: 5m
   triggerLoopOnEvent: true
   metrics:
@@ -75,7 +75,7 @@ external-dns-internal:
     serviceMonitor:
       enabled: true
 
-# Internal instance for public services: resolves websecurepublic resources
+# Internal instance for public services: resolves wspublic resources
 # to the public MetalLB VIP in Unifi DNS so they're reachable from the LAN.
 external-dns-public-internal:
   fullnameOverride: external-dns-public-internal
@@ -113,7 +113,7 @@ external-dns-public-internal:
     - ingress
     - gateway-httproute
     - traefik-proxy
-  annotationFilter: "traefik.ingress.kubernetes.io/router.entrypoints in (websecurepublic)"
+  annotationFilter: "traefik.ingress.kubernetes.io/router.entrypoints in (wspublic)"
   extraArgs:
     - --default-targets=10.69.80.120
     - --force-default-targets

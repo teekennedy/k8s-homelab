@@ -6,6 +6,10 @@ metadata:
   annotations:
     metallb.io/address-pool: public
     metallb.io/loadBalancerIPs: 10.69.80.120
+    # Share the public VIP with traefik-public-udp below so HTTP/3 (UDP/443)
+    # and HTTP/1.1+2 (TCP/443) can coexist on the same external IP without
+    # relying on the MixedProtocolLBService feature gate.
+    metallb.io/allow-shared-ip: traefik-public-vip
 spec:
   type: LoadBalancer
   loadBalancerClass: metallb
@@ -15,14 +19,36 @@ spec:
       port: 80
       protocol: TCP
       targetPort: webpublic
-    - name: websecurepublic
+    - name: wspublic
       port: 443
       protocol: TCP
-      targetPort: websecurepublic
+      targetPort: wspublic
     - name: terrariapublic
       port: 7777
       protocol: TCP
       targetPort: terrariapublic
+  selector:
+    app.kubernetes.io/instance: traefik-kube-system
+    app.kubernetes.io/name: traefik
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-public-udp
+  namespace: kube-system
+  annotations:
+    metallb.io/address-pool: public
+    metallb.io/loadBalancerIPs: 10.69.80.120
+    metallb.io/allow-shared-ip: traefik-public-vip
+spec:
+  type: LoadBalancer
+  loadBalancerClass: metallb
+  externalTrafficPolicy: Local
+  ports:
+    - name: wspublic-http3
+      port: 443
+      protocol: UDP
+      targetPort: wspublic-http3
   selector:
     app.kubernetes.io/instance: traefik-kube-system
     app.kubernetes.io/name: traefik

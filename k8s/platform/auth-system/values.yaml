@@ -6,7 +6,7 @@ authelia:
   ingress:
     enabled: true
     annotations:
-      traefik.ingress.kubernetes.io/router.entrypoints: websecurepublic
+      traefik.ingress.kubernetes.io/router.entrypoints: wspublic
       # External-dns cannot autodetect the load balancer IP for a Traefik IngressRoute
       # Explicitly set an A record target.
       external-dns.alpha.kubernetes.io/target: 10.69.80.120
@@ -19,7 +19,7 @@ authelia:
       enabled: true
       disableIngressRoute: false
       strategy: wrr
-      entryPoints: ["websecure", "websecurepublic"]
+      entryPoints: ["websecure", "wspublic"]
   configMap:
     theme: auto
     extraConfigs:
