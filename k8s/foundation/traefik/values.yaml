@@ -1,8 +1,17 @@
 traefik:
   service:
+    # Split into separate TCP and UDP services so HTTP/3 (UDP) can coexist with
+    # HTTP/1.1+2 (TCP) on port 443. Kubernetes' MixedProtocolLBService is
+    # gated/unsupported by some LB implementations (incl. our MetalLB setup),
+    # so the chart's recommended workaround is dual Services sharing one VIP.
+    # See https://github.com/kubernetes/kubernetes/issues/47249#issuecomment-587960741
+    single: false
     annotations:
       metallb.io/address-pool: internal
       metallb.io/loadBalancerIPs: 10.69.80.100
+      # Allow the TCP and UDP services to share the same MetalLB-assigned IP.
+      # The value must match on every service that wants to share the VIP.
+      metallb.io/allow-shared-ip: traefik-public
     spec:
       loadBalancerClass: metallb
   tlsStore:
@@ -93,6 +102,9 @@ traefik:
   nodeSelector:
     node-role.kubernetes.io/control-plane: "true"
   ports:
+    websecure:
+      http3:
+        enabled: true
     webpublic:
       port: 8001
       expose:
@@ -115,6 +127,8 @@ traefik:
           enabled: true
         middlewares:
           - crowdsec-crowdsec-bouncer@kubernetescrd
+      http3:
+        enabled: true
     terrariapublic:
       port: 7777
       expose:
