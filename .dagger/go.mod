@@ -29,7 +29,7 @@ require (
 )
 
 require (
-	dagger.io/dagger v0.20.5-0.20260409204156-6e4822e59cbb
+	dagger.io/dagger v0.20.6
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
