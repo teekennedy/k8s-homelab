@@ -1,3 +1,4 @@
+# https://github.com/M0NsTeRRR/helm-charts/tree/main/charts/homepage
 homepage:
   image:
     registry: ghcr.io

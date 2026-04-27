@@ -218,17 +218,15 @@ authelia:
             redirect_uris:
               - https://argocd.msng.to/auth/callback
               - https://argocd.msng.to/pkce/verify
-          # Confidential PKCE client for oauth2-proxy. The client_secret value
-          # is read at Authelia startup from a file mounted via additionalSecrets
-          # (oauth2-proxy-secrets, mirrored from the oauth2-proxy namespace by
-          # reflector). The {{ secret ... }} template syntax requires the
-          # `template` config filter to be enabled (see pod.env below).
           # token_endpoint_auth_method: client_secret_post matches what
           # oauth2-proxy / golang.org/x/oauth2 sends at the token endpoint.
+          # client_secret is a bcrypt hash of the mittwald-generated secret in
+          # oauth2-proxy-secrets. The hash can be regenerated with:
+          # authelia crypto hash generate bcrypt --password <plaintext>
           - client_id: oauth2-proxy
             client_name: OAuth2 Proxy
             consent_mode: implicit
-            client_secret: '$plaintext${{ secret "/secrets/oauth2-proxy-secrets/client-secret" }}'
+            client_secret: '$2b$12$407JaO6LrgVmhnL4tO46vOcZwW4vsM0qTTHAXXpuJF7TkhNxOTTDy'
             token_endpoint_auth_method: client_secret_post
             authorization_policy: one_factor
             require_pkce: true
@@ -266,11 +264,6 @@ authelia:
           secretKeyRef:
             name: smtp-creds
             key: username
-      # Enable Authelia's template config filter so {{ secret "..." }}
-      # references in the configmap (e.g. the oauth2-proxy client_secret) are
-      # interpolated from mounted files at startup.
-      - name: X_AUTHELIA_CONFIG_FILTERS
-        value: template
     # Add step CA to Authelia's trusted certificates
     extraVolumeMounts:
       - name: certificates
@@ -315,12 +308,6 @@ authelia:
         items:
           - key: oidc.jwk.RS256.pem
             path: oidc.jwk.RS256.pem
-      # Mirrored from oauth2-proxy namespace by reflector. Provides the
-      # client_secret for the oauth2-proxy OIDC client (see clients[] above).
-      oauth2-proxy-secrets:
-        items:
-          - key: client-secret
-            path: client-secret
 
 
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-4.0.1/charts/library/common/values.schema.json

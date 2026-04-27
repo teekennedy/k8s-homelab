@@ -1,2 +1,0 @@
-# source https://github.com/emberstack/kubernetes-reflector/blob/main/src/helm/reflector/values.yaml
-reflector: {}
