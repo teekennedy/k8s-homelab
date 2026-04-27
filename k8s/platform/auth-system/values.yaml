@@ -17,13 +17,7 @@ authelia:
       secret: authelia-tls-certificate
     traefikCRD:
       enabled: true
-      # The chart's IngressRoute template doesn't expose `serversTransport`
-      # on its service, so disable it and provide our own in templates/ that
-      # references our authelia ServersTransport. Without an explicit
-      # idleConnTimeout, Traefik's backend pool holds connections idle
-      # forever and Authelia's fasthttp logs every reaped keepalive as a
-      # 408 error.
-      disableIngressRoute: true
+      disableIngressRoute: false
       strategy: wrr
       entryPoints: ["websecure", "wspublic"]
   configMap:
@@ -31,9 +25,9 @@ authelia:
     extraConfigs:
       - /config/ca-trust-store.yaml
     server:
-      # idle > Traefik's idleConnTimeout (default 90s) so Traefik closes
-      # pooled keepalive connections first. Avoids fasthttp logging every
-      # reaped idle connection as a 408 error.
+      # read timeout > Traefik's idleConnTimeout (default 90s) so Traefik
+      # closes pooled keepalive connections first. Avoids fasthttp logging
+      # every reaped idle connection as a 408 error.
       timeouts:
         read: 120s
         write: 30s
