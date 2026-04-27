@@ -35,6 +35,7 @@ oauth2-proxy:
       # and forwards authenticated requests to homepage. Unauthenticated
       # requests get a real 302 redirect to /oauth2/start (no Traefik errors
       # middleware in the path), so the sign-in flow is fully seamless.
+      skip_provider_button = true
       upstreams = ["http://homepage.homepage.svc.cluster.local/"]
       trusted_proxy_ips = ["10.42.0.0/16"]
 
