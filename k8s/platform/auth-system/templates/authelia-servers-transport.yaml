@@ -1,0 +1,11 @@
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: authelia
+  namespace: {{ .Release.Namespace }}
+spec:
+  # Close pooled idle backend connections before Authelia's fasthttp idle
+  # timeout (120s) so Traefik FINs cleanly instead of Authelia logging a
+  # 408 on the read-side timeout.
+  forwardingTimeouts:
+    idleConnTimeout: 90s

@@ -1,0 +1,36 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: auth-system-authelia
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: wspublic
+    external-dns.alpha.kubernetes.io/target: 10.69.80.120
+spec:
+  entryPoints:
+    - websecure
+    - wspublic
+  routes:
+    - kind: Rule
+      match: Host(`authelia.msng.to`) && PathPrefix(`/`)
+      priority: 500
+      middlewares:
+        - name: chain-auth-system-authelia
+          namespace: {{ .Release.Namespace }}
+      services:
+        - kind: Service
+          name: auth-system-authelia
+          namespace: {{ .Release.Namespace }}
+          port: 80
+          scheme: http
+          strategy: wrr
+          weight: 10
+          passHostHeader: true
+          responseForwarding:
+            flushInterval: 100ms
+          serversTransport: authelia
+  tls:
+    secretName: authelia-tls-certificate
+    options:
+      name: auth-system-authelia
+      namespace: {{ .Release.Namespace }}

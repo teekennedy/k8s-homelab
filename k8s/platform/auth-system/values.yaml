@@ -17,13 +17,27 @@ authelia:
       secret: authelia-tls-certificate
     traefikCRD:
       enabled: true
-      disableIngressRoute: false
+      # The chart's IngressRoute template doesn't expose `serversTransport`
+      # on its service, so disable it and provide our own in templates/ that
+      # references our authelia ServersTransport. Without an explicit
+      # idleConnTimeout, Traefik's backend pool holds connections idle
+      # forever and Authelia's fasthttp logs every reaped keepalive as a
+      # 408 error.
+      disableIngressRoute: true
       strategy: wrr
       entryPoints: ["websecure", "wspublic"]
   configMap:
     theme: auto
     extraConfigs:
       - /config/ca-trust-store.yaml
+    server:
+      # idle > Traefik's idleConnTimeout (default 90s) so Traefik closes
+      # pooled keepalive connections first. Avoids fasthttp logging every
+      # reaped idle connection as a 408 error.
+      timeouts:
+        read: 120s
+        write: 30s
+        idle: 120s
     definitions:
       network:
         internal:
@@ -52,8 +66,10 @@ authelia:
       # Password reset through authelia works normally.
       password_reset:
         disable: false
-      # How often authelia should check if there is a user update in LDAP
-      refresh_interval: 5m
+      # How often authelia should check if there is a user update in LDAP.
+      # Kept long to keep LDAP off the forward-auth hot path; group/disable
+      # changes propagate within this window or on next login.
+      refresh_interval: 1h
       ldap:
         enabled: true
         implementation: lldap
@@ -156,22 +172,15 @@ authelia:
           subdomain: authelia
           default_redirection_url: 'https://msng.to'
 
-      # Redis Sentinel for session storage
+      # Single Valkey instance backed by a Longhorn PVC with AOF persistence.
+      # Sessions survive Valkey pod restarts; the ~30-90s reschedule window is
+      # an acceptable tradeoff for the homelab to avoid Sentinel failover
+      # chatter on the forward-auth hot path.
       redis:
         enabled: true
-        host: redis-sentinel.auth-system.svc.cluster.local
-        port: &sentinelPort 26379
+        host: valkey.auth-system.svc.cluster.local
+        port: 6379
         database_index: 0
-        high_availability:
-          enabled: true
-          sentinel_name: mymaster
-          nodes:
-            - host: redis-0.redis-sentinel-headless.auth-system.svc.cluster.local
-              port: *sentinelPort
-            - host: redis-1.redis-sentinel-headless.auth-system.svc.cluster.local
-              port: *sentinelPort
-            - host: redis-2.redis-sentinel-headless.auth-system.svc.cluster.local
-              port: *sentinelPort
     # TODO setup metrics
     telemetry:
       metrics:
