@@ -1,0 +1,36 @@
+---
+# Traefik forwardAuth middleware. Apply to a protected ingress with:
+#   traefik.ingress.kubernetes.io/router.middlewares: oauth2-proxy-oauth2-proxy@kubernetescrd
+# Pair with the errors middleware below (oauth2-proxy-signin) so unauthenticated
+# requests are redirected through the OIDC flow rather than returning a bare 401.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: oauth2-proxy
+  namespace: {{ .Release.Namespace }}
+spec:
+  forwardAuth:
+    address: http://oauth2-proxy.{{ .Release.Namespace }}.svc.cluster.local/oauth2/auth
+    trustForwardHeader: true
+    authResponseHeaders:
+      - X-Auth-Request-User
+      - X-Auth-Request-Email
+      - X-Auth-Request-Groups
+      - X-Auth-Request-Access-Token
+      - Authorization
+---
+# Catches 401s from the forwardAuth middleware and redirects the browser to
+# /oauth2/sign_in?rd=<original-url> so the user lands in the Authelia login flow.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: oauth2-proxy-signin
+  namespace: {{ .Release.Namespace }}
+spec:
+  errors:
+    status:
+      - "401"
+    service:
+      name: oauth2-proxy
+      port: 80
+    query: "/oauth2/sign_in?rd={url}"

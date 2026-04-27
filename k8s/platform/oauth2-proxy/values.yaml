@@ -1,0 +1,72 @@
+# https://github.com/oauth2-proxy/manifests/blob/main/helm/oauth2-proxy/values.yaml
+oauth2-proxy:
+  # Use existingSecret so client-id, client-secret (empty for public PKCE), and
+  # cookie-secret come from the mittwald-generated Secret.
+  config:
+    existingSecret: oauth2-proxy-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://msng.to/oauth2/callback"
+      # Apex form (no leading dot): RFC 6265 cookies set with Domain=msng.to
+      # apply to msng.to AND all subdomains. The legacy leading-dot form
+      # triggers an oauth2-proxy warning when the request host is the apex.
+      cookie_domains = ["msng.to"]
+      cookie_expire = "168h"
+      cookie_refresh = "1h"
+      cookie_secure = true
+      cookie_httponly = true
+      cookie_samesite = "lax"
+      # Leading-dot form here so rd= can redirect to subdomains as well.
+      whitelist_domains = [".msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      # Leave skip_provider_button=false (default) so /oauth2/sign_in returns
+      # a 200 HTML page with a sign-in button rather than a 302. Traefik's
+      # `errors` middleware preserves the original 401 status while only
+      # substituting the body — so a 302 from sign_in renders as a "Found"
+      # link the user has to click manually. The 200 form submits cleanly.
+      pass_authorization_header = true
+      pass_access_token = true
+      set_xauthrequest = true
+      code_challenge_method = "S256"
+      scope = "openid profile email"
+      # Bypass auth for clients on the internal network, mirroring the
+      # previous Authelia internal-network bypass.
+      trusted_ips = ["10.69.0.0/16"]
+      # Traefik overwrites X-Real-Ip with the connecting client's address and
+      # does not trust client-supplied values, so trusted_ips can't be spoofed.
+      # X-Forwarded-For is appended-to (leftmost is attacker-controlled), which
+      # is what oauth2-proxy warns about when paired with reverse_proxy=true.
+      real_client_ip_header = "X-Real-Ip"
+
+  # Public PKCE client: pass an explicit empty client_secret on the command line
+  # so oauth2-proxy treats this as a public client.
+  extraArgs:
+    client-secret: "''"
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  ingress:
+    enabled: true
+    className: traefik
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: wspublic
+    path: /oauth2
+    pathType: Prefix
+    hosts:
+      - msng.to
+    tls:
+      - hosts:
+          - msng.to

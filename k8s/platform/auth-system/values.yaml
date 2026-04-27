@@ -218,6 +218,29 @@ authelia:
             redirect_uris:
               - https://argocd.msng.to/auth/callback
               - https://argocd.msng.to/pkce/verify
+          # Public PKCE client for oauth2-proxy. oauth2-proxy holds its own
+          # session cookie so this OIDC flow only runs at sign-in, not on
+          # every request.
+          - client_id: oauth2-proxy
+            client_name: OAuth2 Proxy
+            consent_mode: implicit
+            public: true
+            authorization_policy: one_factor
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+              - groups
+              - offline_access
+            grant_types:
+              - authorization_code
+              - refresh_token
+            response_types:
+              - code
+            redirect_uris:
+              - https://msng.to/oauth2/callback
         jwks:
           - key_id: argocd
             algorithm: RS256
