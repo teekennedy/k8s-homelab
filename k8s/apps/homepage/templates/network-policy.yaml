@@ -21,14 +21,16 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
-    # Traefik ingress controller
+    # oauth2-proxy reverse-proxies authenticated traffic from the public
+    # msng.to ingress into homepage. Traefik no longer talks to homepage
+    # directly — it forwards to oauth2-proxy, which forwards here.
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: kube-system
+              kubernetes.io/metadata.name: oauth2-proxy
           podSelector:
             matchLabels:
-              app.kubernetes.io/name: traefik
+              app.kubernetes.io/name: oauth2-proxy
       ports:
         - protocol: TCP
           port: 3000

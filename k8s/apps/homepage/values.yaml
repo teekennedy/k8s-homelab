@@ -3,19 +3,14 @@ homepage:
     registry: ghcr.io
     repository: gethomepage/homepage
     tag: "v1.12.3"
+  # Homepage is fronted by oauth2-proxy in reverse-proxy mode (see
+  # k8s/platform/oauth2-proxy). The msng.to ingress and TLS are owned by the
+  # oauth2-proxy chart, which forwards authenticated traffic to this service.
   ingress:
-    enabled: true
-    annotations:
-      traefik.ingress.kubernetes.io/router.entrypoints: wspublic
-      traefik.ingress.kubernetes.io/router.middlewares: homepage-public-rate-limit@kubernetescrd,oauth2-proxy-oauth2-proxy-signin@kubernetescrd,oauth2-proxy-oauth2-proxy@kubernetescrd
-    hosts:
-      - host: &homepageHost msng.to
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      - hosts:
-          - *homepageHost
+    enabled: false
+  config:
+    allowedHosts:
+      - msng.to
   volumeMounts:
     - name: homepage-config
       mountPath: /app/config/settings.yaml
