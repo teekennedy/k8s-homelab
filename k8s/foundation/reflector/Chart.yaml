@@ -1,0 +1,9 @@
+apiVersion: v2
+name: reflector
+description: emberstack/kubernetes-reflector for cross-namespace secret/configmap mirroring
+type: application
+version: 0.0.1
+dependencies:
+  - name: reflector
+    version: 10.0.39
+    repository: https://emberstack.github.io/helm-charts
