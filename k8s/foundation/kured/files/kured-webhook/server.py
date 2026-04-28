@@ -197,6 +197,10 @@ def handle_event(event: str, node: str) -> bool:
             create_silence(alertname, duration, node, "kured drain")
         set_reboot_alert(node, resolved=False)
         return True
+    if event == "reboot":
+        # Resolve reboot alert
+        set_reboot_alert(node, resolved=True)
+        return True
     if event == "uncordon":
         # Silence alerts
         duration = parse_duration(config().post_reboot_silence_duration)
