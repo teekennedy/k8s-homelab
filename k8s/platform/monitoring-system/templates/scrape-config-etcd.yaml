@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: etcd
+  namespace: {{ .Release.Namespace }}
+  labels:
+    release: {{ .Release.Name }}
+spec:
+  kubernetesSDConfigs:
+    - role: Node
+  relabelings:
+    - sourceLabels: [__meta_kubernetes_node_label_node_role_kubernetes_io_etcd]
+      regex: "true"
+      action: keep
+    - sourceLabels: [__meta_kubernetes_node_address_InternalIP]
+      replacement: "$1:2381"
+      targetLabel: __address__
+    - sourceLabels: [__meta_kubernetes_node_name]
+      targetLabel: instance
+    - replacement: etcd
+      targetLabel: job
+  metricRelabelings:
+    - action: drop
+      sourceLabels: [__name__]
+      regex: (etcd_disk_backend_(defrag|snapshot)_duration_seconds|etcd_mvcc_(db_compaction_(keys|pause|total)_duration_seconds|hash_duration_seconds|hash_rev_duration_seconds)|etcd_snap_(db_save_total|db_fsync|fsync)_duration_seconds|etcd_network_(client_grpc_received|client_grpc_sent)_bytes|grpc_server_handling_seconds)_bucket
+  scheme: HTTP
+  scrapeInterval: 30s
