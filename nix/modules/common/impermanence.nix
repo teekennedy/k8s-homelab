@@ -1,37 +1,49 @@
 {
   inputs,
-  lib,
   config,
+  pkgs,
   ...
 }: {
   imports = [
     inputs.impermanence.nixosModules.impermanence
   ];
 
-  boot.initrd.postResumeCommands = lib.mkAfter ''
-    MNTPOINT=$(mktemp -d)
-    mount ${config.fileSystems."/".device} $MNTPOINT
-    trap 'umount $MNTPOINT; rm -rf $MNTPOINT' EXIT
-    if [[ -e $MNTPOINT/root ]]; then
-        mkdir -p $MNTPOINT/old_roots
-        timestamp=$(date --date="@$(stat -c %Y $MNTPOINT/root)" "+%Y-%m-%-d_%H:%M:%S")
-        mv $MNTPOINT/root "$MNTPOINT/old_roots/$timestamp"
-    fi
+  boot.initrd.systemd.services.impermanence = {
+    description = "Archive and recreate BTRFS root subvolume for nix-impermanence";
+    wantedBy = ["initrd.target"];
+    # disk-main-root is the disko-assigned partlabel for the btrfs partition on all hosts
+    after = ["dev-disk-by\\x2dpartlabel-disk\\x2dmain\\x2droot.device"];
+    before = ["sysroot.mount"];
+    unitConfig.DefaultDependencies = "no";
+    serviceConfig = {
+      Type = "oneshot";
+    };
+    path = [pkgs.btrfs-progs pkgs.mktemp pkgs.util-linux pkgs.coreutils pkgs.findutils];
+    script = ''
+      MNTPOINT=$(mktemp -d)
+      mount ${config.fileSystems."/".device} $MNTPOINT -o subvol=/
+      trap 'umount $MNTPOINT; rm -rf $MNTPOINT' EXIT
+      if [[ -e $MNTPOINT/root ]]; then
+          mkdir -p $MNTPOINT/old_roots
+          timestamp=$(date --date="@$(stat -c %Y $MNTPOINT/root)" "+%Y-%m-%-d_%H:%M:%S")
+          mv $MNTPOINT/root "$MNTPOINT/old_roots/$timestamp"
+      fi
 
-    delete_subvolume_recursively() {
-        IFS=$'\n'
-        for i in $(btrfs subvolume list -o "$1" | cut -f 9- -d ' '); do
-            delete_subvolume_recursively "$MNTPOINT/$i"
-        done
-        btrfs subvolume delete "$1"
-    }
+      delete_subvolume_recursively() {
+          IFS=$'\n'
+          for i in $(btrfs subvolume list -o "$1" | cut -f 9- -d ' '); do
+              delete_subvolume_recursively "$MNTPOINT/$i"
+          done
+          btrfs subvolume delete "$1"
+      }
 
-    for i in $(find $MNTPOINT/old_roots/ -maxdepth 1 -mtime +30); do
-        delete_subvolume_recursively "$i"
-    done
+      for i in $(find $MNTPOINT/old_roots/ -maxdepth 1 -mtime +30); do
+          delete_subvolume_recursively "$i"
+      done
 
-    btrfs subvolume create $MNTPOINT/root
-  '';
+      btrfs subvolume snapshot $MNTPOINT/root-blank $MNTPOINT/root
+    '';
+  };
 
   # persistent is for files/directories that are backed up
   fileSystems."/persistent".neededForBoot = true;
