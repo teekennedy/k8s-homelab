@@ -19,7 +19,7 @@
   boot.blacklistedKernelModules = ["btusb" "bluetooth"];
 
   # Add wheel group to nix trusted users
-  nix.settings.trusted-users = ["root" "@wheel"];
+  nix.settings.trusted-users = ["@wheel"];
 
   # Set your time zone.
   time.timeZone = "America/Denver";

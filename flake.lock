@@ -172,24 +172,6 @@
         "type": "github"
       }
     },
-    "flake-utils": {
-      "inputs": {
-        "systems": "systems_2"
-      },
-      "locked": {
-        "lastModified": 1731533236,
-        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "type": "github"
-      }
-    },
     "git-hooks-nix": {
       "inputs": {
         "flake-compat": "flake-compat_2",
@@ -256,23 +238,6 @@
         "repo": "impermanence",
         "type": "github"
       }
-    },
-    "lab": {
-      "inputs": {
-        "flake-utils": "flake-utils",
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "path": "./cmd/lab",
-        "type": "path"
-      },
-      "original": {
-        "path": "./cmd/lab",
-        "type": "path"
-      },
-      "parent": []
     },
     "lenovo_sa120_fanspeed": {
       "inputs": {
@@ -457,7 +422,6 @@
         "disko": "disko",
         "flake-parts": "flake-parts_2",
         "impermanence": "impermanence",
-        "lab": "lab",
         "lenovo_sa120_fanspeed": "lenovo_sa120_fanspeed",
         "nixos-facter-modules": "nixos-facter-modules",
         "nixpkgs": "nixpkgs_5",
@@ -486,21 +450,6 @@
       }
     },
     "systems": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    },
-    "systems_2": {
       "locked": {
         "lastModified": 1681028828,
         "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",

@@ -8,8 +8,6 @@
     disko.url = "github:nix-community/disko?ref=master";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence?ref=master";
-    lab.url = "./cmd/lab";
-    lab.inputs.nixpkgs.follows = "nixpkgs";
     lenovo_sa120_fanspeed.url = "./nix/modules/packages/lenovo_sa120_fanspeed";
     lenovo_sa120_fanspeed.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix?ref=master";
@@ -25,6 +23,7 @@
     flake-parts.lib.mkFlake {
       inherit inputs;
     } {
+      imports = [./nix/modules/builders/flake-module.nix];
       systems = ["aarch64-darwin" "x86_64-linux"];
       perSystem = {system, ...}: {
         _module.args.pkgs = import inputs.nixpkgs {
@@ -140,6 +139,27 @@
           }
         ];
       in {
+        # Addresses and build capacity for each borg builder host.
+        # maxJobs defaults to half the CPU core count read from each host's facter report.
+        builderClusters.borg = {
+          "borg-0" = {
+            address = "10.69.80.10";
+            facterPath = ./nix/hosts/borg-0/facter.json;
+          };
+          "borg-1" = {
+            address = "10.69.80.11";
+            facterPath = ./nix/hosts/borg-1/facter.json;
+          };
+          "borg-2" = {
+            address = "10.69.80.12";
+            facterPath = ./nix/hosts/borg-2/facter.json;
+          };
+          "borg-3" = {
+            address = "10.69.80.13";
+            facterPath = ./nix/hosts/borg-3/facter.json;
+          };
+        };
+
         # enable magic rollback and other checks
         checks = builtins.mapAttrs (_: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
         deploy.nodes = builtins.listToAttrs (builtins.map (host: {
@@ -159,10 +179,17 @@
               value = inputs.nixpkgs.lib.nixosSystem {
                 system = host.system;
                 specialArgs = {
-                  inherit inputs;
+                  inherit inputs self;
                 };
                 modules =
                   [
+                    self.nixosModules.builders
+                    {
+                      nix.builders = {
+                        cluster = "borg";
+                        remoteClusters = ["borg"];
+                      };
+                    }
                     ./nix/hosts/common
                     (./nix/hosts + "/${host.hostname}")
                     ./nix/modules/common
@@ -204,15 +231,19 @@
             # ln -s "$(readlink -f /tmp)/nix/$(readlink result)" result-iso
             installIso = inputs.nixpkgs.lib.nixosSystem {
               system = "x86_64-linux";
+              specialArgs = {inherit inputs self;};
               modules = [
                 "${inputs.nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
                 # Nix caches and settings
                 ./nix/modules/common/nix.nix
+                # Use borg hosts as remote builders when building with this ISO
+                self.nixosModules.builders
                 ({
                   lib,
                   pkgs,
                   ...
                 }: {
+                  nix.builders.remoteClusters = ["borg"];
                   users.users.root.openssh.authorizedKeys.keyFiles = builtins.map (s: ./nix/modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./nix/modules/users/authorized_keys));
                   networking.hostName = "nixos-installer";
                   # Pin nixpkgs to flake input
