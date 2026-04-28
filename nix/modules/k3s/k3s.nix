@@ -113,22 +113,6 @@ in {
     services.k3s.gracefulNodeShutdown.shutdownGracePeriodCriticalPods = "60s";
     services.k3s.gracefulNodeShutdown.shutdownGracePeriod = "120s";
 
-    # One-time migration: copy cred.bak into the freshly-mounted persistent cred directory.
-    # Remove this unit once all nodes have been rebooted with the new persistence config
-    # and cred.bak has been cleaned up.
-    systemd.services.k3s-migrate-cred = lib.mkIf isServer {
-      description = "Migrate k3s server cred files from backup into persistent mount";
-      after = ["var-lib-rancher-k3s-server-cred.mount"];
-      before = ["k3s.service"];
-      wantedBy = ["k3s.service"];
-      unitConfig.ConditionPathExists = "/var/lib/rancher/k3s/server/cred.bak";
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = "${pkgs.bash}/bin/bash -c 'cp -a /var/lib/rancher/k3s/server/cred.bak/. /var/lib/rancher/k3s/server/cred/'";
-        RemainAfterExit = true;
-      };
-    };
-
     # Persist important k3s data across reboots
     environment.persistence."/persistent" = {
       directories = lib.optionals isServer [
