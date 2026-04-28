@@ -24,6 +24,9 @@ kured:
     # If a drain fails or times out, force a reboot instead of giving up.
     # This prevents the node from continuing to run when it has been marked unschedulable in Longhorn.
     forceReboot: true
+    # How long after successful reboot to wait before releasing lock.
+    # Gives the cluster some time to settle after node comes back online.
+    lockReleaseDelay: 5m
 
 webhook:
   enabled: true
