@@ -1,12 +1,4 @@
 {...}: {
-  disableWakeOnLan.devices = [
-    "enp0s29f1" # aka eno1
-    "enp0s29f2" # aka eno2
-    # enp2s0 didn't exist as of the 2025-06-03 boot. Weird.
-    # Checked again on 2026-02-15 and it's back.
-    "enp2s0"
-    "enp3s0"
-  ];
   systemd.network = {
     netdevs = {
       "bond0" = {
