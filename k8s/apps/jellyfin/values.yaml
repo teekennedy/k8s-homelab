@@ -420,19 +420,18 @@ app-template:
                 httpGet:
                   path: /health
                   port: 8096
-                failureThreshold: 5
+                failureThreshold: 3
                 initialDelaySeconds: 30
-                periodSeconds: 10
+                periodSeconds: 30
                 successThreshold: 1
-                timeoutSeconds: 1
+                timeoutSeconds: 10
             readiness:
               enabled: true
               custom: true
               spec:
-                httpGet:
-                  path: /health
+                tcpSocket:
                   port: 8096
-                failureThreshold: 3
+                failureThreshold: 5
                 initialDelaySeconds: 30
                 periodSeconds: 10
                 successThreshold: 1
@@ -575,6 +574,48 @@ app-template:
                 secretKeyRef:
                   name: api-keys
                   key: RADARR_API_KEY
+    cleanuparr:
+      pod:
+        securityContext:
+          fsGroup: 1000
+          fsGroupChangePolicy: "OnRootMismatch"
+          runAsUser: 1000
+          runAsGroup: 1000
+      replicas: 1
+      containers:
+        cleanuparr:
+          # https://cleanuparr.github.io/Cleanuparr/
+          image:
+            repository: ghcr.io/cleanuparr/cleanuparr
+            tag: 2.9.10
+          env:
+            TZ: America/Denver
+            PORT: "11011"
+            BASE_PATH: ""
+            PUID: "1000"
+            PGID: "1000"
+            UMASK: "022"
+          probes:
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /health
+                  port: 11011
+                failureThreshold: 3
+                initialDelaySeconds: 30
+                periodSeconds: 30
+                timeoutSeconds: 10
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: 11011
+                failureThreshold: 3
+                initialDelaySeconds: 30
+                periodSeconds: 10
     downloader:
       replicas: 1
       pod:
@@ -715,6 +756,12 @@ app-template:
         jellyseerr:
           port: 5055
           protocol: HTTP
+    cleanuparr:
+      controller: cleanuparr
+      ports:
+        http:
+          port: 11011
+          protocol: HTTP
     arrs:
       controller: arrs
       ports:
@@ -776,6 +823,19 @@ app-template:
       tls:
         - hosts:
             - *qbittorrentHost
+    cleanuparr:
+      enabled: true
+      hosts:
+        - host: &cleanuparrHost cleanuparr.msng.to
+          paths:
+            - path: /
+              pathType: Prefix
+              service:
+                identifier: cleanuparr
+                port: http
+      tls:
+        - hosts:
+            - *cleanuparrHost
     prowlarr:
       enabled: true
       hosts:
@@ -873,6 +933,15 @@ app-template:
             - path: /data/config/logging.json
               readOnly: true
               subPath: logging.json
+    cleanuparr-data:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      size: 500Mi
+      storageClass: longhorn
+      advancedMounts:
+        cleanuparr:
+          cleanuparr:
+            - path: /config
     configarr-repos:
       type: emptyDir
       advancedMounts:
