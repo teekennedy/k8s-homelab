@@ -287,6 +287,17 @@ loki:
           index:
             prefix: loki_index_
             period: 24h
+    ruler:
+      storage:
+        type: local
+        local:
+          directory: /rules
+      rule_path: /tmp/ruler-scratch
+      alertmanager_url: http://monitoring-system-kube-pro-alertmanager.monitoring-system.svc.cluster.local:9093
+      enable_alertmanager_v2: true
+      ring:
+        kvstore:
+          store: inmemory
   singleBinary:
     replicas: 1
     persistence:
@@ -296,6 +307,13 @@ loki:
       labels:
         recurring-job.longhorn.io/source: "enabled"
         recurring-job-group.longhorn.io/ephemeral: "enabled"
+    extraVolumes:
+      - name: loki-rules
+        configMap:
+          name: loki-alert-rules
+    extraVolumeMounts:
+      - name: loki-rules
+        mountPath: /rules/fake
   read:
     replicas: 0
   write:
