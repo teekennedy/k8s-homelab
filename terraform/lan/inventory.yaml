@@ -219,7 +219,7 @@ vlans:
     subnet: 10.69.100.160/27 # 30 usable hosts
     wifi_networks: ["kennedy_iot"]
     switch_ports: [17, 19]
-    notes: "includes Xcel net meter and solar panel"
+    notes: "includes Xcel net meter, solar combiner, and smart breaker panel"
     dhcp:
       enabled: true
       start: 10.69.100.165
