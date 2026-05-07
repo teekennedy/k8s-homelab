@@ -10,7 +10,10 @@
     randomizedDelaySec = "1h";
     pools = ["storage"];
   };
-  # Tell zfs to leave a minimum of 10% total memory free.
+  # Don't import the zfs root pools during early boot.
+  # Before 26.11, this defaulted to true and carried risk of data loss.
+  boot.zfs.forceImportRoot = false;
+  # Tell zfs to leave a minimum of 25% total memory free.
   boot.extraModprobeConfig = with builtins; let
     total_mem_bytes =
       (
@@ -23,7 +26,7 @@
       )
           .range;
   in ''
-    options zfs zfs_arc_sys_free=${toString (floor (mul total_mem_bytes 0.1))}
+    options zfs zfs_arc_sys_free=${toString (floor (mul total_mem_bytes 0.25))}
   '';
   disko.devices = {
     disk = {
