@@ -11,3 +11,15 @@ parameters:
   # staleReplicaTimeout: "2880" # 48 hours in minutes
   # fromBackup: ""
   # fsType: "ext4"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-rc2
+  namespace: {{ .Release.Namespace }}
+parameters:
+  numberOfReplicas: "2"
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

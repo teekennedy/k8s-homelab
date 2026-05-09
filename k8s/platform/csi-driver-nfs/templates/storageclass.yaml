@@ -1,0 +1,19 @@
+{{- range .Values.nfs.storageClasses }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .name }}
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: {{ $.Values.nfs.server }}
+  share: {{ .share }}
+volumeBindingMode: Immediate
+reclaimPolicy: {{ .reclaimPolicy }}
+allowVolumeExpansion: true
+mountOptions:
+  - nfsvers=4.2
+  # xprtsec=mtls: kernel performs a mutual TLS handshake via tlshd before mounting.
+  # Both the provisioner pod's node and any data-plane nodes must have nfs-mtls clientMode enabled.
+  - xprtsec=mtls
+{{- end }}

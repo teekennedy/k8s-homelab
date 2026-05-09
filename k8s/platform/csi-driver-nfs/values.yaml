@@ -1,0 +1,12 @@
+nfs:
+  server: borg-2.msng.to
+
+  storageClasses:
+    - name: nfs
+      share: /k8s
+      reclaimPolicy: Delete
+    - name: nfs-backups
+      share: /k8s/backups
+      reclaimPolicy: Retain
+
+# upstream defaults: https://github.com/kubernetes-csi/csi-driver-nfs/blob/master/charts/latest/csi-driver-nfs/values.yaml

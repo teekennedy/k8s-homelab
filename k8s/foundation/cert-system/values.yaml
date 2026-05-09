@@ -23,6 +23,8 @@ step-certificates:
   ca:
     name: Missing Token Internal K8s CA
     # dns name will be <fullName>.<namespace>.svc.cluster.local
+    provisioner:
+      name: admin
   existingSecrets: {}
   # Decrease the database PVC size from the default 10Gi.
   # I have a hard time believing it needs that much space.

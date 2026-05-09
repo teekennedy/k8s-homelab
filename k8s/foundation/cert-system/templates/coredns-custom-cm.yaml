@@ -1,0 +1,23 @@
+# k3s CoreDNS loads *.override files into the main .:53 server block and
+# *.server files as standalone server blocks. This ConfigMap is mounted at
+# /etc/coredns/custom/ via the coredns Deployment in kube-system.
+#
+# borg-nodes.override: adds internal LAN IP entries for each borg host.
+# Without these entries, step-ca pods would attempt to resolve borg-N.msng.to
+# through the public DNS (where there is no record), causing HTTP-01 ACME
+# challenges to fail. With these entries, step-ca resolves borg hostnames to
+# their LAN IPs and the HTTP-01 challenge succeeds entirely within the cluster.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  borg-nodes.override: |
+    hosts {
+      10.69.80.10 borg-0.msng.to
+      10.69.80.11 borg-1.msng.to
+      10.69.80.12 borg-2.msng.to
+      10.69.80.13 borg-3.msng.to
+      fallthrough
+    }

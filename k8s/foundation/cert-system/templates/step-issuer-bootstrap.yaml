@@ -29,11 +29,20 @@ spec:
 
               apk add --no-cache jq
 
+              echo "Waiting for step-ca to be ready..."
+              until kubectl get -n {{ .Release.Namespace }} configmap/step-ca-certs -o name >/dev/null 2>&1 && \
+                    kubectl get -n {{ .Release.Namespace }} configmap/step-ca-config -o name >/dev/null 2>&1; do
+                echo "  step-ca configmaps not yet available, retrying in 5s..."
+                sleep 5
+              done
+
               echo "Fetching and encoding CA root certificate..."
               CA_ROOT_B64=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.data['root_ca\.crt']}" configmap/step-ca-certs | base64 | tr -d '\n')
 
-              echo "Fetching provisioner KID..."
-              CA_PROVISIONER_KID=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.data['ca\.json']}" configmap/step-ca-config | jq -r .authority.provisioners[0].key.kid)
+              echo "Fetching provisioner KID (looking up by provisioner name)..."
+              PROVISIONER_NAME="{{ index .Values "step-certificates" "ca" "provisioner" "name" }}"
+              CA_PROVISIONER_KID=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.data['ca\.json']}" configmap/step-ca-config | \
+                jq -r --arg name "$PROVISIONER_NAME" '.authority.provisioners[] | select(.name == $name) | .key.kid')
 
               echo "Applying StepIssuer CR..."
               cat <<EOF | kubectl apply -f -
