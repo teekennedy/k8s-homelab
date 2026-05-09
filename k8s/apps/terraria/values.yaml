@@ -17,7 +17,7 @@ app-template:
         terraria:
           image:
             repository: ghcr.io/passivelemon/terraria-docker
-            tag: terraria-1.4.5.5
+            tag: terraria-1.4.5.6
             pullPolicy: IfNotPresent
           args:
             # Allow steam friends to join
