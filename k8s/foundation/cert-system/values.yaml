@@ -30,11 +30,12 @@ step-certificates:
   # I have a hard time believing it needs that much space.
   db:
     size: 1Gi
-  # bootstrap.secrets: false prevents Helm from rendering empty step-ca-ca-password and
-  # step-ca-provisioner-password Secrets. These were created once by the bootstrap Job
-  # and must not be overwritten with blanks.
+  # bootstrap.secrets: true is required for the StatefulSet to mount the step-ca-ca-password
+  # Secret and pass --password-file to step-ca. Helm renders the Secrets with no data;
+  # ignoreDifferences in application.yaml prevents ArgoCD from wiping the real passwords
+  # (written once by the bootstrap Job) with that empty Helm output.
   bootstrap:
-    secrets: false
+    secrets: true
   ingress:
     enabled: true
     hosts:

@@ -45,6 +45,18 @@ spec:
       namespace: monitoring-system
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
+    # step-ca password Secrets are written once by the bootstrap Job. With bootstrap.secrets: true,
+    # Helm renders them with no data; ignoreDifferences prevents ArgoCD from wiping the real values.
+    - kind: Secret
+      name: step-ca-ca-password
+      namespace: cert-system
+      jsonPointers:
+        - /data
+    - kind: Secret
+      name: step-ca-provisioner-password
+      namespace: cert-system
+      jsonPointers:
+        - /data
     # step-ca ConfigMaps are populated by the bootstrap Job (on first install) and by the
     # step-ca-acme-provisioner Job (post-install/upgrade). Helm renders them without data
     # (since inject is disabled); ignoreDifferences prevents ArgoCD from wiping their contents.
