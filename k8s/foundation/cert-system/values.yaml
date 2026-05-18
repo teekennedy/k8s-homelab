@@ -30,6 +30,11 @@ step-certificates:
   # I have a hard time believing it needs that much space.
   db:
     size: 1Gi
+  # bootstrap.secrets: false prevents Helm from rendering empty step-ca-ca-password and
+  # step-ca-provisioner-password Secrets. These were created once by the bootstrap Job
+  # and must not be overwritten with blanks.
+  bootstrap:
+    secrets: false
   ingress:
     enabled: true
     hosts:

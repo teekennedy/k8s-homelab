@@ -45,6 +45,24 @@ spec:
       namespace: monitoring-system
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
+    # step-ca ConfigMaps are populated by the bootstrap Job (on first install) and by the
+    # step-ca-acme-provisioner Job (post-install/upgrade). Helm renders them without data
+    # (since inject is disabled); ignoreDifferences prevents ArgoCD from wiping their contents.
+    - kind: ConfigMap
+      name: step-ca-config
+      namespace: cert-system
+      jsonPointers:
+        - /data
+    - kind: ConfigMap
+      name: step-ca-certs
+      namespace: cert-system
+      jsonPointers:
+        - /data
+    - kind: ConfigMap
+      name: step-ca-secrets
+      namespace: cert-system
+      jsonPointers:
+        - /data
   project: default
   source:
     path: k8s/foundation/cert-system

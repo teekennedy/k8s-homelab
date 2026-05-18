@@ -63,37 +63,7 @@ The NFS export on the server specifies `xprtsec=mtls`, meaning the server **reje
 
 ## One-time setup
 
-### 1. Add the ACME provisioner to step-ca
-
-```sh
-kubectl exec -n cert-system statefulset/step-ca -- \
-  step ca provisioner add nixos \
-  --type=ACME \
-  --require-eab \
-  --admin-provisioner=admin \
-  --admin-subject=step \
-  --admin-password-file=/home/step/secrets/passwords/password
-```
-
-> **Note**: The step-ca pod mounts `ca.json` read-only from a ConfigMap, so `provisioner add` must use the admin API (`--admin-*` flags). The admin subject `step` is the default created by the step-certificates Helm chart. If this fails with "admin not found", list available admins:
-> ```sh
-> kubectl exec -n cert-system statefulset/step-ca -- \
->   step ca admin list \
->   --admin-provisioner=admin \
->   --admin-subject=step \
->   --admin-password-file=/home/step/secrets/passwords/password
-> ```
-
-Verify the provisioner was added:
-```sh
-kubectl exec -n cert-system statefulset/step-ca -- \
-  step ca provisioner list \
-  --admin-provisioner=admin \
-  --admin-subject=step \
-  --admin-password-file=/home/step/secrets/passwords/password
-```
-
-### 2. Generate EAB credentials
+### 1. Generate EAB credentials
 
 Each node needs its own EAB key pair:
 
@@ -104,25 +74,25 @@ kubectl exec -n cert-system statefulset/step-ca -- \
 
 Note the `keyID` and `hmacKey` output. Repeat this for each node (NFS server + all k3s clients).
 
-### 3. Get the step-ca root certificate
+### 2. Get the step-ca root certificate
 
 ```sh
 kubectl get -n cert-system configmap/step-ca-certs \
   -o jsonpath='{.data.root_ca\.crt}'
 ```
 
-### 4. Add sops secrets to each node
+### 3. Add sops secrets to each node
 
 For each node, add to its `nix/hosts/<hostname>/secrets.yaml`:
 
 ```yaml
 nfs_acme_env: |
-    EAB_KID=<keyID from step 2>
-    EAB_HMAC_KEY=<hmacKey from step 2>
+    EAB_KID=<keyID from step 1>
+    EAB_HMAC_KEY=<hmacKey from step 1>
     LEGO_CA_CERTIFICATES=/run/secrets/step_ca_root
 step_ca_root: |
     -----BEGIN CERTIFICATE-----
-    <root cert from step 3>
+    <root cert from step 2>
     -----END CERTIFICATE-----
 ```
 
@@ -131,9 +101,9 @@ Then re-encrypt:
 sops --encrypt --in-place nix/hosts/<hostname>/secrets.yaml
 ```
 
-Each node gets its **own unique EAB key pair** (step 2 generates a fresh pair per invocation). The `step_ca_root` value is the same for all nodes.
+Each node gets its **own unique EAB key pair** (step 1 generates a fresh pair per invocation). The `step_ca_root` value is the same for all nodes.
 
-### 5. Configure nodes in flake.nix
+### 4. Configure nodes in flake.nix
 
 **NFS server node** — enable `serverMode`:
 ```nix
@@ -173,17 +143,17 @@ Each node gets its **own unique EAB key pair** (step 2 generates a fresh pair pe
 })
 ```
 
-### 6. Deploy
+### 5. Deploy
 
 Commit and push the flake changes. ArgoCD will sync the NFS StorageClasses automatically. Deploy the NixOS hosts:
 
 ```sh
 # Deploy the NFS server first so it's ready before clients try to mount
-deploy .#<nfs-server>
+lab host deploy <nfs-server>
 
 # Then deploy the k3s client nodes
-deploy .#<client-0>
-deploy .#<client-1>
+lab host deploy <client-0>
+lab host deploy <client-1>
 ```
 
 On first boot after deploy, the ACME service (`acme-<hostname>.service`) runs and acquires the TLS certificate. `tlshd` starts after the cert is available.
@@ -319,20 +289,26 @@ step certificate sign /home/step/certs/intermediate_ca.crt /tmp/new-root.crt \
   /tmp/new-root.key --profile=intermediate-ca > /tmp/new-intermediate.crt
 ```
 
-### 3. Update the step-ca Helm values
+### 3. Update the step-ca ConfigMaps
 
-Update the root CA and intermediate CA in the step-certificates Helm values (or the Kubernetes Secret/ConfigMap backing them). Add the new root to the trust bundle so both old and new are trusted during the transition period:
+The root and intermediate CA PEMs live in the `step-ca-certs` ConfigMap. Patch it directly to add the new root alongside the old one (keeping both trusted during the transition) and replace the intermediate:
 
-```yaml
-step-certificates:
-  ca:
-    # trust bundle: old root + new root (remove old after all certs are re-issued)
-    root: |
-      <old root PEM>
-      <new root PEM>
+```sh
+# Write the new certs to temp files
+cat /tmp/new-root.crt >> /tmp/root-bundle.pem       # bundle: old + new root
+cat /home/step/certs/root_ca.crt >> /tmp/root-bundle.pem
+
+kubectl create configmap step-ca-certs -n cert-system \
+  --from-literal=root_ca.crt="$(cat /tmp/root-bundle.pem)" \
+  --from-literal=intermediate_ca.crt="$(cat /tmp/new-intermediate.crt)" \
+  --dry-run=client -o yaml | kubectl replace -f -
 ```
 
-Commit and push — ArgoCD will update the step-ca StatefulSet.
+Then restart the pod to pick up the new certs:
+
+```sh
+kubectl rollout restart -n cert-system statefulset/step-ca
+```
 
 ### 4. Update sops secrets on all nodes
 
@@ -377,7 +353,7 @@ journalctl -u acme-<node-fqdn>.service -n 50
 ```
 
 Common causes:
-- The `nixos` ACME provisioner hasn't been added to step-ca yet (see step 1 of setup)
+- The `nixos` ACME provisioner isn't active yet — check that the step-ca pod has been restarted after the last ArgoCD sync (see step 1 of setup)
 - EAB credentials are wrong or the `nfs_acme_env` secret is missing
 - Port 80 is unreachable from step-ca pods (check firewall and DNS A record)
 
