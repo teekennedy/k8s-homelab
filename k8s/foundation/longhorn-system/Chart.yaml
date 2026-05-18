@@ -2,7 +2,7 @@ apiVersion: v2
 name: longhorn
 description: Distributed block storage
 version: 0.1.6
-appVersion: 1.11.1
+appVersion: 1.11.2
 
 dependencies:
   - name: longhorn
