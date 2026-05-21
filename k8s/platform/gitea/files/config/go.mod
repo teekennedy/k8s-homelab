@@ -3,7 +3,7 @@ module git.msng.to/teekennedy/k8s-homelab/gitea/config
 go 1.26.1
 
 require (
-	code.gitea.io/sdk/gitea v0.24.1
+	code.gitea.io/sdk/gitea v0.25.1
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.4
