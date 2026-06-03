@@ -11,40 +11,24 @@
     nixpkgs,
     flake-utils,
   }:
-    flake-utils.lib.eachDefaultSystem (system: let
+    (flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      labMod = import ./devenv.nix {
+        inherit pkgs;
+        lib = pkgs.lib;
+      };
     in {
       packages = {
         default = self.packages.${system}.lab;
-        lab = pkgs.buildGoModule {
-          pname = "lab";
-          version = "0.2.0";
-          src = ./.;
-          vendorHash = "sha256-VnGUV/B3rxSmHi5kdAXJ5eoHDbTc7lQX+YJsh3Ymwi8=";
-
-          # Install shell completions
-          postInstall = ''
-            installShellCompletion --cmd lab \
-              --bash <($out/bin/lab completion bash) \
-              --zsh <($out/bin/lab completion zsh) \
-              --fish <($out/bin/lab completion fish)
-          '';
-
-          nativeBuildInputs = with pkgs; [installShellFiles];
-
-          meta = with pkgs.lib; {
-            description = "Unified CLI for k8s-homelab management";
-            homepage = "https://github.com/teekennedy/homelab";
-            license = licenses.mit;
-            maintainers = [];
-            mainProgram = "lab";
-          };
-        };
+        lab = builtins.head labMod.packages;
       };
 
       apps.default = {
         type = "app";
         program = "${self.packages.${system}.lab}/bin/lab";
       };
-    });
+    }))
+    // {
+      devenvModules.default = import ./devenv.nix;
+    };
 }

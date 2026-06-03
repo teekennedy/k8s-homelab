@@ -5,7 +5,6 @@
   devenv-zsh,
   ...
 }: let
-  lab = inputs.lab.packages.${pkgs.stdenv.hostPlatform.system}.default;
   dagger = inputs.dagger.packages.${pkgs.stdenv.hostPlatform.system}.dagger;
 in {
   cachix.enable = true;
@@ -27,14 +26,8 @@ in {
 
   # Use zsh for shell instead of bash
   # https://github.com/mcdonc/devenv-zsh
-  imports = [devenv-zsh.plugin];
+  imports = [devenv-zsh.plugin inputs.lab.devenvModules.default];
   zsh.enable = true;
-  zsh.extraInit = ''
-    # Add lab completions to FPATH for zsh
-    export FPATH="''${FPATH-}:${lab}/share/zsh/site-functions"
-    autoload -Uz _lab
-    compdef _lab lab
-  '';
 
   # https://devenv.sh/basics/
   env.KUBECONFIG = "${config.env.DEVENV_STATE}/kube/config";
@@ -59,7 +52,6 @@ in {
       kubernetes-helm
       kubetail
       kustomize
-      lab
       nixos-anywhere
       opentofu
       sops
