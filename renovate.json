@@ -218,6 +218,14 @@
       ]
     },
     {
+      "description": "Don't apply minimumReleaseAge to jellyfin image+appVersion so they stay grouped",
+      "minimumReleaseAge": "0 days",
+      "matchPackageNames": [
+        "ghcr.io/jellyfin/jellyfin",
+        "jellyfin/jellyfin"
+      ]
+    },
+    {
       "groupName": "helm spoolman",
       "matchFileNames": [
         "k8s/apps/spoolman/**"
