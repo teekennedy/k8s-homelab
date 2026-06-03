@@ -10,6 +10,11 @@ dagger-helm:
         "logLevel": "info",
         "security": {
           "insecureRootCapabilities": false
+        },
+        "gc": {
+          "enabled": true,
+          "maxUsedSpace": "55GB",
+          "minFreeSpace": "15%"
         }
       }
     kind: StatefulSet

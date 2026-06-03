@@ -981,7 +981,8 @@ app-template:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
       # As of 2025-10-27 this was using 165MB
-      size: 1Gi
+      # As of 2026-06-03 this was using 897MB
+      size: 5Gi
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
