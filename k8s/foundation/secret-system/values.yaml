@@ -1,6 +1,7 @@
 # https://github.com/mittwald/kubernetes-secret-generator/blob/master/deploy/helm-chart/kubernetes-secret-generator/values.yaml
 kubernetes-secret-generator:
   securityContext:
+    allowPrivilegeEscalation: false
     capabilities:
       drop:
         - ALL

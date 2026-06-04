@@ -1,11 +1,8 @@
 exemptions:
   # SECRET_LENGTH is an operator configuration value (the byte-length for generated secrets),
   # not an actual secret. Polaris flags it because the env var name contains "SECRET".
+  # This env var is defined in the upstream chart template and cannot be renamed.
   - controllerNames:
       - secret-system-kubernetes-secret-generator
     rules:
       - sensitiveContainerEnvVar
-  - controllerNames:
-      - secret-system-kubernetes-secret-generator
-    rules:
-      - privilegeEscalationAllowed
