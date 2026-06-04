@@ -286,6 +286,11 @@ authelia:
       requests:
         cpu: '0.25'
         memory: '125Mi'
+    securityContext:
+      container:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 65534
 
   secret:
     # Generate our own secrets for authelia

@@ -26,6 +26,8 @@ spec:
           # TODO make sure renovatebot can update this
           # Root is needed to install kubectl
           image: ghcr.io/lldap/lldap:2025-05-19-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
 
           command:
             - /bootstrap/bootstrap.sh

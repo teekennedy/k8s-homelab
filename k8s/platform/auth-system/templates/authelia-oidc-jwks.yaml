@@ -60,6 +60,8 @@ spec:
       containers:
         - name: generate
           image: alpine:3.22.2
+          securityContext:
+            allowPrivilegeEscalation: false
           command:
             - /bin/sh
             - -c
