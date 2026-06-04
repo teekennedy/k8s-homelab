@@ -1,11 +1,15 @@
 exemptions:
-  # MetalLB speaker requires host network access to announce layer 2 addresses.
+  # MetalLB speaker requires host network access to announce layer 2 addresses and must
+  # run as root: the upstream chart intentionally leaves speaker.securityContext empty
+  # because the speaker binary requires UID 0 for raw socket operations even with NET_RAW.
   # METALLB_ML_SECRET_KEY_PATH env var name contains "SECRET" but is just a file path,
   # not a secret value — false positive from polaris name matching.
   - controllerNames:
       - metallb-speaker
     rules:
       - hostNetworkSet
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
       - sensitiveContainerEnvVar
   # MetalLB controller sets env vars with "SECRET" in the name (memberlist configuration)
   # that are sourced from a Secret reference, not plain-text literals.
