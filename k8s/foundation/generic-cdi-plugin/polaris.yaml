@@ -1,6 +1,14 @@
 exemptions:
-  # CDI plugin DaemonSet mounts host paths and requires privileged access to register
-  # container device interfaces with the Kubelet at runtime.
+  # These three rules are all downstream of `privileged: true`, which is an
+  # upstream hard requirement (see https://github.com/OlfillasOdikno/generic-cdi-plugin).
+  # The plugin must mount /var/lib/kubelet (root-owned host tree) and register CDI device
+  # interfaces directly with the Kubelet, which requires full host privileges.
+  #
+  # - runAsPrivileged: `privileged: true` is required by upstream; cannot be removed.
+  # - runAsRootAllowed: writing to /var/lib/kubelet requires root on the host.
+  # - privilegeEscalationAllowed: Kubernetes rejects `allowPrivilegeEscalation: false`
+  #   combined with `privileged: true` at the API level (admission error), so this
+  #   field cannot be set to satisfy polaris without breaking the workload.
   - controllerNames:
       - generic-cdi-plugin-daemonset
     rules:
