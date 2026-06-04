@@ -1,0 +1,10 @@
+exemptions:
+  # Dagger Engine is a container runtime and requires privileged access, root, and extra
+  # capabilities to execute arbitrary container workloads on the host.
+  - controllerNames:
+      - dagger-engine-dagger-helm-engine
+    rules:
+      - runAsPrivileged
+      - runAsRootAllowed
+      - dangerousCapabilities
+      - privilegeEscalationAllowed

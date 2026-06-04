@@ -1,0 +1,19 @@
+exemptions:
+  # CSI drivers require privileged access and host networking for kernel-level NFS
+  # mount/unmount operations. These are standard requirements for any CSI node plugin.
+  - controllerNames:
+      - csi-nfs-node
+    rules:
+      - hostNetworkSet
+      - runAsPrivileged
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+      - dangerousCapabilities
+  - controllerNames:
+      - csi-nfs-controller
+    rules:
+      - hostNetworkSet
+      - runAsPrivileged
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+      - dangerousCapabilities

@@ -61,6 +61,7 @@ gitea:
             key: password
     config:
       server:
+        HTTP_PORT: 3000
         LANDING_PAGE: explore
         ROOT_URL: https://git.msng.to
         OFFLINE_MODE: true

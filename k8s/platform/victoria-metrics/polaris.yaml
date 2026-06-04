@@ -1,0 +1,6 @@
+exemptions:
+  - controllerNames:
+      - victoria-metrics-server
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed

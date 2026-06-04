@@ -24,6 +24,10 @@ const (
 	helmImage = "alpine/helm:latest"
 	// renovate: datasource=docker depName=alpine
 	alpineImage = "alpine:latest"
+	// renovate: datasource=docker depName=quay.io/fairwinds/polaris
+	polarisImage = "quay.io/fairwinds/polaris:latest"
+	// renovate: datasource=docker depName=ghcr.io/yannh/kubeconform
+	kubeconformImage = "ghcr.io/yannh/kubeconform:latest"
 )
 
 func nixContainer() *dagger.Container {

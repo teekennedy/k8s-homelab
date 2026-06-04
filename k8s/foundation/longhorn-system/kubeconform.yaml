@@ -1,0 +1,2 @@
+skipKinds:
+  - RecurringJob  # datreeio catalog schema is stale; missing system-backup task type added in Longhorn 1.7+

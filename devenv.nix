@@ -49,9 +49,11 @@ in {
       kind
       kubecolor
       kubectl
+      kubeconform
       kubernetes-helm
       kubetail
       kustomize
+      polaris
       nixos-anywhere
       opentofu
       sops

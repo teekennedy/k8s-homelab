@@ -1,0 +1,26 @@
+exemptions:
+  - controllerNames:
+      - loki-helm-test
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+      - tagNotSpecified
+  - controllerNames:
+      - monitoring-system-crds-upgrade
+    rules:
+      - tagNotSpecified
+  - controllerNames:
+      - monitoring-system-grafana
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - monitoring-system-prometheus-node-exporter
+    rules:
+      - hostNetworkSet
+      - hostPIDSet
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - monitoring-system-promtail
+    rules:
+      - runAsRootAllowed

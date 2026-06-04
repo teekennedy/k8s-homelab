@@ -1,0 +1,20 @@
+exemptions:
+  # terraria-docker uses a PUID/PGID entrypoint that starts as root to execute gosu and
+  # drop to the configured non-root user (UID 1200). The root start is intentional and
+  # safe; the actual server process runs as the non-root PUID.
+  - controllerNames:
+      - terraria
+    rules:
+      - runAsRootAllowed
+  - controllerNames:
+      - terraria
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - terraria-discord-bot
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - terraria-terraria-web
+    rules:
+      - privilegeEscalationAllowed

@@ -1,0 +1,43 @@
+exemptions:
+  - controllerNames:
+      - longhorn-basic-auth-setup
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - longhorn-driver-deployer
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - longhorn-manager
+    rules:
+      - privilegeEscalationAllowed
+      - runAsPrivileged
+      - runAsRootAllowed
+  - controllerNames:
+      - longhorn-post-upgrade
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - longhorn-pre-upgrade
+    rules:
+      - privilegeEscalationAllowed
+      - runAsPrivileged
+      - runAsRootAllowed
+  - controllerNames:
+      - longhorn-support-bundle
+    rules:
+      - clusterrolebindingClusterAdmin
+      - clusterrolebindingPodExecAttach
+  - controllerNames:
+      - longhorn-ui
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - longhorn-uninstall
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed

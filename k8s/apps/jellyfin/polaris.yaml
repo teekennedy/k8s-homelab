@@ -1,0 +1,47 @@
+exemptions:
+  - controllerNames:
+      - jellyfin-arrs
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - jellyfin-cleanuparr
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - jellyfin-configarr
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - jellyfin-debug
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - jellyfin-downloader
+    rules:
+      - dangerousCapabilities
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - jellyfin-jellyseerr
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - jellyfin-main
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - jellyfin-qbittorrent-password-hash
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+      - tagNotSpecified
+  - controllerNames:
+      - jellyfin-qbittorrent-update-password
+    rules:
+      - sensitiveConfigmapContent
+  - controllerNames:
+      - jellyfin-unpackerr
+    rules:
+      - privilegeEscalationAllowed

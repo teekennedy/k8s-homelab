@@ -1,0 +1,12 @@
+exemptions:
+  # kured DaemonSet requires privileged access to nsenter /proc/1/ns/mnt on the host
+  # in order to trigger a node reboot via systemctl. This is an intentional design
+  # of the upstream kured chart (privileged: true with comment in values.yaml).
+  - controllerNames:
+      - kured
+    rules:
+      - runAsPrivileged
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+      - dangerousCapabilities
+      - hostPIDSet

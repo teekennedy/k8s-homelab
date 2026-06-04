@@ -1,0 +1,37 @@
+exemptions:
+  # Bootstrap job needs pods/exec to exec into crowdsec-lapi to generate a bouncer API key.
+  - controllerNames:
+      - crowdsec-bootstrap
+    rules:
+      - rolePodExecAttach
+      - rolebindingRolePodExecAttach
+  # Bootstrap job runs as root (ghcr.io/astral-sh/uv:alpine) to run kubectl exec and
+  # Python scripts against the LAPI. It is a pre-install/pre-upgrade hook.
+  - controllerNames:
+      - crowdsec-bootstrap-middleware
+    rules:
+      - runAsRootAllowed
+  # CrowdSec LAPI runs as root; the upstream chart does not expose a securityContext value
+  # for the LAPI container at this version.
+  - controllerNames:
+      - crowdsec-lapi
+    rules:
+      - runAsRootAllowed
+  # CrowdSec agent DaemonSet reads host log files and must run as root. The upstream chart
+  # does not expose container securityContext settings.
+  - controllerNames:
+      - crowdsec-agent
+    rules:
+      - runAsRootAllowed
+  # Helm test pods use curl/wget without pinned tags and run as root.
+  - controllerNames:
+      - crowdsec-test-agent
+      - crowdsec-test-lapi-up
+    rules:
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+      - tagNotSpecified
+  - controllerNames:
+      - crowdsec-bootstrap-middleware
+    rules:
+      - privilegeEscalationAllowed

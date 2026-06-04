@@ -1,0 +1,13 @@
+exemptions:
+  # gpg-bootstrap is a one-shot ArgoCD sync hook that installs gnupg via apk and generates
+  # a GPG key for Renovate commit signing. The apk install requires root; the Job is
+  # ephemeral (deleted on HookSucceeded) so the risk window is minimal.
+  - controllerNames:
+      - renovate-gpg-bootstrap
+    rules:
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - renovate
+    rules:
+      - privilegeEscalationAllowed

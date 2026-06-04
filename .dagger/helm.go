@@ -100,49 +100,62 @@ func (hc *HelmChart) Build(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
 	}
 
-	prepared := hc.sourceWithDeps()
-	releaseName := filepath.Base(hc.Path)
-
-	// Parse namespace and release name from application.yaml if present
-	namespace := releaseName
-	appYaml, err := hc.Source.File("application.yaml").Contents(ctx)
-	if err == nil && appYaml != "" {
-		for _, line := range strings.Split(appYaml, "\n") {
-			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "namespace:") {
-				ns := strings.TrimSpace(strings.TrimPrefix(trimmed, "namespace:"))
-				if ns != "" {
-					namespace = ns
-				}
-			}
-			if strings.HasPrefix(trimmed, "releaseName:") {
-				rel := strings.TrimSpace(strings.TrimPrefix(trimmed, "releaseName:"))
-				if rel != "" {
-					releaseName = rel
-				}
-			}
-		}
-	}
-
-	args := []string{"helm", "template", releaseName, "/chart", "--namespace", namespace, "--debug"}
-
-	container := hc.container(prepared)
-
-	// Mount cluster values if available
-	if hc.ClusterValues != nil {
-		container = container.
-			WithMountedFile("/cluster-values.yaml", hc.ClusterValues)
-		args = append(args, "--values", "/cluster-values.yaml")
-	}
-
-	_, err = container.
-		WithExec(args).
-		Sync(ctx)
+	manifest, err := hc.renderedManifest(ctx)
 	if err != nil {
 		return "", fmt.Errorf("helm template failed for %s: %w", hc.Path, err)
 	}
 
+	if _, err := manifest.Sync(ctx); err != nil {
+		return "", fmt.Errorf("helm template failed for %s: %w", hc.Path, err)
+	}
+
 	return fmt.Sprintf("Helm template passed for %s", hc.Path), nil
+}
+
+// parseApplicationYaml extracts releaseName and namespace from an application.yaml file's content.
+// Both default to defaultName when not present in the content.
+func parseApplicationYaml(content, defaultName string) (releaseName, namespace string) {
+	releaseName = defaultName
+	namespace = defaultName
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "namespace:") {
+			if ns := strings.TrimSpace(strings.TrimPrefix(trimmed, "namespace:")); ns != "" {
+				namespace = ns
+			}
+		}
+		if strings.HasPrefix(trimmed, "releaseName:") {
+			if rel := strings.TrimSpace(strings.TrimPrefix(trimmed, "releaseName:")); rel != "" {
+				releaseName = rel
+			}
+		}
+	}
+	return releaseName, namespace
+}
+
+// renderedManifest runs helm template and returns the rendered YAML as a file.
+// The manifest is written to /rendered.yaml inside the container, then extracted.
+// Build, Polaris, and Kubeconform all call this so the render is cached once per chart.
+func (hc *HelmChart) renderedManifest(ctx context.Context) (*dagger.File, error) {
+	prepared := hc.sourceWithDeps()
+	defaultName := filepath.Base(hc.Path)
+	releaseName, namespace := defaultName, defaultName
+
+	if appYaml, err := hc.Source.File("application.yaml").Contents(ctx); err == nil && appYaml != "" {
+		releaseName, namespace = parseApplicationYaml(appYaml, defaultName)
+	}
+
+	args := []string{"helm", "template", releaseName, "/chart", "--namespace", namespace, "--include-crds"}
+
+	container := hc.container(prepared)
+	if hc.ClusterValues != nil {
+		container = container.WithMountedFile("/cluster-values.yaml", hc.ClusterValues)
+		args = append(args, "--values", "/cluster-values.yaml")
+	}
+
+	// Redirect helm template stdout to a file so validators can consume it
+	cmd := strings.Join(args, " ") + " > /rendered.yaml"
+	return container.WithExec([]string{"sh", "-c", cmd}).File("/rendered.yaml"), nil
 }
 
 // container returns a helm container with the chart mounted and shared caches.

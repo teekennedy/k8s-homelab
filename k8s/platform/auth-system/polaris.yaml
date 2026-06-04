@@ -1,0 +1,39 @@
+exemptions:
+  # Authelia sets env vars like AUTHELIA_SESSION_SECRET_FILE and AUTHELIA_JWT_SECRET_FILE
+  # that contain "SECRET" or "KEY" in their names. These are file paths to mounted secret
+  # files (not literal secret values), so sensitiveContainerEnvVar is a false positive.
+  # runAsRootAllowed: upstream authelia chart defaults to running as root when no explicit
+  # runAsUser is set; the container does not need root but chart migration is deferred.
+  - controllerNames:
+      - auth-system-authelia
+    rules:
+      - sensitiveContainerEnvVar
+      - runAsRootAllowed
+  # authelia-oidc-jwks runs alpine:3.22.2 and installs openssl + kubectl via apk,
+  # which requires root. It is a one-shot Job that generates OIDC signing keys.
+  - controllerNames:
+      - authelia-oidc-jwks
+    rules:
+      - runAsRootAllowed
+  # lldap-bootstrap runs as root to install kubectl via apk before bootstrapping
+  # users/groups. See TODO comment in the template for planned rootless migration.
+  - controllerNames:
+      - lldap-bootstrap
+    rules:
+      - runAsRootAllowed
+  - controllerNames:
+      - auth-system-authelia
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - authelia-oidc-jwks
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - lldap-bootstrap
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - valkey
+    rules:
+      - privilegeEscalationAllowed

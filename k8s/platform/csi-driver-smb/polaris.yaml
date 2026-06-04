@@ -1,0 +1,19 @@
+exemptions:
+  # CSI drivers require privileged access and host networking to perform kernel-level
+  # volume mount/unmount operations. These are standard requirements for any CSI node plugin.
+  - controllerNames:
+      - csi-smb-node
+      - csi-smb-node-win
+    rules:
+      - hostNetworkSet
+      - runAsPrivileged
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+      - dangerousCapabilities
+  - controllerNames:
+      - csi-smb-controller
+    rules:
+      - hostNetworkSet
+      - runAsPrivileged
+      - runAsRootAllowed
+      - privilegeEscalationAllowed

@@ -1,0 +1,30 @@
+exemptions:
+  # The upstream homepage chart emits a ClusterRole with a spurious "namespace" field in
+  # its metadata. Polaris can't resolve the ClusterRoleBinding reference in file-audit mode
+  # and fails both RBAC checks conservatively. The actual ClusterRole has no wildcard
+  # permissions — only get/list on standard read-only resources.
+  - controllerNames:
+      - homepage
+    rules:
+      - clusterrolebindingClusterAdmin
+      - clusterrolebindingPodExecAttach
+  # Helm test pod included by the upstream homepage chart. Uses busybox without a pinned
+  # tag and runs as root. This is a chart test resource, not a production workload.
+  - controllerNames:
+      - homepage-test-connection
+    rules:
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+      - tagNotSpecified
+  # The secret-sync Job compiles and runs a Go program at startup using golang:alpine.
+  # The Go toolchain writes to /root/.cache and the build cache; running as non-root
+  # would require remounting the home/cache directories. The sync job is short-lived
+  # and not internet-exposed.
+  - controllerNames:
+      - homepage-secret-sync
+    rules:
+      - runAsRootAllowed
+  - controllerNames:
+      - homepage-secret-sync
+    rules:
+      - privilegeEscalationAllowed

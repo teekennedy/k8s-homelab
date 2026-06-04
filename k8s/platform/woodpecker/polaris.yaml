@@ -1,0 +1,20 @@
+exemptions:
+  # Woodpecker CI pipelines exec into the Dagger Engine pod to run container builds.
+  # The dagger-pipeline-exec Role explicitly grants pods/exec in the dagger-engine
+  # namespace so the CI agent's service account can reach the engine.
+  - controllerNames:
+      - dagger-pipeline-exec
+    rules:
+      - rolePodExecAttach
+  - controllerNames:
+      - dagger-pipeline-exec-binding
+    rules:
+      - rolebindingRolePodExecAttach
+  - controllerNames:
+      - woodpecker-agent
+    rules:
+      - privilegeEscalationAllowed
+  - controllerNames:
+      - woodpecker-server
+    rules:
+      - privilegeEscalationAllowed

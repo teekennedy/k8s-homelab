@@ -1,0 +1,9 @@
+exemptions:
+  # CDI plugin DaemonSet mounts host paths and requires privileged access to register
+  # container device interfaces with the Kubelet at runtime.
+  - controllerNames:
+      - generic-cdi-plugin-daemonset
+    rules:
+      - runAsPrivileged
+      - runAsRootAllowed
+      - privilegeEscalationAllowed

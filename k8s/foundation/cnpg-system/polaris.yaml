@@ -1,0 +1,7 @@
+exemptions:
+  # CNPG operator requires pods/exec and pods/attach for database management operations.
+  - controllerNames:
+      - cnpg-system-cloudnative-pg
+    rules:
+      - clusterrolePodExecAttach
+      - clusterrolebindingPodExecAttach

@@ -14,8 +14,7 @@ kube-prometheus-stack:
     deploymentStrategy:
       type: Recreate
     serviceMonitor:
-      labels:
-        release: monitoring-system
+      labels: {}
     ingress:
       enabled: true
       hosts:

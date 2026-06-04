@@ -1,0 +1,25 @@
+exemptions:
+  - controllerNames:
+      - argocd-application-controller
+    rules:
+      - clusterrolePodExecAttach
+      - clusterrolebindingClusterAdmin
+      - clusterrolebindingPodExecAttach
+  - controllerNames:
+      - argocd-argo-events-controller-manager
+    rules:
+      - clusterrolePodExecAttach
+      - clusterrolebindingPodExecAttach
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
+  - controllerNames:
+      - argocd-repo-server
+    rules:
+      - rolePodExecAttach
+      - rolebindingClusterAdminRole
+      - rolebindingRolePodExecAttach
+  - controllerNames:
+      - argocd-server
+    rules:
+      - clusterrolePodExecAttach
+      - clusterrolebindingPodExecAttach
