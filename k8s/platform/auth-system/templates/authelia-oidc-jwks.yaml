@@ -80,11 +80,12 @@ spec:
               mountPath: /keys
       containers:
         - name: generate
-          # alpine/k8s has kubectl pre-installed; runs as uid 65534 (nobody)
+          # alpine/k8s has kubectl pre-installed; runs as uid 1000 to match step-cli's
+          # key file ownership (mode 600, uid 1000) so the file is readable
           image: alpine/k8s:1.32.4
           securityContext:
             runAsNonRoot: true
-            runAsUser: 65534
+            runAsUser: 1000
             allowPrivilegeEscalation: false
           command:
             - /bin/sh
