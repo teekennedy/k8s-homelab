@@ -1,13 +1,11 @@
 exemptions:
-  # MetalLB speaker requires host network access to announce layer 2 addresses and may need
-  # root for raw socket operations. METALLB_ML_SECRET_KEY (memberlist gossip key) is read
-  # from a Secret reference but the env var name contains "SECRET", triggering a false positive.
+  # MetalLB speaker requires host network access to announce layer 2 addresses.
+  # METALLB_ML_SECRET_KEY_PATH env var name contains "SECRET" but is just a file path,
+  # not a secret value — false positive from polaris name matching.
   - controllerNames:
       - metallb-speaker
     rules:
       - hostNetworkSet
-      - runAsRootAllowed
-      - privilegeEscalationAllowed
       - sensitiveContainerEnvVar
   # MetalLB controller sets env vars with "SECRET" in the name (memberlist configuration)
   # that are sourced from a Secret reference, not plain-text literals.
