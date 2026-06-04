@@ -1,9 +1,1 @@
-exemptions:
-  - controllerNames:
-      - external-dns-internal
-    rules:
-      - privilegeEscalationAllowed
-  - controllerNames:
-      - external-dns-public-internal
-    rules:
-      - privilegeEscalationAllowed
+exemptions: []

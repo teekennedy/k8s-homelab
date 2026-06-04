@@ -39,6 +39,10 @@ external-dns-internal:
       image:
         repository: ghcr.io/kashalls/external-dns-unifi-webhook
         tag: v0.4.3
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 65534
       env:
         - name: UNIFI_HOST
           value: "https://10.69.80.1"
@@ -85,6 +89,10 @@ external-dns-public-internal:
       image:
         repository: ghcr.io/kashalls/external-dns-unifi-webhook
         tag: v0.4.3
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 65534
       env:
         - name: UNIFI_HOST
           value: "https://10.69.80.1"
