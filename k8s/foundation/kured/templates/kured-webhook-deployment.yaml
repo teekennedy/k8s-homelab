@@ -23,6 +23,10 @@ spec:
         - name: webhook
           image: "{{ .Values.webhook.image.repository }}:{{ .Values.webhook.image.tag }}"
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65534
           command:
             - python
             - /app/server.py
