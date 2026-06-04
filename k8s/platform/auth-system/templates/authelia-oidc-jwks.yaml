@@ -57,10 +57,34 @@ spec:
     spec:
       serviceAccountName: authelia-oidc-jwks
       restartPolicy: OnFailure
+      initContainers:
+        - name: generate-key
+          # step-cli runs as uid 1000 (non-root) and generates PKCS#8 RSA private keys
+          image: smallstep/step-cli:0.28.6
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+          command:
+            - step
+            - crypto
+            - keypair
+            - --kty=RSA
+            - --size=2048
+            - --no-password
+            - --insecure
+            - /keys/oidc.pub.pem
+            - /keys/oidc.jwk.RS256.pem
+          volumeMounts:
+            - name: keys
+              mountPath: /keys
       containers:
         - name: generate
-          image: alpine:3.22.2
+          # alpine/k8s has kubectl pre-installed; runs as uid 65534 (nobody)
+          image: alpine/k8s:1.32.4
           securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
             allowPrivilegeEscalation: false
           command:
             - /bin/sh
@@ -68,8 +92,6 @@ spec:
           args:
             - |
               set -euo pipefail
-              apk add --no-cache openssl kubectl
-
               namespace="{{ .Release.Namespace }}"
               secret_name="authelia-oidc-jwks"
 
@@ -78,7 +100,12 @@ spec:
                 exit 0
               fi
 
-              tmpdir="$(mktemp -d)"
-              openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${tmpdir}/oidc.jwk.RS256.pem"
               kubectl -n "${namespace}" create secret generic "${secret_name}" \
-                --from-file=oidc.jwk.RS256.pem="${tmpdir}/oidc.jwk.RS256.pem"
+                --from-file=oidc.jwk.RS256.pem=/keys/oidc.jwk.RS256.pem
+          volumeMounts:
+            - name: keys
+              mountPath: /keys
+              readOnly: true
+      volumes:
+        - name: keys
+          emptyDir: {}

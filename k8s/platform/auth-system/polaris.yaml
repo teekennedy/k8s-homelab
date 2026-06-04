@@ -6,12 +6,6 @@ exemptions:
       - auth-system-authelia
     rules:
       - sensitiveContainerEnvVar
-  # authelia-oidc-jwks runs alpine:3.22.2 and installs openssl + kubectl via apk,
-  # which requires root. It is a one-shot Job that generates OIDC signing keys.
-  - controllerNames:
-      - authelia-oidc-jwks
-    rules:
-      - runAsRootAllowed
   # lldap-bootstrap runs as root to install kubectl via apk before bootstrapping
   # users/groups. See TODO comment in the template for planned rootless migration.
   - controllerNames:
