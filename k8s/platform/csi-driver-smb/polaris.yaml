@@ -9,7 +9,6 @@ exemptions:
       - runAsPrivileged
       - runAsRootAllowed
       - privilegeEscalationAllowed
-      - dangerousCapabilities
   - controllerNames:
       - csi-smb-controller
     rules:
