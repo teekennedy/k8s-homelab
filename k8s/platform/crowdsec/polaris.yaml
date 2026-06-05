@@ -5,12 +5,6 @@ exemptions:
     rules:
       - rolePodExecAttach
       - rolebindingRolePodExecAttach
-  # Bootstrap job runs as root (ghcr.io/astral-sh/uv:alpine) to run kubectl exec and
-  # Python scripts against the LAPI. It is a pre-install/pre-upgrade hook.
-  - controllerNames:
-      - crowdsec-bootstrap-middleware
-    rules:
-      - runAsRootAllowed
   # CrowdSec LAPI runs as root; the upstream chart does not expose a securityContext value
   # for the LAPI container at this version.
   - controllerNames:
@@ -31,7 +25,3 @@ exemptions:
       - runAsRootAllowed
       - privilegeEscalationAllowed
       - tagNotSpecified
-  - controllerNames:
-      - crowdsec-bootstrap-middleware
-    rules:
-      - privilegeEscalationAllowed

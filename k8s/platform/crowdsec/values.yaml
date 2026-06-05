@@ -157,7 +157,10 @@ bootstrapMiddleware:
       memory: 128Mi
 
   # Security context for the bootstrap job
-  securityContext: {}
+  securityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    runAsUser: 65534
 
   # Node selector for the bootstrap job
   nodeSelector: {}

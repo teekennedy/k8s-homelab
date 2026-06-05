@@ -34,6 +34,9 @@ spec:
               cp -rL /scripts/. /project/
               cd /project
               uv run --no-cache --link-mode copy --script bootstrap.py
+          env:
+            - name: HOME
+              value: /project
           volumeMounts:
             - name: scripts
               mountPath: /scripts
