@@ -16,7 +16,17 @@ spec:
       containers:
         - name: apply
           image: golang:1.26-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65534
           env:
+            - name: GOCACHE
+              value: /tmp/go-cache
+            - name: GOMODCACHE
+              value: /tmp/go-modules
+            - name: HOME
+              value: /tmp
             - name: GITEA_HOST
               value: http://gitea-http:3000
             - name: GITEA_USER
@@ -42,10 +52,18 @@ spec:
             - name: source
               mountPath: /go/src/gitea-resources
               readOnly: true
+            - name: go-cache
+              mountPath: /tmp/go-cache
+            - name: go-modules
+              mountPath: /tmp/go-modules
       volumes:
         - name: source
           configMap:
             name: gitea-resources-config
+        - name: go-cache
+          emptyDir: {}
+        - name: go-modules
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: ConfigMap

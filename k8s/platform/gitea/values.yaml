@@ -3,6 +3,10 @@ psql:
   image: ghcr.io/cloudnative-pg/postgresql:18.3-standard-bookworm
 
 gitea:
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    runAsUser: 1000
   image:
     tag: "1.23.7"
     rootless: true

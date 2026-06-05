@@ -1,28 +1,8 @@
 exemptions:
-  # Gitea init containers (init-directories, init-app-ini, configure-gitea) run as root to
-  # create and chown gitea data directories before the main container starts. The main
-  # gitea container uses rootless: true but the upstream chart does not set runAsNonRoot
-  # explicitly, causing the runAsRootAllowed check to fail.
+  # configure-gitea init container sets GITEA_ADMIN_PASSWORD from a secretKeyRef, but polaris
+  # flags the env var name regardless of value source. Cannot fix without patching upstream chart.
   - controllerNames:
       - gitea
-    rules:
-      - runAsRootAllowed
-  # configure-gitea init container sets GITEA_ADMIN_PASSWORD from a secret but the env var
-  # name contains "PASSWORD", triggering a false positive since the value comes from a
-  # secretKeyRef, not a literal.
-  - controllerNames:
-      - gitea
-    rules:
-      - sensitiveContainerEnvVar
-  # gitea-resources Job compiles and runs a Go program as root (golang:1.26-alpine default).
-  - controllerNames:
-      - gitea-resources
-    rules:
-      - runAsRootAllowed
-  # gitea-valkey-cluster uses env vars with REDIS_PASSWORD in the name; values are sourced
-  # from a Secret reference, not literals.
-  - controllerNames:
-      - gitea-valkey-cluster
     rules:
       - sensitiveContainerEnvVar
   # Helm test pod uses busybox without a pinned tag and runs as root.
@@ -32,11 +12,3 @@ exemptions:
       - runAsRootAllowed
       - privilegeEscalationAllowed
       - tagNotSpecified
-  - controllerNames:
-      - gitea
-    rules:
-      - privilegeEscalationAllowed
-  - controllerNames:
-      - gitea-resources
-    rules:
-      - privilegeEscalationAllowed
