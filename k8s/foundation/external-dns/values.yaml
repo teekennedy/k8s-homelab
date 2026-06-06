@@ -144,5 +144,5 @@ ddnsUpdater:
       cpu: 20m
       memory: 32Mi
     limits:
-      cpu: 100m
+      cpu: 250m
       memory: 64Mi
