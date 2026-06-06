@@ -54,16 +54,33 @@ spec:
               readOnly: true
             - name: go-cache
               mountPath: /tmp/go-cache
+              subPath: go-cache
             - name: go-modules
               mountPath: /tmp/go-modules
+              subPath: go-modules
       volumes:
         - name: source
           configMap:
             name: gitea-resources-config
         - name: go-cache
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: gitea-resources-go-cache
         - name: go-modules
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: gitea-resources-go-cache
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-resources-go-cache
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
 ---
 apiVersion: v1
 kind: ConfigMap
