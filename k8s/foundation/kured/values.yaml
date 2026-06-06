@@ -46,11 +46,14 @@ webhook:
   alertmanagerUrl: http://monitoring-system-kube-pro-alertmanager.monitoring-system.svc.cluster.local:9093
   drainSilenceDuration: 1h
   drainSilenceAlerts:
+    - CNPGInstanceNotReady
     - LonghornVolumeStatusWarning
     - LonghornVolumeActualSpaceUsedWarning
     - NodeSystemSaturation
     - NodeCPUHighUsage
     - LonghornInstanceManagerCPUUsageWarning
+    - LonghornManagerNotReady
+    - LonghornCSINotReady
     - HighDiskLatency
     - HighDiskQueueDepth
   postRebootSilenceDuration: 15m
