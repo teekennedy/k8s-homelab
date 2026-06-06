@@ -25,7 +25,7 @@ dagger-helm:
       requests:
         cpu: "4"
         memory: 8Gi
-    # use PVC instead of host path for data volume
+    # use local-path PVC instead of host path for data volume
     hostPath:
       dataVolume:
         enabled: false
@@ -33,11 +33,8 @@ dagger-helm:
     statefulSet:
       persistentVolumeClaim:
         enabled: true
-        storageClassName: longhorn-rc1
+        storageClassName: local-path
         accessModes: [ReadWriteOnce]
-        labels:
-          recurring-job.longhorn.io/source: "enabled"
-          recurring-job-group.longhorn.io/ephemeral: "enabled"
         resources:
           requests:
             storage: 80Gi

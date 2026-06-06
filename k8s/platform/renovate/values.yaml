@@ -24,13 +24,9 @@ renovate:
         # -- Allow the cache to persist between runs
         enabled: true
         # -- Storage class of the cache PVC (single replica is fine for cache)
-        storageClass: longhorn-rc1
+        storageClass: local-path
         # -- Storage size of the cache PVC
         storageSize: "20Gi"
-        # -- Labels to set on the cache PVC
-        labels:
-          recurring-job.longhorn.io/source: "enabled"
-          recurring-job-group.longhorn.io/ephemeral: "enabled"
   resources:
     requests:
       cpu: 2000m
