@@ -1,6 +1,7 @@
 renovate:
   cronjob:
-    schedule: '0 9 * * *'  # Everyday at 09:00
+    # Runs every 4 hours, but with static random offset (1h 22m)
+    schedule: '22 1,5,9,13,17,21 * * *'
     ttlSecondsAfterFinished: 259200 # 3 days
     concurrencyPolicy: Forbid
     jobBackoffLimit: 1
