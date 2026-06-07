@@ -1,9 +1,12 @@
 metallb:
   loadBalancerClass: metallb
-  # disable frr as it was causing issues with kernel 6.18
+  # disable frr (legacy embedded mode) and frrk8s (new default BGP backend in 0.16+)
+  # — not using BGP and FRR caused issues with kernel 6.18
   speaker:
     frr:
       enabled: false
+  frrk8s:
+    enabled: false
   prometheus:
     rbacPrometheus: false
     serviceMonitor:
