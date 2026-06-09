@@ -29,7 +29,7 @@ data:
             expr: |
               sum by (host) (
                 count_over_time(
-                  {job="dmesg"} |~ `(EXT4-fs error|EXT4-fs.*abort|ext4_error|BTRFS.*error|XFS.*error.*corruption)`
+                  {job="dmesg"} |~ `(EXT4-fs error|EXT4-fs (error|warning).*error -[0-9]+|EXT4-fs.*abort|ext4_error|BTRFS.*error|XFS.*error.*corruption)`
                   [5m]
                 )
               ) > 0
@@ -40,6 +40,22 @@ data:
             annotations:
               summary: {{ `"Filesystem error on {{ $labels.host }}"` }}
               description: {{ `"dmesg on {{ $labels.host }} is reporting filesystem errors indicating possible disk corruption or failure."` }}
+
+          - alert: NodeBlockDeviceIOError
+            expr: |
+              sum by (host) (
+                count_over_time(
+                  {job="dmesg"} |~ `(blk_update_request: I/O error|Buffer I/O error on dev|end_request: I/O error)`
+                  [5m]
+                )
+              ) > 0
+            for: 0m
+            labels:
+              severity: critical
+              component: hardware
+            annotations:
+              summary: {{ `"Block device I/O error on {{ $labels.host }}"` }}
+              description: {{ `"dmesg on {{ $labels.host }} is reporting block device I/O errors. A storage device may be failing."` }}
 
           - alert: NodeMachineCheckError
             expr: |
