@@ -27,6 +27,7 @@ func newHostCmd() *cobra.Command {
 	cmd.AddCommand(newHostSSHCmd())
 	cmd.AddCommand(newHostChangedCmd())
 	cmd.AddCommand(newHostRebootCmd())
+	cmd.AddCommand(newHostGenerationsCmd())
 
 	return cmd
 }

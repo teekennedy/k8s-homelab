@@ -26,7 +26,7 @@ in {
 
   # Use zsh for shell instead of bash
   # https://github.com/mcdonc/devenv-zsh
-  imports = [devenv-zsh.plugin inputs.lab.devenvModules.default];
+  imports = [devenv-zsh.plugin];
   zsh.enable = true;
 
   # https://devenv.sh/basics/

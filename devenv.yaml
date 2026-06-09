@@ -16,14 +16,11 @@ inputs:
     inputs:
       nixpkgs:
         follows: nixpkgs
-  lab:
-    url: path:cmd/lab
-    inputs:
-      nixpkgs:
-        follows: nixpkgs
   mk-shell-bin:
     url: github:rrbutani/nix-mk-shell-bin
   nix2container:
     url: github:nlewo/nix2container
   nixpkgs:
     url: github:NixOS/nixpkgs/nixos-unstable
+imports:
+  - ./cmd/lab
