@@ -8,7 +8,7 @@ gitea:
     runAsNonRoot: true
     runAsUser: 1000
   image:
-    tag: "1.23.7"
+    tag: "1.26.1"
     rootless: true
   ingress:
     enabled: true
@@ -35,6 +35,9 @@ gitea:
       # Default preset of 'nano' resulted in ~33% CPU throttling.
       # Preset definitions: https://github.com/bitnami/charts/blob/948f461f839ebd068afec65b8c6ff9ba871d1ff7/bitnami/common/templates/_resources.tpl#L15
       resourcesPreset: micro
+
+  persistence:
+    storageClass: longhorn
 
   strategy:
     type: Recreate
