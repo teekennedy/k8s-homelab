@@ -1,3 +1,6 @@
+require_version: true
+imports:
+  - ./cmd/lab
 inputs:
   dagger:
     url: github:dagger/nix?ref=main
@@ -22,5 +25,3 @@ inputs:
     url: github:nlewo/nix2container
   nixpkgs:
     url: github:NixOS/nixpkgs/nixos-unstable
-imports:
-  - ./cmd/lab
