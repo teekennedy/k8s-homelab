@@ -11,8 +11,7 @@ spec:
   primaryUpdateStrategy: unsupervised
   storage:
     size: 5Gi
-    # Use single replica storageclass to avoid write amplification with multiple instances.
-    storageClass: longhorn-rc1
+    storageClass: longhorn-rc2
   enableSuperuserAccess: true
   postgresql:
     # postgresql configuration options (postgresql.conf)
