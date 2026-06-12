@@ -461,12 +461,14 @@ func main() {
 		// Check if secret already has credentials populated
 		secretClient := k8sClient.CoreV1().Secrets(app.SecretNamespace)
 		secret, err := secretClient.Get(ctx, app.SecretName, metav1.GetOptions{})
+		var existingClientID string
+		secretPopulated := false
 		if err == nil {
-			if clientID, ok := secret.Data["WOODPECKER_GITEA_CLIENT"]; ok && len(clientID) > 0 {
-				if clientSecret, ok := secret.Data["WOODPECKER_GITEA_SECRET"]; ok && len(clientSecret) > 0 {
-					log.Printf("OAuth2 app secret %s already populated, skipping", app.SecretName)
-					continue
-				}
+			clientID, hasClientID := secret.Data["WOODPECKER_GITEA_CLIENT"]
+			clientSecret, hasClientSecret := secret.Data["WOODPECKER_GITEA_SECRET"]
+			if hasClientID && len(clientID) > 0 && hasClientSecret && len(clientSecret) > 0 {
+				secretPopulated = true
+				existingClientID = string(clientID)
 			}
 		} else if !apierrors.IsNotFound(err) {
 			log.Printf("Get OAuth2 app secret %s in %s: %v", app.SecretName, app.SecretNamespace, err)
@@ -480,9 +482,25 @@ func main() {
 			continue
 		}
 
+		// If secret is populated, verify the app exists in Gitea with a matching clientID
+		if secretPopulated {
+			appVerified := false
+			for _, existing := range existingApps {
+				if existing.Name == app.Name && existing.ClientID == existingClientID {
+					appVerified = true
+					break
+				}
+			}
+			if appVerified {
+				log.Printf("OAuth2 app secret %s already populated and verified in Gitea, skipping", app.SecretName)
+				continue
+			}
+			log.Printf("OAuth2 app secret %s is populated but app not found in Gitea (clientID mismatch or missing), recreating", app.SecretName)
+		}
+
 		for _, existing := range existingApps {
 			if existing.Name == app.Name {
-				log.Printf("OAuth2 app %s already exists (ID %d) but secret is not populated, recreating", app.Name, existing.ID)
+				log.Printf("OAuth2 app %s already exists (ID %d), recreating", app.Name, existing.ID)
 				_, err = client.DeleteOauth2(existing.ID)
 				if err != nil {
 					log.Printf("Delete existing OAuth2 app %s: %v", app.Name, err)
