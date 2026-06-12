@@ -1,6 +1,6 @@
 dependencies:
 - name: woodpecker
   repository: oci://ghcr.io/woodpecker-ci/helm
-  version: 3.5.1
-digest: sha256:5a922f685956554dd005faab898b4b227931cdf992f053141c774e1a51e4d288
-generated: "2026-03-31T18:15:13.570841-06:00"
+  version: 3.6.4
+digest: sha256:cd4b314d2458869742580f1d14f5b0b94759bed12624913986c20f4d1ea14537
+generated: "2026-06-12T23:44:26.691200701Z"
