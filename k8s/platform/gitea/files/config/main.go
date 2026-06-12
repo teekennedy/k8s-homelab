@@ -303,6 +303,107 @@ func main() {
 		}
 	}
 
+	for _, user := range config.Users {
+		log.Printf("Processing user %s with secret %s in %s", user.Name, user.SecretName, user.SecretNamespace)
+		password, err := getOrCreatePassword(ctx, k8sClient, user.SecretNamespace, user.SecretName, user.Name)
+		if err != nil {
+			log.Printf("getOrCreatePassword for user %s: %v", user.Name, err)
+		}
+		mustChangePassword := false
+		_, _, err = client.GetUserInfo(user.Name)
+		if err != nil {
+			_, _, err = client.AdminCreateUser(gitea.CreateUserOption{
+				Username:           user.Name,
+				LoginName:          user.Name,
+				FullName:           user.FullName,
+				Password:           password,
+				MustChangePassword: &mustChangePassword,
+				Email:              user.Email,
+			})
+			if err != nil {
+				log.Printf("Create %s: %v", user.Name, err)
+				continue
+			}
+		}
+		_, err = client.AdminEditUser(user.Name, gitea.EditUserOption{
+			LoginName:          user.Name,
+			Email:              &user.Email,
+			FullName:           &user.FullName,
+			Password:           password,
+			Admin:              &user.Admin,
+			MustChangePassword: &mustChangePassword,
+		})
+		if err != nil {
+			log.Printf("Edit %s: %v", user.Name, err)
+		} else {
+			log.Printf("Successfully updated user %s", user.Name)
+		}
+
+		if len(user.AccessTokens) > 0 {
+			userOptions := []gitea.ClientOption{gitea.SetBasicAuth(user.Name, password), gitea.SetContext(ctx)}
+			userClient, err := gitea.NewClient(giteaHost, userOptions...)
+			if err != nil {
+				log.Printf("Logging in as %s: %v", user.Name, err)
+				continue
+			}
+			currTokenList, _, err := userClient.ListAccessTokens(gitea.ListAccessTokensOptions{ListOptions: gitea.ListOptions{Page: -1}})
+			if err != nil {
+				log.Printf("Listing current access tokens for %s: %v", user.Name, err)
+				continue
+			}
+			currTokens := make(map[string]*gitea.AccessToken)
+			for _, currToken := range currTokenList {
+				currTokens[currToken.Name] = currToken
+			}
+			for _, token := range user.AccessTokens {
+				var scopes []gitea.AccessTokenScope
+				for _, s := range token.Scopes {
+					scopes = append(scopes, gitea.AccessTokenScope(s))
+				}
+				slices.Sort(scopes)
+
+				currToken, ok := currTokens[token.Name]
+				if ok {
+					slices.Sort(currToken.Scopes)
+
+					if slices.Equal(scopes, currToken.Scopes) {
+						log.Printf("Existing access token %s matches expected scopes", currToken.Name)
+					} else {
+						log.Printf("Existing access token %s differs from expected scopes. Deleting", currToken.Name)
+						_, err = userClient.DeleteAccessToken(currToken.ID)
+						if err != nil {
+							log.Printf("Deleting %s: %v", currToken.Name, err)
+							continue
+						}
+					}
+
+				}
+
+				log.Printf("Creating token %s for user %s", token.Name, user.Name)
+				newToken, _, err := userClient.CreateAccessToken(gitea.CreateAccessTokenOption{
+					Name:   token.Name,
+					Scopes: scopes,
+				})
+				if err != nil {
+					log.Printf("Creating %s: %v", token.Name, err)
+					continue
+				}
+				secretClient := k8sClient.CoreV1().Secrets(user.SecretNamespace)
+				b64Token := base64.URLEncoding.EncodeToString([]byte(newToken.Token))
+
+				patch := map[string]any{"data": map[string]string{"token": b64Token}}
+				patchBytes, _ := json.Marshal(patch)
+
+				_, err = secretClient.Patch(ctx, user.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+				if err != nil {
+					log.Printf("Updating secret %s for token %s: %v", user.SecretName, token.Name, err)
+					continue
+				}
+				log.Printf("Successfully created token %s and updated secret %s", token.Name, user.SecretName)
+			}
+
+		}
+	}
 	for _, repo := range config.Repositories {
 		if repo.Migrate.Source != "" {
 			_, _, err = client.MigrateRepo(gitea.MigrateRepoOption{
@@ -325,108 +426,6 @@ func main() {
 			})
 			if err != nil {
 				log.Printf("Create %s/%s: %v", repo.Owner, repo.Name, err)
-			}
-		}
-
-		for _, user := range config.Users {
-			log.Printf("Processing user %s with secret %s in %s", user.Name, user.SecretName, user.SecretNamespace)
-			password, err := getOrCreatePassword(ctx, k8sClient, user.SecretNamespace, user.SecretName, user.Name)
-			if err != nil {
-				log.Printf("getOrCreatePassword for user %s: %v", user.Name, err)
-			}
-			mustChangePassword := false
-			_, _, err = client.GetUserInfo(user.Name)
-			if err != nil {
-				_, _, err = client.AdminCreateUser(gitea.CreateUserOption{
-					Username:           user.Name,
-					LoginName:          user.Name,
-					FullName:           user.FullName,
-					Password:           password,
-					MustChangePassword: &mustChangePassword,
-					Email:              user.Email,
-				})
-				if err != nil {
-					log.Printf("Create %s: %v", user.Name, err)
-				}
-			} else {
-				_, err := client.AdminEditUser(user.Name, gitea.EditUserOption{
-					LoginName:          user.Name,
-					Email:              &user.Email,
-					FullName:           &user.FullName,
-					Password:           password,
-					Admin:              &user.Admin,
-					MustChangePassword: &mustChangePassword,
-				})
-				if err != nil {
-					log.Printf("Edit %s: %v", user.Name, err)
-				} else {
-					log.Printf("Successfully updated user")
-				}
-			}
-
-			if len(user.AccessTokens) > 0 {
-				userOptions := []gitea.ClientOption{gitea.SetBasicAuth(user.Name, password), gitea.SetContext(ctx)}
-				userClient, err := gitea.NewClient(giteaHost, userOptions...)
-				if err != nil {
-					log.Printf("Logging in as %s: %v", user.Name, err)
-					continue
-				}
-				currTokenList, _, err := userClient.ListAccessTokens(gitea.ListAccessTokensOptions{ListOptions: gitea.ListOptions{Page: -1}})
-				if err != nil {
-					log.Printf("Listing current access tokens for %s: %v", user.Name, err)
-					continue
-				}
-				currTokens := make(map[string]*gitea.AccessToken)
-				for _, currToken := range currTokenList {
-					currTokens[currToken.Name] = currToken
-				}
-				for _, token := range user.AccessTokens {
-					var scopes []gitea.AccessTokenScope
-					for _, s := range token.Scopes {
-						scopes = append(scopes, gitea.AccessTokenScope(s))
-					}
-					slices.Sort(scopes)
-
-					currToken, ok := currTokens[token.Name]
-					if ok {
-						slices.Sort(currToken.Scopes)
-
-						if slices.Equal(scopes, currToken.Scopes) {
-							log.Printf("Existing access token %s matches expected scopes", currToken.Name)
-						} else {
-							log.Printf("Existing access token %s differs from expected scopes. Deleting", currToken.Name)
-							_, err = userClient.DeleteAccessToken(currToken.ID)
-							if err != nil {
-								log.Printf("Deleting %s: %v", currToken.Name, err)
-								continue
-							}
-						}
-
-					}
-
-					log.Printf("Creating token %s for user %s", token.Name, user.Name)
-					newToken, _, err := userClient.CreateAccessToken(gitea.CreateAccessTokenOption{
-						Name:   token.Name,
-						Scopes: scopes,
-					})
-					if err != nil {
-						log.Printf("Creating %s: %v", token.Name, err)
-						continue
-					}
-					secretClient := k8sClient.CoreV1().Secrets(user.SecretNamespace)
-					b64Token := base64.URLEncoding.EncodeToString([]byte(newToken.Token))
-
-					patch := map[string]any{"data": map[string]string{"token": b64Token}}
-					patchBytes, _ := json.Marshal(patch)
-
-					_, err = secretClient.Patch(ctx, user.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
-					if err != nil {
-						log.Printf("Updating secret %s for token %s: %v", user.SecretName, token.Name, err)
-						continue
-					}
-					log.Printf("Successfully created token %s and updated secret %s", token.Name, user.SecretName)
-				}
-
 			}
 		}
 	}
