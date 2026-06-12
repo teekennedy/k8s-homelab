@@ -10,7 +10,7 @@ app-template:
         jellyfin-debug:
           image:
             repository: alpine
-            tag: latest@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+            tag: latest@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
           command:
             - sleep
             - infinity
@@ -405,7 +405,7 @@ app-template:
         jellyfin:
           image:
             repository: ghcr.io/jellyfin/jellyfin
-            tag: 10.11.8
+            tag: 10.11.11
           env:
             TZ: America/Denver
             JELLYFIN_DATA_DIR: "/data"
