@@ -31,10 +31,10 @@ renovate:
   resources:
     requests:
       cpu: 2000m
-      memory: 1Gi
+      memory: 3Gi
     limits:
       cpu: 3000m
-      memory: 2Gi
+      memory: 4Gi
   env:
     LOG_LEVEL: debug
   envList:
