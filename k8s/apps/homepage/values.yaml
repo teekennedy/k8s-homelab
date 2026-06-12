@@ -3,7 +3,7 @@ homepage:
   image:
     registry: ghcr.io
     repository: gethomepage/homepage
-    tag: "v1.12.3"
+    tag: "v1.13.2"
   # Homepage is fronted by oauth2-proxy in reverse-proxy mode (see
   # k8s/platform/oauth2-proxy). The msng.to ingress and TLS are owned by the
   # oauth2-proxy chart, which forwards authenticated traffic to this service.

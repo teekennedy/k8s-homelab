@@ -1,6 +1,6 @@
 dependencies:
 - name: homepage
   repository: oci://ghcr.io/m0nsterrr/helm-charts
-  version: 4.11.1
-digest: sha256:1e130946380502849be5798a88523615e86bba7c718fa3bcab4dfcca3429e875
-generated: "2026-04-06T15:02:46.588039643Z"
+  version: 4.12.2
+digest: sha256:bdc2f5fc23b57f53a7aac2905360cf3e383a87151e79a20fb970a2c0d133d9b5
+generated: "2026-06-12T23:44:10.736657855Z"
