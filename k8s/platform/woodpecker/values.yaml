@@ -6,7 +6,6 @@ woodpecker:
       WOODPECKER_HOST: "https://ci.msng.to"
       WOODPECKER_GITEA: "true"
       WOODPECKER_GITEA_URL: "http://gitea-http.gitea:3000"
-      WOODPECKER_EXPERT_FORGE_OAUTH_HOST: "https://git.msng.to"
       WOODPECKER_ADMIN: "tkennedy"
     extraSecretNamesForEnvFrom:
       - woodpecker-default-agent-secret
@@ -32,5 +31,5 @@ woodpecker:
       WOODPECKER_SERVER: "woodpecker-server:9000"
       WOODPECKER_BACKEND: "kubernetes"
       WOODPECKER_BACKEND_K8S_NAMESPACE: "woodpecker"
-      WOODPECKER_BACKEND_K8S_STORAGE_CLASS: "longhorn"
+      WOODPECKER_BACKEND_K8S_STORAGE_CLASS: "local-path"
       WOODPECKER_BACKEND_K8S_VOLUME_SIZE: "1G"
