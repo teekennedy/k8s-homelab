@@ -222,10 +222,35 @@ func makeSampleData() AMData {
 		StartsAt:     now.Add(-30 * time.Minute),
 	}
 
+	a3 := Alert{
+		Labels: makeKV(map[string]string{
+			"container":     "longhorn-manager",
+			"endpoint":      "manager",
+			"instance":      "10.42.2.195:9500",
+			"job":           "longhorn-backend",
+			"namespace":     "longhorn-system",
+			"node":          "borg-2",
+			"pod":           "longhorn-manager-p92k4",
+			"pvc":           "renovate-cache",
+			"pvc_namespace": "renovate",
+			"service":       "longhorn-backend",
+			"volume":        "pvc-3588bb1c-ce80-492e-8905-b7976311ae6b",
+		}),
+		Annotations: makeKV(map[string]string{
+			"summary":          "The actual used space of Longhorn volume is over 90% of the capacity.",
+			"description":      "The actual space used by Longhorn volume for the PVC renovate-cache in the renovate namespace is at 106% capacity for more than 5 minutes",
+			"custom_link_text": "volume",
+			"custom_link_url":  "https://longhorn.example.com/#/volume/pvc-3588bb1c-ce80-492e-8905-b7976311ae6b",
+		}),
+		GeneratorURL: "https://prometheus/graph?expr=histogram_quantile(...)",
+		Value:        "106.40499114990234",
+		StartsAt:     now.Add(-30 * time.Minute),
+	}
+
 	var data AMData
 	data.Status = "firing"
 	data.GroupLabels = groupLabels
 	data.CommonLabels = commonLabels
-	data.Alerts = []Alert{a1, a2}
+	data.Alerts = []Alert{a1, a2, a3}
 	return data
 }
