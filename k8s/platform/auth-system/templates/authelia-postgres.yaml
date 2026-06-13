@@ -6,7 +6,7 @@ metadata:
   name: authelia-psql
   namespace: {{ .Release.Namespace }}
 spec:
-  instances: 2
+  instances: 3
   imageName: ghcr.io/cloudnative-pg/postgresql:17.5-standard-bookworm
   primaryUpdateStrategy: unsupervised
   storage:
@@ -24,8 +24,11 @@ spec:
       max_wal_size: 2GB
   monitoring:
     enablePodMonitor: true
-  # Disable pod disruption budget so that the cluster can be shut down
-  enablePDB: false
+  enablePDB: true
+  # prevent two pods from landing on the same node 
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
   resources:
     requests:
       memory: "512Mi"
