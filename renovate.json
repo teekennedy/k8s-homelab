@@ -276,11 +276,7 @@
       ],
       "matchPackageNames": [
         "cert-manager",
-        "trust-manager",
-        "step-certificates",
-        "step-issuer",
-        "cr.step.sm/smallstep/step-ca",
-        "cr.step.sm/smallstep/step-issuer"
+        "trust-manager"
       ]
     },
     {
