@@ -4,22 +4,8 @@ exemptions:
     rules:
       - tagNotSpecified
   - controllerNames:
-      - cert-system-step-issuer
-    rules:
-      - privilegeEscalationAllowed
-  - controllerNames:
-      - step-ca-acme-provisioner
+      - nfs-mtls-cert-sync
     rules:
       - privilegeEscalationAllowed
       - runAsRootAllowed
-  - controllerNames:
-      - step-ca-test-connection
-    rules:
-      - privilegeEscalationAllowed
-      - runAsRootAllowed
-      - tagNotSpecified
-  - controllerNames:
-      - step-issuer-bootstrap
-    rules:
-      - privilegeEscalationAllowed
-      - runAsRootAllowed
+      - hostPIDSet

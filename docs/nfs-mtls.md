@@ -12,7 +12,7 @@ NFS volumes in the cluster use kernel-native mutual TLS (`xprtsec=mtls`, RFC 928
 
 ```
 ┌─────────────────────────────┐        ┌─────────────────────────────────┐
-│  k3s node (client)          │        │  NFS server (borg-2)            │
+│  k3s node (client)          │        │  NFS server                     │
 │                             │        │                                 │
 │  kernel NFS client          │◄──────►│  nfsd + tlshd                   │
 │  │                          │        │  │                              │
@@ -42,7 +42,7 @@ NFS volumes in the cluster use kernel-native mutual TLS (`xprtsec=mtls`, RFC 928
 
 cert-manager issues one `Certificate` resource per borg node (`nfs-mtls-cert-borg-N`) via the `internal-ca` ClusterIssuer. The CA is a self-signed ECDSA root cert stored in Secret `internal-ca-cert` in `cert-system`. cert-manager renews host certs automatically 30 days before their 90-day expiry.
 
-The trust-manager `Bundle` named `step-ca-bundle` distributes the internal CA cert to a ConfigMap of the same name in every namespace, making it available to workloads that need to verify internal TLS (e.g. Authelia verifying the LDAP cert).
+The trust-manager `Bundle` named `cluster-ca-bundle` distributes the internal CA cert to a ConfigMap of the same name in every namespace, making it available to workloads that need to verify internal TLS (e.g. Authelia verifying the LDAP cert).
 
 ### Getting certs onto the host (cert-sync DaemonSet)
 
@@ -220,7 +220,7 @@ chown -R 1200:1200 /storage/nas/k8s/<directory>
 | `services.nfs-mtls.serverMode` | bool | false | Export `/storage/nas/k8s` with xprtsec=mtls, run tlshd as server |
 | `services.nfs-mtls.clientMode` | bool | false | Run tlshd as client (required on all k3s nodes that mount NFS) |
 
-**Both `serverMode` and `clientMode` can be enabled simultaneously** — borg-2 is both the NFS server and a k3s node that may schedule NFS-backed pods.
+**Both `serverMode` and `clientMode` can be enabled simultaneously** — you can have a host that is both the NFS server and a k3s node that may schedule NFS-backed pods.
 
 Cert paths are fixed at `/var/lib/nfs-mtls/` and written by the `nfs-mtls-cert-sync` DaemonSet. No per-host configuration is needed beyond enabling the appropriate modes.
 
@@ -238,7 +238,7 @@ For a zero-downtime rotation, create a new Certificate with a different `secretN
 
 ### 2. Update the trust-manager Bundle
 
-The `step-ca-bundle` Bundle in `cert-system/templates/step-ca-bundle.yaml` already points to `internal-ca-cert`. Once the Secret is updated by cert-manager, trust-manager automatically propagates the new CA cert to all namespace ConfigMaps within ~60 seconds.
+The `cluster-ca-bundle` Bundle in `cert-system/templates/cluster-ca-bundle.yaml` already points to `internal-ca-cert`. Once the Secret is updated by cert-manager, trust-manager automatically propagates the new CA cert to all namespace ConfigMaps within ~60 seconds.
 
 ### 3. Force cert-sync reload
 
@@ -283,8 +283,8 @@ Most common cause: cert files don't exist at `/var/lib/nfs-mtls/` yet. Wait for 
 # Check tlshd is running on the client node
 systemctl status tlshd.service
 
-# Verify xprtsec=mtls export is active on borg-2
-ssh borg-2 exportfs -v
+# Verify xprtsec=mtls export is active on the nfs server
+ssh <nfs-server> exportfs -v
 
 # Check TLS kernel module is loaded
 lsmod | grep ^tls

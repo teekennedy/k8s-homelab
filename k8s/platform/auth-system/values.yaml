@@ -275,7 +275,7 @@ authelia:
     extraVolumes:
       - name: certificates
         configMap:
-          name: step-ca-bundle
+          name: cluster-ca-bundle
       - name: ca-trust-store-config
         configMap:
           name: authelia-ca-trust-store

@@ -2,7 +2,7 @@
 apiVersion: trust.cert-manager.io/v1alpha1
 kind: Bundle
 metadata:
-  name: step-ca-bundle  # Name also used as the target ConfigMap name in each namespace
+  name: cluster-ca-bundle  # Name also used as the target ConfigMap name in each namespace
   namespace: {{ .Release.Namespace }}
 spec:
   sources:

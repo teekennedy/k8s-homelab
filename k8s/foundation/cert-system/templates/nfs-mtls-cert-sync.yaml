@@ -87,7 +87,7 @@ spec:
             optional: true
         - name: ca-bundle
           configMap:
-            name: step-ca-bundle
+            name: cluster-ca-bundle
         - name: host-nfs-mtls
           hostPath:
             path: /var/lib/nfs-mtls
