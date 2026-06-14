@@ -8,4 +8,5 @@ exemptions:
     rules:
       - privilegeEscalationAllowed
       - runAsRootAllowed
+      - runAsPrivileged
       - hostPIDSet
