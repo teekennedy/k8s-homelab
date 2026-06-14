@@ -2,13 +2,13 @@
 apiVersion: trust.cert-manager.io/v1alpha1
 kind: Bundle
 metadata:
-  name: step-ca-bundle  # The bundle name will also be used for the target
+  name: step-ca-bundle  # Name also used as the target ConfigMap name in each namespace
   namespace: {{ .Release.Namespace }}
 spec:
   sources:
-  - configMap:
-      name: "step-ca-certs"
-      key: "root_ca.crt"
+  - secret:
+      name: "internal-ca-cert"
+      key: "ca.crt"
   target:
     configMap:
       key: "root-certs.pem"

@@ -196,6 +196,7 @@
                     ./nix/modules/common
                     ./nix/modules/restic
                     ./nix/modules/k3s
+                    ./nix/modules/nfs-mtls
                     ./nix/modules/users/defaultUser.nix
                     inputs.determinate.nixosModules.default
                     inputs.nixos-facter-modules.nixosModules.facter

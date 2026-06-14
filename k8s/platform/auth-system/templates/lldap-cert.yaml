@@ -21,8 +21,7 @@ spec:
   duration: 24h
   # Renew 8 hours before the certificate expiration
   renewBefore: 8h
-  # The reference to the step issuer
   issuerRef:
-    group: certmanager.step.sm
-    kind: StepClusterIssuer
-    name: step-issuer
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: internal-ca

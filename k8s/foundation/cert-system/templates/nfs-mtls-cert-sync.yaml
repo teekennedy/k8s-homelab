@@ -1,0 +1,135 @@
+# Syncs per-node NFS mTLS certificates from K8s Secrets to the host filesystem.
+# tlshd (the NFS kernel TLS handshake daemon) reads certs from /var/lib/nfs-mtls/
+# at connection time, so cert rotation is picked up automatically on the next handshake.
+#
+# Design:
+#   - All 4 node cert Secrets are mounted as volumes (optional: true).
+#   - NODE_NAME from the Downward API selects the right cert directory (/certs/<nodename>).
+#   - Kubelet auto-updates mounted Secret volumes within ~60s of cert-manager renewal.
+#   - A polling loop (60s) detects changes and copies files + reloads tlshd via nsenter.
+#   - No RBAC needed: kubelet handles Secret volume mounts using its own credentials.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nfs-mtls-cert-sync-script
+  namespace: {{ .Release.Namespace }}
+data:
+  sync.sh: |
+    #!/bin/sh
+    set -eu
+    HOST_DIR=/host
+    CERT_DIR=/certs/${NODE_NAME}
+    CA_FILE=/ca/root-certs.pem
+
+    sync() {
+      if [ ! -f "${CERT_DIR}/tls.crt" ]; then
+        echo "$(date -Iseconds): cert not yet available for ${NODE_NAME}, waiting..."
+        return
+      fi
+      changed=0
+      if ! diff -q "${CERT_DIR}/tls.crt" "${HOST_DIR}/cert.pem" >/dev/null 2>&1; then
+        install -m 644 "${CERT_DIR}/tls.crt" "${HOST_DIR}/cert.pem"
+        install -m 600 "${CERT_DIR}/tls.key" "${HOST_DIR}/key.pem"
+        changed=1
+      fi
+      if ! diff -q "${CA_FILE}" "${HOST_DIR}/ca.crt" >/dev/null 2>&1; then
+        install -m 644 "${CA_FILE}" "${HOST_DIR}/ca.crt"
+        changed=1
+      fi
+      if [ "${changed}" = "1" ]; then
+        echo "$(date -Iseconds): cert updated for ${NODE_NAME}, reloading tlshd"
+        nsenter -t 1 -m -- systemctl reload tlshd.service 2>/dev/null \
+          || nsenter -t 1 -m -- systemctl restart tlshd.service 2>/dev/null \
+          || echo "$(date -Iseconds): warning: tlshd not running yet on ${NODE_NAME}"
+      fi
+    }
+
+    mkdir -p "${HOST_DIR}"
+    while true; do
+      sync
+      sleep 60
+    done
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nfs-mtls-cert-sync
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nfs-mtls-cert-sync
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nfs-mtls-cert-sync
+    spec:
+      hostPID: true
+      tolerations:
+        - operator: Exists
+      volumes:
+        - name: cert-borg-0
+          secret:
+            secretName: nfs-mtls-cert-borg-0
+            optional: true
+        - name: cert-borg-1
+          secret:
+            secretName: nfs-mtls-cert-borg-1
+            optional: true
+        - name: cert-borg-2
+          secret:
+            secretName: nfs-mtls-cert-borg-2
+            optional: true
+        - name: cert-borg-3
+          secret:
+            secretName: nfs-mtls-cert-borg-3
+            optional: true
+        - name: ca-bundle
+          configMap:
+            name: step-ca-bundle
+        - name: host-nfs-mtls
+          hostPath:
+            path: /var/lib/nfs-mtls
+            type: DirectoryOrCreate
+        - name: sync-script
+          configMap:
+            name: nfs-mtls-cert-sync-script
+            defaultMode: 0755
+      containers:
+        - name: sync
+          image: alpine:3
+          command: ["/scripts/sync.sh"]
+          securityContext:
+            privileged: true
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: cert-borg-0
+              mountPath: /certs/borg-0
+              readOnly: true
+            - name: cert-borg-1
+              mountPath: /certs/borg-1
+              readOnly: true
+            - name: cert-borg-2
+              mountPath: /certs/borg-2
+              readOnly: true
+            - name: cert-borg-3
+              mountPath: /certs/borg-3
+              readOnly: true
+            - name: ca-bundle
+              mountPath: /ca
+              readOnly: true
+            - name: host-nfs-mtls
+              mountPath: /host
+            - name: sync-script
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 32Mi

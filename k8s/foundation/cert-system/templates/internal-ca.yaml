@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/cert-manager.io/clusterissuer_v1.json
+# Bootstrap the internal CA using cert-manager's self-signed issuer pattern:
+#   1. A SelfSigned ClusterIssuer signs the root CA Certificate
+#   2. The CA cert is stored in Secret/internal-ca-cert
+#   3. A ca ClusterIssuer (internal-ca) uses that Secret to sign all internal certs
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: internal-ca-selfsigned
+spec:
+  selfSigned: {}
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/cert-manager.io/certificate_v1.json
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: internal-ca
+  namespace: {{ .Release.Namespace }}
+spec:
+  isCA: true
+  commonName: "Missing Token Internal K8s CA"
+  secretName: internal-ca-cert
+  duration: 87600h      # 10 years
+  renewBefore: 720h     # 30 days before expiry
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: internal-ca-selfsigned
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/cert-manager.io/clusterissuer_v1.json
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: internal-ca
+spec:
+  ca:
+    secretName: internal-ca-cert

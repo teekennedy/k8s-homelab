@@ -1,0 +1,24 @@
+# One TLS certificate per borg node for NFS kernel mTLS (xprtsec=mtls).
+# cert-manager issues and renews these automatically via the internal-ca ClusterIssuer.
+# The nfs-mtls-cert-sync DaemonSet reads these Secrets and writes cert/key to the
+# host filesystem at /var/lib/nfs-mtls/ where tlshd can read them.
+{{- range list "borg-0" "borg-1" "borg-2" "borg-3" }}
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/cert-manager.io/certificate_v1.json
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: nfs-mtls-cert-{{ . }}
+  namespace: cert-system
+spec:
+  secretName: nfs-mtls-cert-{{ . }}
+  commonName: {{ . }}.msng.to
+  dnsNames:
+    - {{ . }}.msng.to
+  duration: 2160h    # 90 days
+  renewBefore: 720h  # 30 days
+  issuerRef:
+    name: internal-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+{{- end }}
