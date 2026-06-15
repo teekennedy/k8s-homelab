@@ -50,6 +50,8 @@
                   role = "agent";
                   serverAddr = "https://10.69.80.101:6443";
                 };
+
+                hardware.cpu.intel.updateMicrocode = true;
               })
             ];
           }
@@ -130,6 +132,8 @@
                     Gateway = ["10.69.80.1"];
                   };
                 };
+
+                hardware.cpu.intel.updateMicrocode = true;
 
                 services.k3s = {
                   role = "server";

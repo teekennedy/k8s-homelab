@@ -33,17 +33,17 @@ package homelab
 
 // Host represents a NixOS host in the cluster
 #Host: {
-	name:     #Hostname
-	ip:       #IPv4
-	k3s:      #K3sHost
+	name: #Hostname
+	ip:   #IPv4
+	k3s:  #K3sHost
 	modules?: [...string]
 }
 
 // Apps represents the application deployment configuration by tier
 #Apps: {
 	foundation: [...string]
-	platform:   [...string]
-	apps:       [...string]
+	platform: [...string]
+	apps: [...string]
 }
 
 // Environment represents a complete environment configuration
@@ -51,8 +51,8 @@ package homelab
 	name:      string
 	inherits?: string
 	cluster:   #Cluster
-	hosts:     [...#Host]
-	apps:      #Apps
+	hosts: [...#Host]
+	apps: #Apps
 
 	// Validation: at least one host must have clusterInit if any hosts exist
 	_hasClusterInit: or([for h in hosts if h.k3s.clusterInit == true {true}]) | len(hosts) == 0

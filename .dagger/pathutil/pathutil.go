@@ -11,6 +11,7 @@ import (
 var (
 	LintNixPatterns    = []string{"**/*.nix"}
 	LintCuePatterns    = []string{"config/**/*.cue"}
+	ExportCuePatterns  = []string{"config/**/*.cue", "config/gen/**"}
 	LintGoPatterns     = []string{"**/*.go", "**/go.mod", "**/go.sum"}
 	LintPythonPatterns = []string{"**/*.py", "**/pyproject.toml", "**/uv.lock"}
 	LintYamlPatterns   = []string{"**/*.yaml", "**/*.yml", ".yamllint.yaml"}

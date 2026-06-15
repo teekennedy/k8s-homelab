@@ -1,3 +1,4 @@
+// Package cmd defines the lab CLI interface
 package cmd
 
 import (

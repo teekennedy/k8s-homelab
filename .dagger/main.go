@@ -79,28 +79,6 @@ func (m *Homelab) nixFormat(source *dagger.Directory, paths []string) *dagger.Di
 		Directory("/src")
 }
 
-// LintCue validates CUE configuration
-// +check
-func (m *Homelab) LintCue(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!config/**/*.cue"]
-	source *dagger.Directory,
-	// +optional
-	paths []string,
-) (string, error) {
-	_, err := dag.Container().
-		From(cueImage).
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src/config").
-		WithExec([]string{"cue", "vet", "./..."}).
-		Sync(ctx)
-	if err != nil {
-		return "", fmt.Errorf("cue vet failed: %w", err)
-	}
-
-	return "CUE validation passed", nil
-}
-
 // LintYaml runs YAML linting
 // +check
 func (m *Homelab) LintYaml(ctx context.Context,

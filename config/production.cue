@@ -14,25 +14,32 @@ production: #Environment & _clusterDefaults & _productionApps & {
 			name: "borg-0"
 			ip:   "10.69.80.10"
 			k3s: {
-				role:        "server"
-				clusterInit: true
+				role:       "agent"
+				serverAddr: "https://10.69.80.101:6443"
+			}
+		},
+		{
+			name: "borg-1"
+			ip:   "10.69.80.11"
+			k3s: {
+				role:       "server"
+				serverAddr: "https://10.69.80.101:6443"
 			}
 		},
 		{
 			name: "borg-2"
 			ip:   "10.69.80.12"
 			k3s: {
-				role:       "server"
-				serverAddr: "https://10.69.80.10:6443"
+				role:        "server"
+				clusterInit: true
 			}
-			modules: ["samba/server"]
 		},
 		{
 			name: "borg-3"
 			ip:   "10.69.80.13"
 			k3s: {
 				role:       "server"
-				serverAddr: "https://10.69.80.10:6443"
+				serverAddr: "https://10.69.80.101:6443"
 			}
 		},
 	]

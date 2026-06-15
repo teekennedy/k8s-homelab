@@ -1,6 +1,8 @@
+// Package config provides functions to manage the k8s-homelab CUE configs
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -96,14 +98,16 @@ func ValidateEnvironment(configDir, envName string) error {
 
 // ExportEnvironment exports the environment configuration to different formats
 func ExportEnvironment(configDir, envName, format string) (string, error) {
+	if format == "json" {
+		return exportEnvironmentJSON(configDir, envName)
+	}
+
 	env, err := LoadEnvironment(configDir, envName)
 	if err != nil {
 		return "", err
 	}
 
 	switch format {
-	case "json":
-		return exportJSON(env)
 	case "yaml":
 		return exportYAML(env)
 	case "nix":
@@ -117,12 +121,50 @@ func ExportEnvironment(configDir, envName, format string) (string, error) {
 	}
 }
 
-func exportJSON(env *Environment) (string, error) {
-	out, err := json.MarshalIndent(env, "", "  ")
-	if err != nil {
-		return "", err
+// exportEnvironmentJSON exports a single environment as indented JSON by serializing
+// the raw CUE value directly. This produces byte-identical output to `cue export -e <env>`.
+func exportEnvironmentJSON(configDir, envName string) (string, error) {
+	ctx := cuecontext.New()
+
+	cfg := &load.Config{Dir: configDir}
+	instances := load.Instances([]string{"."}, cfg)
+	if len(instances) == 0 {
+		return "", fmt.Errorf("no CUE instances found in %s", configDir)
 	}
-	return string(out) + "\n", nil
+
+	inst := instances[0]
+	if inst.Err != nil {
+		return "", fmt.Errorf("load CUE instance: %w", inst.Err)
+	}
+
+	value := ctx.BuildInstance(inst)
+	if value.Err() != nil {
+		return "", fmt.Errorf("build CUE instance: %w", value.Err())
+	}
+
+	envValue := value.LookupPath(cue.ParsePath(envName))
+	if !envValue.Exists() {
+		return "", fmt.Errorf("environment %q not found in configuration", envName)
+	}
+
+	return exportJSONValue(envValue)
+}
+
+// exportJSONValue serializes a CUE value to 2-space-indented JSON with a trailing newline,
+// matching the output format of `cue export`.
+func exportJSONValue(v cue.Value) (string, error) {
+	compact, err := v.MarshalJSON()
+	if err != nil {
+		return "", fmt.Errorf("marshal CUE value to JSON: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, compact, "", "  "); err != nil {
+		return "", fmt.Errorf("indent JSON: %w", err)
+	}
+	buf.WriteString("\n")
+
+	return buf.String(), nil
 }
 
 func exportYAML(env *Environment) (string, error) {
