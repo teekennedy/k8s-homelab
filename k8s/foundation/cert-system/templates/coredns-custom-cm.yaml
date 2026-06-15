@@ -3,9 +3,9 @@
 # /etc/coredns/custom/ via the coredns Deployment in kube-system.
 #
 # borg-nodes.server: adds internal LAN IP entries for each borg host.
-# Required for NFS mounts: the csi-driver-nfs storageclass uses borg-2.msng.to
-# as the NFS server address, and pods need to resolve this to a LAN IP.
-# Without this, NFS volume mounts would fail because borg-N.msng.to has no
+# Required for NFS mounts: the csi-driver-nfs storageclass uses a host-based
+# DNS entry as the NFS server address, and pods need to resolve this to a LAN
+# IP. Without this, NFS volume mounts would fail because borg-N.msng.to has no
 # public DNS record and is unreachable via the cluster's upstream resolvers.
 #
 # This must be a standalone server block. k3s also injects a hosts plugin for
