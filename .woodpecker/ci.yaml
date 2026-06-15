@@ -13,6 +13,7 @@ steps:
       kubernetes:
         serviceAccountName: dagger-pipeline
     commands:
-      - apk add --no-cache curl
+      # kubectl is needed for dagger cli to communicate with the runner host
+      - apk add --no-cache curl kubectl
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       - dagger check
