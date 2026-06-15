@@ -31,6 +31,7 @@ data:
       if ! diff -q "${CERT_DIR}/tls.crt" "${HOST_DIR}/cert.pem" >/dev/null 2>&1; then
         install -m 644 "${CERT_DIR}/tls.crt" "${HOST_DIR}/cert.pem"
         install -m 600 "${CERT_DIR}/tls.key" "${HOST_DIR}/key.pem"
+        nsenter -t 1 -m -- chown tlshd:tlshd /var/lib/nfs-mtls/key.pem
         changed=1
       fi
       if ! diff -q "${CA_FILE}" "${HOST_DIR}/ca.crt" >/dev/null 2>&1; then
