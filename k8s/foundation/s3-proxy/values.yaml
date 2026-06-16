@@ -1,6 +1,6 @@
 image:
   repository: andrewgaul/s3proxy
-  tag: sha-be0c38c
+  tag: sha-871539d
 
 # Capacity of the backups PV
 capacity:

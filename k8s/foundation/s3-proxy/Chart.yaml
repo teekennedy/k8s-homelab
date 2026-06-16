@@ -1,5 +1,5 @@
 apiVersion: v2
 name: s3-proxy
 type: application
-version: 0.1.0
-appVersion: "sha-be0c38c"
+version: 0.1.1
+appVersion: "sha-871539d"
