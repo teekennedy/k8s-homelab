@@ -1,6 +1,26 @@
 # Daily base backup of gitea-psql to s3proxy → /storage/nas/backups/postgres/gitea-psql/
 # yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/postgresql.cnpg.io/scheduledbackup_v1.json
 ---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ .Values.psql.clusterName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  configuration:
+    endpointURL: http://s3proxy.s3-proxy.svc.cluster.local
+    destinationPath: s3://postgres/{{ .Values.psql.clusterName }}/
+    s3Credentials:
+      accessKeyId:
+        name: cnpg-s3-credentials
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: cnpg-s3-credentials
+        key: SECRET_ACCESS_KEY
+    data:
+      compression: bzip2
+  retentionPolicy: "14d"
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
@@ -11,6 +31,9 @@ spec:
   backupOwnerReference: self
   cluster:
     name: {{ .Values.psql.clusterName }}
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
 
 # Credentials for CNPG to authenticate to s3proxy.
 ---

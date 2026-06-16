@@ -36,22 +36,11 @@ spec:
       memory: 256Mi
     limits:
       memory: 512Mi
-  backup:
-    barmanObjectStore:
-      endpointURL: http://s3proxy.s3-proxy.svc.cluster.local
-      destinationPath: s3://postgres/crowdsec-psql/
-      s3Credentials:
-        accessKeyId:
-          name: cnpg-s3-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: cnpg-s3-credentials
-          key: SECRET_ACCESS_KEY
-      data:
-        # https://cloudnative-pg.io/documentation/1.16/backup_recovery/#compression-algorithms
-        compression: bzip2
-    retentionPolicy: "14d"
-    target: prefer-standby
+  plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: crowdsec-psql
   bootstrap:
     initdb:
       database: crowdsec
