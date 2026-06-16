@@ -26,6 +26,8 @@ spec:
               value: "filesystem"
             - name: JCLOUDS_FILESYSTEM_BASEDIR
               value: "/data"
+            - name: S3PROXY_JAVA_OPTS
+              value: {{ .Values.javaOpts | quote }}
             - name: S3PROXY_IDENTITY
               valueFrom:
                 secretKeyRef:
