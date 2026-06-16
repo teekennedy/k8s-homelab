@@ -9,7 +9,7 @@ metadata:
 spec:
   configuration:
     endpointURL: http://s3proxy.s3-proxy.svc.cluster.local
-    destinationPath: s3://postgres/{{ .Values.psql.clusterName }}/
+    destinationPath: s3://postgres/
     s3Credentials:
       accessKeyId:
         name: cnpg-s3-credentials
