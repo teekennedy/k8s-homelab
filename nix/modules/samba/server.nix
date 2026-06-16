@@ -20,8 +20,6 @@
       };
       k8s = {
         comment = "Volume storage for kubernetes cluster";
-        # TODO create /storage/nas/k8s/backups dir owned by smb-k8s user/group
-        # This was done interactively on 2025/11/01
         path = "/storage/nas/k8s";
         writable = "yes";
         # public = no is the default, but it's good to be explicit
@@ -31,15 +29,18 @@
     };
   };
 
+  # Pre-create share root directory used by smb clients.
+  systemd.tmpfiles.rules = [
+    "d /storage/nas/k8s 0755 root root -"
+  ];
+
   # Create samba users and groups
   users = {
-    users = {
-      smb-k8s = {
-        description = "Samba mount user for k8s volume storage";
-        isSystemUser = true;
-        uid = 1200;
-        group = config.users.groups.smb-k8s.name;
-      };
+    users.smb-k8s = {
+      description = "Samba mount user for k8s volume storage";
+      isSystemUser = true;
+      uid = 1200;
+      group = config.users.groups.smb-k8s.name;
     };
     groups.smb-k8s = {
       gid = 1200;

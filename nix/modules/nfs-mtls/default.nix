@@ -48,16 +48,16 @@ in {
         };
     };
 
-    # Export /storage/nas/k8s with xprtsec=mtls enforced. Clients without a valid
-    # cert signed by the internal CA are rejected at the NFS level.
+    # Export /storage/nas/k8s with xprtsec=mtls enforced, node LAN only.
+    # Pod CIDR is intentionally excluded: kernel NFS mounts go through the CSI node
+    # plugin (node IP), so pod-level access is neither needed nor permitted.
     services.nfs.server.exports = lib.mkIf cfg.serverMode ''
-      /storage/nas/k8s 10.69.80.0/25(rw,async,no_subtree_check,no_root_squash,insecure,xprtsec=mtls) 10.42.0.0/16(rw,async,no_subtree_check,no_root_squash,insecure,xprtsec=mtls)
+      /storage/nas/k8s 10.69.80.0/25(rw,async,no_subtree_check,no_root_squash,insecure,xprtsec=mtls)
     '';
 
-    # Pre-create share root directories used by the CSI driver for per-PV subdirectories.
+    # Pre-create the root directory used by the CSI driver for per-PV subdirectories.
     systemd.tmpfiles.rules = lib.mkIf cfg.serverMode [
       "d /storage/nas/k8s 0755 root root -"
-      "d /storage/nas/k8s/backups 0755 root root -"
     ];
   };
 }

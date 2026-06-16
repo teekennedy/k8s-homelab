@@ -1,0 +1,13 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3proxy
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app.kubernetes.io/name: s3proxy
+  ports:
+    - port: 80
+      targetPort: http
+      name: http

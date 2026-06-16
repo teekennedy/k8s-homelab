@@ -5,8 +5,14 @@ nfs:
     - name: nfs
       share: /k8s
       reclaimPolicy: Delete
+      mountOptions:
+        - nfsvers=4.2
+        - xprtsec=mtls
     - name: nfs-backups
-      share: /k8s/backups
+      share: /backups
       reclaimPolicy: Retain
+      mountOptions:
+        - nfsvers=4.2
+        - xprtsec=mtls
 
 # upstream defaults: https://github.com/kubernetes-csi/csi-driver-nfs/blob/master/charts/latest/csi-driver-nfs/values.yaml

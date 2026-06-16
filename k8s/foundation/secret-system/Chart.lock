@@ -3,4 +3,4 @@ dependencies:
   repository: https://helm.mittwald.de
   version: 3.4.1
 digest: sha256:630468cac220a199ef1b7ef8c4c5f87d5cf0c7a12f684b7fca65c11cdef84994
-generated: "2025-07-15T21:00:40.405902-06:00"
+generated: "2026-06-15T19:29:19.886756-06:00"

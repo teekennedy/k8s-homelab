@@ -1,12 +1,22 @@
 {config, ...}: let
-  longhornBackupDir = "/storage/nas/backups/longhorn";
+  nasBackupDir = "/storage/nas/backups";
 in {
-  # ensure nas directories exist
+  # s3proxy runs as this UID inside the container; NFS maps UIDs by number,
+  # so the backup subdirs must be owned by the same UID on the server.
+  users.groups.s3proxy = {gid = 2001;};
+  users.users.s3proxy = {
+    uid = 2001;
+    group = "s3proxy";
+    isSystemUser = true;
+  };
+
+  # ensure nas backup directories exist on the ZFS dataset.
   # Note this does not create tmpfs mounts - these directories will be created on top of zfs
   # See man tmpfiles.d for more info
   systemd.tmpfiles.rules = [
-    "d /storage/nas/backups 0755 root root -"
-    "d ${longhornBackupDir} 0755 root root -"
+    "d ${nasBackupDir} 0755 root root -"
+    "d ${nasBackupDir}/longhorn 0750 s3proxy s3proxy -"
+    "d ${nasBackupDir}/postgres 0750 s3proxy s3proxy -"
   ];
 
   # NFSv4-only: disable v2/v3 while still allowing the default nfs-server unit
@@ -19,19 +29,24 @@ in {
     "vers4.1" = "y";
     "vers4.2" = "y";
   };
-  # "insecure" export option means that the client doesn't have to connect from a privileged port.
+  # NFSv4 pseudoroot restricted to node LAN only; mTLS required.
+  # Pod CIDR removed — pods access /storage/nas/backups via the s3proxy service instead.
+  # root_squash (default) is intentional: nodes only traverse this pseudoroot,
+  # they never write files to /storage/nas itself. Subdir exports (/k8s) retain
+  # no_root_squash where the CSI driver needs root identity for PV provisioning.
   services.nfs.server.exports = ''
-    /storage/nas 10.69.80.0/25(rw,async,no_subtree_check,no_root_squash,fsid=0,insecure) 10.42.0.0/16(rw,async,no_subtree_check,no_root_squash,fsid=0,insecure)
+    /storage/nas 10.69.80.0/25(rw,async,no_subtree_check,fsid=0,insecure,xprtsec=mtls)
   '';
 
   networking.firewall.allowedTCPPorts = [2049];
 
-  services.restic.backups.longhorn-weekly = {
+  # Offsite backup of all NAS backup data (longhorn snapshots, postgres base backups) to S3.
+  services.restic.backups.nas-backups-weekly = {
     initialize = true;
     passwordFile = config.sops.secrets.restic_repo_password.path;
     environmentFile = config.sops.secrets.restic_env_file.path;
-    repository = "s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/longhorn";
-    paths = [longhornBackupDir];
+    repository = "s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/nas-backups";
+    paths = [nasBackupDir];
     pruneOpts = [
       "--keep-weekly 8"
       "--keep-monthly 12"

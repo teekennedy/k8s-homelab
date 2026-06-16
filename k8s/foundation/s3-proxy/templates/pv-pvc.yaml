@@ -1,0 +1,39 @@
+---
+# Static PV backed by /storage/nas/backups on borg-2 via mTLS-protected NFS.
+# The CSI node plugin mounts this at the node level (node IP in 10.69.80.0/25),
+# satisfying the xprtsec=mtls requirement on the server-side export.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: s3proxy-backups
+spec:
+  capacity:
+    storage: {{ .Values.capacity.storage }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.2
+    - xprtsec=mtls
+  nfs:
+    # /backups is the NFSv4 path relative to fsid=0 root (/storage/nas), resolving to /storage/nas/backups
+    server: borg-2.msng.to
+    path: /backups
+  claimRef:
+    name: s3proxy-backups
+    namespace: s3-proxy
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: s3proxy-backups
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: s3proxy-backups
+  resources:
+    requests:
+      storage: {{ .Values.capacity.storage }}

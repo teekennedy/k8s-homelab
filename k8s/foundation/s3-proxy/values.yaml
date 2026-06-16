@@ -1,0 +1,14 @@
+image:
+  repository: andrewgaul/s3proxy
+  tag: sha-be0c38c
+
+# Capacity of the backups PV
+capacity:
+  storage: 10Ti
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    memory: 512Mi

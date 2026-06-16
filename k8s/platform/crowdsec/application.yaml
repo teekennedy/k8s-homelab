@@ -41,6 +41,11 @@ spec:
       namespace: crowdsec
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: cnpg-s3-credentials
+      namespace: crowdsec
   project: default
   source:
     path: k8s/platform/crowdsec

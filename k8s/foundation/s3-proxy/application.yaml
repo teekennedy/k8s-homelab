@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: s3-proxy
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: s3-proxy
+  ignoreDifferences:
+    # SECRET_ACCESS_KEY is managed by kubernetes-secret-generator
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: s3proxy-credentials
+      namespace: s3-proxy
+  project: default
+  source:
+    path: k8s/foundation/s3-proxy
+    repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true

@@ -45,6 +45,16 @@ spec:
       namespace: monitoring-system
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
+    # SopsSecret data is decrypted in-cluster by the sops-secrets-operator
+    - jsonPointers:
+        - /spec/secretTemplates
+      group: isindir.github.com
+      kind: SopsSecret
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: cnpg-s3-credentials
+      namespace: auth-system
   project: default
   source:
     path: k8s/platform/auth-system
