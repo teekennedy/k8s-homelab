@@ -52,7 +52,7 @@ spec:
       containers:
         - name: s3proxy
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          args: ["--properties", "/etc/s3proxy/s3proxy.conf"]
+          args: ["s3proxy", "--properties", "/etc/s3proxy/s3proxy.conf"]
           ports:
             - containerPort: 8080
               name: http
