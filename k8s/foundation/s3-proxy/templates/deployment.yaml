@@ -14,45 +14,28 @@ spec:
       labels:
         app.kubernetes.io/name: s3proxy
     spec:
-      initContainers:
-        # Generates /etc/s3proxy/s3proxy.conf from Secret env vars so that credentials
-        # are never exposed in process args or the pod spec.
-        - name: config-gen
-          image: busybox:1
-          command:
-            - sh
-            - -c
-            - |
-              cat > /config/s3proxy.conf <<EOF
-              s3proxy.endpoint=http://0.0.0.0:8080
-              s3proxy.authorization=aws-v2-or-v4
-              s3proxy.identity=${ACCESS_KEY_ID}
-              s3proxy.credential=${SECRET_ACCESS_KEY}
-              jclouds.provider=filesystem
-              jclouds.filesystem.basedir=/data
-              EOF
+      containers:
+        - name: s3proxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           env:
-            - name: ACCESS_KEY_ID
+            - name: S3PROXY_ENDPOINT
+              value: "http://0.0.0.0:8080"
+            - name: S3PROXY_AUTHORIZATION
+              value: "aws-v2-or-v4"
+            - name: JCLOUDS_PROVIDER
+              value: "filesystem"
+            - name: JCLOUDS_FILESYSTEM_BASEDIR
+              value: "/data"
+            - name: S3PROXY_IDENTITY
               valueFrom:
                 secretKeyRef:
                   name: s3proxy-credentials
                   key: ACCESS_KEY_ID
-            - name: SECRET_ACCESS_KEY
+            - name: S3PROXY_CREDENTIAL
               valueFrom:
                 secretKeyRef:
                   name: s3proxy-credentials
                   key: SECRET_ACCESS_KEY
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            allowPrivilegeEscalation: false
-          volumeMounts:
-            - name: config-generated
-              mountPath: /config
-      containers:
-        - name: s3proxy
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          args: ["s3proxy", "--properties", "/etc/s3proxy/s3proxy.conf"]
           ports:
             - containerPort: 8080
               name: http
@@ -61,9 +44,6 @@ spec:
             runAsUser: 2001 # UID of the s3proxy user on the host
             allowPrivilegeEscalation: false
           volumeMounts:
-            - name: config-generated
-              mountPath: /etc/s3proxy
-              readOnly: true
             - name: data
               mountPath: /data
           resources: {{ toYaml .Values.resources | nindent 12 }}
@@ -73,8 +53,6 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
       volumes:
-        - name: config-generated
-          emptyDir: {}
         - name: data
           persistentVolumeClaim:
             claimName: s3proxy-backups
