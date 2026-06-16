@@ -10,7 +10,7 @@ spec:
     name: in-cluster
     namespace: s3-proxy
   ignoreDifferences:
-    # SECRET_ACCESS_KEY is managed by kubernetes-secret-generator
+    # AWS_SECRET_ACCESS_KEY is managed by kubernetes-secret-generator
     - jsonPointers:
         - /data
       kind: Secret
