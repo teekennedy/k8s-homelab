@@ -7,7 +7,7 @@ metadata:
   name: {{ .Values.psql.clusterName }}-daily
   namespace: {{ .Release.Namespace }}
 spec:
-  schedule: "39 17 * * *"
+  schedule: "18 5 * * *"
   backupOwnerReference: self
   cluster:
     name: {{ .Values.psql.clusterName }}
