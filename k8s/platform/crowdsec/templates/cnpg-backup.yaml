@@ -7,7 +7,7 @@ metadata:
   name: crowdsec-psql-daily
   namespace: {{ .Release.Namespace }}
 spec:
-  schedule: "10 1 * * *"
+  schedule: "50 57 3 * * *"
   backupOwnerReference: self
   cluster:
     name: crowdsec-psql
