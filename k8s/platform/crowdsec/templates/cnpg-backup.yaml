@@ -19,5 +19,5 @@ metadata:
   name: cnpg-s3-credentials
   namespace: {{ .Release.Namespace }}
   annotations:
-    reflector.v1.k8s.emberstack.com/reflects: "s3proxy/s3proxy-credentials"
+    reflector.v1.k8s.emberstack.com/reflects: "s3-proxy/s3proxy-credentials"
 data: {}
