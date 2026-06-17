@@ -15,7 +15,7 @@ in {
   # See man tmpfiles.d for more info
   systemd.tmpfiles.rules = [
     "d ${nasBackupDir} 0755 root root -"
-    "d ${nasBackupDir}/longhorn 0750 s3proxy s3proxy -"
+    "d ${nasBackupDir}/longhorn 0755 root root -"
     "d ${nasBackupDir}/postgres 0750 s3proxy s3proxy -"
   ];
 
@@ -36,6 +36,7 @@ in {
   # no_root_squash where the CSI driver needs root identity for PV provisioning.
   services.nfs.server.exports = ''
     /storage/nas 10.69.80.0/25(rw,async,no_subtree_check,fsid=0,insecure,xprtsec=mtls)
+    /storage/nas/backups/longhorn 10.42.0.0/16(rw,async,no_subtree_check,no_root_squash,insecure)
   '';
 
   networking.firewall.allowedTCPPorts = [2049];

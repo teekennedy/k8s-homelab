@@ -32,12 +32,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: s3proxy-credentials
-                  key: AWS_ACCESS_KEY_ID
+                  key: ACCESS_KEY_ID
             - name: S3PROXY_CREDENTIAL
               valueFrom:
                 secretKeyRef:
                   name: s3proxy-credentials
-                  key: AWS_SECRET_ACCESS_KEY
+                  key: SECRET_ACCESS_KEY
           ports:
             - containerPort: 8080
               name: http

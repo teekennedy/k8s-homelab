@@ -18,9 +18,9 @@ longhorn:
     # -- Upgrade Checker that periodically checks for new Longhorn versions. When a new version is available, a notification appears on the Longhorn UI. This setting is enabled by default
     upgradeChecker: false
   defaultBackupStore:
-    # s3proxy service in the s3-proxy namespace, backed by /storage/nas/backups/longhorn on borg-2
-    backupTarget: s3://longhorn@us-east-1/
-    backupTargetCredentialSecret: longhorn-s3-credentials
+    # NFS export on borg-2 (/storage/nas/backups/longhorn), no mTLS — pod CIDR exception in exportfs
+    backupTarget: nfs://borg-2.msng.to:/backups/longhorn
+    backupTargetCredentialSecret: ~
     # -- Number of seconds that Longhorn waits before checking the default backupstore for new backups.
     # This setting affects Disaster Recovery volumes which are incrementally restored from backup on an ongoing basis.
     # See https://longhorn.io/docs/archives/1.7.1/concepts/#34-backupstore-update-intervals-rto-and-rpo
