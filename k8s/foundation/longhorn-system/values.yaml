@@ -19,7 +19,7 @@ longhorn:
     upgradeChecker: false
   defaultBackupStore:
     # NFS export on borg-2 (/storage/nas/backups/longhorn), no mTLS — pod CIDR exception in exportfs
-    backupTarget: nfs://borg-2.msng.to:/backups/longhorn
+    backupTarget: nfs://borg-2.msng.to:/backups/longhorn?nfsOptions=xprtsec=mtls,nfsvers=4.2
     backupTargetCredentialSecret: ~
     # -- Number of seconds that Longhorn waits before checking the default backupstore for new backups.
     # This setting affects Disaster Recovery volumes which are incrementally restored from backup on an ongoing basis.

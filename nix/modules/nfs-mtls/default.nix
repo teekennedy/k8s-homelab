@@ -27,6 +27,19 @@ in {
     # kTLS kernel module required for NFS-over-TLS
     boot.kernelModules = ["tls"];
 
+    # NFSv4-only: disable v2/v3 while still allowing the default nfs-server unit
+    # dependencies (rpcbind/mountd) to start so nfs-server can come up cleanly.
+    services.nfs.server.enable = true;
+    services.nfs.settings.nfsd = {
+      vers2 = "n";
+      vers3 = "n";
+      vers4 = "y";
+      "vers4.1" = "y";
+      "vers4.2" = "y";
+    };
+
+    networking.firewall.allowedTCPPorts = [2049];
+
     # tlshd: userspace TLS handshake daemon invoked by the kernel for NFS-over-TLS connections.
     # Certs are written to certDir by the nfs-mtls-cert-sync DaemonSet and read at handshake time.
     system.services.tlshd = {
@@ -48,11 +61,11 @@ in {
         };
     };
 
-    # Export /storage/nas/k8s with xprtsec=mtls enforced, node LAN only.
+    # Export /storage/nas with xprtsec=mtls enforced, node LAN only.
     # Pod CIDR is intentionally excluded: kernel NFS mounts go through the CSI node
     # plugin (node IP), so pod-level access is neither needed nor permitted.
     services.nfs.server.exports = lib.mkIf cfg.serverMode ''
-      /storage/nas/k8s 10.69.80.0/25(rw,async,no_subtree_check,no_root_squash,insecure,xprtsec=mtls)
+      /storage/nas     10.69.80.0/25(rw,async,fsid=0,insecure,no_subtree_check,no_root_squash,pnfs,xprtsec=mtls)
     '';
 
     # Pre-create the root directory used by the CSI driver for per-PV subdirectories.
