@@ -18,8 +18,10 @@ longhorn:
     # -- Upgrade Checker that periodically checks for new Longhorn versions. When a new version is available, a notification appears on the Longhorn UI. This setting is enabled by default
     upgradeChecker: false
   defaultBackupStore:
-    # NFS export on borg-2 (/storage/nas/backups/longhorn), no mTLS — pod CIDR exception in exportfs
-    backupTarget: nfs://borg-2.msng.to:/backups/longhorn?nfsOptions=xprtsec=mtls,nfsvers=4.2
+    # NFS export on borg-2 (/storage/nas/backups/longhorn). No mTLS: longhorn-manager
+    # pods run in their own network namespace and cannot reach tlshd on the host.
+    # Separate export for pod CIDR (10.42.0.0/16) without xprtsec in nfs-mtls module.
+    backupTarget: nfs://borg-2.msng.to:/storage/nas/backups/longhorn?nfsOptions=nfsvers=4.2
     backupTargetCredentialSecret: ~
     # -- Number of seconds that Longhorn waits before checking the default backupstore for new backups.
     # This setting affects Disaster Recovery volumes which are incrementally restored from backup on an ongoing basis.

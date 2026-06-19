@@ -62,10 +62,11 @@ in {
     };
 
     # Export /storage/nas with xprtsec=mtls enforced, node LAN only.
-    # Pod CIDR is intentionally excluded: kernel NFS mounts go through the CSI node
-    # plugin (node IP), so pod-level access is neither needed nor permitted.
+    # Pod CIDR is intentionally excluded from the root export: kernel NFS mounts go
+    # through the CSI node plugin (node IP), so broad pod-level access is neither
+    # needed nor permitted.
     services.nfs.server.exports = lib.mkIf cfg.serverMode ''
-      /storage/nas     10.69.80.0/25(rw,async,fsid=0,insecure,no_subtree_check,no_root_squash,pnfs,xprtsec=mtls)
+      /storage/nas 10.69.80.0/25(rw,async,fsid=0,insecure,no_subtree_check,no_root_squash,pnfs,xprtsec=mtls)
     '';
 
     # Pre-create the root directory used by the CSI driver for per-PV subdirectories.
