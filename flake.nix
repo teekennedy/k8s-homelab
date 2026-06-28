@@ -167,17 +167,21 @@
 
         # enable magic rollback and other checks
         checks = builtins.mapAttrs (_: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
-        deploy.nodes = builtins.listToAttrs (builtins.map (host: {
-            name = host.hostname;
-            value = {
-              hostname = host.hostname;
-              profiles.system = {
-                user = "root";
-                path = inputs.deploy-rs.lib.${host.system}.activate.nixos self.nixosConfigurations.${host.hostname};
+        deploy = {
+          nodes = builtins.listToAttrs (builtins.map (host: {
+              name = host.hostname;
+              value = {
+                hostname = host.hostname;
+                profiles.system = {
+                  user = "root";
+                  path = inputs.deploy-rs.lib.${host.system}.activate.nixos self.nixosConfigurations.${host.hostname};
+                };
               };
-            };
-          })
-          borgHosts);
+            })
+            borgHosts);
+          # Build on remote host
+          remoteBuild = true;
+        };
         nixosConfigurations =
           (builtins.listToAttrs (builtins.map (host: {
               name = host.hostname;
