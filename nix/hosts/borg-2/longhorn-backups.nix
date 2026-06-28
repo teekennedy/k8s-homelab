@@ -19,13 +19,6 @@ in {
     "d ${nasBackupDir}/postgres 0750 s3proxy s3proxy -"
   ];
 
-  # /storage/nas/backups/longhorn is exported separately for the pod CIDR without
-  # mTLS: longhorn-manager runs in a pod network namespace, so the kernel cannot
-  # reach tlshd (which runs in the host network namespace) for the TLS handshake.
-  services.nfs.server.exports = ''
-    /storage/nas/backups/longhorn 10.42.0.0/16(rw,async,no_subtree_check,no_root_squash)
-  '';
-
   # Offsite backup of all NAS backup data (longhorn snapshots, postgres base backups) to S3.
   services.restic.backups.nas-backups-weekly = {
     initialize = true;

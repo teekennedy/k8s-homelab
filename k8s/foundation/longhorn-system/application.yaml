@@ -12,6 +12,12 @@ spec:
     name: in-cluster
     namespace: longhorn-system
   ignoreDifferences:
+    - kind: DaemonSet
+      name: longhorn-manager
+      namespace: longhorn-system
+      jsonPointers:
+        - /spec/template/spec/hostNetwork
+        - /spec/template/spec/dnsPolicy
     - jsonPointers:
         - /spec/volumeName
         - /spec/storageClassName
