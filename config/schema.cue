@@ -39,11 +39,12 @@ package homelab
 	modules?: [...string]
 }
 
-// Apps represents the application deployment configuration by tier
+// Apps represents the application deployment configuration by tier.
+// Each key is a release name; true means enabled in this environment.
 #Apps: {
-	foundation: [...string]
-	platform: [...string]
-	apps: [...string]
+	foundation: {[string]: bool}
+	platform: {[string]: bool}
+	apps: {[string]: bool}
 }
 
 // Environment represents a complete environment configuration
