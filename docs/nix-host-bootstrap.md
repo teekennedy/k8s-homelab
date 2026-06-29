@@ -10,6 +10,9 @@ This guide covers the full process of adding a new NixOS host to the homelab clu
    ```bash
    nix build .#nixosConfigurations.installIso.config.system.build.isoImage
    ```
+
+   If host is not the same Nix system as the installIso system, you can use the `--builders` flag to build on a remote system that matches the target system., e.g. `--builders 'ssh://borg-0 x86_64-linux'`.
+
    The resulting image will be symlinked to `./result`.
 
 3. **Boot the target machine**: Write the installer ISO to a USB drive and boot the target machine from it. Note the IP address assigned to the machine.
