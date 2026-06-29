@@ -26,12 +26,20 @@
         public = "no";
         "valid users" = "@smb-k8s";
       };
+      longhorn-backup = {
+        comment = "Longhorn backup target";
+        path = "/storage/nas/backups/longhorn";
+        writable = "yes";
+        public = "no";
+        "valid users" = "@smb-longhorn";
+      };
     };
   };
 
   # Pre-create share root directory used by smb clients.
   systemd.tmpfiles.rules = [
     "d /storage/nas/k8s 0755 root root -"
+    "d /storage/nas/backups/longhorn 0755 root root -"
   ];
 
   # Create samba users and groups
@@ -44,6 +52,15 @@
     };
     groups.smb-k8s = {
       gid = 1200;
+    };
+    users.smb-longhorn = {
+      description = "Samba mount user for longhorn backups";
+      isSystemUser = true;
+      uid = 1201;
+      group = config.users.groups.smb-longhorn.name;
+    };
+    groups.smb-longhorn = {
+      gid = 1201;
     };
   };
 

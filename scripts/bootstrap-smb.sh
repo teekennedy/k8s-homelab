@@ -37,25 +37,28 @@ for i in "$@"; do
   esac
 done
 
-ssh "$ssh_url" sudo mkdir -p /storage/nas/k8s
-ssh "$ssh_url" sudo chown smb-k8s:smb-k8s /storage/nas/k8s
-
-echo "You will be asked for the same password three times"
+echo "Password for smb-k8s"
 ssh "$ssh_url" sudo smbpasswd -a smb-k8s
 
-echo "Setting up namespace and secret"
-kubectl create namespace csi-driver-smb
+echo "Password for smb-longhorn"
+ssh "$ssh_url" sudo smbpasswd -a smb-longhorn
+
+echo "Setting up namespaces and secrets"
 
 # Read Password
 echo -n Password for smb-k8s:
 read -rs password
 echo
+
+kubectl get namespace/csi-driver-smb >/dev/null 2>&1 || kubectl create namespace csi-driver-smb
 kubectl -n csi-driver-smb create secret generic smbcreds \
   --from-literal=username=smb-k8s \
-  --from-literal=CIFS_USERNAME=smb-k8s \
-  "--from-literal=password=$password" \
-  "--from-literal=CIFS_PASSWORD=$password"
+  "--from-literal=password=$password"
 
-kubectl -n csi-driver-smb annotate secret smbcreds \
-  reflector.v1.k8s.emberstack.com/reflection-allowed='true' \
-  reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces='longhorn-system'
+echo -n Password for smb-longhorn:
+read -rs password
+echo
+kubectl get namespace/longhorn-system >/dev/null 2>&1 || kubectl create namespace longhorn-system
+kubectl -n longhorn-system create secret generic cifs-secret \
+  --from-literal=CIFS_USERNAME=smb-longhorn \
+  "--from-literal=CIFS_PASSWORD=$password"

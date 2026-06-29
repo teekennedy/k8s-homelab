@@ -19,7 +19,7 @@ longhorn:
     upgradeChecker: false
   defaultBackupStore:
     # CIFS export on borg-2 (/storage/nas/backups/longhorn). Uses host networking for mTLS.
-    backupTarget: cifs://borg-2.msng.to:/backups/longhorn?cifsOptions=uid=1200,gid=1200,mfsymlinks,noserverino
+    backupTarget: cifs://borg-2.msng.to/longhorn-backup?cifsOptions=uid=1201,gid=1201,mfsymlinks,noserverino
     backupTargetCredentialSecret: cifs-secret
     # -- Number of seconds that Longhorn waits before checking the default backupstore for new backups.
     # This setting affects Disaster Recovery volumes which are incrementally restored from backup on an ongoing basis.
