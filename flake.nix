@@ -136,7 +136,7 @@
                 hardware.cpu.intel.updateMicrocode = true;
 
                 services.k3s = {
-                  role = "server";
+                  role = "agent";
                   serverAddr = "https://10.69.80.101:6443";
                 };
               })
