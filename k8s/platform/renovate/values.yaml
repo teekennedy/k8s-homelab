@@ -34,7 +34,7 @@ renovate:
       memory: 3Gi
     limits:
       cpu: 3000m
-      memory: 4Gi
+      memory: 6Gi
   env:
     LOG_LEVEL: debug
   envList:
