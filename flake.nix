@@ -43,11 +43,11 @@
             system = "x86_64-linux";
             modules = [
               ({...}: {
-                disko.devices.disk.main.device = "/dev/disk/by-id/ata-TS512GMTS430S_J478260466";
+                disko.devices.disk.main.device = "/dev/disk/by-id/nvme-Samsung_SSD_9100_PRO_1TB_S7YENS0L104680K";
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
-                system.stateVersion = "25.05";
+                system.stateVersion = "26.11";
                 services.k3s = {
-                  role = "agent";
+                  role = "server";
                   serverAddr = "https://10.69.80.101:6443";
                 };
 
@@ -232,13 +232,8 @@
             })
             borgHosts))
           // {
-            # build this with
-            # nix build .#nixosConfigurations.installIso.config.system.build.isoImage
-            # the resulting image will be found symlinked to ./result
-            # If host is not the same system as iso system, can use --builders flag, e.g.
-            # --builders 'ssh://borg-0 x86_64-linux' --store $(readlink -f /tmp)/nix
-            # then create a store-fixed symlink based on ./result:
-            # ln -s "$(readlink -f /tmp)/nix/$(readlink result)" result-iso
+            # Live NixOS distribution used to bootstrap a host.
+            # See docs/nix-host-bootstrap.md for more info.
             installIso = inputs.nixpkgs.lib.nixosSystem {
               system = "x86_64-linux";
               specialArgs = {inherit inputs self;};

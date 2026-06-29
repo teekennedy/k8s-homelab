@@ -1,8 +1,6 @@
 {...}: {
   imports = [
-    ./disable-wol.nix
-    ./networking.nix
-    ./nvme.nix
+    ./network.nix
     ./nfs-mtls.nix
   ];
 }
