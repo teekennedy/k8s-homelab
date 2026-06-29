@@ -25,7 +25,7 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
-      name: longhorn-s3-credentials
+      name: cifs-secret
       namespace: longhorn-system
   project: default
   source:

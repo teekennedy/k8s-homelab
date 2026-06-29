@@ -18,9 +18,9 @@ longhorn:
     # -- Upgrade Checker that periodically checks for new Longhorn versions. When a new version is available, a notification appears on the Longhorn UI. This setting is enabled by default
     upgradeChecker: false
   defaultBackupStore:
-    # NFS export on borg-2 (/storage/nas/backups/longhorn). Uses host networking for mTLS.
-    backupTarget: nfs://borg-2.msng.to:/backups/longhorn?nfsOptions=nfsvers=4.2,xprtsec=mtls
-    backupTargetCredentialSecret: ~
+    # CIFS export on borg-2 (/storage/nas/backups/longhorn). Uses host networking for mTLS.
+    backupTarget: cifs://borg-2.msng.to:/backups/longhorn?cifsOptions=uid=1200,gid=1200,mfsymlinks,noserverino
+    backupTargetCredentialSecret: cifs-secret
     # -- Number of seconds that Longhorn waits before checking the default backupstore for new backups.
     # This setting affects Disaster Recovery volumes which are incrementally restored from backup on an ongoing basis.
     # See https://longhorn.io/docs/archives/1.7.1/concepts/#34-backupstore-update-intervals-rto-and-rpo

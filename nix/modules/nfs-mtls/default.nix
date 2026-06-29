@@ -5,6 +5,9 @@
 # tlshd reads cert/key/ca from /var/lib/nfs-mtls/ at handshake time — cert rotation
 # is picked up automatically on the next NFS connection without restarting anything.
 #
+# tlshd runs as a static system user (not DynamicUser) so that the nfs-mtls-cert-sync
+# DaemonSet can reliably chown the private key to tlshd regardless of boot order.
+#
 # See docs/nfs-mtls.md for architecture details, PVC examples, and troubleshooting.
 {
   config,
@@ -27,6 +30,15 @@ in {
     # kTLS kernel module required for NFS-over-TLS
     boot.kernelModules = ["tls"];
 
+    # Static system user for tlshd so the nfs-mtls-cert-sync DaemonSet can chown
+    # the private key to a predictable user regardless of service start order.
+    users.users.tlshd = {
+      isSystemUser = true;
+      group = "tlshd";
+      description = "tlshd NFS kernel TLS handshake daemon";
+    };
+    users.groups.tlshd = {};
+
     # NFSv4-only: disable v2/v3 while still allowing the default nfs-server unit
     # dependencies (rpcbind/mountd) to start so nfs-server can come up cleanly.
     services.nfs.server.enable = true;
@@ -42,6 +54,7 @@ in {
 
     # tlshd: userspace TLS handshake daemon invoked by the kernel for NFS-over-TLS connections.
     # Certs are written to certDir by the nfs-mtls-cert-sync DaemonSet and read at handshake time.
+    # DynamicUser is disabled in favour of the static tlshd user defined above.
     system.services.tlshd = {
       imports = [pkgs.ktls-utils.services.default];
       tlshd.settings =
@@ -59,6 +72,13 @@ in {
             "x509.truststore" = "${certDir}/ca.crt";
           };
         };
+    };
+
+    # Override DynamicUser so the static tlshd user above is used instead.
+    systemd.services.tlshd.serviceConfig = {
+      DynamicUser = lib.mkForce false;
+      User = "tlshd";
+      Group = "tlshd";
     };
 
     # Export /storage/nas with xprtsec=mtls enforced, node LAN only.
