@@ -12,12 +12,6 @@ spec:
     name: in-cluster
     namespace: longhorn-system
   ignoreDifferences:
-    - kind: DaemonSet
-      name: longhorn-manager
-      namespace: longhorn-system
-      jsonPointers:
-        - /spec/template/spec/hostNetwork
-        - /spec/template/spec/dnsPolicy
     - jsonPointers:
         - /spec/volumeName
         - /spec/storageClassName
@@ -26,31 +20,6 @@ spec:
         # and attempt a patch that Kubernetes rejects as reducing the storage request.
         - /spec/resources/requests/storage
       kind: PersistentVolumeClaim
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: lldap-authelia-bind-user
-      namespace: auth-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: authelia-secrets
-      namespace: auth-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: gitea-admin-secret
-      namespace: gitea
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: monitoring-system-grafana
-      namespace: monitoring-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: alertmanager-monitoring-system-kube-pro
-      namespace: monitoring-system
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
     - jsonPointers:
