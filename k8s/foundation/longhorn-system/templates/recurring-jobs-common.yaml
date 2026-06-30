@@ -10,9 +10,7 @@ spec:
   cron: 0 4 * * *     # 04:00 daily
   groups:
   - ephemeral
-  - secondary
   - default
-  - critical
   retain: 0
   task: filesystem-trim
 

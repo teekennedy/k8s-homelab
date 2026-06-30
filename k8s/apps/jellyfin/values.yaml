@@ -907,6 +907,9 @@ app-template:
       # As of 2025-07-22 this was using 5.4GB
       size: 100Gi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
       advancedMounts:
         main:
           jellyfin:
@@ -938,6 +941,9 @@ app-template:
       type: persistentVolumeClaim
       size: 500Mi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
       advancedMounts:
         cleanuparr:
           cleanuparr:
@@ -973,6 +979,9 @@ app-template:
       # As of 2025-07-22 this was using 7.4MB
       size: 1Gi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
       advancedMounts:
         jellyseerr:
           jellyseerr:
@@ -998,6 +1007,9 @@ app-template:
       # As of 2026-03-17 this was using 886MB
       size: 2Gi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
       advancedMounts:
         arrs:
           prowlarr:
@@ -1008,6 +1020,9 @@ app-template:
       # As of 2025-07-22 this was using 266MB
       size: 5Gi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
       advancedMounts:
         arrs:
           radarr:
@@ -1025,7 +1040,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/secondary: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
       advancedMounts:
         arrs:
           sonarr:
@@ -1065,6 +1080,9 @@ app-template:
       # As of 2025-07-22 this was using 151MB
       size: 1Gi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
       advancedMounts:
         downloader:
           password-updater:

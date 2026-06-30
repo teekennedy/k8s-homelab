@@ -5,8 +5,6 @@ Following the 3-2-1 rule of backups, all of my data will be stored in:
 - My home NAS (a 6 drive RAIDZ array)
 - S3 bucket (the offsite solution)
 
-## Retention Tiers
-
 ## What to backup
 
 ### NixOS persistent subvolume
@@ -21,19 +19,12 @@ Restic uses the default cache dir at `/var/cache/restic-backups-<job>` and `/var
 ### Kubernetes persistent volumes
 
 I'm using Longhorn as my default storage class for persistent volumes.
-Backups land on the NAS via NFS (borg-2) at `nfs://10.69.80.12:/backups/longhorn`.
-A restic job on borg-2 (`longhorn-weekly`) backs the NAS backup directory to S3 weekly (repo: `restic/longhorn`).
-Volumes are organized into different retention tiers based on how much it would suck to lose its data:
+Backups land on the NAS via CIFS (borg-2) at `cifs://borg-2.msng.to/longhorn-backups`.
+A restic job on borg-2 (`nas-backups-weekly`) backs the NAS backup directory to S3 weekly (repo: `restic/nas-backups`).
 
-- **critical**: Data that if lost, I would never be able to get back: photos, videos, and personal projects.
-  - snapshot retention policy: 24 hourly.
-  - backup retention policy: 30 daily.
-- **default**: Stuff that would suck to have to setup again, but not the end of the world. Manually configured services, downloaded media, game saves.
-  - backup retention policy: 14 daily. (roughly 1/2 of critical)
-- **secondary**: Some services have their own backup solution, such as a database dump or a config file export.
-  This is used as the services primary backup solution, bumping Longhorn backups to secondary solution.
-  These backups are only needed in cases where the primary strategy fails.
-  - backup retention policy: 1 daily.
-- **ephemeral**: Tempfiles and cached data that should be excluded from backup.
-  - snapshot policy: none.
-  - rentention policy: none.
+Longhorn's role is to get data off the cluster onto the NAS. Restic handles retention. Volumes use one of two groups:
+
+- **default**: Data that should be backed up.
+  - backup retention policy: 1 daily. Retention history is managed by restic, not Longhorn.
+- **ephemeral**: Tempfiles, caches, and data that can be safely discarded.
+  - backup policy: none.

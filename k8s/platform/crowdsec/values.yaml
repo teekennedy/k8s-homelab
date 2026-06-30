@@ -59,10 +59,17 @@ crowdsec:
 
     # Persistent storage for LAPI database
     persistentVolume:
+      config:
+        labels:
+          recurring-job.longhorn.io/source: "enabled"
+          recurring-job-group.longhorn.io/default: "enabled"
       data:
         enabled: true
         storageClassName: longhorn
         size: 1Gi
+        labels:
+          recurring-job.longhorn.io/source: "enabled"
+          recurring-job-group.longhorn.io/default: "enabled"
 
     # Environment variables for LAPI
     env:

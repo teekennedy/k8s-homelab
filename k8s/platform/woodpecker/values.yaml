@@ -12,6 +12,9 @@ woodpecker:
       - woodpecker-gitea-oauth2
     persistentVolume:
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
     ingress:
       enabled: true
       hosts:

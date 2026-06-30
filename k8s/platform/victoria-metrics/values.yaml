@@ -17,3 +17,6 @@ victoria-metrics-single:
       enabled: true
       storageClass: longhorn
       size: 150Gi
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"

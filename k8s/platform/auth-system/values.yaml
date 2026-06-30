@@ -424,6 +424,9 @@ app-template:
       type: persistentVolumeClaim
       size: 100Mi
       storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
       globalMounts:
         - path: /data
     lldap-tls:

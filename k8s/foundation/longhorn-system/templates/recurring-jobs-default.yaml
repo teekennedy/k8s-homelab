@@ -9,7 +9,7 @@ spec:
   concurrency: 1
   cron: "30 2 * * *"         # 02:30 daily
   groups: ["default"]
-  retain: 14
+  retain: 1
   task: backup
   labels:
     job: default-backup-daily

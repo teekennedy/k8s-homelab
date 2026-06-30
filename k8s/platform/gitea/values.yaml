@@ -31,6 +31,9 @@ gitea:
     enabled: true
     persistence:
       storageClass: longhorn-rc1
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
     valkey:
       # Default preset of 'nano' resulted in ~33% CPU throttling.
       # Preset definitions: https://github.com/bitnami/charts/blob/948f461f839ebd068afec65b8c6ff9ba871d1ff7/bitnami/common/templates/_resources.tpl#L15
@@ -38,6 +41,9 @@ gitea:
 
   persistence:
     storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/default: "enabled"
 
   strategy:
     type: Recreate

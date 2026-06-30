@@ -29,6 +29,9 @@ kube-prometheus-stack:
       enabled: true
       size: 10Gi
       type: pvc
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/default: "enabled"
     sidecar:
       dashboards:
         enabled: true
