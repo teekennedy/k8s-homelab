@@ -25,15 +25,15 @@ metadata:
 addressType: IPv4
 endpoints:
   - addresses:
+      - 10.69.80.10
+    conditions:
+      ready: true
+  - addresses:
       - 10.69.80.11
     conditions:
       ready: true
   - addresses:
       - 10.69.80.12
-    conditions:
-      ready: true
-  - addresses:
-      - 10.69.80.13
     conditions:
       ready: true
 ports:

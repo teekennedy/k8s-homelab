@@ -39,6 +39,11 @@ in {
     };
     users.groups.tlshd = {};
 
+    # Cache the mtls certificate dir
+    environment.persistence."/cache".directories = [
+      "/var/lib/nfs-mtls"
+    ];
+
     # NFSv4-only: disable v2/v3 while still allowing the default nfs-server unit
     # dependencies (rpcbind/mountd) to start so nfs-server can come up cleanly.
     services.nfs.server.enable = true;

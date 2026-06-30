@@ -8,11 +8,11 @@ capacity:
 
 # JVM heap for s3proxy. The jclouds filesystem backend loads all bucket objects
 # into memory for listings; the longhorn bucket has ~350k files requiring ~400MB+.
-javaOpts: "-Xmx768m"
+javaOpts: "-Xmx1536m"
 
 resources:
   requests:
     cpu: 50m
-    memory: 512Mi
-  limits:
     memory: 1Gi
+  limits:
+    memory: 2Gi

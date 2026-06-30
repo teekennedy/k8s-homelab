@@ -72,3 +72,25 @@ data:
             annotations:
               summary: {{ `"Machine check error on {{ $labels.host }}"` }}
               description: {{ `"dmesg on {{ $labels.host }} is reporting machine check exceptions, indicating hardware-level CPU/memory errors."` }}
+
+  systemd-alerts.yaml: |
+    groups:
+      - name: systemd_failures
+        interval: 1m
+        rules:
+          - alert: SystemdUnitFailed
+            expr: |
+              sum by (host, systemd_unit) (
+                count_over_time(
+                  {job="systemd-journal", systemd_unit=~".+\\.service"}
+                  |~ `(Failed with result|entered failed state)`
+                  [10m]
+                )
+              ) > 0
+            for: 0m
+            labels:
+              severity: warning
+              component: system
+            annotations:
+              summary: {{ `"Systemd unit {{ $labels.systemd_unit }} failed on {{ $labels.host }}"` }}
+              description: {{ `"{{ $labels.systemd_unit }} has entered a failed state on {{ $labels.host }}. Check with: journalctl -u {{ $labels.systemd_unit }} --since '-1h'"` }}

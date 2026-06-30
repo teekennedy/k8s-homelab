@@ -18,6 +18,9 @@ data:
   sync.sh: |
     #!/bin/sh
     set -eu
+    # NixOS hosts don't have binaries at standard FHS paths; nsenter inherits this PATH
+    # and uses it to look up commands in the host mount namespace after namespace entry.
+    export PATH="/run/current-system/sw/bin:${PATH}"
     HOST_DIR=/host
     CERT_DIR=/certs/${NODE_NAME}
     CA_FILE=/ca/root-certs.pem
