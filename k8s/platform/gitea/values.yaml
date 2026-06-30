@@ -38,6 +38,10 @@ gitea:
       # Default preset of 'nano' resulted in ~33% CPU throttling.
       # Preset definitions: https://github.com/bitnami/charts/blob/948f461f839ebd068afec65b8c6ff9ba871d1ff7/bitnami/common/templates/_resources.tpl#L15
       resourcesPreset: micro
+      # Most fields in a statefulset are immutable
+      # Tell ArgoCD to delete-then-create the resource to sync changes
+      podAnnotations:
+        argocd.argoproj.io/sync-options: Force=true,Replace=true
 
   persistence:
     storageClass: longhorn

@@ -3,6 +3,10 @@ kind: StatefulSet
 metadata:
   name: valkey
   namespace: {{ .Release.Namespace }}
+  # Most fields in a statefulset are immutable
+  # Tell ArgoCD to delete-then-create the resource to sync changes
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
   labels:
     app.kubernetes.io/name: valkey
     app.kubernetes.io/component: valkey

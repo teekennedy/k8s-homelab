@@ -49,5 +49,3 @@ spec:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
       - RespectIgnoreDifferences=true
-      - Replace=true
-      - Force=true
