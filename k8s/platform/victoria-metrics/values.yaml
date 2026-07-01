@@ -20,3 +20,12 @@ victoria-metrics-single:
       labels:
         recurring-job.longhorn.io/source: "enabled"
         recurring-job-group.longhorn.io/backup: "enabled"
+    podSecurityContext:
+      enabled: true
+      fsGroup: 65534
+    securityContext:
+      enabled: true
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      allowPrivilegeEscalation: false
