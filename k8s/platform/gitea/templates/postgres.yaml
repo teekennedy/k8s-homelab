@@ -24,8 +24,7 @@ spec:
       max_wal_size: 2GB
   monitoring:
     enablePodMonitor: true
-  # Disable pod disruption budget so that the cluster can be shut down
-  enablePDB: false
+  enablePDB: true
   resources:
     requests:
       memory: "512Mi"
