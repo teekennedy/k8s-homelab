@@ -7,7 +7,3 @@ exemptions:
     rules:
       - runAsRootAllowed
       - privilegeEscalationAllowed
-  - controllerNames:
-      - renovate
-    rules:
-      - privilegeEscalationAllowed

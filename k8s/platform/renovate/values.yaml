@@ -12,6 +12,11 @@ renovate:
     fsGroup: 1000
     fsGroupChangePolicy: "OnRootMismatch"
   renovate:
+    # container-level securityContext for the renovate container
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 12021
+      allowPrivilegeEscalation: false
     config: |
       {
         "platform": "gitea",
