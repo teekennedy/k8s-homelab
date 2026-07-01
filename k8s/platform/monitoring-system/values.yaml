@@ -289,11 +289,7 @@ loki:
           index:
             prefix: loki_index_
             period: 24h
-    ruler:
-      storage:
-        type: local
-        local:
-          directory: /rules
+    rulerConfig:
       rule_path: /tmp/ruler-scratch
       alertmanager_url: http://monitoring-system-kube-pro-alertmanager.monitoring-system.svc.cluster.local:9093
       enable_alertmanager_v2: true
@@ -315,7 +311,7 @@ loki:
           name: loki-alert-rules
     extraVolumeMounts:
       - name: loki-rules
-        mountPath: /rules/fake
+        mountPath: /var/loki/rules/fake
   read:
     replicas: 0
   write:
