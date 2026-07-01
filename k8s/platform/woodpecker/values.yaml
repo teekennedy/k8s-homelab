@@ -2,6 +2,10 @@
 woodpecker:
   server:
     createAgentSecret: false
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      allowPrivilegeEscalation: false
     env:
       WOODPECKER_HOST: "https://ci.msng.to"
       WOODPECKER_GITEA: "true"
@@ -30,6 +34,10 @@ woodpecker:
 
   agent:
     replicaCount: 1
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      allowPrivilegeEscalation: false
     env:
       WOODPECKER_SERVER: "woodpecker-server:9000"
       WOODPECKER_BACKEND: "kubernetes"

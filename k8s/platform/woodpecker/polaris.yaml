@@ -10,11 +10,3 @@ exemptions:
       - dagger-pipeline-exec-binding
     rules:
       - rolebindingRolePodExecAttach
-  - controllerNames:
-      - woodpecker-agent
-    rules:
-      - privilegeEscalationAllowed
-  - controllerNames:
-      - woodpecker-server
-    rules:
-      - privilegeEscalationAllowed
