@@ -2,10 +2,15 @@ exemptions:
   - controllerNames:
       - monitoring-system-prometheus-node-exporter
     rules:
+      # node-exporter needs hostNetwork to expose true node-level network
+      # stats and to bind on the node IP, and hostPID to see host process/
+      # systemd state via the mounted /proc and dbus socket.
       - hostNetworkSet
       - hostPIDSet
-      - privilegeEscalationAllowed
   - controllerNames:
       - monitoring-system-promtail
     rules:
+      # promtail must run as root to read host log paths like /var/log/pods
+      # (mode 750, owned by root:root) and /run/log/journal across nodes
+      # with varying systemd-journal GIDs. Verified on-cluster 2026-07-01.
       - runAsRootAllowed

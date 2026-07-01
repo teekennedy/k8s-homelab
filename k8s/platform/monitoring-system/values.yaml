@@ -278,6 +278,9 @@ kube-prometheus-stack:
                 storage: 220Gi
 
   prometheus-node-exporter:
+    containerSecurityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
     extraArgs:
       - --collector.systemd
     extraVolumes:
