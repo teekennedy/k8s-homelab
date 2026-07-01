@@ -165,14 +165,13 @@ traefik:
         mountPath: /plugins-local
 
   # Enable access logs for CrowdSec agent to parse
-  logs:
-    access:
-      enabled: true
-      format: json
-      fields:
-        headers:
-          defaultMode: keep
-          names:
-            User-Agent: keep
-            X-Forwarded-For: keep
-            X-Real-IP: keep
+  accessLog:
+    enabled: true
+    format: json
+    fields:
+      headers:
+        defaultMode: drop
+        names:
+          User-Agent: keep
+          X-Forwarded-For: keep
+          X-Real-IP: keep
