@@ -1,0 +1,26 @@
+# Prometheus alerting rules for container OOM kills
+# kube-prometheus-stack's default rules (disabled via defaultRules.create=false) and the
+# vendored kubernetes-mixin rules don't ship an OOM-kill alert, so this fills that gap.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: oom-monitoring-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: oom_monitoring
+    interval: 60s
+    rules:
+
+    # Alert when a container is OOM killed by the kernel/cgroup memory limit
+    - alert: ContainerOOMKilled
+      expr: increase(container_oom_events_total{container!=""}[5m]) > 0
+      labels:
+        severity: warning
+        component: container
+      annotations:
+        summary: {{ "Container {{ $labels.container }} in {{ $labels.namespace }}/{{ $labels.pod }} was OOM killed" | quote }}
+        description: {{ "Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} on {{ $labels.node }} was killed by the OOM killer in the last 5 minutes. Check the container's memory limit vs. actual usage." | quote }}
