@@ -279,9 +279,16 @@ kube-prometheus-stack:
         hostPath:
           path: /run/dbus/system_bus_socket
           type: Socket
+      - name: os-release
+        hostPath:
+          path: /etc/os-release
+          type: File
     extraVolumeMounts:
       - name: dbus-socket
         mountPath: /var/run/dbus/system_bus_socket
+      - name: os-release
+        mountPath: /etc/os-release
+        readOnly: true
 
 loki:
   enabled: true
