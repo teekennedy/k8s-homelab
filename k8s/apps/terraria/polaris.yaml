@@ -11,10 +11,6 @@ exemptions:
     rules:
       - privilegeEscalationAllowed
   - controllerNames:
-      - terraria-discord-bot
-    rules:
-      - privilegeEscalationAllowed
-  - controllerNames:
       - terraria-terraria-web
     rules:
       - privilegeEscalationAllowed

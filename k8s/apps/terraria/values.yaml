@@ -111,6 +111,8 @@ app-template:
             repository: ghcr.io/astral-sh/uv
             tag: alpine
             pullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
           command:
             - uv
             - run
