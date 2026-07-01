@@ -82,7 +82,7 @@ data:
             expr: |
               sum by (host, systemd_unit) (
                 count_over_time(
-                  {job="systemd-journal", systemd_unit=~".+\\.service"}
+                  {job="systemd-journal", systemd_unit="init.scope"}
                   |~ `(Failed with result|entered failed state)`
                   [10m]
                 )
@@ -92,5 +92,5 @@ data:
               severity: warning
               component: system
             annotations:
-              summary: {{ `"Systemd unit {{ $labels.systemd_unit }} failed on {{ $labels.host }}"` }}
-              description: {{ `"{{ $labels.systemd_unit }} has entered a failed state on {{ $labels.host }}. Check with: journalctl -u {{ $labels.systemd_unit }} --since '-1h'"` }}
+              summary: {{ `"Systemd unit {{ $value | reReplaceAll "^(.+):" "" }} failed on {{ $labels.host }}"` }}
+              description: {{ `"{{ $value | reReplaceAll "^(.+):" "" }} has entered a failed state on {{ $labels.host }}. Check with: journalctl -u {{ $labels.systemd_unit }} --since '-1h'"` }}

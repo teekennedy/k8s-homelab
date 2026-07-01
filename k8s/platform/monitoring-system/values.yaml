@@ -110,6 +110,9 @@ kube-prometheus-stack:
           - receiver: "null"
             matchers:
               - alertname = "Watchdog"
+          - receiver: "null"
+            matchers:
+              - alertname = "ResticBackupRunning"
 
       receivers:
         - name: "null"
@@ -267,6 +270,18 @@ kube-prometheus-stack:
             resources:
               requests:
                 storage: 220Gi
+
+  prometheus-node-exporter:
+    extraArgs:
+      - --collector.systemd
+    extraVolumes:
+      - name: dbus-socket
+        hostPath:
+          path: /run/dbus/system_bus_socket
+          type: Socket
+    extraVolumeMounts:
+      - name: dbus-socket
+        mountPath: /var/run/dbus/system_bus_socket
 
 loki:
   enabled: true

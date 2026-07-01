@@ -79,3 +79,12 @@ spec:
           annotations:
             summary: {{ "CloudNativePG instance {{ $labels.namespace }}/{{ $labels.pod }} is not ready" | quote }}
             description: {{ "A CloudNativePG Postgres instance pod has been unready for at least 2 minutes. Automated node reboots should stop until database readiness recovers." | quote }}
+
+        - alert: ResticBackupRunning
+          expr: node_systemd_unit_state{name=~"restic-backups-.+\\.service", state="active"} == 1
+          labels:
+            severity: info
+            component: backup
+          annotations:
+            summary: {{ "Restic backup {{ $labels.name }} is running on {{ $labels.instance }}" | quote }}
+            description: {{ "A restic backup systemd unit is currently active. Automated node reboots are blocked until the backup completes." | quote }}
