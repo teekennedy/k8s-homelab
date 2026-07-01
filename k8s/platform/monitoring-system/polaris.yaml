@@ -6,10 +6,6 @@ exemptions:
       - runAsRootAllowed
       - tagNotSpecified
   - controllerNames:
-      - monitoring-system-crds-upgrade
-    rules:
-      - tagNotSpecified
-  - controllerNames:
       - monitoring-system-grafana
     rules:
       - privilegeEscalationAllowed
