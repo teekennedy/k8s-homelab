@@ -1,11 +1,5 @@
 exemptions:
   - controllerNames:
-      - loki-helm-test
-    rules:
-      - privilegeEscalationAllowed
-      - runAsRootAllowed
-      - tagNotSpecified
-  - controllerNames:
       - monitoring-system-prometheus-node-exporter
     rules:
       - hostNetworkSet

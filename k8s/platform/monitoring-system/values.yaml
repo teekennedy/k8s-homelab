@@ -299,6 +299,12 @@ kube-prometheus-stack:
 loki:
   enabled: true
   deploymentMode: SingleBinary
+  # The loki-helm-test hook pod (only ever run via `helm test`) has no
+  # values-exposed securityContext or pinned tag in this chart version, so
+  # it can't be brought into polaris compliance without vendoring a patched
+  # template. It's not part of the running deployment; disable it instead.
+  test:
+    enabled: false
   loki:
     auth_enabled: false
     commonConfig:
