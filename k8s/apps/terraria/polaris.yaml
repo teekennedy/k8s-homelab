@@ -10,7 +10,3 @@ exemptions:
       - terraria
     rules:
       - privilegeEscalationAllowed
-  - controllerNames:
-      - terraria-terraria-web
-    rules:
-      - privilegeEscalationAllowed

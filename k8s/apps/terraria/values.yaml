@@ -189,6 +189,8 @@ app-template:
             repository: ghcr.io/teekennedy/terraria-server-live-map
             tag: "6713bbf"
             pullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
           env:
             - name: WORLD_FILE_PATH
               value: /worlds/backflip.wld
