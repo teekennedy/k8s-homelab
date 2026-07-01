@@ -46,10 +46,10 @@ _productionApps: {
 			"woodpecker":        true
 		}
 		apps: {
-			"homepage":  true
-			"jellyfin":  true
-			"spoolman":  true
-			"terraria":  true
+			"homepage": true
+			"jellyfin": true
+			"spoolman": true
+			"terraria": true
 		}
 	}
 }
@@ -91,10 +91,10 @@ _stagingApps: {
 			"woodpecker":        false
 		}
 		apps: {
-			"homepage":  true
-			"jellyfin":  false
-			"spoolman":  false
-			"terraria":  false
+			"homepage": true
+			"jellyfin": false
+			"spoolman": false
+			"terraria": false
 		}
 	}
 }

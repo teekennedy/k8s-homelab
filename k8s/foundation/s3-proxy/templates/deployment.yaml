@@ -43,7 +43,9 @@ spec:
               name: http
           securityContext:
             runAsNonRoot: true
-            runAsUser: 2001 # UID of the s3proxy user on the host
+            # UID / GID of the s3proxy user on the host
+            runAsUser: 2001
+            runAsGroup: 2001
             allowPrivilegeEscalation: false
           volumeMounts:
             - name: data

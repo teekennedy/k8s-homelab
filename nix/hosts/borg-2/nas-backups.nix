@@ -15,7 +15,6 @@ in {
   # See man tmpfiles.d for more info
   systemd.tmpfiles.rules = [
     "d ${nasBackupDir} 0755 root root -"
-    "d ${nasBackupDir}/longhorn 0755 root root -"
     "d ${nasBackupDir}/postgres 0750 s3proxy s3proxy -"
   ];
 
@@ -27,7 +26,7 @@ in {
     repository = "s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/nas-backups";
     paths = [nasBackupDir];
     pruneOpts = [
-      "--keep-weekly 8"
+      "--keep-weekly 4"
       "--keep-monthly 12"
     ];
     timerConfig = {

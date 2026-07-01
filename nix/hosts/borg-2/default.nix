@@ -2,7 +2,7 @@
   imports = [
     ./lenovo-sa120-fanspeed.nix
     ./zfs-storage.nix
-    ./longhorn-backups.nix
+    ./nas-backups.nix
     ./nfs-mtls.nix
   ];
 }

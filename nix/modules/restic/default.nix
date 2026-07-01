@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   backupName = "persistent-daily";
@@ -10,6 +11,9 @@
     && (config.fileSystems ? "/persistent");
 in {
   config = lib.mkIf hasPersistent {
+    # Make the restic cli available for interactive use
+    environment.systemPackages = [pkgs.restic];
+
     sops.secrets.restic_env_file = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) {
       sopsFile = ./secrets.enc.yaml;
       owner = config.users.users.root.name;
