@@ -84,6 +84,7 @@ in {
     yamllint.enable = true;
     # Python formatter
     black.enable = true;
+    black.settings.flags = "--line-length 79";
   };
 
   # See full reference at https://devenv.sh/reference/options/

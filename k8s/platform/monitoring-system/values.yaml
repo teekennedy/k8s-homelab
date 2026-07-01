@@ -283,6 +283,8 @@ kube-prometheus-stack:
       allowPrivilegeEscalation: false
     extraArgs:
       - --collector.systemd
+      - --collector.zfs
+      - --collector.textfile.directory=/var/node-exporter-textfiles
     extraVolumes:
       - name: dbus-socket
         hostPath:
@@ -292,11 +294,18 @@ kube-prometheus-stack:
         hostPath:
           path: /etc/os-release
           type: File
+      - name: textfile-dir
+        hostPath:
+          path: /var/lib/prometheus/node-exporter-textfiles
+          type: DirectoryOrCreate
     extraVolumeMounts:
       - name: dbus-socket
         mountPath: /var/run/dbus/system_bus_socket
       - name: os-release
         mountPath: /etc/os-release
+        readOnly: true
+      - name: textfile-dir
+        mountPath: /var/node-exporter-textfiles
         readOnly: true
 
 loki:

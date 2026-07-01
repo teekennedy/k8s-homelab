@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zfs-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: zfs
+      interval: 1m
+      rules:
+        - alert: ZFSPoolNotOnline
+          expr: zpool_health == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: storage
+          annotations:
+            summary: {{ "ZFS pool {{ $labels.pool }} is {{ $labels.state }}" | quote }}
+            description: {{ "ZFS pool {{ $labels.pool }} on {{ $labels.instance }} has been in state {{ $labels.state }} for at least 5 minutes. Automated node reboots are blocked." | quote }}
+
+        - alert: ZFSVdevChecksumErrors
+          expr: zpool_vdev_checksum_errors > 0
+          labels:
+            severity: warning
+            component: storage
+          annotations:
+            summary: {{ "ZFS vdev {{ $labels.vdev }} has checksum errors" | quote }}
+            description: {{ "Vdev {{ $labels.vdev }} in pool {{ $labels.pool }} on {{ $labels.instance }} has {{ $value }} checksum errors. This may indicate a failing disk." | quote }}
+
+        - alert: ZFSScrubErrors
+          expr: zpool_scrub_errors > 0
+          labels:
+            severity: critical
+            component: storage
+          annotations:
+            summary: {{ "ZFS scrub found errors in pool {{ $labels.pool }}" | quote }}
+            description: {{ "The last scrub of pool {{ $labels.pool }} on {{ $labels.instance }} found {{ $value }} errors." | quote }}
+
+        - alert: ZFSScrubTooOld
+          expr: zpool_scrub_age_seconds > (35 * 24 * 3600)
+          labels:
+            severity: warning
+            component: storage
+          annotations:
+            summary: {{ "ZFS pool {{ $labels.pool }} has not been scrubbed in over 35 days" | quote }}
+            description: {{ "Pool {{ $labels.pool }} on {{ $labels.instance }} last completed scrub was {{ $value | humanizeDuration }} ago. Monthly scrub is configured." | quote }}
