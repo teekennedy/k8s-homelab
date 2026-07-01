@@ -13,6 +13,10 @@ kube-prometheus-stack:
     defaultDashboardsEnabled: false
     deploymentStrategy:
       type: Recreate
+    # fsGroup (472) already sets volume ownership on mount; the chown init
+    # container is redundant and only exists to run as root.
+    initChownData:
+      enabled: false
     serviceMonitor:
       labels: {}
     ingress:
