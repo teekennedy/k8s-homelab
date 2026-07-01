@@ -38,7 +38,7 @@
 
   # Pre-create share root directory used by smb clients.
   systemd.tmpfiles.rules = [
-    "d /storage/nas/k8s 0750 root root -"
+    "d /storage/nas/k8s 0755 root root -"
     "d /storage/nas/backups/longhorn 0750 smb-longhorn smb-longhorn -"
   ];
 
