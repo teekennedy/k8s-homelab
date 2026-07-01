@@ -105,6 +105,11 @@ fi
 while sleep 1; do
   modified="$(get_last_modified "$chart_path")"
   if [[ $modified -gt $last_modified ]]; then
+    # If Chart.lock was modified specifically, re-run helm dependency update
+    lock_modified="$(get_last_modified "$chart_path/Chart.lock")"
+    if [[ $lock_modified -gt $last_modified ]]; then
+      helm dependency update "$chart_path"
+    fi
     if helm template -n "$namespace" "$release" "$chart_path" >"$output_dir/$modified.yaml"; then
       # Safely shell-quote the filenames
       quoted_files=$(printf ' %q' "$output_dir/$last_successfully_modified.yaml" "$output_dir/$modified.yaml")
