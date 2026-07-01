@@ -10,10 +10,11 @@ spec:
   cron: 0 4 * * *     # 04:00 daily
   groups:
   - ephemeral
-  - default
+  - backup
   retain: 0
   task: filesystem-trim
 
+# yaml-language-server: $schema=https://github.com/datreeio/CRDs-catalog/raw/refs/heads/main/longhorn.io/recurringjob_v1beta2.json
 ---
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
@@ -27,3 +28,19 @@ spec:
   parameters:
     # Don't backup volumes as part of this job
     volume-backup-policy: disabled
+
+# yaml-language-server: $schema=https://github.com/datreeio/CRDs-catalog/raw/refs/heads/main/longhorn.io/recurringjob_v1beta2.json
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: backup-daily
+  namespace: {{ .Release.Namespace }}
+spec:
+  concurrency: 1
+  cron: "30 2 * * *"         # 02:30 daily
+  groups: ["backup"]
+  retain: 1
+  task: backup
+  labels:
+    job: backup-daily

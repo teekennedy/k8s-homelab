@@ -909,7 +909,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/default: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
       advancedMounts:
         main:
           jellyfin:
@@ -943,7 +943,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/default: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
       advancedMounts:
         cleanuparr:
           cleanuparr:
@@ -981,7 +981,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/default: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
       advancedMounts:
         jellyseerr:
           jellyseerr:
@@ -1009,7 +1009,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/default: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
       advancedMounts:
         arrs:
           prowlarr:
@@ -1022,7 +1022,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/default: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
       advancedMounts:
         arrs:
           radarr:
@@ -1040,7 +1040,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/default: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
       advancedMounts:
         arrs:
           sonarr:
@@ -1082,7 +1082,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/default: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
       advancedMounts:
         downloader:
           password-updater:

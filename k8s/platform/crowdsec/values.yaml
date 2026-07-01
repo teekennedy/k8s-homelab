@@ -62,14 +62,14 @@ crowdsec:
       config:
         labels:
           recurring-job.longhorn.io/source: "enabled"
-          recurring-job-group.longhorn.io/default: "enabled"
+          recurring-job-group.longhorn.io/backup: "enabled"
       data:
         enabled: true
         storageClassName: longhorn
         size: 1Gi
         labels:
           recurring-job.longhorn.io/source: "enabled"
-          recurring-job-group.longhorn.io/default: "enabled"
+          recurring-job-group.longhorn.io/backup: "enabled"
 
     # Environment variables for LAPI
     env:

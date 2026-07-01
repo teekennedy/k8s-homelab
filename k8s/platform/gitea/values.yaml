@@ -47,7 +47,7 @@ gitea:
     storageClass: longhorn
     labels:
       recurring-job.longhorn.io/source: "enabled"
-      recurring-job-group.longhorn.io/default: "enabled"
+      recurring-job-group.longhorn.io/backup: "enabled"
 
   strategy:
     type: Recreate
