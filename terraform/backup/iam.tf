@@ -40,13 +40,6 @@ data "aws_iam_policy_document" "backup_policy" {
     effect    = "Allow"
     actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
     resources = [aws_s3_bucket.backup.arn]
-
-    # Limit listing to the allowed prefix for this user
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values   = ["${each.value.s3_prefix}*", each.value.s3_prefix]
-    }
   }
 
   statement {

@@ -30,11 +30,6 @@ module "smtp_secret" {
   }
 }
 
-module "ntfy" {
-  source = "./ntfy"
-  auth   = yamldecode(data.sops_file.tfvars.raw).ntfy
-}
-
 module "backup" {
   source             = "./backup"
   backup_bucket_name = local.backup_bucket_name
@@ -43,17 +38,10 @@ module "backup" {
     "restic-backup-user" = {
       s3_prefix = "restic/"
     }
-    "longhorn-backup-user" = {
-      s3_prefix = "longhorn/"
+    "home-assistant-backup-user" = {
+      s3_prefix = "home-assistant/"
     }
   }
-}
-
-module "longhorn_backup_secret" {
-  source    = "./k8s-secret"
-  name      = "longhorn-backup-user"
-  namespace = "longhorn-system"
-  data      = sensitive(module.backup.access_keys["longhorn-backup-user"])
 }
 
 module "extra_secrets" {
