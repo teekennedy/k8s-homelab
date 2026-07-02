@@ -502,7 +502,7 @@ app-template:
         prowlarr:
           image:
             repository: lscr.io/linuxserver/prowlarr
-            tag: 2.3.5.5327-ls141
+            tag: 2.4.0.5397-ls152
           env:
             TZ: America/Denver
             PROWLARR__AUTH__APIKEY:
@@ -514,7 +514,7 @@ app-template:
         radarr:
           image:
             repository: lscr.io/linuxserver/radarr
-            tag: 6.1.1.10360-ls298
+            tag: 6.2.1.10461-ls308
           env:
             # https://wiki.servarr.com/en/radarr/environment-variables
             TZ: America/Denver
@@ -531,7 +531,7 @@ app-template:
         sonarr:
           image:
             repository: lscr.io/linuxserver/sonarr
-            tag: 4.0.17.2952-ls306
+            tag: 4.0.19.2979-ls316
           env:
             # https://wiki.servarr.com/en/sonarr/environment-variables
             TZ: America/Denver
@@ -643,7 +643,7 @@ app-template:
         qbittorrent:
           image:
             repository: lscr.io/linuxserver/qbittorrent
-            tag: 5.1.4-r2-ls448
+            tag: 5.1.4-r3-ls453
           env:
             TZ: America/Denver
             PUID: "1200"
