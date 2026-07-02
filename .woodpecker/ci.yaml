@@ -1,8 +1,10 @@
+# https://woodpecker-ci.org/docs/usage/workflow-syntax
 when:
   - event: pull_request
   # Renovate will hold off on creating a PR for an update until the feature branch has a pending status check.
   # CI check needs to run on renovate branch or PR will never be created.
   - branch: renovate/*
+    event: push
 
 steps:
   - name: ci
