@@ -1,0 +1,22 @@
+---
+# Longhorn (SSD) PVC for syncthing state: config.xml, device keys and the
+# SQLite state DB. Kept off NFS because SQLite over NFS risks lock/corruption.
+# The backup labels enrol it in Longhorn's recurring backup-to-NAS job — the
+# device identity keys and paired-peer list here are irreplaceable.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "syncthing.fullname" . }}-state
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "syncthing.labels" . | nindent 4 }}
+    {{- with .Values.persistence.state.backupLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.persistence.state.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.state.size }}

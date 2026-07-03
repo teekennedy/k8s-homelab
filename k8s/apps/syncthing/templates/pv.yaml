@@ -1,0 +1,44 @@
+---
+# Static PV backed by /storage/nas/backups/syncthing/data on the borg NAS via
+# mTLS-protected NFS. The CSI node plugin mounts this at the node level (node IP
+# in 10.69.80.0/25), satisfying the xprtsec=mtls requirement on the server-side
+# export. The directory (owned 8384:8384) is pre-created by the nfs-mtls module's
+# tmpfiles rules. Only the synced data lives here; state is on Longhorn.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "syncthing.fullname" . }}-data
+  labels:
+    {{- include "syncthing.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.persistence.data.storage }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.2
+    - xprtsec=mtls
+  nfs:
+    server: {{ .Values.persistence.data.server }}
+    path: {{ .Values.persistence.data.path }}
+  claimRef:
+    name: {{ include "syncthing.fullname" . }}-data
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "syncthing.fullname" . }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "syncthing.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: {{ include "syncthing.fullname" . }}-data
+  resources:
+    requests:
+      storage: {{ .Values.persistence.data.storage }}

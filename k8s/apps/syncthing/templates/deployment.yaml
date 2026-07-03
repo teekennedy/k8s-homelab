@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "syncthing.fullname" . }}
+  labels:
+    {{- include "syncthing.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # Single writer: the config DB and synced tree must not be opened by two
+  # syncthing instances at once (state PVC is RWO Longhorn anyway).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "syncthing.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "syncthing.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Declaratively bootstrap config: mint config + device keys on first
+        # boot (idempotent — re-running `generate` preserves keys and paired
+        # peers), and ensure the GUI host-check is disabled so the proxied
+        # syncthing.msng.to Host header is accepted. No GUI user/password is
+        # set: access is gated by oauth2-proxy-internal + a NetworkPolicy.
+        - name: init-config
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              CFG=/var/syncthing/config
+              if [ ! -f "$CFG/config.xml" ]; then
+                /bin/syncthing generate --home="$CFG"
+              fi
+              if ! grep -q insecureSkipHostcheck "$CFG/config.xml"; then
+                sed -i 's#</gui>#    <insecureSkipHostcheck>true</insecureSkipHostcheck>\n    </gui>#' "$CFG/config.xml"
+              fi
+          volumeMounts:
+            - name: state
+              mountPath: /var/syncthing/config
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PUID
+              value: {{ .Values.puid | quote }}
+            - name: PGID
+              value: {{ .Values.pgid | quote }}
+            - name: STGUIADDRESS
+              value: "0.0.0.0:8384"
+            # Config, keys and the state DB (Longhorn state volume).
+            - name: STHOMEDIR
+              value: /var/syncthing/config
+            # New/default synced folders resolve under $HOME → the persisted
+            # NFS data mount.
+            - name: HOME
+              value: /var/syncthing/data
+          ports:
+            - name: http
+              containerPort: 8384
+              protocol: TCP
+            - name: sync-tcp
+              containerPort: 22000
+              protocol: TCP
+            - name: sync-udp
+              containerPort: 22000
+              protocol: UDP
+            - name: discovery
+              containerPort: 21027
+              protocol: UDP
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            # State (config + keys + SQLite DB) on Longhorn SSD.
+            - name: state
+              mountPath: /var/syncthing/config
+            # Synced folder trees on NFS.
+            - name: data
+              mountPath: /var/syncthing/data
+            # Writable scratch for the read-only root filesystem.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: {{ include "syncthing.fullname" . }}-state
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "syncthing.fullname" . }}-data
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

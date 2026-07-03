@@ -1,0 +1,13 @@
+Syncthing is deployed.
+
+Web GUI:  https://syncthing.msng.to
+  - No syncthing login: access is gated by oauth2-proxy-internal (Authelia SSO,
+    syncthing-admins group). The GUI's own auth is disabled and :8384 is
+    restricted by NetworkPolicy to the proxy.
+
+Sync protocol (device pairing / off-network sync):
+  - {{ .Values.syncLoadBalancer.ip }}:22000 (TCP+UDP), on the public MetalLB pool.
+  - Add this cluster's Device ID on your other devices (and theirs here).
+
+State (config + keys + DB): Longhorn PVC {{ include "syncthing.fullname" . }}-state (backed up).
+Synced data:               NFS {{ .Values.persistence.data.server }}:{{ .Values.persistence.data.path }}

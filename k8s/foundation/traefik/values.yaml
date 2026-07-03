@@ -1,3 +1,4 @@
+# https://github.com/traefik/traefik-helm-chart/blob/master/traefik/VALUES.md
 traefik:
   service:
     # Split into separate TCP and UDP services so HTTP/3 (UDP) can coexist with
@@ -22,6 +23,62 @@ traefik:
   providers:
     kubernetesGateway:
       enabled: true
+
+  # Gateway API entrypoints. The default gateway (traefik-gateway in kube-system)
+  # only accepts routes from its own namespace; instead of `from: All`, each
+  # listener opens to HTTPRoutes in any namespace carrying the matching opt-in
+  # label (apps set it via their ArgoCD Application's managedNamespaceMetadata),
+  # so a namespace can't bind a hostname unintentionally. The web/websecure
+  # listeners are internal-only (VIP 10.69.80.100, `internal-gateway-access`);
+  # the websecurepublic listener is the public path (VIP 10.69.80.120 + CrowdSec,
+  # `external-gateway-access`) and is the Gateway API equivalent of opting an
+  # Ingress into the wspublic entrypoint. All HTTPS listeners terminate TLS with
+  # the *.msng.to wildcard cert so routes get real HTTPS (required for
+  # OIDC/oauth2-proxy on internal hosts).
+  gateway:
+    listeners:
+      web:
+        port: 8000
+        protocol: HTTP
+        namespacePolicy:
+          from: Selector
+          selector:
+            matchLabels:
+              internal-gateway-access: "true"
+      websecure:
+        port: 8443
+        protocol: HTTPS
+        certificateRefs:
+          - group: ''
+            kind: Secret
+            name: wildcard-tls-certificate
+        namespacePolicy:
+          from: Selector
+          selector:
+            matchLabels:
+              internal-gateway-access: "true"
+      # Public listener. Port 8444 is the `wspublic` entrypoint's container port,
+      # so Traefik's listener->entrypoint port-match binds HTTPRoutes attached
+      # here to that entrypoint: they egress on the public VIP (10.69.80.120) and
+      # inherit its CrowdSec bouncer middleware and HTTP/3 config, mirroring what
+      # a `router.entrypoints: wspublic` Ingress annotation gives today. Public
+      # exposure stays opt-in and double-locked: a route must BOTH name this
+      # listener (parentRefs sectionName: websecurepublic) AND live in a namespace
+      # labeled `external-gateway-access: "true"` (apps opt in via their ArgoCD
+      # Application's managedNamespaceMetadata), so naming the listener alone
+      # can't publish a hostname from an unlabeled namespace.
+      websecurepublic:
+        port: 8444
+        protocol: HTTPS
+        certificateRefs:
+          - group: ''
+            kind: Secret
+            name: wildcard-tls-certificate
+        namespacePolicy:
+          from: Selector
+          selector:
+            matchLabels:
+              external-gateway-access: "true"
   global:
     checkNewVersion: false
     sendAnonymousUsage: false

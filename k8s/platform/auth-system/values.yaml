@@ -244,6 +244,36 @@ authelia:
               - code
             redirect_uris:
               - https://msng.to/oauth2/callback
+          # Internal oauth2-proxy (k8s/platform/oauth2-proxy-internal) fronting
+          # the syncthing GUI with no internal-network bypass. client_secret is a
+          # bcrypt hash of the mittwald-generated secret in
+          # oauth2-proxy-internal-secrets. BOOTSTRAP: the hash below is a
+          # placeholder — after first sync, regenerate it from the real value:
+          #   kubectl -n oauth2-proxy-internal get secret oauth2-proxy-internal-secrets \
+          #     -o jsonpath='{.data.client-secret}' | base64 -d
+          #   authelia crypto hash generate bcrypt --password <that-value>
+          # then commit the new hash here. (See oauth2-proxy-internal/README.md.)
+          - client_id: oauth2-proxy-internal
+            client_name: OAuth2 Proxy (internal)
+            consent_mode: implicit
+            client_secret: '$2b$12$rDLnW0tP8RhDrelNhajlGendwesVQ.hx.9xHq154ShVdzSb8HBgCG'
+            token_endpoint_auth_method: client_secret_post
+            authorization_policy: two_factor
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+              - groups
+              - offline_access
+            grant_types:
+              - authorization_code
+              - refresh_token
+            response_types:
+              - code
+            redirect_uris:
+              - https://syncthing.msng.to/oauth2/callback
         jwks:
           - key_id: argocd
             algorithm: RS256

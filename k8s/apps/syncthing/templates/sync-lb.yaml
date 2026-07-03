@@ -1,0 +1,52 @@
+{{- if .Values.syncLoadBalancer.enabled }}
+{{- $fullName := include "syncthing.fullname" . -}}
+{{- $ip := .Values.syncLoadBalancer.ip -}}
+{{- $pool := .Values.syncLoadBalancer.pool -}}
+---
+# Sync protocol exposed on the public MetalLB pool for off-network devices.
+# MetalLB can't put TCP + UDP on one mixed-protocol Service, so (like the
+# traefik-public split) we use two Services sharing one VIP via allow-shared-ip.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-sync-tcp
+  labels:
+    {{- include "syncthing.labels" . | nindent 4 }}
+  annotations:
+    metallb.io/address-pool: {{ $pool }}
+    metallb.io/loadBalancerIPs: {{ $ip }}
+    metallb.io/allow-shared-ip: syncthing-sync
+spec:
+  type: LoadBalancer
+  loadBalancerClass: metallb
+  externalTrafficPolicy: Local
+  selector:
+    {{- include "syncthing.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: sync-tcp
+      port: 22000
+      targetPort: sync-tcp
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-sync-udp
+  labels:
+    {{- include "syncthing.labels" . | nindent 4 }}
+  annotations:
+    metallb.io/address-pool: {{ $pool }}
+    metallb.io/loadBalancerIPs: {{ $ip }}
+    metallb.io/allow-shared-ip: syncthing-sync
+spec:
+  type: LoadBalancer
+  loadBalancerClass: metallb
+  externalTrafficPolicy: Local
+  selector:
+    {{- include "syncthing.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: sync-udp
+      port: 22000
+      targetPort: sync-udp
+      protocol: UDP
+{{- end }}

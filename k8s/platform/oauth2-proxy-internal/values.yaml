@@ -1,0 +1,64 @@
+# Internal oauth2-proxy instance. Unlike the public oauth2-proxy (which fronts
+# the homepage dashboard and BYPASSES auth for internal clients via trusted_ips),
+# this instance has NO trusted_ips bypass: every client — LAN included — must
+# authenticate. It reverse-proxies the syncthing GUI (which has no auth of its
+# own) and admits only members of the syncthing-admins group. The value is SSO
+# convenience: a syncthing-admin already signed into Authelia reaches the GUI
+# with no extra login and no fetching a k8s secret.
+oauth2-proxy:
+  # Pin the Service/Deployment name so the HTTPRoute backendRef is stable.
+  fullnameOverride: oauth2-proxy-internal
+  config:
+    existingSecret: oauth2-proxy-internal-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://syncthing.msng.to/oauth2/callback"
+      # Host-scoped cookie with a distinct name so it never collides with the
+      # public instance's Domain=msng.to cookie on this subdomain.
+      cookie_domains = ["syncthing.msng.to"]
+      cookie_name = "_oauth2_proxy_internal"
+      cookie_expire = "168h"
+      cookie_refresh = "1h"
+      cookie_secure = true
+      cookie_httponly = true
+      cookie_samesite = "lax"
+      whitelist_domains = ["syncthing.msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      pass_authorization_header = true
+      pass_access_token = true
+      set_xauthrequest = true
+      code_challenge_method = "S256"
+      # groups scope so allowed_groups can be enforced (Authelia's
+      # oauth2-proxy-internal client releases the groups claim).
+      scope = "openid profile email groups"
+      # NO trusted_ips: internal clients must authenticate.
+      real_client_ip_header = "X-Real-Ip"
+      skip_provider_button = true
+      # Only syncthing-admins may pass.
+      allowed_groups = ["syncthing-admins", "full-admin"]
+      # Reverse-proxy authenticated traffic to the syncthing GUI.
+      upstreams = ["http://syncthing.syncthing.svc.cluster.local:8384/"]
+      trusted_proxy_ips = ["10.42.0.0/16"]
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  # Exposed via a Gateway API HTTPRoute (templates/httproute.yaml) on the
+  # internal gateway's websecure listener, not the subchart's own ingress.
+  ingress:
+    enabled: false
+
+# Hostname this instance fronts (used by the HTTPRoute).
+host: syncthing.msng.to

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: syncthing
+description: Syncthing continuous file synchronization, exposed internally via Gateway API.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the syncthing/syncthing image tag deployed by this chart.
+appVersion: "2.1.0"

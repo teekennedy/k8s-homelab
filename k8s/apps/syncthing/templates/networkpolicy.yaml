@@ -1,0 +1,36 @@
+---
+# The GUI (:8384) has no built-in auth — access is gated by oauth2-proxy-internal,
+# which reverse-proxies it. This policy ensures the GUI can ONLY be reached from
+# that proxy's namespace, so nothing in-cluster can bypass the SSO gate by
+# hitting the Service/Pod directly. The sync protocol ports (22000) are
+# intentionally left open to all sources (they carry their own device-cert
+# mutual-auth TLS and are reached via the public LoadBalancer).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "syncthing.fullname" . }}-gui
+  labels:
+    {{- include "syncthing.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "syncthing.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # GUI: only from the oauth2-proxy-internal namespace (the SSO reverse proxy).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.guiProxyNamespace }}
+      ports:
+        - port: 8384
+          protocol: TCP
+    # Sync protocol: reachable from anywhere (public LoadBalancer + peers).
+    - ports:
+        - port: 22000
+          protocol: TCP
+        - port: 22000
+          protocol: UDP
+        - port: 21027
+          protocol: UDP
