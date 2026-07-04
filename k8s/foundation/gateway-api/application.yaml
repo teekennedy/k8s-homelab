@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: gateway-api
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    # All resources here are cluster-scoped (CRDs + a ValidatingAdmissionPolicy);
+    # the namespace is only used for ArgoCD tracking metadata.
+    namespace: kube-system
+  # NOTE: unlike the other foundation apps, this Application OWNS the Gateway API
+  # CRDs, so it intentionally does NOT ignore differences on
+  # apiextensions.k8s.io/CustomResourceDefinition -- doing so would prevent it
+  # from ever reconciling CRD upgrades.
+  project: default
+  source:
+    path: k8s/foundation/gateway-api
+    repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      # selfHeal: false
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      # Gateway API CRDs exceed the 262144-byte client-side-apply annotation
+      # limit, so they must be applied server-side. This also cleanly adopts the
+      # orphaned v1.4.0 CRDs left over from the k3s-bundled Traefik era.
+      - ServerSideApply=true

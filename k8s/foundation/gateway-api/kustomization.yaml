@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Gateway API CRDs, standard channel. TLSRoute graduated to the standard
+# channel in v1.5.0, so >= v1.5.0 is required for tlsroutes.gateway.networking.k8s.io.
+# The `config/crd` base pulls the full standard channel (Gateway, GatewayClass,
+# HTTPRoute, GRPCRoute, TLSRoute, TCPRoute, UDPRoute, ReferenceGrant,
+# BackendTLSPolicy, ListenerSet + the safe-upgrade ValidatingAdmissionPolicy).
+#
+# Renovate tracks the `?ref=` via its built-in kustomize manager
+# (datasource: kubernetes-sigs/gateway-api).
+resources:
+  - github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.6.0
