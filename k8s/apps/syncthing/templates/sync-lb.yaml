@@ -2,6 +2,7 @@
 {{- $fullName := include "syncthing.fullname" . -}}
 {{- $ip := .Values.syncLoadBalancer.ip -}}
 {{- $pool := .Values.syncLoadBalancer.pool -}}
+{{- $annotations := .Values.syncLoadBalancer.annotations -}}
 ---
 # Sync protocol exposed on the public MetalLB pool for off-network devices.
 # MetalLB can't put TCP + UDP on one mixed-protocol Service, so (like the
@@ -16,6 +17,9 @@ metadata:
     metallb.io/address-pool: {{ $pool }}
     metallb.io/loadBalancerIPs: {{ $ip }}
     metallb.io/allow-shared-ip: syncthing-sync
+    {{- range $key, $val := $annotations }}
+    {{ $key }}: {{ $val | quote }}
+    {{- end }}
 spec:
   type: LoadBalancer
   loadBalancerClass: metallb
