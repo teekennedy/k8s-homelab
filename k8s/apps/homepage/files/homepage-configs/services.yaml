@@ -38,13 +38,19 @@
     - Spoolman:
         icon: sh-spoolman.svg
         href: https://spoolman.msng.to
-        description: Filament spool manager
+        description: Filament spool inventory
         namespace: spoolman
         app: spoolman
         widget:
           type: spoolman
           url: https://spoolman.msng.to
           cache: 3
+    - Syncthing:
+        icon: sh-syncthing.svg
+        href: https://syncthing.msng.to
+        description: File sync
+        namespace: syncthing
+        app: syncthing
 - Cluster:
     - Grafana:
         icon: sh-grafana.svg
