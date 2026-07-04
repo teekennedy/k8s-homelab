@@ -49,6 +49,7 @@ in {
       kind
       kubecolor
       kubectl
+      kubectl-cnpg
       kubeconform
       kubernetes-helm
       kubetail
