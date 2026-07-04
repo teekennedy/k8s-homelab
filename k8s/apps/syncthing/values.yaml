@@ -73,7 +73,7 @@ guiProxyNamespace: oauth2-proxy-internal
 # is never exposed here.
 syncLoadBalancer:
   enabled: true
-  ip: 10.69.80.120
+  ip: 10.69.80.121
   pool: public
 
 resources:
