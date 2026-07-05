@@ -161,8 +161,30 @@
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "go-gitea/gitea",
       "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Track pinned Grafana Drilldown app plugins in grafana.ini preinstall",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "k8s/platform/monitoring-system/values.yaml"
+      ],
+      "matchStrings": [
+        "(?<depName>grafana-[a-z]+-app)@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "custom.grafana-plugins",
+      "versioningTemplate": "semver"
     }
   ],
+  "customDatasources": {
+    "grafana-plugins": {
+      "description": "Grafana.com plugin catalog version API",
+      "defaultRegistryUrlTemplate": "https://grafana.com/api/plugins/{{packageName}}/versions",
+      "format": "json",
+      "transformTemplates": [
+        "{ \"releases\": items.{ \"version\": version, \"releaseTimestamp\": createdAt } }"
+      ]
+    }
+  },
   "nix": {
     "enabled": true
   },
@@ -398,6 +420,12 @@
         "kube-prometheus-stack",
         "teekennedy/prometheus-operator",
         "ghcr.io/teekennedy/prometheus-operator"
+      ]
+    },
+    {
+      "groupName": "grafana drilldown plugins",
+      "matchDatasources": [
+        "custom.grafana-plugins"
       ]
     },
     {

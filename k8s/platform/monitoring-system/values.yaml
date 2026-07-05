@@ -64,6 +64,15 @@ kube-prometheus-stack:
     grafana.ini:
       server:
         root_url: https://grafana.msng.to
+      plugins:
+        # Pin the Grafana Drilldown app plugins so they are reinstalled to these
+        # exact versions on startup. The default preinstall list installs the
+        # latest version only when a plugin is MISSING and never upgrades one
+        # already present on the persistent PVC, so across a Grafana major bump
+        # the stale frontend stops loading ("App not found"). Pinning via
+        # preinstall overwrites a mismatched on-disk version on boot. Versions
+        # are kept current by Renovate (custom.grafana-plugins datasource).
+        preinstall: grafana-lokiexplore-app@2.1.5,grafana-metricsdrilldown-app@2.2.0
       # TODO integrate with Authelia
       auth.generic_oauth:
         enabled: false
