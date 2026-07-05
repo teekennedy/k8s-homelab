@@ -11,8 +11,14 @@ metadata:
     app.kubernetes.io/name: valkey
     app.kubernetes.io/component: valkey
 spec:
-  serviceName: valkey
-  replicas: 1
+  serviceName: valkey-headless
+  # Three-node replication set: one primary + two replicas, with a Sentinel
+  # co-located in every pod (quorum 2 of 3). See files/valkey-entrypoint.sh for
+  # how each pod discovers its role from Sentinel at startup.
+  replicas: 3
+  # OrderedReady so valkey-0 (the bootstrap primary) is Ready before the
+  # replicas start and discover it.
+  podManagementPolicy: OrderedReady
   selector:
     matchLabels:
       app.kubernetes.io/name: valkey
@@ -30,6 +36,16 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+      # Spread the three pods across distinct nodes so a single node loss never
+      # takes more than one replica (and never breaks Sentinel quorum).
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: valkey
+                app.kubernetes.io/component: valkey
+            topologyKey: kubernetes.io/hostname
       containers:
       - name: valkey
         image: valkey/valkey:9-alpine
@@ -39,11 +55,20 @@ spec:
         - containerPort: 6379
           name: valkey
         env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: VALKEY_PASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ .Values.authelia.secret.existingSecret }}
               key: session.redis.password.txt
+        - name: SENTINEL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.authelia.secret.existingSecret }}
+              key: session.redis.sentinel.password.txt
         # maxmemory tracks the container memory limit (in bytes via the
         # downward API) so resizing resources.limits.memory propagates to
         # Valkey's eviction threshold without manual config updates.
@@ -55,8 +80,7 @@ spec:
               divisor: "1"
         command:
         - sh
-        - -c
-        - exec valkey-server /etc/valkey/valkey.conf --requirepass "$VALKEY_PASSWORD" --maxmemory "$VALKEY_MAXMEMORY"
+        - /etc/valkey/valkey-entrypoint.sh
         volumeMounts:
         - name: config
           mountPath: /etc/valkey
@@ -90,10 +114,71 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+      - name: sentinel
+        image: valkey/valkey:9-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+        ports:
+        - containerPort: 26379
+          name: sentinel
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: VALKEY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.authelia.secret.existingSecret }}
+              key: session.redis.password.txt
+        - name: SENTINEL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.authelia.secret.existingSecret }}
+              key: session.redis.sentinel.password.txt
+        command:
+        - sh
+        - /etc/valkey/sentinel-entrypoint.sh
+        volumeMounts:
+        - name: config
+          mountPath: /etc/valkey
+          readOnly: true
+        - name: sentinel-conf
+          mountPath: /sentinel
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - valkey-cli -p 26379 -a "$SENTINEL_PASSWORD" --no-auth-warning ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - valkey-cli -p 26379 -a "$SENTINEL_PASSWORD" --no-auth-warning ping
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
       volumes:
       - name: config
         configMap:
           name: valkey-config
+      # Writable location for Sentinel's self-rewritten config.
+      - name: sentinel-conf
+        emptyDir: {}
   volumeClaimTemplates:
   - metadata:
       name: data
