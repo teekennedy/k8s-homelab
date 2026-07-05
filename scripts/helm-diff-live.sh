@@ -96,7 +96,10 @@ last_modified=1
 last_successfully_modified=0
 
 # Make sure dependencies are up to date
-helm dependency update "$chart_path"
+if [[ -f "$chart_path/Chart.lock" ]]; then
+  helm dependency update "$chart_path"
+  last_modified="$(get_last_modified "$chart_path/Chart.lock")"
+fi
 
 if helm template -n "$namespace" "$release" "$chart_path" | tee "$output_dir/$last_modified.yaml" | bat -l yaml; then
   last_successfully_modified="$last_modified"
@@ -106,9 +109,11 @@ while sleep 1; do
   modified="$(get_last_modified "$chart_path")"
   if [[ $modified -gt $last_modified ]]; then
     # If Chart.lock was modified specifically, re-run helm dependency update
-    lock_modified="$(get_last_modified "$chart_path/Chart.lock")"
-    if [[ $lock_modified -gt $last_modified ]]; then
-      helm dependency update "$chart_path"
+    if [[ -f "$chart_path/Chart.lock" ]]; then
+      lock_modified="$(get_last_modified "$chart_path/Chart.lock")"
+      if [[ $lock_modified -gt $last_modified ]]; then
+        helm dependency update "$chart_path"
+      fi
     fi
     if helm template -n "$namespace" "$release" "$chart_path" >"$output_dir/$modified.yaml"; then
       # Safely shell-quote the filenames
