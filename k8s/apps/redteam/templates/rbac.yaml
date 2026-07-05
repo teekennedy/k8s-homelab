@@ -1,0 +1,37 @@
+---
+# Two service accounts, one per scenario. Both get the built-in `view`
+# ClusterRole (read-only, cluster-wide). `view` already EXCLUDES secrets — good;
+# it does include configmaps (accepted per threat model). This access is the
+# "oracle" the ROE prompts describe, NOT attack surface.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: redteam-external
+  namespace: redteam
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: redteam-internal
+  namespace: redteam
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: redteam-view
+  annotations:
+    # False positive: `view` is a built-in read-only ClusterRole (no pods/exec or
+    # pods/attach), but Polaris analyses the chart statically and can't see it, so it
+    # trips the "references a ClusterRole that ... does not exist" branch of the check.
+    polaris.fairwinds.com/clusterrolebindingPodExecAttach-exempt: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: redteam-external
+    namespace: redteam
+  - kind: ServiceAccount
+    name: redteam-internal
+    namespace: redteam

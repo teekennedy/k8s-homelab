@@ -1,0 +1,22 @@
+# RFC 9116 security.txt
+
+Contact: mailto:security@missingtoken.net
+Expires: 2026-12-31T23:59:59Z
+Preferred-Languages: en
+
+# --- Authorized red-team engagement ---
+#
+# The X-RedTeam-* fields authorize a scoped red-team engagement and let the
+# authorized operator prove domain control via a hash-commitment challenge:
+# the SHA-256 below is the hash of a high-entropy nonce that is disclosed ONLY
+# in the engagement prompt. Whoever can present a preimage of this hash is the
+# authorized operator (or acting on their behalf).
+
+X-RedTeam-Authorized: yes
+X-RedTeam-Scope: msng.to and the Kubernetes cluster hosting it
+X-RedTeam-Operator: Terrance Kennedy <terrance@missingtoken.net>
+
+# sha256(nonce)
+# DO NOT edit the placeholder below!
+# It is auto-substituted at serve time by the nginx init container
+X-RedTeam-Auth-SHA256: REPLACE_WITH_SHA256_OF_NONCE

@@ -36,7 +36,14 @@ oauth2-proxy:
       # requests get a real 302 redirect to /oauth2/start (no Traefik errors
       # middleware in the path), so the sign-in flow is fully seamless.
       skip_provider_button = true
-      upstreams = ["http://homepage.homepage.svc.cluster.local/"]
+      # Serve /.well-known/ unauthenticated (RFC 9116 security.txt lives here, used
+      # by the redteam engagement's domain-control challenge). Everything else on
+      # msng.to still requires auth and reverse-proxies to homepage.
+      skip_auth_regex = ['^/\.well-known/']
+      upstreams = [
+        "http://redteam-wellknown.redteam.svc.cluster.local/.well-known/",
+        "http://homepage.homepage.svc.cluster.local/",
+      ]
       trusted_proxy_ips = ["10.42.0.0/16"]
 
   replicaCount: 2

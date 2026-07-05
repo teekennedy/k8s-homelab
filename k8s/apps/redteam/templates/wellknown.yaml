@@ -1,0 +1,119 @@
+---
+# Tiny static server for /.well-known/security.txt. An init container reads the
+# mittwald-generated NONCE (required: the pod will not start until the secret value
+# exists), hashes it, and substitutes the hash into security.txt — so the published
+# X-RedTeam-Auth-SHA256 always matches the live nonce with zero manual steps.
+# oauth2-proxy (the msng.to front door) routes /.well-known/ here and skips auth for
+# it (see k8s/platform/oauth2-proxy/values.yaml). Independent of session replicas.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redteam-wellknown
+data:
+  security.txt: |-
+{{ .Files.Get "files/security.txt" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redteam-wellknown
+  labels:
+    app: redteam-wellknown
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redteam-wellknown
+  template:
+    metadata:
+      labels:
+        app: redteam-wellknown
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # fsGroup matches nginx-unprivileged's group so both containers can use the
+        # shared emptyDir (render-hash writes it, nginx reads it).
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Substitute sha256(NONCE) into the served security.txt.
+        - name: render-hash
+          image: busybox:stable
+          securityContext:
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -eu
+              HASH=$(printf %s "$NONCE" | sha256sum | cut -d' ' -f1)
+              sed "s/REPLACE_WITH_SHA256_OF_NONCE/$HASH/" /tmpl/security.txt > /out/security.txt
+          env:
+            # Required (optional defaults to false): blocks startup until mittwald
+            # has populated the nonce.
+            - name: NONCE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.nonce }}
+                  key: NONCE
+          volumeMounts:
+            - name: tmpl
+              mountPath: /tmpl
+              readOnly: true
+            - name: content
+              mountPath: /out
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:stable
+          securityContext:
+            runAsUser: 101
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: content
+              mountPath: /usr/share/nginx/html/.well-known
+              readOnly: true
+      volumes:
+        - name: tmpl
+          configMap:
+            name: redteam-wellknown
+        - name: content
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redteam-wellknown
+spec:
+  selector:
+    app: redteam-wellknown
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+# The well-known server is the one pod in the namespace that SHOULD accept ingress
+# (from oauth2-proxy). default-deny-all covers everything else.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redteam-wellknown
+spec:
+  podSelector:
+    matchLabels:
+      app: redteam-wellknown
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.oauth2ProxyNamespace }}
+      ports:
+        - port: 8080
+          protocol: TCP

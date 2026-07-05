@@ -1,0 +1,90 @@
+---
+# EXTERNAL red-team session (internet attacker). Two containers sharing one network
+# namespace: Gluetun (VPN killswitch) + the session. All outbound attack traffic
+# transits the VPN, so it reaches msng.to from a real internet IP and split-horizon
+# DNS resolves to your public addresses. Attach with:
+#   kubectl exec -it deploy/redteam-external -n redteam -c session -- tmux new -A -s rt
+# then run `claude --model fable`. Scaled to 0 by default.
+#
+# This pod is REPO-BLIND by design (reaching internal gitea through a public VPN is a
+# split-horizon mess); its only internal reach is the kube API oracle, carved out of
+# the tunnel via Gluetun FIREWALL_OUTBOUND_SUBNETS.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redteam-external
+  labels:
+    app: redteam-external
+  annotations:
+    # gluetun genuinely requires NET_ADMIN + root to build the VPN tunnel/killswitch;
+    # these two checks are irreducible for the sidecar (the session container is
+    # still hardened to non-root, no-caps below).
+    polaris.fairwinds.com/dangerousCapabilities-exempt: "true"
+    polaris.fairwinds.com/runAsRootAllowed-exempt: "true"
+spec:
+  replicas: 0 # TODO: scale to 1 to run an engagement; back to 0 after.
+  selector:
+    matchLabels:
+      app: redteam-external
+  template:
+    metadata:
+      labels:
+        app: redteam-external
+    spec:
+      serviceAccountName: redteam-external
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gluetun
+          image: {{ .Values.gluetun.image }}
+          securityContext:
+            # The one container that must be root, for the tunnel.
+            runAsNonRoot: false
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [NET_ADMIN]
+          env:
+            {{- range $k, $v := .Values.gluetun.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            # Oracle carve-out: the kube API bypasses the tunnel so the agent can
+            # read cluster state without that path counting as "external reach".
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: {{ .Values.kubeApiCidr | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.vpn }} # WIREGUARD_PRIVATE_KEY, WIREGUARD_ADDRESSES
+          volumeMounts:
+            - name: tun
+              mountPath: /dev/net/tun
+        - name: session
+          image: {{ .Values.image }}
+          command: ["sleep", "infinity"]
+          workingDir: /work
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: NONCE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.nonce }}
+                  key: NONCE
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.anthropic }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice

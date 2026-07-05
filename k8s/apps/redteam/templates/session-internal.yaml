@@ -1,0 +1,73 @@
+---
+# INTERNAL red-team session (LAN attacker). Plain Deployment; you attach with:
+#   kubectl exec -it deploy/redteam-internal -n redteam -- tmux new -A -s rt
+# then run `claude --model fable`. `kubectl exec -it` allocates a real PTY, so the
+# Claude TUI renders correctly; running inside tmux means a dropped exec doesn't
+# kill the session. Access is gated by whoever holds pods/exec RBAC on this ns.
+# Scaled to 0 by default — scale to 1 per engagement.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redteam-internal
+  labels:
+    app: redteam-internal
+spec:
+  replicas: 0 # TODO: scale to 1 to run an engagement; back to 0 after.
+  selector:
+    matchLabels:
+      app: redteam-internal
+  template:
+    metadata:
+      labels:
+        app: redteam-internal
+    spec:
+      serviceAccountName: redteam-internal
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Pre-clone the repo (Gitea allows unauthenticated read of ops/k8s-homelab)
+        # so it's ready in /work/k8s-homelab when the session starts. Treat as public
+        # (mirrored to GitHub). No credentials needed.
+        - name: clone-repo
+          image: {{ .Values.image }}
+          command: ["sh", "-c"]
+          args:
+            - git clone --no-single-branch {{ .Values.repoURL | quote }} /work/k8s-homelab || true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: work
+              mountPath: /work
+      containers:
+        - name: session
+          image: {{ .Values.image }}
+          command: ["sleep", "infinity"]
+          workingDir: /work
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            # High-entropy nonce for the authorization challenge (see ROE §0).
+            - name: NONCE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.nonce }}
+                  key: NONCE
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.anthropic }}
+          volumeMounts:
+            - name: work
+              mountPath: /work
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: work
+          emptyDir: {}

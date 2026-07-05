@@ -1,0 +1,7 @@
+apiVersion: v2
+name: redteam
+description: On-demand sandboxed Claude Code (Fable) sessions for authorized red-team assessment of the cluster and its services.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+appVersion: "0.1.0"

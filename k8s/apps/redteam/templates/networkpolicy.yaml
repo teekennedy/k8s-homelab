@@ -1,0 +1,82 @@
+---
+# Baseline: deny all ingress + egress for every pod in the namespace. Per-pod
+# policies below are ADDITIVE (a policy only grants allows to pods it selects),
+# so each session gets exactly its own allowances with no cross-contamination.
+# Ingress stays fully denied everywhere — you attach via `kubectl exec` (through
+# the API server/kubelet), which is not subject to pod-network NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# EXTERNAL scenario. Attack traffic is forced through the Gluetun VPN sidecar
+# (killswitch) so it exits from a real internet IP. This L3 NetworkPolicy is
+# defense-in-depth around that. The only *direct* (non-VPN) egress permitted is
+# the oracle (kube API); everything else is internet-bound and gated by Gluetun.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redteam-external
+spec:
+  podSelector:
+    matchLabels:
+      app: redteam-external
+  policyTypes: [Egress]
+  egress:
+    # Oracle: kube API only (bypasses VPN via Gluetun FIREWALL_OUTBOUND_SUBNETS).
+    # kubectl reaches the API by ClusterIP so no cluster DNS is needed. All
+    # attack-target name resolution happens through the VPN's own resolver.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.kubeApiCidr }}
+    # Internet (VPN handshake + tunnelled attack traffic). Excludes RFC1918 so the
+    # pod cannot directly touch the LAN outside the tunnel.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+---
+# INTERNAL scenario. Simulates an insider on the LAN: broad reachability into
+# 10.69.0.0/16 (includes git.msng.to for the init-container clone), DNS, plus 443
+# to the internet for the Anthropic API only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redteam-internal
+spec:
+  podSelector:
+    matchLabels:
+      app: redteam-internal
+  policyTypes: [Egress]
+  egress:
+    # DNS (to resolve git.msng.to, api.anthropic.com, internal hosts).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # The LAN — the insider's playground (git.msng.to lives here too).
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.lanCidr }}
+    # Anthropic API (model). TODO: tighten to Anthropic ranges if desired.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP

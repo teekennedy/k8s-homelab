@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: redteam
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    name: in-cluster
+    namespace: redteam
+  project: default
+  ignoreDifferences:
+    # NONCE is auto-filled in-cluster by mittwald secret-generator; don't fight it.
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: redteam-nonce
+      namespace: redteam
+  source:
+    path: k8s/apps/redteam
+    repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
