@@ -1,6 +1,31 @@
 # Settings normally found in hardware-configuration.nix that are common between hosts.
-{...}: {
+{
+  config,
+  lib,
+  ...
+}: let
+  # nixos-facter's SMBIOS report lists a memory_device per DIMM slot, sibling to
+  # memory_array. Each populated slot exposes `ecc_bits`: the number of ECC bits
+  # on the module (0 = non-ECC; DDR5 ECC SODIMMs report 16). If any slot has ECC
+  # bits, this host has ECC memory. `or` defaults keep this safe on hosts whose
+  # facter report lacks the smbios/memory_device attrs.
+  memoryDevices = config.facter.report.smbios.memory_device or [];
+  hasEcc = builtins.any (dev: (dev.ecc_bits or 0) > 0) memoryDevices;
+in {
   networking.useNetworkd = true;
+
+  # On hosts with ECC memory, run rasdaemon so uncorrectable/fatal machine-check
+  # errors are captured and persisted via the mce_record tracepoint (query with
+  # `ras-mc-ctl --summary`). This works independently of EDAC.
+  #
+  # NOTE: there is currently no in-tree EDAC driver for the Arrow Lake-HX (285HX,
+  # host-bridge PCI id 0x7D1C) sideband-ECC memory controller, so per-DIMM
+  # correctable-error counters are unavailable — ECC still corrects in hardware,
+  # we just can't observe the rate. igen6_edac is NOT the driver: it is IBECC
+  # (in-band ECC) only and its PCI alias list omits 0x7D1C, so it loads but binds
+  # no controller (no /sys/devices/system/edac/mc/mc0). Add the real driver via
+  # boot.kernelModules here if/when one lands upstream.
+  hardware.rasdaemon.enable = lib.mkIf hasEcc true;
 
   # sets static nameservers directly in /etc/systemd/resolved.conf.
   # This avoids having duplicate entries gathered from network devices.
