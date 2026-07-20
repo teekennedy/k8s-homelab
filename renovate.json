@@ -203,54 +203,22 @@
       "enabled": false
     },
     {
-      "groupName": "all non-major dependencies (excluding 0.x)",
-      "groupSlug": "all-minor-patch-semver",
-      "matchPackageNames": [
-        "*"
+      "description": "Group every update by the directory its package file lives in, so each project folder (helm chart, Go module, Python project, nix flake, etc.) gets a single PR. A folder holding multiple ecosystems (e.g. cmd/lab has go.mod + flake.nix + devenv.nix) is grouped together because they share the same packageFileDir. separateMajorMinor (default) still splits majors into their own PR.",
+      "matchFileNames": [
+        "**"
       ],
-      "matchManagers": [
-        "gomod",
-        "helm-values",
-        "helmfile",
-        "helmv3",
-        "jsonnet-bundler",
-        "nix",
-        "terraform"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "matchCurrentValue": "!/^v?0\\./"
+      "groupName": "{{packageFileDir}}"
     },
     {
-      "groupName": "helm dashy",
+      "description": "Root-level nix flake / devenv inputs have an empty packageFileDir; give them an explicit group name.",
       "matchFileNames": [
-        "k8s/apps/dashy/**"
+        "flake.nix",
+        "flake.lock",
+        "devenv.nix",
+        "devenv.yaml",
+        "devenv.lock"
       ],
-      "matchPackageNames": [
-        "dashy",
-        "lissy93/dashy"
-      ]
-    },
-    {
-      "groupName": "helm jellyfin",
-      "matchFileNames": [
-        "k8s/apps/jellyfin/**"
-      ],
-      "matchPackageNames": [
-        "alpine",
-        "app-template",
-        "ghcr.io/jellyfin/jellyfin",
-        "docker.io/fallenbagel/jellyseerr",
-        "lscr.io/linuxserver/prowlarr",
-        "lscr.io/linuxserver/radarr",
-        "lscr.io/linuxserver/sonarr",
-        "ghcr.io/unpackerr/unpackerr",
-        "lscr.io/linuxserver/qbittorrent",
-        "docker.io/qmcgaw/gluetun",
-        "jellyfin/jellyfin"
-      ]
+      "groupName": "root"
     },
     {
       "description": "Don't apply minimumReleaseAge to jellyfin image+appVersion so they stay grouped",
@@ -258,183 +226,6 @@
       "matchPackageNames": [
         "ghcr.io/jellyfin/jellyfin",
         "jellyfin/jellyfin"
-      ]
-    },
-    {
-      "groupName": "helm spoolman",
-      "matchFileNames": [
-        "k8s/apps/spoolman/**"
-      ],
-      "matchPackageNames": [
-        "app-template",
-        "ghcr.io/donkie/spoolman",
-        "Donkie/Spoolman"
-      ]
-    },
-    {
-      "groupName": "helm crowdsec",
-      "matchFileNames": [
-        "k8s/platform/crowdsec/**"
-      ],
-      "matchPackageNames": [
-        "crowdsec",
-        "crowdsecurity/crowdsec"
-      ]
-    },
-    {
-      "groupName": "helm argocd",
-      "matchFileNames": [
-        "k8s/foundation/argocd/**"
-      ],
-      "matchPackageNames": [
-        "argo-cd",
-        "argocd-apps"
-      ]
-    },
-    {
-      "groupName": "helm cert-system",
-      "matchFileNames": [
-        "k8s/foundation/cert-system/**"
-      ],
-      "matchPackageNames": [
-        "cert-manager",
-        "trust-manager"
-      ]
-    },
-    {
-      "groupName": "helm cnpg-system",
-      "matchFileNames": [
-        "k8s/foundation/cnpg-system/**"
-      ],
-      "matchPackageNames": [
-        "cloudnative-pg",
-        "cloudnative-pg/cloudnative-pg"
-      ]
-    },
-    {
-      "groupName": "helm external-dns",
-      "matchFileNames": [
-        "k8s/foundation/external-dns/**"
-      ],
-      "matchPackageNames": [
-        "external-dns"
-      ]
-    },
-    {
-      "groupName": "helm generic-cdi-plugin",
-      "matchFileNames": [
-        "k8s/foundation/generic-cdi-plugin/**"
-      ],
-      "matchPackageNames": [
-        "ghcr.io/olfillasodikno/generic-cdi-plugin"
-      ]
-    },
-    {
-      "groupName": "helm intel-device-plugins-gpu",
-      "matchFileNames": [
-        "k8s/foundation/intel-device-plugins-gpu/**"
-      ],
-      "matchPackageNames": [
-        "intel-device-plugins-operator",
-        "intel-device-plugins-gpu",
-        "intel/intel-device-plugins-for-kubernetes"
-      ]
-    },
-    {
-      "groupName": "helm kured",
-      "matchFileNames": [
-        "k8s/foundation/kured/**"
-      ],
-      "matchPackageNames": [
-        "kured",
-        "kubereboot/kured"
-      ]
-    },
-    {
-      "groupName": "helm longhorn-system",
-      "matchFileNames": [
-        "k8s/foundation/longhorn-system/**"
-      ],
-      "matchPackageNames": [
-        "longhorn",
-        "longhorn/charts"
-      ]
-    },
-    {
-      "groupName": "helm node-feature-discovery",
-      "matchFileNames": [
-        "k8s/foundation/node-feature-discovery/**"
-      ],
-      "matchPackageNames": [
-        "node-feature-discovery",
-        "kubernetes-sigs/node-feature-discovery"
-      ]
-    },
-    {
-      "groupName": "helm secret-system",
-      "matchFileNames": [
-        "k8s/foundation/secret-system/**"
-      ],
-      "matchPackageNames": [
-        "kubernetes-secret-generator",
-        "mittwald/kubernetes-secret-generator"
-      ]
-    },
-    {
-      "groupName": "helm auth-system",
-      "matchFileNames": [
-        "k8s/platform/auth-system/**"
-      ],
-      "matchPackageNames": [
-        "authelia",
-        "app-template",
-        "ghcr.io/lldap/lldap"
-      ]
-    },
-    {
-      "groupName": "helm csi-driver-smb",
-      "matchFileNames": [
-        "k8s/platform/csi-driver-smb/**"
-      ],
-      "matchPackageNames": [
-        "csi-driver-smb"
-      ]
-    },
-    {
-      "groupName": "helm gitea",
-      "matchFileNames": [
-        "k8s/platform/gitea/**"
-      ],
-      "matchPackageNames": [
-        "gitea",
-        "ghcr.io/cloudnative-pg/postgresql",
-        "go-gitea/gitea"
-      ]
-    },
-    {
-      "groupName": "helm monitoring-system",
-      "matchFileNames": [
-        "k8s/platform/monitoring-system/**"
-      ],
-      "matchPackageNames": [
-        "kube-prometheus-stack",
-        "teekennedy/prometheus-operator",
-        "ghcr.io/teekennedy/prometheus-operator"
-      ]
-    },
-    {
-      "groupName": "grafana drilldown plugins",
-      "matchDatasources": [
-        "custom.grafana-plugins"
-      ]
-    },
-    {
-      "groupName": "helm renovate",
-      "matchFileNames": [
-        "k8s/platform/renovate/**"
-      ],
-      "matchPackageNames": [
-        "renovate"
       ]
     },
     {
@@ -533,7 +324,7 @@
       "versioning": "semver"
     },
     {
-      "description": "Automerge all minor/patch updates (excluding 0.x)",
+      "description": "Automerge all non-major (minor/patch) updates, including 0.x packages. Major bumps (incl. 0.x -> 1.0) are excluded and still merged manually.",
       "automerge": true,
       "automergeType": "pr",
       "matchUpdateTypes": [
@@ -542,8 +333,7 @@
       ],
       "matchPackageNames": [
         "*"
-      ],
-      "matchCurrentValue": "!/^v?0\\./"
+      ]
     }
   ]
 }
