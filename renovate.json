@@ -476,13 +476,15 @@
       "versioning": "regex:^(?<minor>\\d+)-(?<patch>\\d+)-(?<build>\\d+)-(?<compatibility>.*)?$"
     },
     {
+      "description": "LinuxServer images: strip the -ls build suffix so Renovate matches the UPSTREAM project's release tags (via each image's sourceUrl override below) and renders its changelog. Trade-off: because the -ls revision is dropped from version comparison, LinuxServer-only rebuilds at the same upstream version no longer generate PRs.",
       "matchDatasources": [
         "docker"
       ],
-      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:[.-]r?(?<build>\\d+))?-ls(?<revision>\\d+)$",
       "matchPackageNames": [
         "/^(?:gh|ls)cr\\.io/linuxserver//"
-      ]
+      ],
+      "extractVersion": "^(?<version>.+)-ls\\d+$",
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:[.-]r?(?<build>\\d+))?$"
     },
     {
       "matchPackageNames": [
@@ -519,13 +521,16 @@
       ]
     },
     {
+      "description": "qBittorrent (LinuxServer) uses <qbt>_v<libtorrent>-ls<n> tags on the libtorrent-2.x main track (the separate libtorrentv1-... track is excluded by the leading-digit anchor). Track only the qBittorrent version: this overrides the generic LinuxServer extractVersion/versioning above and matches qBittorrent's release-X.Y.Z upstream tags via Renovate's built-in 'release' changelog keyword. Same trade-off as the other LinuxServer images: libtorrent-only or ls-only rebuilds at the same qBittorrent version won't generate PRs.",
       "matchDatasources": [
         "docker"
       ],
       "sourceUrl": "https://github.com/qbittorrent/qBittorrent",
       "matchPackageNames": [
         "/^(?:gh|ls)cr\\.io/linuxserver/qbittorrent$/"
-      ]
+      ],
+      "extractVersion": "^(?<version>\\d+\\.\\d+\\.\\d+)_v",
+      "versioning": "semver"
     },
     {
       "description": "Automerge all minor/patch updates (excluding 0.x)",
