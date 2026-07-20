@@ -3,7 +3,7 @@ name: spoolman
 description: Keep track of your inventory of 3D-printer filament spools.
 type: application
 version: 0.1.10
-appVersion: "0.23.1"
+appVersion: "0.24.0"
 dependencies:
   - name: app-template
     version: 5.0.1
