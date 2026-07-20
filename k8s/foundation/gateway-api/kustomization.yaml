@@ -9,4 +9,4 @@ kind: Kustomization
 # Renovate tracks the `?ref=` via its built-in kustomize manager
 # (datasource: kubernetes-sigs/gateway-api).
 resources:
-  - github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.6.0
+  - github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.6.1
