@@ -6,6 +6,7 @@
   ],
   "bumpVersion": "patch",
   "minimumReleaseAge": "7 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
   "rebaseWhen": "behind-base-branch",
   "prHourlyLimit": 12,
   "customManagers": [
@@ -324,7 +325,7 @@
       "versioning": "semver"
     },
     {
-      "description": "Automerge all non-major (minor/patch) updates, including 0.x packages. Major bumps (incl. 0.x -> 1.0) are excluded and still merged manually.",
+      "description": "Automerge all non-major (minor/patch) updates.",
       "automerge": true,
       "automergeType": "pr",
       "matchUpdateTypes": [
