@@ -1,10 +1,10 @@
 apiVersion: v2
 name: kured
 description: KUbernetes REboot Daemon
-version: 0.0.11
-appVersion: "1.22.1"
+version: 0.0.12
+appVersion: "1.23.0"
 
 dependencies:
   - name: kured
-    version: "6.0.0"
+    version: "6.1.0"
     repository: https://kubereboot.github.io/charts
