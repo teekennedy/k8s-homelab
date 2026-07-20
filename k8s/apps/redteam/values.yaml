@@ -16,7 +16,7 @@ lanCidr: "10.69.0.0/16"
 oauth2ProxyNamespace: "oauth2-proxy"
 
 gluetun:
-  image: qmcgaw/gluetun:v3.40.0
+  image: qmcgaw/gluetun:v3.41.1
   # Custom self-hosted WireGuard endpoint (see README: why not a commercial VPN).
   # Non-secret bits here; WIREGUARD_PRIVATE_KEY + WIREGUARD_ADDRESSES come from the
   # redteam-vpn Secret.

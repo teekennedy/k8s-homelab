@@ -55,7 +55,7 @@ secret-sync:
   schedule: "*/30 * * * *"
   image:
     repository: golang
-    tag: 1.26.4-alpine
+    tag: 1.26.5-alpine
   events:
     enabled: true
     eventBusName: homepage-secret-sync
