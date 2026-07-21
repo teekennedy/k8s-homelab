@@ -5,7 +5,7 @@ import "dagger/homelab/internal/dagger"
 // Container image constants with renovate annotations for automated updates.
 const (
 	// renovate: datasource=docker depName=ghcr.io/cachix/devenv/devenv
-	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.0.2"
+	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.1.2"
 	// renovate: datasource=docker depName=nixos/nix
 	nixImage = "nixos/nix:latest"
 	// renovate: datasource=docker depName=golang
