@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,8 @@ import (
 	"github.com/teekennedy/homelab/cmd/lab/internal/helm"
 	"github.com/teekennedy/homelab/cmd/lab/internal/paths"
 	"github.com/teekennedy/homelab/cmd/lab/kubeconfig"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -119,7 +122,7 @@ After bootstrap, ArgoCD will manage all applications.`,
 			}
 
 			for _, app := range bootstrapOrder {
-				if !contains(env.Apps.Foundation, app) {
+				if !slices.Contains(env.Apps.Foundation, app) {
 					continue
 				}
 
@@ -291,10 +294,10 @@ Examples:
 			}
 
 			if app == "" {
-				return syncTier(tier, prune)
+				return syncTier(tier)
 			}
 
-			return syncApp(tier, app, prune)
+			return syncApp(tier, app)
 		},
 	}
 
@@ -333,9 +336,9 @@ Examples:
 			hasKubeconfig := mgr.Exists(envName)
 
 			if jsonOutput {
-				var output interface{}
+				var output any
 				if tier == "" {
-					output = map[string]interface{}{
+					output = map[string]any{
 						"environment":   envName,
 						"hasKubeconfig": hasKubeconfig,
 						"apps":          env.Apps,
@@ -368,7 +371,7 @@ Examples:
 				if tier != "" && tier != name {
 					return
 				}
-				fmt.Printf("\n%s:\n", strings.Title(name))
+				fmt.Printf("\n%s:\n", cases.Title(language.English).String(name))
 				for _, app := range apps {
 					appPath := filepath.Join("k8s", name, app)
 					status := "✓"
@@ -699,8 +702,8 @@ func diffApp(tier, app string) error {
 		depCmd := exec.Command("helm", "dependency", "build", chartDir)
 		depCmd.Stdout = os.Stdout
 		depCmd.Stderr = os.Stderr
-		if err := depCmd.Run(); err != nil {
-			return fmt.Errorf("helm dependency build: %w", err)
+		if depErr := depCmd.Run(); depErr != nil {
+			return fmt.Errorf("helm dependency build: %w", depErr)
 		}
 	}
 
@@ -714,7 +717,7 @@ func diffApp(tier, app string) error {
 	}
 
 	clusterValues := filepath.Join(getConfigDir(), "gen", "cluster-values.yaml")
-	if _, err := os.Stat(clusterValues); err == nil {
+	if _, statErr := os.Stat(clusterValues); statErr == nil {
 		templateArgs = append(templateArgs, "--values", clusterValues)
 	}
 
@@ -851,7 +854,7 @@ func findChartDir(filePath string) string {
 	return ""
 }
 
-func syncTier(tier string, prune bool) error {
+func syncTier(tier string) error {
 	tierPath := filepath.Join("k8s", tier)
 	charts, err := helm.DiscoverCharts(tierPath)
 	if err != nil {
@@ -859,14 +862,14 @@ func syncTier(tier string, prune bool) error {
 	}
 
 	for _, chart := range charts {
-		if err := syncApp(chart.Tier, chart.Name, prune); err != nil {
+		if err := syncApp(chart.Tier, chart.Name); err != nil {
 			fmt.Printf("Warning: %s/%s: %v\n", chart.Tier, chart.Name, err)
 		}
 	}
 	return nil
 }
 
-func syncApp(tier, app string, prune bool) error {
+func syncApp(tier, app string) error {
 	chartDir := filepath.Join("k8s", tier, app)
 
 	info, err := helm.ParseChartInfo(chartDir)
@@ -949,13 +952,4 @@ func applyKustomization(path string, dryRun bool) error {
 		return kubectlCmd.Run()
 	}
 	return nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

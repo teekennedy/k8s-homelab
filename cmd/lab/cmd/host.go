@@ -142,7 +142,7 @@ func newHostDeployCmd() *cobra.Command {
 			}
 
 			if jsonOutput {
-				result := map[string]interface{}{
+				result := map[string]any{
 					"host":   hostname,
 					"dryRun": dryRun,
 					"status": "success",
