@@ -5,7 +5,12 @@
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
     determinate.url = "github:DeterminateSystems/determinate";
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules?ref=main";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # TEMPORARY: pinned to PR #540857 (KiaraGrouwstra/nixpkgs@modular-reload-fixes)
+    # which fixes a modular-services (system.services.*) eval regression that
+    # otherwise breaks tlshd / nix/modules/nfs-mtls on every borg host. Revert to
+    # "github:NixOS/nixpkgs/nixos-unstable" once the PR lands in nixos-unstable.
+    # NB: this branch is based on nixpkgs master, not nixos-unstable.
+    nixpkgs.url = "github:KiaraGrouwstra/nixpkgs/ae9994806ca939447a8a6adc4f94d12cbdf06e01";
     disko.url = "github:nix-community/disko?ref=master";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence?ref=master";
@@ -168,7 +173,7 @@
         # enable magic rollback and other checks
         checks = builtins.mapAttrs (_: deployLib: deployLib.deployChecks self.deploy) inputs.deploy-rs.lib;
         deploy = {
-          nodes = builtins.listToAttrs (builtins.map (host: {
+          nodes = builtins.listToAttrs (map (host: {
               name = host.hostname;
               value = {
                 hostname = host.hostname;
@@ -183,7 +188,7 @@
           remoteBuild = true;
         };
         nixosConfigurations =
-          (builtins.listToAttrs (builtins.map (host: {
+          (builtins.listToAttrs (map (host: {
               name = host.hostname;
               value = inputs.nixpkgs.lib.nixosSystem {
                 system = host.system;
@@ -249,7 +254,7 @@
                   ...
                 }: {
                   nix.builders.remoteClusters = ["borg"];
-                  users.users.root.openssh.authorizedKeys.keyFiles = builtins.map (s: ./nix/modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./nix/modules/users/authorized_keys));
+                  users.users.root.openssh.authorizedKeys.keyFiles = map (s: ./nix/modules/users/authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./nix/modules/users/authorized_keys));
                   networking.hostName = "nixos-installer";
                   # Pin nixpkgs to flake input
                   nix.registry.nixpkgs.flake = inputs.nixpkgs;
