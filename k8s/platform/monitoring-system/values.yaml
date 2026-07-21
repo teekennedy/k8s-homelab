@@ -335,6 +335,15 @@ loki:
       enabled: true
     storage:
       type: filesystem
+    compactor:
+      retention_enabled: true
+      compaction_interval: 30m
+      delete_request_store: filesystem
+      working_directory: /tmp/retention
+      retention_delete_delay: 2h
+      retention_delete_worker_count: 150
+    limits_config:
+      retention_period: 744h # 31 days
     schemaConfig:
       configs:
         - from: 2026-01-01
