@@ -11,7 +11,9 @@ spec:
   primaryUpdateStrategy: unsupervised
   storage:
     size: 5Gi
-    storageClass: longhorn-rc2
+    # Node-local single replica: CNPG's own streaming replication provides HA,
+    # so Longhorn's cross-node replication only added fsync latency.
+    storageClass: longhorn-strict-local
   enableSuperuserAccess: true
   postgresql:
     # postgresql configuration options (postgresql.conf)
@@ -25,10 +27,15 @@ spec:
   monitoring:
     enablePodMonitor: true
   enablePDB: true
-  # prevent two pods from landing on the same node 
   affinity:
     enablePodAntiAffinity: true
+    # required (not preferred): with strict-local storage, two instances on the
+    # same node would share one physical disk and lose fault isolation.
+    podAntiAffinityType: required
     topologyKey: kubernetes.io/hostname
+    # Constrain instances to nodes that actually host Longhorn storage.
+    nodeSelector:
+      node.msng.to/cnpg-storage: "true"
   resources:
     requests:
       memory: "512Mi"
