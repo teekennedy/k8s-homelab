@@ -6,6 +6,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 provisioner: driver.longhorn.io
 allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
 parameters:
   numberOfReplicas: "1"
   # staleReplicaTimeout: "2880" # 48 hours in minutes
@@ -24,3 +25,18 @@ provisioner: driver.longhorn.io
 allowVolumeExpansion: true
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
+---
+# A single replica storage class with strict-local data locality
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: longhorn-strict-local
+  namespace: {{ .Release.Namespace }}
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  numberOfReplicas: "1" # Required for strict-local
+  dataLocality: "strict-local"
+  staleReplicaTimeout: "720" # 12 hours in minutes
+reclaimPolicy: Delete
