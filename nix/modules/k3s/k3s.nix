@@ -104,6 +104,10 @@ in {
           "--embedded-registry"
         ])
       ];
+      nodeLabel = lib.mkIf (builtins.stringLength config.disko.longhornDevice > 0) [
+        "node.longhorn.io/create-default-disk=true"
+        "node.msng.to/cnpg-storage=true"
+      ];
       tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
     };
 
