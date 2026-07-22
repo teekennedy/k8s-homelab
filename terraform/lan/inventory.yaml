@@ -2,12 +2,13 @@ hosts:
   ups:
     hostname: rmc0628AB
     mac_address: 00:0c:15:06:28:ab
-    ip_address: 10.69.0.247
+    ip_address: unknown
+    dhcp: true
     connected_via: qnap_poe
-    switch_port: 9
-    patch_panel_port: 9
-    vlan: management
-    notes: It SHOULD be on the management vlan but it ain't. The IP is hardcoded in home assistant config under config/packages/ups.yaml.
+    switch_port: 7
+    patch_panel_port: 7
+    vlan: ups
+    notes: The IP is hardcoded in home assistant config under config/packages/ups.yaml.
   proxmox-router:
     hostname: proxmox-router
     mac_address: 24:5e:be:83:d2:0d
@@ -168,17 +169,6 @@ vlans:
       stop: 10.69.10.199
     switch_ports: [] # TODO
     notes: Fam network. Last octet of 200 and above reserved for VPN.
-  okta:
-    name: "Okta"
-    vlan_tag: 700
-    network_isolation: true
-    subnet: 10.69.70.0/26 # 62 usable hosts
-    dhcp:
-      enabled: true
-      start: 10.69.70.6
-      stop: 10.69.70.62
-    wifi_networks: ["kennedy🏡"]
-    switch_ports: [17, 19]
   k8s:
     vlan_tag: 800
     subnet: 10.69.80.0/25 # 126 usable hosts
@@ -245,6 +235,13 @@ vlans:
     vlan_tag: 1020
     subnet: 10.69.102.0/25 # 126 usable hosts
     switch_ports: [10, 16, 17, 19]
+    dhcp:
+      enabled: true
+  ups:
+    name: UPS
+    vlan_tag: 1100
+    subnet: 10.69.110.0/25 # 126 usable hosts
+    switch_ports: [7, 17]
     dhcp:
       enabled: true
 wan:

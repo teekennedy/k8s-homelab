@@ -37,6 +37,11 @@ locals {
       name   = coalesce(try(vlan.name, null), vlan_name)
       subnet = try(vlan.subnet, null) != null ? join("", [cidrhost(vlan.subnet, 1), regex("/\\d+$", vlan.subnet)]) : null
       vlan   = try(vlan.vlan_tag, null)
+      # Enable DHCP guarding (prevent rogue dhcp servers) by default if dhcp is enabled
+      dhcp_guarding = try(vlan.dhcp.guarding_enabled, try(vlan.dhcp.enabled, false)) ? {
+        enabled = true
+        servers = [cidrhost(vlan.subnet, 1)]
+      } : null
       dhcp_server = try(vlan.dhcp.enabled, false) ? {
         enabled         = vlan.dhcp.enabled
         gateway_enabled = try(vlan.dhcp.gateway_enabled, false)
