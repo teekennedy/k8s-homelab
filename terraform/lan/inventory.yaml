@@ -9,13 +9,6 @@ hosts:
     patch_panel_port: 7
     vlan: ups
     notes: The IP is hardcoded in home assistant config under config/packages/ups.yaml.
-  proxmox-router:
-    hostname: proxmox-router
-    mac_address: 24:5e:be:83:d2:0d
-    ip_address: 10.69.0.10
-    switch_port: null
-    dhcp: false
-    notes: Interface is called vmbr0 on host.
   poe-switch:
     hostname: poe-switch
     mac_address: 24:5e:be:83:d2:0d
@@ -194,7 +187,6 @@ vlans:
       stop: 10.69.100.19
   roombas:
     name: "IoT Roombas"
-    network_isolation: true
     vlan_tag: 1004
     wifi_networks: ["kennedy_iot"]
     subnet: 10.69.100.128/27 # 30 usable hosts

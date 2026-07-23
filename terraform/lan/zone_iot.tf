@@ -2,16 +2,19 @@
 resource "unifi_firewall_zone" "iot" {
   name = "IoT"
   network_ids = [
+    unifi_network.vlans["xcel"].id,
+    unifi_network.vlans["esphome"].id,
+    unifi_network.vlans["roombas"].id,
     unifi_network.vlans["rain_machine"].id,
   ]
 }
 
-# Allow internal source subnets -> RainMachine on tcp/8080 (HTTP UI).
-resource "unifi_firewall_policy" "allow_http_rain_machine" {
-  name        = "Allow HTTP RainMachine"
-  description = "Allow access to the RainMachine HTTP API"
+# Allow specific internal subnets -> IoT zone
+resource "unifi_firewall_policy" "allow_iot" {
+  name        = "Allow IoT Traffic"
+  description = "Allow traffic to IoT zone"
   action      = "ALLOW"
-  protocol    = "tcp"
+  protocol    = "all"
   ip_version  = "BOTH"
 
   # auto-create the established/related return rule
@@ -29,11 +32,37 @@ resource "unifi_firewall_policy" "allow_http_rain_machine" {
 
   destination = {
     zone_id         = unifi_firewall_zone.iot.id
+    matching_target = "ANY"
+  }
+}
+
+# Allow ESPHome devices to communicate with home assistant via native API
+# https://esphome.io/components/api/
+resource "unifi_firewall_policy" "allow_esphome_api" {
+  name        = "Allow ESPHome API"
+  description = "Allow ESPHome devices to communicate with home assistant via native API"
+  action      = "ALLOW"
+  protocol    = "tcp"
+  ip_version  = "BOTH"
+
+  source = {
+    zone_id         = unifi_firewall_zone.iot.id
     matching_target = "NETWORK"
     network_ids = [
-      unifi_network.vlans["rain_machine"].id,
+      unifi_network.vlans["esphome"].id,
     ]
-    port               = "8080"
+  }
+
+  destination = {
+    zone_id         = data.unifi_firewall_zone.internal.id
+    matching_target = "NETWORK"
+    network_ids = [
+      data.unifi_network.default.id,
+      # TODO remove default after Home Assistant is migrated
+      unifi_network.vlans["home_assistant"].id,
+    ]
+
+    port               = "6053"
     port_matching_type = "SPECIFIC"
   }
 }
