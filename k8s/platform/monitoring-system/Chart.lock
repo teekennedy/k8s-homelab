@@ -4,9 +4,9 @@ dependencies:
   version: 87.16.1
 - name: loki
   repository: https://grafana.github.io/helm-charts
-  version: 7.0.0
+  version: 7.1.0
 - name: promtail
   repository: https://grafana.github.io/helm-charts
   version: 6.17.1
-digest: sha256:ecc7d4b7ac7576be4ed66f7659d94944aa93e19df692d56aca92aebaf30b56ac
-generated: "2026-07-22T00:40:12.927047909Z"
+digest: sha256:4173e1d5ea7e145e9b6e40a13c5af193d3c9ade83f0185e92e15d55379cdb2a6
+generated: "2026-07-23T11:24:27.756004154Z"
