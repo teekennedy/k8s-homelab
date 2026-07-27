@@ -12,7 +12,7 @@ in {
 
   overlays = [
     (_: prev: {
-      kubernetes-helm = prev.wrapHelm prev.kubernetes-helm {
+      kubernetes-helm-wrapped = prev.wrapHelm prev.kubernetes-helm {
         plugins = with prev.kubernetes-helmPlugins; [
           helm-secrets
           helm-diff
@@ -50,13 +50,14 @@ in {
       deploy-rs
       go
       golangci-lint
+      helmfile-wrapped
       k9s
       kind
       kubecolor
       kubectl
       kubectl-cnpg
       kubeconform
-      kubernetes-helm
+      kubernetes-helm-wrapped
       kubernetes-polaris
       kubetail
       kustomize

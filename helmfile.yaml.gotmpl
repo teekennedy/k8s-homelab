@@ -1,0 +1,215 @@
+environments:
+  production:
+    values:
+      - config/gen/production/env.json
+  staging:
+    values:
+      - config/gen/staging/env.json
+  ephemeral:
+    values:
+      - config/gen/ephemeral/env.json
+---
+templates:
+  foundation:
+    chart: 'k8s/foundation/{{`{{ .Release.Name }}`}}'
+    namespace: '{{`{{ .Release.Name }}`}}'
+    installedTemplate:  '{{`{{ .Values | get (print "apps.foundation." .Release.Name) false }}`}}'
+    labels:
+      tier: foundation
+    # Only the foundation template has an optional per-environment overlay
+    # (k8s/foundation/*/{{`{{ .Environment.Name }}`}}.yaml, e.g. production.yaml)
+    # that doesn't exist for every release, so the lenient handler is scoped
+    # here rather than set file-wide.
+    missingFileHandler: Warn
+    values:
+      - 'k8s/foundation/{{`{{ .Release.Name }}`}}/values.yaml'
+      - 'k8s/foundation/{{`{{ .Release.Name }}`}}/{{`{{ .Environment.Name }}`}}.yaml'
+
+  platform:
+    chart: 'k8s/platform/{{`{{ .Release.Name }}`}}'
+    namespace: '{{`{{ .Release.Name }}`}}'
+    installedTemplate: '{{`{{ .Values | get (print "apps.platform." .Release.Name) false }}`}}'
+    labels:
+      tier: platform
+    values:
+      - 'k8s/platform/{{`{{ .Release.Name }}`}}/values.yaml'
+
+  apps:
+    chart: 'k8s/apps/{{`{{ .Release.Name }}`}}'
+    namespace: '{{`{{ .Release.Name }}`}}'
+    installedTemplate: '{{`{{ .Values | get (print "apps.apps." .Release.Name) false }}`}}'
+    labels:
+      tier: apps
+    values:
+      - 'k8s/apps/{{`{{ .Release.Name }}`}}/values.yaml'
+
+# Releases opt in to a template via `inherit:` (rather than `defaultInherit`,
+# which would apply a template's fields to every release in the file,
+# clobbering per-release overrides — see the `namespace:` overrides below).
+
+releases:
+  # --- foundation tier ---
+  - name: argocd
+    inherit:
+      - template: foundation
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: cert-system
+    inherit:
+      - template: foundation
+  - name: cnpg-system
+    inherit:
+      - template: foundation
+    needs:
+      - cert-system/cert-system
+
+  - name: external-dns
+    inherit:
+      - template: foundation
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: generic-cdi-plugin
+    inherit:
+      - template: foundation
+  - name: intel-device-plugins-gpu
+    inherit:
+      - template: foundation
+    needs:
+      - node-feature-discovery/node-feature-discovery
+
+  - name: kured
+    inherit:
+      - template: foundation
+
+  - name: longhorn-system
+    inherit:
+      - template: foundation
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: metallb
+    namespace: metallb-system
+    inherit:
+      - template: foundation
+
+  - name: node-feature-discovery
+    inherit:
+      - template: foundation
+  - name: reflector
+    inherit:
+      - template: foundation
+
+  - name: s3-proxy
+    inherit:
+      - template: foundation
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: secret-system
+    inherit:
+      - template: foundation
+
+  - name: traefik
+    # This application is deployed to kube-system namespace for ease of transition from the k3s packaged traefik
+    namespace: kube-system
+    inherit:
+      - template: foundation
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  # --- platform tier ---
+  - name: csi-driver-nfs
+    inherit:
+      - template: platform
+
+  - name: csi-driver-smb
+    inherit:
+      - template: platform
+
+  - name: dagger-engine
+    inherit:
+      - template: platform
+
+  - name: crowdsec
+    inherit:
+      - template: platform
+    needs:
+      - secret-system/secret-system
+
+  - name: victoria-metrics
+    inherit:
+      - template: platform
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: auth-system
+    inherit:
+      - template: platform
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+      - cnpg-system/cnpg-system
+
+  - name: forgejo
+    inherit:
+      - template: platform
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+      - cnpg-system/cnpg-system
+
+  - name: monitoring-system
+    inherit:
+      - template: platform
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: renovate
+    inherit:
+      - template: platform
+    needs:
+      - forgejo/forgejo
+
+  - name: woodpecker
+    inherit:
+      - template: platform
+    needs:
+      - forgejo/forgejo
+      - secret-system/secret-system
+
+  # --- apps tier ---
+  - name: homepage
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+
+  - name: jellyfin
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: spoolman
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: terraria
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system

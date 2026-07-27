@@ -38,9 +38,10 @@ type K3sHost struct {
 	ServerAddr  string `json:"serverAddr,omitempty"`
 }
 
-// Apps represents the application deployment configuration
+// Apps represents the application deployment configuration.
+// Each map value is true if the release is enabled in this environment.
 type Apps struct {
-	Foundation []string `json:"foundation"`
-	Platform   []string `json:"platform"`
-	Apps       []string `json:"apps"`
+	Foundation map[string]bool `json:"foundation"`
+	Platform   map[string]bool `json:"platform"`
+	Apps       map[string]bool `json:"apps"`
 }

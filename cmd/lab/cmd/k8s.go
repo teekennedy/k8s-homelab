@@ -152,7 +152,7 @@ func bootstrapOrder(skipArgo bool) []string {
 // foundation tier and present on disk under k8s/foundation/.
 func installFoundationApps(ctx context.Context, env *config.Environment, order []string, dryRun bool) error {
 	for _, app := range order {
-		if !slices.Contains(env.Apps.Foundation, app) {
+		if !env.Apps.Foundation[app] {
 			continue
 		}
 
@@ -416,12 +416,19 @@ func printK8sListText(env *config.Environment, envName, tier string, hasKubeconf
 		fmt.Println(" (no kubeconfig)")
 	}
 
-	printTier := func(name string, apps []string) {
+	printTier := func(name string, apps map[string]bool) {
 		if tier != "" && tier != name {
 			return
 		}
 		fmt.Printf("\n%s:\n", cases.Title(language.English).String(name))
-		for _, app := range apps {
+		enabled := make([]string, 0, len(apps))
+		for app, ok := range apps {
+			if ok {
+				enabled = append(enabled, app)
+			}
+		}
+		slices.Sort(enabled)
+		for _, app := range enabled {
 			appPath := filepath.Join("k8s", name, app)
 			status := "✓"
 			if _, err := os.Stat(appPath); os.IsNotExist(err) {
@@ -528,15 +535,31 @@ This exports the environment configuration to formats usable by Helm charts.`,
 				return fmt.Errorf("write terraform values: %w", err)
 			}
 
+			// Write env.json for Helmfile environment values consumption.
+			envJSON, err := config.ExportEnvironment(configDir, envName, "json")
+			if err != nil {
+				return fmt.Errorf("export env json: %w", err)
+			}
+			envJSONDir := filepath.Join(outputDir, envName)
+			if err := os.MkdirAll(envJSONDir, 0o750); err != nil {
+				return fmt.Errorf("create env json directory: %w", err)
+			}
+			envJSONPath := filepath.Join(envJSONDir, "env.json")
+			if err := os.WriteFile(envJSONPath, []byte(envJSON), 0o600); err != nil {
+				return fmt.Errorf("write env json: %w", err)
+			}
+
 			if !jsonOutput {
 				fmt.Printf("Generated configuration for %s environment:\n", envName)
 				fmt.Printf("  Helm values: %s\n", helmPath)
 				fmt.Printf("  Terraform vars: %s\n", tfPath)
+				fmt.Printf("  Helmfile env: %s\n", envJSONPath)
 			} else {
 				result := map[string]string{
 					"environment": envName,
 					"helmValues":  helmPath,
 					"tfVars":      tfPath,
+					"envJSON":     envJSONPath,
 				}
 				out, _ := json.Marshal(result)
 				fmt.Println(string(out))
