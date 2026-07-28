@@ -199,9 +199,11 @@
                   [
                     self.nixosModules.builders
                     {
+                      # Builder provider only. Accept builds but do not
+                      # forward them, preventing infinite forwarding loops.
                       nix.builders = {
                         cluster = "borg";
-                        remoteClusters = ["borg"];
+                        remoteClusters = [];
                       };
                     }
                     ./nix/hosts/common
