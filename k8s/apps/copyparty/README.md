@@ -14,26 +14,40 @@ same NAS.
 | --- | --- |
 | copyparty | Deployment, 1 replica, `Recreate` (single writer for the index + dedup symlinks) |
 | Config | ConfigMap → `/cfg/copyparty.conf` (see `files/copyparty.conf`) |
-| User data | static NFS PV over mTLS → `/w` (`files/` and `pub/` subdirs) |
+| User data | static NFS PV over mTLS → `/w`, mounted as the `[/f]` volume |
 | Index / thumbs / shares.db / idp.db | Longhorn RWO PVC → `/state` |
 | SSO | dedicated `oauth2-proxy` subchart + two Traefik `Middleware`s |
-| Exposure | two Ingresses on the `wspublic` entrypoint |
+| Exposure | three Ingresses on the `wspublic` entrypoint |
 
 ## Auth
 
 copyparty has **no local accounts**. Identity arrives as headers, asserted by a
-dedicated oauth2-proxy running as a Traefik `forwardAuth` middleware:
+dedicated oauth2-proxy running as a Traefik `forwardAuth` middleware — but only
+for paths in `.Values.protectedPaths` (currently just `/f`). Everything else,
+including `/`, never runs forwardAuth at all:
 
 ```
 browser ──► Traefik (wspublic)
-              ├─ signin(errors 401 → /oauth2/sign_in)
-              ├─ forwardAuth ──► copyparty-auth (oauth2-proxy) ──► Authelia
-              └─ ──────────────► copyparty :3923   (X-Auth-Request-* headers)
+              ├─ /f  → signin(errors 401 → /oauth2/sign_in)
+              │        forwardAuth ──► copyparty-auth (oauth2-proxy) ──► Authelia
+              │        ──────────────► copyparty :3923  (X-Auth-Request-* headers)
+              ├─ /oauth2 → copyparty-auth (the auth flow itself)
+              └─ /  (everything else) ─► copyparty :3923  (no headers, ever)
 ```
 
-forwardAuth (rather than oauth2-proxy's reverse-proxy `upstreams` mode, which is
-what the syncthing instance uses) keeps request **bodies** off the proxy — only
-the small auth subrequest goes there. That matters for multi-GB uploads.
+`forwardAuth`, rather than oauth2-proxy's reverse-proxy `upstreams` mode,
+keeps request **bodies** off the proxy — only the small auth subrequest goes
+there. Makes a difference with large uploads.
+
+Why `/` isn't gated: copyparty's own JS treats the site root as an API surface
+(`?ls`, `?setck`, ...) regardless of which volume the user is actually
+browsing. Gating root meant every one of those calls hit a cross-origin
+redirect into Authelia that the browser refused to follow (CORS), leaving the
+UI spinning forever. copyparty.conf's `[/]` volume has no ACL entries at all,
+so an unauthenticated request that lands here — which, since headers never
+arrive, is *every* request that lands here — gets a same-origin "access
+denied" instead. The only sanctioned way for an anonymous visitor to read a
+file is a `/share` link.
 
 ### Groups
 
@@ -42,12 +56,15 @@ released by Authelia in the `groups` claim, enforced twice — by oauth2-proxy's
 `allowed_groups` (can you get in at all) and by copyparty's per-volume ACLs (what
 can you do):
 
-| Group | `/` (`/w/files`) | `/pub` (`/w/pub`) |
+| Group | `/f` (`/w`) | `/` |
 | --- | --- | --- |
-| _(anonymous)_ | — | `r` |
-| `copyparty-users` | `rwmd.` | `rwmd.` |
-| `copyparty-admins` | `A` (= `rwmda.`) | `A` |
-| `full-admin` | `A` | `A` |
+| _(anonymous)_ | — | — |
+| `copyparty-users` | `rwmd.` | — |
+| `copyparty-admins` | `A` (= `rwmda.`) | — |
+| `full-admin` | `A` | — |
+
+`/` is unreachable by every group, including admins — see "Why `/` isn't
+gated" above.
 
 `A` adds admin: uploader IPs, upload timestamps, and the control panel's
 `[reload cfg]` button (which re-reads volumes without a restart; `[global]`
@@ -72,23 +89,24 @@ ConfigMap, buying nothing over these):
 copyparty silently ignores the identity headers and **every user becomes
 anonymous**. The symptom looks like "SSO broke", not like a misconfigured CIDR.
 
-### Public (unauthenticated) paths
+### Protected paths
 
-Everything on the host requires a session except the prefixes in
-`.Values.publicPaths`. This is defence-in-depth only — copyparty applies its own
-ACLs to those paths too, so a bypassed prefix still can't read a protected
-volume (upstream's README warns about exactly this).
+Nothing on the host requires a session except the prefixes in
+`.Values.protectedPaths` (currently just `/f`) — the inverse of the old model,
+where everything was gated except an allowlist. This is defence-in-depth only
+in the sense that copyparty applies its own ACLs regardless: no volume has an
+`r: *` entry anymore, so a request that reaches copyparty without identity
+headers — which includes every request outside `/f` — can't read anything
+except through a `/share` link (upstream's README warns about exactly this
+kind of bypassed-prefix assumption, which is why the ACLs are the real gate,
+not the Ingress split).
 
-| Prefix | Why |
-| --- | --- |
-| `/oauth2` | the sign-in flow itself (routed to oauth2-proxy) |
-| `/share` | `--shr` share links; the share's own password + expiry is the gate |
-| `/pub` | the volume with `r: *` |
-| `/.cpr` | copyparty's static CSS/JS — share pages are unusable without it |
-| `/favicon.ico`, `/robots.txt` | browser / crawler boilerplate |
+A volume added later and forgotten from `protectedPaths` is exposed by
+default, not protected — keep the list explicit, and keep the copyparty ACL as
+the backstop.
 
-Traefik ranks routers by rule specificity, so these beat the catch-all `/`
-router without any explicit priority.
+Traefik ranks routers by rule specificity, so the `/f` and `/oauth2` routers
+beat the catch-all `/` router without any explicit priority.
 
 ## HEIC / HEIF thumbnails — not supported (deferred)
 

@@ -2,9 +2,9 @@
 # Static PV backed by /storage/nas/backups/copyparty/data on the borg NAS via
 # mTLS-protected NFS. The CSI node plugin mounts this at the node level (node IP
 # in 10.69.80.0/25), satisfying the xprtsec=mtls requirement on the server-side
-# export. The directory tree (data/, data/files/, data/pub/, owned 3923:3923) is
-# pre-created by the nfs-mtls module's tmpfiles rules. Only user data lives
-# here; the index/thumbnail cache is on Longhorn.
+# export. `data/` itself (owned 3923:3923) is pre-created by the nfs-mtls
+# module's tmpfiles rules and mounted directly as the `[/f]` volume.
+# Only user data lives here; the index/thumbnail cache is on Longhorn.
 apiVersion: v1
 kind: PersistentVolume
 metadata:

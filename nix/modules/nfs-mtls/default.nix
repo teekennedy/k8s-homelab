@@ -102,16 +102,13 @@ in {
     # (syncthing's DB, copyparty's index/thumbnail cache) is on Longhorn instead.
     #
     #   syncthing  8384:8384  synced folder trees
-    #   copyparty  3923:3923  files/ = the private root volume,
-    #                         pub/   = the world-readable volume
+    #   copyparty  3923:3923  the private root volume
     systemd.tmpfiles.rules = lib.mkIf cfg.serverMode [
       "d /storage/nas/k8s 0755 root root -"
       "d /storage/nas/backups/syncthing 0755 8384 8384 -"
       "d /storage/nas/backups/syncthing/data 0755 8384 8384 -"
       "d /storage/nas/backups/copyparty 0755 3923 3923 -"
       "d /storage/nas/backups/copyparty/data 0755 3923 3923 -"
-      "d /storage/nas/backups/copyparty/data/files 0755 3923 3923 -"
-      "d /storage/nas/backups/copyparty/data/pub 0755 3923 3923 -"
     ];
   };
 }

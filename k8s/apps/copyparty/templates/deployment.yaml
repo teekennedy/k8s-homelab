@@ -57,9 +57,9 @@ spec:
             - name: http
               containerPort: 3923
               protocol: TCP
-          # copyparty answers every HTTP path with the ACLs applied, so an
-          # unauthenticated GET / is a 401 by design. TCP probes avoid asserting
-          # anything about the auth config.
+          # copyparty answers every HTTP path with its ACLs applied, and `/` is
+          # deliberately unreachable by anyone (see copyparty.conf). TCP probes
+          # avoid asserting anything about the auth config.
           livenessProbe:
             tcpSocket:
               port: http
@@ -85,7 +85,7 @@ spec:
             - name: config
               mountPath: /cfg
               readOnly: true
-            # User data (the `/` and `/pub` volumes) on NFS.
+            # User data (the `/f` volume) on NFS.
             - name: data
               mountPath: /w
             # Thumbnails, up2k.db, shares.db, idp.db, config dir — Longhorn SSD.
@@ -94,6 +94,12 @@ spec:
             # Writable scratch for the read-only root filesystem.
             - name: tmp
               mountPath: /tmp
+            # Backs the `[/]` volume in copyparty.conf. Dedicated and untouched
+            # by anything else, so it's guaranteed empty even during the -e2dsa
+            # boot scan — /tmp itself isn't (copyparty's own scratch writes could
+            # land there before the scan finishes and get indexed as garbage).
+            - name: void
+              mountPath: /void
       volumes:
         - name: config
           configMap:
@@ -104,6 +110,8 @@ spec:
         - name: state
           persistentVolumeClaim:
             claimName: {{ include "copyparty.fullname" . }}-state
+        - name: void
+          emptyDir: {}
         - name: tmp
           emptyDir: {}
       {{- with .Values.nodeSelector }}

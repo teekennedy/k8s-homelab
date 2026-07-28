@@ -1,13 +1,16 @@
 {{- $fullName := include "copyparty.fullname" . -}}
 {{- $ns := .Release.Namespace -}}
 ---
-# Default route: EVERY path on files.msng.to requires an Authelia session before
-# Traefik will forward it. The middleware order matters — `signin` (errors) must
-# wrap `forwardauth` so it can turn its 401 into a redirect to the login flow.
+# Catch-all route: every path on files.msng.to is reachable WITHOUT an Authelia
+# session by default. This is the inverse of the old model (deny-by-default at
+# the Traefik layer) — see the long comment on .Values.protectedPaths for why,
+# and copyparty.conf's `[/]` volume (no ACL entries at all) for why this is
+# still fail-closed in practice: an unauthenticated request that lands here
+# cannot read anything unless it also carries a valid /share link.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ $fullName }}
+  name: {{ $fullName }}-public
   namespace: {{ $ns }}
   labels:
     {{- include "copyparty.labels" . | nindent 4 }}
@@ -15,8 +18,6 @@ metadata:
     # Public entrypoint; also the annotation external-dns filters on to put this
     # record in the public zone.
     traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.entrypoint }}
-    traefik.ingress.kubernetes.io/router.middlewares: >-
-      {{ $ns }}-{{ $fullName }}-signin@kubernetescrd,{{ $ns }}-{{ $fullName }}-forwardauth@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:
@@ -35,17 +36,13 @@ spec:
     - hosts:
         - {{ .Values.host }}
 ---
-# Unauthenticated routes. Traefik ranks routers by rule specificity, so these
-# longer PathPrefix rules win over the catch-all `/` router above.
-#
-# /oauth2 goes to the proxy itself (sign_in / start / callback / sign_out);
-# everything else goes to copyparty, which applies its own ACLs — an anonymous
-# request to /pub gets the `r: *` volume and nothing more, and /share only
-# resolves links whose password and expiry check out.
+# /oauth2 goes to the proxy itself (sign_in / start / callback / sign_out), not
+# to copyparty. It doesn't need the forwardAuth/signin middlewares below — it
+# IS the auth flow.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ $fullName }}-public
+  name: {{ $fullName }}-oauth2
   namespace: {{ $ns }}
   labels:
     {{- include "copyparty.labels" . | nindent 4 }}
@@ -57,20 +54,48 @@ spec:
     - host: {{ .Values.host }}
       http:
         paths:
-          {{- range .Values.publicPaths }}
+          - path: /oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: copyparty-auth
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - {{ .Values.host }}
+---
+# Protected routes (.Values.protectedPaths). Traefik ranks routers by rule
+# specificity, so these longer PathPrefix rules win over the catch-all `/`
+# router above without needing an explicit priority.
+#
+# The middleware order matters — `signin` (errors) must wrap `forwardauth` so
+# it can turn its 401 into a redirect to the login flow.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "copyparty.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.entrypoint }}
+    traefik.ingress.kubernetes.io/router.middlewares: >-
+      {{ $ns }}-{{ $fullName }}-signin@kubernetescrd,{{ $ns }}-{{ $fullName }}-forwardauth@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ .Values.host }}
+      http:
+        paths:
+          {{- range .Values.protectedPaths }}
           - path: {{ . }}
             pathType: Prefix
             backend:
               service:
-                {{- if eq . "/oauth2" }}
-                name: copyparty-auth
-                port:
-                  number: 80
-                {{- else }}
                 name: {{ $fullName }}
                 port:
                   name: http
-                {{- end }}
           {{- end }}
   tls:
     - hosts:
