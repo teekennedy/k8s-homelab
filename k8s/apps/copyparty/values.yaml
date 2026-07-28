@@ -4,10 +4,10 @@
 # device-to-device sync). It is PUBLIC — reachable from the internet on the
 # wspublic Traefik entrypoint — so every default here is deny-first: no
 # copyparty-local accounts exist, identity comes exclusively from Authelia via
-# the dedicated oauth2-proxy below, and there is no public volume at all —
-# anonymous visitors can only ever reach a file through a `/share` link. The
-# real volume (`protectedPaths` below) requires a session; everything else,
-# including `/`, is reachable but reads back empty (see copyparty.conf).
+# the dedicated oauth2-proxy below, and there is no public volume at all.
+# Every path on `host` requires a valid Authelia session except the explicit
+# exceptions in `unauthenticatedPaths` below — anonymous visitors can only
+# ever reach a file through a `/share` link.
 
 image:
   # copyparty/iv = Pillow + FFmpeg + libvips. Widest thumbnail/media-tag
@@ -59,23 +59,28 @@ host: files.msng.to
 # this record belongs in the PUBLIC zone.
 entrypoint: wspublic
 
-# URL prefixes that DO require a valid Authelia session before Traefik will
-# forward the request to copyparty. Everything else on `host` is reachable
-# without the SSO gate — including `/`, which is intentional: copyparty's own
-# JS treats the site root as an API surface (?ls, ?setck, ...) no matter which
-# volume the user is actually browsing, and gating root meant every one of
-# those calls hit a cross-origin redirect into Authelia that the browser
-# refused to follow, leaving the UI spinning forever. The `[/]` volume in
-# copyparty.conf has no ACL entries at all, so this is fail-open at the
-# Traefik layer but still fail-closed at the copyparty layer: a request that
-# reaches copyparty unauthenticated (root, or any other ungated prefix) still
-# cannot read anything, since nothing is `r: *` anymore. Share links are the
-# only sanctioned path to a file for an anonymous visitor.
+# URL prefixes served WITHOUT the SSO gate. Everything else on `host`,
+# including `/`, requires a valid Authelia session before Traefik will forward
+# the request to copyparty.
 #
-# A volume added here later and forgotten from this list is exposed by
-# default. Copyparty's own ACLs are the real backstop.
-protectedPaths:
-  - /f
+# This is defence-in-depth only: copyparty independently enforces its own ACLs
+# on these paths, so a bypassed prefix still cannot read a protected volume.
+#   /share       copyparty's `--shr` share-link folder; shares carry their own
+#                password/expiry, which is the whole point of the feature
+#   /.cpr        copyparty's static assets (CSS/JS); share pages are unusable
+#                without them
+#   /favicon.ico, /robots.txt  browser/crawler boilerplate
+#
+# copyparty's own JS also XHRs the site root directly for a couple of calls
+# that anonymous share visitors need (`/?setck=js=y` while hydrating a share
+# page), which Ingress can't match on since it only looks at the path — those
+# get their own IngressRoute (ingressroute-setck.yaml) instead of an entry
+# here.
+unauthenticatedPaths:
+  - /share
+  - /.cpr
+  - /favicon.ico
+  - /robots.txt
 
 # Namespace Traefik runs in; referenced by the NetworkPolicy so only Traefik can
 # reach copyparty's port directly (nothing in-cluster can skip the SSO gate).

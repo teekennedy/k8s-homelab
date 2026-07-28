@@ -14,52 +14,45 @@ same NAS.
 | --- | --- |
 | copyparty | Deployment, 1 replica, `Recreate` (single writer for the index + dedup symlinks) |
 | Config | ConfigMap → `/cfg/copyparty.conf` (see `files/copyparty.conf`) |
-| User data | static NFS PV over mTLS → `/w`, mounted as the `[/f]` volume |
+| User data | static NFS PV over mTLS → `/w`, mounted as the `[/]` volume |
 | Index / thumbs / shares.db / idp.db | Longhorn RWO PVC → `/state` |
 | SSO | dedicated `oauth2-proxy` subchart + two Traefik `Middleware`s |
-| Exposure | three Ingresses on the `wspublic` entrypoint |
+| Exposure | three Ingresses + one query-string IngressRoute on the `wspublic` entrypoint |
 
 ## Auth
 
 copyparty has **no local accounts**. Identity arrives as headers, asserted by a
-dedicated oauth2-proxy running as a Traefik `forwardAuth` middleware — but only
-for paths in `.Values.protectedPaths` (currently just `/f`) plus the
-**control-panel query strings**: `/?h`, `/?shares`, `/?ru`, `/?stack`,
-`/?reload=cfg` (see below). Everything else on `/` never runs forwardAuth at
-all:
+dedicated oauth2-proxy running as a Traefik `forwardAuth` middleware in front
+of every path on `host` except the exceptions in `.Values.unauthenticatedPaths`
+(`/share`, `/.cpr`, `/favicon.ico`, `/robots.txt`) and one query-string route
+that an Ingress can't express (`/?setck=js=y`, see below):
 
 ```
 browser ──► Traefik (wspublic)
-              ├─ /f              → signin(errors 401 → /oauth2/sign_in)
-              │                    forwardAuth ──► copyparty-auth (oauth2-proxy) ──► Authelia
-              │                    ──────────────► copyparty :3923  (X-Auth-Request-* headers)
-              ├─ /?h, /?shares,
-              │  /?ru, /?stack,
-              │  /?reload=cfg     → same as /f (IngressRoute, see below)
+              ├─ /share, /.cpr,
+              │  /favicon.ico,
+              │  /robots.txt      → copyparty :3923  (no headers, ever)
+              ├─ /?setck=js=y     → same as above (IngressRoute, see below)
               ├─ /oauth2          → copyparty-auth (the auth flow itself)
-              └─ /  (everything else) ─► copyparty :3923  (no headers, ever)
+              └─ /  (everything
+                 else)            → signin(errors 401 → /oauth2/sign_in)
+                                     forwardAuth ──► copyparty-auth (oauth2-proxy) ──► Authelia
+                                     ──────────────► copyparty :3923  (X-Auth-Request-* headers)
 ```
 
 `forwardAuth`, rather than oauth2-proxy's reverse-proxy `upstreams` mode,
 keeps request **bodies** off the proxy — only the small auth subrequest goes
 there. Makes a difference with large uploads.
 
-Why `/` isn't gated: copyparty's own JS treats the site root as an API surface
-(`?ls`, `?setck`, ...) regardless of which volume the user is actually
-browsing. Gating root meant every one of those calls hit a cross-origin
-redirect into Authelia that the browser refused to follow (CORS), leaving the
-UI spinning forever. For anonymous and logged-in visitors alike, a request
-that lands on `/` without headers just gets a same-origin "access denied"
-instead. The only sanctioned way for an anonymous visitor to read a file is a
-`/share` link.
-
-The control-panel query strings above are the deliberate exception: unlike
-`?ls`/`setck`, every one of them is a plain `<a href>` on the control panel
-page (splash.html) — a full-page navigation, which follows a cross-origin
-redirect fine — so `ingressroute-controlpanel.yaml` gates them the same as
-`/f`, and `[/]`'s ACLs grant the same groups the same rights as `[/f]` so
-those pages actually render once identified. On every other path those ACLs
-are inert, since headers never arrive there.
+The `/?setck=js=y` exception exists because copyparty's own JS XHRs the site
+root directly while hydrating a share page (`util.js`'s `setck()` call, see
+`ingressroute-setck.yaml`), and that request comes from an anonymous share
+visitor with no session — routing it through forwardAuth would 302 into
+Authelia, which the browser refuses to follow cross-origin (CORS), leaving the
+share page's listing stuck unhydrated. An Ingress can't match on query
+strings, hence the dedicated IngressRoute pinned to that exact value. The
+only sanctioned way for an anonymous visitor to read a file is a `/share`
+link.
 
 ### Groups
 
@@ -68,12 +61,12 @@ released by Authelia in the `groups` claim, enforced twice — by oauth2-proxy's
 `allowed_groups` (can you get in at all) and by copyparty's per-volume ACLs (what
 can you do):
 
-| Group | `/f` (`/w`) | `/` (`/void`, control-panel query strings only) |
-| --- | --- | --- |
-| _(anonymous)_ | — | — |
-| `copyparty-users` | `rwmd.` | `rwmd.` |
-| `copyparty-admins` | `A` (= `rwmda.`) | `A` |
-| `full-admin` | `A` | `A` |
+| Group | `/` (`/w`) |
+| --- | --- |
+| _(anonymous)_ | — |
+| `copyparty-users` | `rwmd.` |
+| `copyparty-admins` | `A` (= `rwmda.`) |
+| `full-admin` | `A` |
 
 `A` adds admin: uploader IPs, upload timestamps, and the control panel's
 `[reload cfg]` button (which re-reads volumes without a restart; `[global]`
@@ -98,30 +91,26 @@ ConfigMap, buying nothing over these):
 copyparty silently ignores the identity headers and **every user becomes
 anonymous**. The symptom looks like "SSO broke", not like a misconfigured CIDR.
 
-### Protected paths
+### Unauthenticated paths
 
-Nothing on the host requires a session except the prefixes in
-`.Values.protectedPaths` (currently just `/f`), plus the control-panel query
-strings (`/?h`, `/?shares`, `/?ru`, `/?stack`, `/?reload=cfg` — gated by their
-own `IngressRoute` since a plain Ingress can't match query strings) — the
-inverse of the old model, where everything was gated except an allowlist.
-This is defence-in-depth only in the sense that copyparty applies its own
-ACLs regardless: no volume has an `r: *` entry anymore, so a request that
-reaches copyparty without identity headers — which includes every request
-outside `/f` and the control-panel query strings — can't read anything except
-through a `/share` link (upstream's README warns about exactly this kind of
+Everything on the host requires a session except the prefixes in
+`.Values.unauthenticatedPaths` (`/share`, `/.cpr`, `/favicon.ico`,
+`/robots.txt`) plus `/?setck=js=y` (gated out via its own `IngressRoute` since
+a plain Ingress can't match query strings). This is defence-in-depth only in
+the sense that copyparty applies its own ACLs regardless: no volume has an
+`r: *` entry, so a request that reaches copyparty without identity headers —
+i.e. anything on `unauthenticatedPaths` — can't read anything except through a
+`/share` link (upstream's README warns about exactly this kind of
 bypassed-prefix assumption, which is why the ACLs are the real gate, not the
 Ingress split).
 
-A volume added later and forgotten from `protectedPaths` is exposed by
-default, not protected — keep the list explicit, and keep the copyparty ACL as
-the backstop.
+A prefix added here later and forgotten is a bypass of the SSO gate — keep the
+list explicit, and keep the copyparty ACL as the backstop.
 
-Traefik ranks routers by rule specificity, so the `/f`, `/oauth2` and
-control-panel routers beat the catch-all `/` router without any explicit
-priority (the control-panel `IngressRoute` sets one anyway, since it's
-competing with an Ingress-derived router rather than another IngressRoute
-rule).
+Traefik ranks routers by rule specificity, so the `/oauth2` and unauthenticated
+routers beat the catch-all `/` router without any explicit priority (the
+`setck` `IngressRoute` sets one anyway, since it's competing with an
+Ingress-derived router rather than another IngressRoute rule).
 
 ## HEIC / HEIF thumbnails — not supported (deferred)
 

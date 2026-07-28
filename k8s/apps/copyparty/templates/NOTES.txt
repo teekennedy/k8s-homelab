@@ -1,6 +1,6 @@
 copyparty is deployed.
 
-Web UI:  https://{{ .Values.host }}/f/
+Web UI:  https://{{ .Values.host }}/
 
 Access is gated by a dedicated oauth2-proxy (Authelia SSO) running in this
 namespace. Only members of {{ .Values.groups.users }} / {{ .Values.groups.admins }} / {{ .Values.groups.superAdmins }} may sign in.
@@ -9,15 +9,14 @@ namespace. Only members of {{ .Values.groups.users }} / {{ .Values.groups.admins
   {{ .Values.groups.admins }}  the above plus admin (uploader IPs, upload times,
                           config reload from the control panel)
 
-Protected URL prefixes (everything else, including /, is reachable but reads
-back empty — copyparty applies its own ACLs on top either way):
-{{- range .Values.protectedPaths }}
+Unauthenticated URL prefixes (everything else requires a session):
+{{- range .Values.unauthenticatedPaths }}
   {{ . }}
 {{- end }}
 
 There is no public volume. The only way for an anonymous visitor to reach a
 file is a /share link, created from the UI's bottom-right [share] button.
 
-User data:      NFS {{ .Values.persistence.data.server }}:{{ .Values.persistence.data.path }} (mounted at /w, exposed as /f)
+User data:      NFS {{ .Values.persistence.data.server }}:{{ .Values.persistence.data.path }} (mounted at /w)
 Index + cache:  Longhorn PVC {{ include "copyparty.fullname" . }}-state (not backed up — rebuildable)
 Config:         ConfigMap {{ include "copyparty.fullname" . }}-config; [global] changes roll the pod.
