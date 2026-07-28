@@ -1,0 +1,15 @@
+---
+# Mounted read-only at /cfg. The image's built-in /z/initcfg ends with `% /cfg`,
+# which includes every *.conf in that directory — dot-prefixed entries are
+# skipped, so Kubernetes' ..data/..2026_* symlink farm is ignored and only
+# copyparty.conf is read.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "copyparty.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "copyparty.labels" . | nindent 4 }}
+data:
+  copyparty.conf: |
+    {{- include "copyparty.config" . | nindent 4 }}

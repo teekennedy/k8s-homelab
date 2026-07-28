@@ -194,6 +194,10 @@ traefik:
       http3:
         enabled: true
         advertisedPort: 443
+      # Disable read timeout so large uploads don't die mid-transfer
+      transport:
+        respondingTimeouts:
+          readTimeout: "0s"
     terrariapublic:
       port: 7777
       expose:

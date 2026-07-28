@@ -1,0 +1,24 @@
+---
+# Longhorn (SSD) PVC for everything copyparty needs fast, local and SQLite-safe:
+# the up2k index, thumbnails/transcode cache, shares.db, idp.db and copyparty's
+# own config dir (XDG_CONFIG_HOME). Kept off NFS because SQLite over NFS risks
+# lock/corruption and thumbnail serving wants SSD latency.
+#
+# Intentionally NOT enrolled in the recurring backup-to-NAS job: every byte here
+# is rebuildable (re-index + re-thumbnail) from the NFS data volume. The one
+# thing that isn't is shares.db — share links would have to be re-created after
+# a restore. That's an accepted trade for not backing up a thumbnail cache.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "copyparty.fullname" . }}-state
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "copyparty.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.persistence.state.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.state.size }}

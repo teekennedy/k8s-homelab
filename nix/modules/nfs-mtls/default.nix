@@ -95,14 +95,23 @@ in {
     '';
 
     # Pre-create the root directory used by the CSI driver for per-PV subdirectories,
-    # plus the syncthing synced-data dir owned by syncthing's numeric UID/GID (8384).
-    # NFSv4 authorises by numeric ID, and the syncthing pod runs as 8384:8384, so the
-    # backing dir must be owned by 8384 for the pod to read/write it. Only the synced
-    # data lives on NFS; syncthing's state DB is on a Longhorn SSD volume instead.
+    # plus one named data dir per app that mounts a static NFS PV, owned by that
+    # app's numeric UID/GID. NFSv4 authorises by numeric ID and these pods run as
+    # non-root, so the backing dir must already be owned by the pod's UID for it
+    # to read/write. In both cases only bulk data lives on NFS; the SQLite state
+    # (syncthing's DB, copyparty's index/thumbnail cache) is on Longhorn instead.
+    #
+    #   syncthing  8384:8384  synced folder trees
+    #   copyparty  3923:3923  files/ = the private root volume,
+    #                         pub/   = the world-readable volume
     systemd.tmpfiles.rules = lib.mkIf cfg.serverMode [
       "d /storage/nas/k8s 0755 root root -"
       "d /storage/nas/backups/syncthing 0755 8384 8384 -"
       "d /storage/nas/backups/syncthing/data 0755 8384 8384 -"
+      "d /storage/nas/backups/copyparty 0755 3923 3923 -"
+      "d /storage/nas/backups/copyparty/data 0755 3923 3923 -"
+      "d /storage/nas/backups/copyparty/data/files 0755 3923 3923 -"
+      "d /storage/nas/backups/copyparty/data/pub 0755 3923 3923 -"
     ];
   };
 }

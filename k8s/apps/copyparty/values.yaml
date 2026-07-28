@@ -1,0 +1,199 @@
+# Default values for copyparty.
+#
+# copyparty is the web-UI half of the Dropbox replacement (syncthing handles
+# device-to-device sync). It is PUBLIC — reachable from the internet on the
+# wspublic Traefik entrypoint — so every default here is deny-first: no
+# copyparty-local accounts exist, identity comes exclusively from Authelia via
+# the dedicated oauth2-proxy below, and anonymous users can only reach the
+# handful of URL prefixes listed in `publicPaths`.
+
+image:
+  # copyparty/iv = Pillow + FFmpeg + libvips. Widest thumbnail/media-tag
+  # coverage of the official images. NOTE: none of the official images can
+  # thumbnail HEIC/HEIF or HEVC — upstream strips those codecs for patent
+  # reasons (scripts/docker/base/build-no265.sh). See README.md.
+  repository: copyparty/iv
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+nameOverride: ""
+fullnameOverride: ""
+
+# UID/GID copyparty runs as. 3923 mirrors copyparty's default port so it's easy
+# to remember which app owns it, and it doesn't collide with the existing
+# homelab users (1000/1200/2000/8384). Must match the ownership of the NFS data
+# directory pre-created by the nfs-mtls module's tmpfiles rules; the Longhorn
+# state volume is chowned to it via fsGroup.
+puid: 3923
+pgid: 3923
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 3923
+  runAsGroup: 3923
+  fsGroup: 3923
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 3923
+
+# --- Exposure ---------------------------------------------------------------
+# Public hostname. TLS is the *.msng.to wildcard cert that Traefik serves as its
+# default certificate (tlsStore.default), so the Ingress lists hosts only.
+host: files.msng.to
+
+# Traefik entrypoint. Also the annotation external-dns filters on to decide that
+# this record belongs in the PUBLIC zone.
+entrypoint: wspublic
+
+# URL prefixes served WITHOUT the SSO gate. Everything else on `host` requires a
+# valid Authelia session before Traefik will forward it to copyparty.
+#
+# This is defence-in-depth only: copyparty independently enforces its own ACLs on
+# these paths, so a bypassed prefix still cannot read a protected volume (the
+# copyparty README calls this out explicitly).
+#   /oauth2      the sign-in flow itself (served by the oauth2-proxy below)
+#   /share       copyparty's `--shr` share-link folder; shares carry their own
+#                password/expiry, which is the whole point of the feature
+#   /pub         the one volume with `r: *` — the "specifically configured for
+#                public access" directory
+#   /.cpr        copyparty's static assets (CSS/JS); share pages are unusable
+#                without them
+#   /favicon.ico, /robots.txt  browser/crawler boilerplate
+publicPaths:
+  - /oauth2
+  - /share
+  - /pub
+  - /.cpr
+  - /favicon.ico
+  - /robots.txt
+
+# Namespace Traefik runs in; referenced by the NetworkPolicy so only Traefik can
+# reach copyparty's port directly (nothing in-cluster can skip the SSO gate).
+traefikNamespace: kube-system
+
+# Pod CIDR. copyparty only honours the real-ip header AND the IdP identity
+# headers when the connection originates inside this range (--xff-src), so a
+# wrong value here silently makes every request anonymous.
+podCidr: 10.42.0.0/16
+
+# --- Authorization ----------------------------------------------------------
+# lldap groups (bootstrapped in k8s/platform/auth-system, released by Authelia in
+# the `groups` claim, forwarded by oauth2-proxy as X-Auth-Request-Groups).
+groups:
+  # read/write/move/delete + dotfiles on the main volume.
+  users: copyparty-users
+  # everything above plus admin: uploader IPs, upload times, config reload.
+  admins: copyparty-admins
+  # Cluster-wide break-glass group, admitted everywhere else in the homelab.
+  superAdmins: full-admin
+
+# --- Persistence -----------------------------------------------------------
+persistence:
+  # Thumbnails, the up2k index, the share/IdP databases and copyparty's own
+  # config dir, on a Longhorn SSD PVC. All of it is SQLite, which must not live
+  # on NFS, and thumbnail reads want to be fast. Deliberately NOT enrolled in
+  # the recurring backup job: every byte here is a rebuildable cache.
+  state:
+    storageClass: longhorn
+    size: 20Gi
+  # User data on the mTLS NFS export (human-findable named dir).
+  data:
+    server: borg-2.msng.to
+    # NFSv4 path relative to fsid=0 root — resolves to
+    # /storage/nas/backups/copyparty/data (pre-created + owned 3923 by tmpfiles,
+    # along with its files/ and pub/ subdirectories).
+    path: /backups/copyparty/data
+    storage: 500Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    # Thumbnailing (FFmpeg/libvips) and up2k hashing are the CPU-hungry bits.
+    cpu: "4"
+    memory: 2Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+podLabels: {}
+
+# --- SSO front door ---------------------------------------------------------
+# A dedicated oauth2-proxy instance, used purely as a Traefik forwardAuth
+# middleware (upstream = static://202; the file bodies never pass through it,
+# which matters for multi-GB uploads).
+#
+# Neither shared instance works here:
+#   * platform/oauth2-proxy bypasses auth for 10.69.0.0/16 (trusted_ips), so LAN
+#     clients would arrive with no identity headers and copyparty would treat
+#     every one of them as anonymous — i.e. locked out of their own files.
+#   * platform/oauth2-proxy-internal is hard-wired to syncthing.msng.to and
+#     admits only syncthing-admins.
+oauth2-proxy:
+  # Pin the Service name so the Ingress/Middleware backendRefs are stable.
+  fullnameOverride: copyparty-auth
+  config:
+    existingSecret: copyparty-oauth2-proxy-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://files.msng.to/oauth2/callback"
+      # Host-scoped cookie with a distinct name so it never collides with the
+      # public instance's Domain=msng.to cookie on this subdomain.
+      cookie_domains = ["files.msng.to"]
+      cookie_name = "_oauth2_proxy_copyparty"
+      cookie_expire = "168h"
+      cookie_refresh = "1h"
+      cookie_secure = true
+      cookie_httponly = true
+      cookie_samesite = "lax"
+      whitelist_domains = ["files.msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      set_xauthrequest = true
+      code_challenge_method = "S256"
+      # groups scope so allowed_groups can be enforced and so copyparty gets
+      # X-Auth-Request-Groups to map onto its @copyparty-* volume ACLs.
+      scope = "openid profile email groups"
+      # NO trusted_ips: this instance IS the identity source, so a bypass would
+      # mean "authenticated as nobody". LAN clients authenticate like everyone.
+      real_client_ip_header = "X-Real-Ip"
+      skip_provider_button = true
+      # Membership check. copyparty then decides what each group may do.
+      allowed_groups = ["copyparty-users", "copyparty-admins", "full-admin"]
+      # forwardAuth only — Traefik routes the actual traffic to copyparty, so
+      # this instance never proxies a request body.
+      upstreams = ["static://202"]
+      trusted_proxy_ips = ["10.42.0.0/16"]
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  # Exposed through this chart's Ingress (the /oauth2 prefix on files.msng.to),
+  # not the subchart's own ingress.
+  ingress:
+    enabled: false

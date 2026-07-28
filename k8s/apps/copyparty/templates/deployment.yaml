@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "copyparty.fullname" . }}
+  labels:
+    {{- include "copyparty.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # Single writer: the up2k index and the dedup symlink bookkeeping must not be
+  # opened by two instances at once (the state PVC is RWO Longhorn anyway).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "copyparty.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # [global] options only apply at startup, so roll the pod when they change.
+        checksum/config: {{ include "copyparty.config" . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "copyparty.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # No command/args: the image entrypoint already runs
+          # `copyparty -c /z/initcfg`, and initcfg's `% /cfg` pulls in the
+          # ConfigMap mounted below.
+          env:
+            - name: TZ
+              value: America/Denver
+            # The image defaults this to /cfg, which is our read-only ConfigMap
+            # mount. Point it at the PVC so copyparty can write the bits it
+            # keeps in its config dir.
+            - name: XDG_CONFIG_HOME
+              value: /state
+            - name: HOME
+              value: /state
+          ports:
+            - name: http
+              containerPort: 3923
+              protocol: TCP
+          # copyparty answers every HTTP path with the ACLs applied, so an
+          # unauthenticated GET / is a 401 by design. TCP probes avoid asserting
+          # anything about the auth config.
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          # The startup volume scan (-e2dsa) over NFS can take a while on a cold
+          # index; don't let the liveness probe kill the pod mid-scan.
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /cfg
+              readOnly: true
+            # User data (the `/` and `/pub` volumes) on NFS.
+            - name: data
+              mountPath: /w
+            # Thumbnails, up2k.db, shares.db, idp.db, config dir — Longhorn SSD.
+            - name: state
+              mountPath: /state
+            # Writable scratch for the read-only root filesystem.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "copyparty.fullname" . }}-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "copyparty.fullname" . }}-data
+        - name: state
+          persistentVolumeClaim:
+            claimName: {{ include "copyparty.fullname" . }}-state
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

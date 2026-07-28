@@ -1,0 +1,77 @@
+{{- $fullName := include "copyparty.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+---
+# Default route: EVERY path on files.msng.to requires an Authelia session before
+# Traefik will forward it. The middleware order matters — `signin` (errors) must
+# wrap `forwardauth` so it can turn its 401 into a redirect to the login flow.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "copyparty.labels" . | nindent 4 }}
+  annotations:
+    # Public entrypoint; also the annotation external-dns filters on to put this
+    # record in the public zone.
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.entrypoint }}
+    traefik.ingress.kubernetes.io/router.middlewares: >-
+      {{ $ns }}-{{ $fullName }}-signin@kubernetescrd,{{ $ns }}-{{ $fullName }}-forwardauth@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ .Values.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  name: http
+  tls:
+    # No secretName: Traefik serves the *.msng.to wildcard as its default cert.
+    - hosts:
+        - {{ .Values.host }}
+---
+# Unauthenticated routes. Traefik ranks routers by rule specificity, so these
+# longer PathPrefix rules win over the catch-all `/` router above.
+#
+# /oauth2 goes to the proxy itself (sign_in / start / callback / sign_out);
+# everything else goes to copyparty, which applies its own ACLs — an anonymous
+# request to /pub gets the `r: *` volume and nothing more, and /share only
+# resolves links whose password and expiry check out.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-public
+  namespace: {{ $ns }}
+  labels:
+    {{- include "copyparty.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.entrypoint }}
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ .Values.host }}
+      http:
+        paths:
+          {{- range .Values.publicPaths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                {{- if eq . "/oauth2" }}
+                name: copyparty-auth
+                port:
+                  number: 80
+                {{- else }}
+                name: {{ $fullName }}
+                port:
+                  name: http
+                {{- end }}
+          {{- end }}
+  tls:
+    - hosts:
+        - {{ .Values.host }}
