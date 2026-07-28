@@ -20,6 +20,31 @@ authelia:
       disableIngressRoute: false
       strategy: wrr
       entryPoints: ["websecure", "wspublic"]
+      tls:
+        # Use Traefik's `default` TLS options, like every other router here.
+        #
+        # The chart otherwise renders a TLSOption of its own and points this
+        # IngressRoute at it. Traefik's snicheck compares the TLS *options name*
+        # of the connection's SNI against the one on the router that matched the
+        # Host header, and answers 421 Misdirected Request when they differ.
+        # Browsers coalesce HTTP/2 connections across hosts that share an IP and
+        # a certificate (all of *.msng.to), so the first hop from any app to the
+        # login portal — files.msng.to -> authelia.msng.to — reused the app's
+        # connection, hit the mismatch and got a 421 that needed a reload to
+        # clear. Reproduce with:
+        #   curl -so /dev/null -w '%{http_code}\n' --http2 \
+        #     -H 'Host: authelia.msng.to' https://files.msng.to/
+        #
+        # So: no per-router TLS options anywhere. If a cipher/version floor is
+        # ever wanted, the only shape that doesn't reintroduce this is a single
+        # TLSOption literally named `default` in Traefik's namespace, which
+        # applies to every router at once. (The list dropped here was the
+        # chart's own default, and included the non-PFS
+        # TLS_RSA_WITH_AES_256_GCM_SHA384 — Traefik's default list is better.)
+        # The chart still renders the TLSOption resource itself (it is gated on
+        # tls.options being set, which neither null nor {} can unset through
+        # Helm's value coalescing). Nothing references it now, so it is inert.
+        disableTLSOptions: true
   configMap:
     theme: auto
     extraConfigs:
