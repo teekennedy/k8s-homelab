@@ -23,15 +23,20 @@ same NAS.
 
 copyparty has **no local accounts**. Identity arrives as headers, asserted by a
 dedicated oauth2-proxy running as a Traefik `forwardAuth` middleware — but only
-for paths in `.Values.protectedPaths` (currently just `/f`). Everything else,
-including `/`, never runs forwardAuth at all:
+for paths in `.Values.protectedPaths` (currently just `/f`) plus the
+**control-panel query strings**: `/?h`, `/?shares`, `/?ru`, `/?stack`,
+`/?reload=cfg` (see below). Everything else on `/` never runs forwardAuth at
+all:
 
 ```
 browser ──► Traefik (wspublic)
-              ├─ /f  → signin(errors 401 → /oauth2/sign_in)
-              │        forwardAuth ──► copyparty-auth (oauth2-proxy) ──► Authelia
-              │        ──────────────► copyparty :3923  (X-Auth-Request-* headers)
-              ├─ /oauth2 → copyparty-auth (the auth flow itself)
+              ├─ /f              → signin(errors 401 → /oauth2/sign_in)
+              │                    forwardAuth ──► copyparty-auth (oauth2-proxy) ──► Authelia
+              │                    ──────────────► copyparty :3923  (X-Auth-Request-* headers)
+              ├─ /?h, /?shares,
+              │  /?ru, /?stack,
+              │  /?reload=cfg     → same as /f (IngressRoute, see below)
+              ├─ /oauth2          → copyparty-auth (the auth flow itself)
               └─ /  (everything else) ─► copyparty :3923  (no headers, ever)
 ```
 
@@ -43,11 +48,18 @@ Why `/` isn't gated: copyparty's own JS treats the site root as an API surface
 (`?ls`, `?setck`, ...) regardless of which volume the user is actually
 browsing. Gating root meant every one of those calls hit a cross-origin
 redirect into Authelia that the browser refused to follow (CORS), leaving the
-UI spinning forever. copyparty.conf's `[/]` volume has no ACL entries at all,
-so an unauthenticated request that lands here — which, since headers never
-arrive, is *every* request that lands here — gets a same-origin "access
-denied" instead. The only sanctioned way for an anonymous visitor to read a
-file is a `/share` link.
+UI spinning forever. For anonymous and logged-in visitors alike, a request
+that lands on `/` without headers just gets a same-origin "access denied"
+instead. The only sanctioned way for an anonymous visitor to read a file is a
+`/share` link.
+
+The control-panel query strings above are the deliberate exception: unlike
+`?ls`/`setck`, every one of them is a plain `<a href>` on the control panel
+page (splash.html) — a full-page navigation, which follows a cross-origin
+redirect fine — so `ingressroute-controlpanel.yaml` gates them the same as
+`/f`, and `[/]`'s ACLs grant the same groups the same rights as `[/f]` so
+those pages actually render once identified. On every other path those ACLs
+are inert, since headers never arrive there.
 
 ### Groups
 
@@ -56,15 +68,12 @@ released by Authelia in the `groups` claim, enforced twice — by oauth2-proxy's
 `allowed_groups` (can you get in at all) and by copyparty's per-volume ACLs (what
 can you do):
 
-| Group | `/f` (`/w`) | `/` |
+| Group | `/f` (`/w`) | `/` (`/void`, control-panel query strings only) |
 | --- | --- | --- |
 | _(anonymous)_ | — | — |
-| `copyparty-users` | `rwmd.` | — |
-| `copyparty-admins` | `A` (= `rwmda.`) | — |
-| `full-admin` | `A` | — |
-
-`/` is unreachable by every group, including admins — see "Why `/` isn't
-gated" above.
+| `copyparty-users` | `rwmd.` | `rwmd.` |
+| `copyparty-admins` | `A` (= `rwmda.`) | `A` |
+| `full-admin` | `A` | `A` |
 
 `A` adds admin: uploader IPs, upload timestamps, and the control panel's
 `[reload cfg]` button (which re-reads volumes without a restart; `[global]`
@@ -92,21 +101,27 @@ anonymous**. The symptom looks like "SSO broke", not like a misconfigured CIDR.
 ### Protected paths
 
 Nothing on the host requires a session except the prefixes in
-`.Values.protectedPaths` (currently just `/f`) — the inverse of the old model,
-where everything was gated except an allowlist. This is defence-in-depth only
-in the sense that copyparty applies its own ACLs regardless: no volume has an
-`r: *` entry anymore, so a request that reaches copyparty without identity
-headers — which includes every request outside `/f` — can't read anything
-except through a `/share` link (upstream's README warns about exactly this
-kind of bypassed-prefix assumption, which is why the ACLs are the real gate,
-not the Ingress split).
+`.Values.protectedPaths` (currently just `/f`), plus the control-panel query
+strings (`/?h`, `/?shares`, `/?ru`, `/?stack`, `/?reload=cfg` — gated by their
+own `IngressRoute` since a plain Ingress can't match query strings) — the
+inverse of the old model, where everything was gated except an allowlist.
+This is defence-in-depth only in the sense that copyparty applies its own
+ACLs regardless: no volume has an `r: *` entry anymore, so a request that
+reaches copyparty without identity headers — which includes every request
+outside `/f` and the control-panel query strings — can't read anything except
+through a `/share` link (upstream's README warns about exactly this kind of
+bypassed-prefix assumption, which is why the ACLs are the real gate, not the
+Ingress split).
 
 A volume added later and forgotten from `protectedPaths` is exposed by
 default, not protected — keep the list explicit, and keep the copyparty ACL as
 the backstop.
 
-Traefik ranks routers by rule specificity, so the `/f` and `/oauth2` routers
-beat the catch-all `/` router without any explicit priority.
+Traefik ranks routers by rule specificity, so the `/f`, `/oauth2` and
+control-panel routers beat the catch-all `/` router without any explicit
+priority (the control-panel `IngressRoute` sets one anyway, since it's
+competing with an Ingress-derived router rather than another IngressRoute
+rule).
 
 ## HEIC / HEIF thumbnails — not supported (deferred)
 

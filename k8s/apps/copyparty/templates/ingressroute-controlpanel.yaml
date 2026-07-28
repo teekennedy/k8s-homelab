@@ -1,0 +1,64 @@
+{{- $fullName := include "copyparty.fullname" . -}}
+{{- $host := .Values.host -}}
+{{- $service := $fullName -}}
+{{- $port := .Values.service.port -}}
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/traefik.io/ingressroute_v1alpha1.json
+#
+# The control panel (splash.html, linked from `/?h`) is a page full of plain
+# `<a href>` admin links, each a bare query string on site root: `?h` itself
+# (browser.html's `#goh` anchor), `?shares` (edit shares), `?ru` (recent
+# uploads), `?stack` (dump stack), `?reload=cfg` (reload cfg).
+#
+# `/` is otherwise ungated (see ingress.yaml + the `[/]` volume comment in
+# copyparty.conf) so JS-initiated API calls don't hit a cross-origin redirect.
+# These links are all full-page navigations, though, not background XHRs — a
+# 302 into Authelia works fine there, unlike the `?ls`/`setck` cases — so
+# gating just these query strings is safe. Without this, any of them would
+# fall through to the public catch-all Ingress with no identity headers, and
+# copyparty's `[/]` volume (which grants `rwmd.`/`A` once headers ARE present,
+# same as `[/f]`) would just render the same read-only anonymous page as
+# everyone else.
+#
+# An Ingress cannot match on query strings, hence the IngressRoute. Any other
+# bare-query-key admin link found on `[/]` in the future belongs in the `list`
+# below; a key=value one (like `?reload=cfg`) needs its own Rule underneath it.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullName }}-controlpanel
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "copyparty.labels" . | nindent 4 }}
+  annotations:
+    # Not functional for an IngressRoute (entryPoints live in the spec) — this is
+    # the annotation the external-dns instances filter on to decide which zone
+    # this name belongs in. Same value as the Ingresses, same record.
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.entrypoint }}
+spec:
+  entryPoints:
+    - {{ .Values.entrypoint }}
+  routes:
+    {{- range list "h" "shares" "ru" "stack" }}
+    - kind: Rule
+      match: Host(`{{ $host }}`) && Path(`/`) && Query(`{{ . }}`)
+      # Explicit priority to take precedence over the public catch-all `/` router.
+      priority: 1000
+      middlewares:
+        - name: {{ $fullName }}-signin
+        - name: {{ $fullName }}-forwardauth
+      services:
+        - name: {{ $service }}
+          port: {{ $port }}
+    {{- end }}
+    # ?reload=cfg carries a value, unlike the bare query keys above.
+    - kind: Rule
+      match: Host(`{{ $host }}`) && Path(`/`) && Query(`reload`, `cfg`)
+      priority: 1000
+      middlewares:
+        - name: {{ $fullName }}-signin
+        - name: {{ $fullName }}-forwardauth
+      services:
+        - name: {{ $service }}
+          port: {{ $port }}
+  tls: {}
