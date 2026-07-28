@@ -21,6 +21,9 @@ spec:
 ---
 # Catches 401s from the forwardAuth middleware and redirects the browser to
 # /oauth2/sign_in?rd=<original-url> so the user lands in the Authelia login flow.
+# statusRewrites is required: the errors middleware serves the error page
+# service's body but keeps the original status code, so without it the browser
+# gets a 401 holding an unfollowed `Found.` link instead of a real redirect.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -34,3 +37,5 @@ spec:
       name: oauth2-proxy
       port: 80
     query: "/oauth2/sign_in?rd={url}"
+    statusRewrites:
+      "401": 302

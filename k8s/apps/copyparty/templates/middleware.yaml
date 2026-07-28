@@ -34,6 +34,11 @@ spec:
 # the Authelia login flow instead of showing a bare error. Must be listed BEFORE
 # the forwardAuth middleware on the Ingress so it wraps (and therefore sees the
 # response of) that middleware.
+#
+# statusRewrites is load-bearing: the errors middleware serves the error page
+# service's *body* but keeps the ORIGINAL status code, so oauth2-proxy's 302 came
+# back to the browser as a 401 carrying a `Found.` link that nothing follows.
+# Rewriting 401 -> 302 makes the Location header actually take effect.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -49,3 +54,5 @@ spec:
       name: copyparty-auth
       port: 80
     query: "/oauth2/sign_in?rd={url}"
+    statusRewrites:
+      "401": 302

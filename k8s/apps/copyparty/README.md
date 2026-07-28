@@ -113,30 +113,3 @@ Then set `image.repository` to the derived image. `--th-dec` already prefers
 
 Unrelated but visible in that same log line: `iv` ships no Mutagen, so media tags
 are read via FFprobe. That's a supported fallback, just slower.
-
-## Bootstrap
-
-1. **Authelia client secret.** `k8s/platform/auth-system/values.yaml` carries a
-   placeholder bcrypt hash for `client_id: copyparty`. After the first sync:
-   ```sh
-   kubectl -n copyparty get secret copyparty-oauth2-proxy-secrets \
-     -o jsonpath='{.data.client-secret}' | base64 -d
-   authelia crypto hash generate bcrypt --password <that-value>
-   ```
-   Commit the new hash. Until then, sign-in fails at the token endpoint.
-4. **Post-deploy verification.** Two things that can't be settled from a
-   `helm template`:
-   * **Router priority.** The unauthenticated Ingress relies on Traefik ranking
-     routers by rule length. Confirm:
-     ```sh
-     curl -so /dev/null -w '%{http_code}\n' https://files.msng.to/oauth2/start   # 302 -> authelia
-     curl -so /dev/null -w '%{http_code}\n' https://files.msng.to/.cpr/ui.css    # 200
-     curl -so /dev/null -w '%{http_code}\n' https://files.msng.to/               # 302 -> authelia
-     ```
-     If `/oauth2/start` returns a copyparty 403 instead, add explicit
-     `traefik.ingress.kubernetes.io/router.priority` annotations.
-   * **`rproxy: -1`.** Set on the assumption that `X-Forwarded-For` arrives with
-     the client IP appended rightmost. Upload a file and check the uploader IP
-     copyparty recorded (visible to `A` users). If it shows `10.42.x.x` or
-     `10.69.x.x` rather than the real client address, flip `rproxy` to `1`.
-     Getting this wrong misattributes ban accounting, not access control.
