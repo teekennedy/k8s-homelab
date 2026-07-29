@@ -129,6 +129,8 @@ metadata:
   name: "lldap-bootstrap-user-configs"
   namespace: "{{ .Release.Namespace }}"
 data:
+  # Stub for locally defined users. Allows additional users while respecting email privacy
+  local.json: ""
 {{- range $path, $_ :=  .Files.Glob  "files/lldap-bootstrap/user-configs/*.json" }}
   {{ $path | base }}: |-
     {{- $.Files.Get $path | nindent 4 }}

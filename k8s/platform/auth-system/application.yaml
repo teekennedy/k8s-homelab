@@ -31,30 +31,15 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
-      name: gitea-admin-secret
-      namespace: gitea
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: monitoring-system-grafana
-      namespace: monitoring-system
-    - jsonPointers:
-        - /data
-      kind: Secret
-      name: alertmanager-monitoring-system-kube-pro
-      namespace: monitoring-system
-    - group: apiextensions.k8s.io
-      kind: CustomResourceDefinition
-    # SopsSecret data is decrypted in-cluster by the sops-secrets-operator
-    - jsonPointers:
-        - /spec/secretTemplates
-      group: isindir.github.com
-      kind: SopsSecret
-    - jsonPointers:
-        - /data
-      kind: Secret
       name: cnpg-s3-credentials
       namespace: auth-system
+    # Ignore locally-defined users in lldap
+    - jsonPointers:
+        - /data/local.json
+      kind: ConfigMap
+      name: lldap-bootstrap-user-configs
+      namespace: auth-system
+
   project: default
   source:
     path: k8s/platform/auth-system
