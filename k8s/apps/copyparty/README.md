@@ -24,14 +24,12 @@ same NAS.
 copyparty has **no local accounts**. Identity arrives as headers, asserted by a
 dedicated oauth2-proxy running as a Traefik `forwardAuth` middleware in front
 of every path on `host` except the exceptions in `.Values.unauthenticatedPaths`
-(`/share`, `/.cpr`, `/favicon.ico`, `/robots.txt`) and one query-string route
-that an Ingress can't express (`/?setck=js=y`, see below):
+(`/share`, `/.cpr`) and one query-string route that an Ingress can't express
+(`/?setck=js=y`, see below):
 
 ```
 browser ──► Traefik (wspublic)
-              ├─ /share, /.cpr,
-              │  /favicon.ico,
-              │  /robots.txt      → copyparty :3923  (no headers, ever)
+              ├─ /share, /.cpr    → copyparty :3923  (no headers, ever)
               ├─ /?setck=js=y     → same as above (IngressRoute, see below)
               ├─ /oauth2          → copyparty-auth (the auth flow itself)
               └─ /  (everything
@@ -39,6 +37,15 @@ browser ──► Traefik (wspublic)
                                      forwardAuth ──► copyparty-auth (oauth2-proxy) ──► Authelia
                                      ──────────────► copyparty :3923  (X-Auth-Request-* headers)
 ```
+
+`/favicon.ico` and `/robots.txt` are deliberately NOT on this list. Unlike
+`/.cpr`, copyparty has no dedicated route for either — both resolve as
+ordinary paths against the `[/]` volume, so an unauthenticated request would
+just hit its ACL (no `r: *` entry) and 403. Leaving them behind the SSO gate
+turns that into an unremarkable 404 for everyone once forwardAuth passes (no
+such file exists), which every browser already handles silently. The favicon
+that actually shows in the tab comes from `--favico`, templated client-side
+into every page as a data URI (`dfavico`) — it never requests this URL.
 
 `forwardAuth`, rather than oauth2-proxy's reverse-proxy `upstreams` mode,
 keeps request **bodies** off the proxy — only the small auth subrequest goes
@@ -94,9 +101,9 @@ anonymous**. The symptom looks like "SSO broke", not like a misconfigured CIDR.
 ### Unauthenticated paths
 
 Everything on the host requires a session except the prefixes in
-`.Values.unauthenticatedPaths` (`/share`, `/.cpr`, `/favicon.ico`,
-`/robots.txt`) plus `/?setck=js=y` (gated out via its own `IngressRoute` since
-a plain Ingress can't match query strings). This is defence-in-depth only in
+`.Values.unauthenticatedPaths` (`/share`, `/.cpr`) plus `/?setck=js=y` (gated
+out via its own `IngressRoute` since a plain Ingress can't match query
+strings). This is defence-in-depth only in
 the sense that copyparty applies its own ACLs regardless: no volume has an
 `r: *` entry, so a request that reaches copyparty without identity headers —
 i.e. anything on `unauthenticatedPaths` — can't read anything except through a

@@ -69,7 +69,14 @@ entrypoint: wspublic
 #                password/expiry, which is the whole point of the feature
 #   /.cpr        copyparty's static assets (CSS/JS); share pages are unusable
 #                without them
-#   /favicon.ico, /robots.txt  browser/crawler boilerplate
+#
+# NOT listed here: /favicon.ico, /robots.txt. Unlike /.cpr, copyparty has no
+# dedicated route for either — both resolve as ordinary paths against the `[/]`
+# volume, so unauthenticated requests hit its ACL (no `r: *` entry) and 403.
+# They're left behind the SSO gate on purpose: an authenticated request just
+# 404s (no such file), which every browser already handles silently. The
+# favicon shown in the tab comes from `--favico`, templated client-side into
+# every page (`dfavico`) — it never touches this URL at all.
 #
 # copyparty's own JS also XHRs the site root directly for a couple of calls
 # that anonymous share visitors need (`/?setck=js=y` while hydrating a share
@@ -79,8 +86,6 @@ entrypoint: wspublic
 unauthenticatedPaths:
   - /share
   - /.cpr
-  - /favicon.ico
-  - /robots.txt
 
 # Namespace Traefik runs in; referenced by the NetworkPolicy so only Traefik can
 # reach copyparty's port directly (nothing in-cluster can skip the SSO gate).
