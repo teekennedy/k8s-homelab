@@ -51,6 +51,12 @@
         description: File sync
         namespace: syncthing
         app: syncthing
+    - Copyparty:
+        icon: sh-copyparty.svg
+        href: https://files.msng.to
+        description: File host
+        namespace: copyparty
+        app: copyparty
 - Cluster:
     - Grafana:
         icon: sh-grafana.svg
