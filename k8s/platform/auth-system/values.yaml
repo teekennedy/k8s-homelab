@@ -268,7 +268,8 @@ authelia:
           - client_id: oauth2-proxy
             client_name: OAuth2 Proxy
             consent_mode: implicit
-            client_secret: '$2b$12$407JaO6LrgVmhnL4tO46vOcZwW4vsM0qTTHAXXpuJF7TkhNxOTTDy'
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/oauth2-proxy
             token_endpoint_auth_method: client_secret_post
             authorization_policy: one_factor
             require_pkce: true
@@ -298,7 +299,8 @@ authelia:
           - client_id: oauth2-proxy-internal
             client_name: OAuth2 Proxy (internal)
             consent_mode: implicit
-            client_secret: '$2b$12$rDLnW0tP8RhDrelNhajlGendwesVQ.hx.9xHq154ShVdzSb8HBgCG'
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/oauth2-proxy-internal
             token_endpoint_auth_method: client_secret_post
             authorization_policy: two_factor
             require_pkce: true
@@ -332,7 +334,8 @@ authelia:
           - client_id: copyparty
             client_name: copyparty
             consent_mode: implicit
-            client_secret: '$2b$12$5ZEqIhQ9proDImmlbb0XQOMr3newPf61Pkh3CVl4tDB1MvQalsF5C'
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/copyparty
             token_endpoint_auth_method: client_secret_post
             authorization_policy: two_factor
             require_pkce: true
@@ -410,6 +413,7 @@ authelia:
         items:
           - key: password
             path: password.txt
+      authelia-oidc-client-secrets: {}
       smtp-creds:
         items:
           - key: password
