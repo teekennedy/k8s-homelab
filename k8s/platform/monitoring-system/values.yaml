@@ -89,6 +89,7 @@ kube-prometheus-stack:
         name: Authelia
         client_id: grafana
         client_secret: $__env{GRAFANA_SSO_CLIENT_SECRET}
+        use_pkce: true
         scopes: openid profile email groups offline_access
         auth_url: https://authelia.msng.to/api/oidc/authorization
         token_url: https://authelia.msng.to/api/oidc/token

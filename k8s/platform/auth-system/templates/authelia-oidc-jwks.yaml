@@ -66,15 +66,24 @@ spec:
             runAsUser: 1000
             allowPrivilegeEscalation: false
           command:
-            - step
-            - crypto
-            - keypair
-            - --kty=RSA
-            - --size=2048
-            - --no-password
-            - --insecure
-            - /keys/oidc.pub.pem
-            - /keys/oidc.jwk.RS256.pem
+            - bash
+            - "-c"
+            - |
+              set -euo pipefail
+
+              step crypto keypair \
+                --kty=RSA \
+                --size=2048 \
+                --no-password \
+                --insecure \
+                /keys/oidc.jwk.RS256{.pub,}.pem
+
+              step crypto keypair \
+                --kty=EC \
+                --crv=P-256 \
+                --no-password \
+                --insecure \
+                /keys/oidc.jwk.ES256{.pub,}.pem
           volumeMounts:
             - name: keys
               mountPath: /keys
@@ -102,7 +111,8 @@ spec:
               fi
 
               kubectl -n "${namespace}" create secret generic "${secret_name}" \
-                --from-file=oidc.jwk.RS256.pem=/keys/oidc.jwk.RS256.pem
+                --from-file=oidc.jwk.RS256.pem=/keys/oidc.jwk.RS256.pem \
+                --from-file=oidc.jwk.ES256.pem=/keys/oidc.jwk.ES256.pem
           volumeMounts:
             - name: keys
               mountPath: /keys

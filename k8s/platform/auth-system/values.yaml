@@ -274,7 +274,7 @@ authelia:
     identity_providers:
       oidc:
         enabled: true
-        enforce_pkce: public_clients_only
+        enforce_pkce: always
         hmac_secret:
           path: identity_providers.oidc.hmac.key
         authorization_policies:
@@ -340,11 +340,13 @@ authelia:
             client_name: Grafana
             consent_mode: pre-configured
             pre_configured_consent_duration: 100y
-            # Grafana does not support PKCE, and the feature request to add it was closed.
-            require_pkce: false
+            require_pkce: true
+            pkce_challenge_method: S256
             client_secret:
               path: /secrets/authelia-oidc-client-secrets/grafana
-            token_endpoint_auth_method: client_secret_post
+            token_endpoint_auth_method: client_secret_basic
+            access_token_signed_response_key_id: ES256
+            access_token_signed_response_alg: ES256
             authorization_policy: grafana
             scopes:
               - openid
@@ -437,11 +439,16 @@ authelia:
             redirect_uris:
               - https://files.msng.to/oauth2/callback
         jwks:
-          - key_id: argocd
+          - key_id: RS256
             algorithm: RS256
             use: sig
             key:
               path: /secrets/oidc-jwks/oidc.jwk.RS256.pem
+          - key_id: ES256
+            algorithm: ES256
+            use: sig
+            key:
+              path: /secrets/oidc-jwks/oidc.jwk.ES256.pem
 
   pod:
     kind: Deployment
@@ -517,6 +524,8 @@ authelia:
         items:
           - key: oidc.jwk.RS256.pem
             path: oidc.jwk.RS256.pem
+          - key: oidc.jwk.ES256.pem
+            path: oidc.jwk.ES256.pem
 
 
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-4.0.1/charts/library/common/values.schema.json
