@@ -58,9 +58,16 @@ kube-prometheus-stack:
         editable: false
         jsonData:
           timeInterval: 30s
-    # This used to contain Dex client secret, but currently doesn't exist.
-    # Can be recreated if needed with GRAFANA_SSO_CLIENT_SECRET: (dex.grafana -> client_secret in global-secrets namespace)
-    # envFromSecret: grafana-secrets
+    # Plaintext client secret for the Authelia OIDC client (see
+    # k8s/platform/auth-system, oidcClientSecrets.clients.grafana and
+    # templates/grafana-oidc.yaml). Authelia only ever sees the bcrypt hash of
+    # this value, hashed by the auth-system sync job; Grafana needs the
+    # plaintext to authenticate at the token endpoint.
+    envValueFrom:
+      GRAFANA_SSO_CLIENT_SECRET:
+        secretKeyRef:
+          name: grafana-oidc-authelia
+          key: client-secret
     grafana.ini:
       server:
         root_url: https://grafana.msng.to
@@ -73,20 +80,29 @@ kube-prometheus-stack:
         # preinstall overwrites a mismatched on-disk version on boot. Versions
         # are kept current by Renovate (custom.grafana-plugins datasource).
         preinstall: grafana-lokiexplore-app@2.4.0,grafana-metricsdrilldown-app@2.3.0
-      # TODO integrate with Authelia
       auth.generic_oauth:
-        enabled: false
-        # Allows OAuth users without existing grafana accounts to login
-        # allow_sign_up: true
-        # Bypass login selection screen
-        # auto_login: true
-        name: SSO
-        client_id: grafana-sso
+        enabled: true
+        # Auto-provision Grafana accounts for anyone Authelia lets through,
+        # and skip Grafana's own login screen straight to Authelia SSO.
+        allow_sign_up: true
+        auto_login: true
+        name: Authelia
+        client_id: grafana
         client_secret: $__env{GRAFANA_SSO_CLIENT_SECRET}
         scopes: openid profile email groups offline_access
-        auth_url: https://dex.msng.to/auth
-        token_url: https://dex.msng.to/token
-        api_url: https://dex.msng.to/userinfo
+        auth_url: https://authelia.msng.to/api/oidc/authorization
+        token_url: https://authelia.msng.to/api/oidc/token
+        api_url: https://authelia.msng.to/api/oidc/userinfo
+        # Maps LDAP groups (see auth-system files/lldap-bootstrap/group-configs)
+        # onto Grafana's built-in roles via the groups claim. full-admin (the
+        # cluster-wide admin group) also grants Grafana Admin. Anyone
+        # authenticated but in none of these groups falls back to
+        # auto_assign_org_role (Viewer).
+        role_attribute_path: >-
+          contains(groups[*], 'grafana-admins') && 'Admin' ||
+          contains(groups[*], 'full-admin') && 'Admin' ||
+          contains(groups[*], 'grafana-editors') && 'Editor' ||
+          contains(groups[*], 'grafana-viewers') && 'Viewer'
 
   homepage-grafana:
     enabled: true

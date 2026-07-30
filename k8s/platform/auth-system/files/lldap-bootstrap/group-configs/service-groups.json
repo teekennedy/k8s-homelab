@@ -1,8 +1,11 @@
 {
-  "name": "grafana-user"
+  "name": "grafana-viewers"
 }
 {
-  "name": "grafana-admin"
+  "name": "grafana-editors"
+}
+{
+  "name": "grafana-admins"
 }
 {
   "name": "argocd-user"

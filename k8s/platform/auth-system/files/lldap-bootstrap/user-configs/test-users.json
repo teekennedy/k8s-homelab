@@ -10,6 +10,6 @@
   "displayName": "User",
   "groups": [
     "argocd-user",
-    "grafana-user"
+    "grafana-viewers"
   ]
 }
