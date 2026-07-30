@@ -24,11 +24,12 @@ spec:
     # oauth2-proxy reverse-proxies authenticated traffic from the public
     # msng.to ingress into homepage. Traefik no longer talks to homepage
     # directly — it forwards to oauth2-proxy, which forwards here.
+    #
+    # The proxy is a sibling in THIS namespace (it used to have its own), so this
+    # is a bare podSelector. Adding a namespaceSelector back would stop matching
+    # and make homepage unreachable.
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: oauth2-proxy
-          podSelector:
+        - podSelector:
             matchLabels:
               app.kubernetes.io/name: oauth2-proxy
       ports:

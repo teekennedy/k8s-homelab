@@ -1,0 +1,9 @@
+apiVersion: v2
+name: oauth2-proxy-instance
+description: Library chart holding the homelab-specific glue every dedicated oauth2-proxy instance needs.
+# Library chart: templates only, renders nothing on its own. Consumers add it
+# alongside their own `oauth2-proxy` subchart dependency and `include` the
+# named templates from a one-line template file.
+type: library
+# Bump on any change to the named templates.
+version: 0.1.0

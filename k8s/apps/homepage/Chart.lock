@@ -2,5 +2,11 @@ dependencies:
 - name: homepage
   repository: oci://ghcr.io/m0nsterrr/helm-charts
   version: 4.14.0
-digest: sha256:270f4cf1f08e87cbf25a0f345b3e5efeb2b0c2cd9dcfb41ffd9a7d19e0fd9bed
-generated: "2026-07-27T11:24:32.303135473Z"
+- name: oauth2-proxy
+  repository: https://oauth2-proxy.github.io/manifests
+  version: 10.7.0
+- name: oauth2-proxy-instance
+  repository: file://../../charts/oauth2-proxy-instance
+  version: 0.1.0
+digest: sha256:49bfd0fee23836a1768c405683dfc9955649c4a6145c3ce2b59feadaee3469ae
+generated: "2026-07-29T19:47:21.863401-06:00"

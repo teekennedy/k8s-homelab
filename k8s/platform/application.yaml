@@ -24,6 +24,6 @@ spec:
     # This is because the values have the `omitempty` json tag, which means after applying the changes,
     # automated will be an empty object.
     # See https://github.com/argoproj/argo-cd/issues/22546
-    automated: {}
-    #   prune: false
-    #   selfHeal: false
+    automated:
+      prune: true
+      # selfHeal: false

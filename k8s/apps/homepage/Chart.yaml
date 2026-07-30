@@ -2,9 +2,20 @@ apiVersion: v2
 name: homepage
 description: Homepage dashboard
 type: application
-version: 0.1.5
+version: 0.2.0
 appVersion: "v1.8.0"
 dependencies:
   - name: homepage
     version: 4.14.0
     repository: oci://ghcr.io/m0nsterrr/helm-charts
+  # Public oauth2-proxy instance owning the apex msng.to and reverse-proxying
+  # authenticated traffic to homepage. Absorbed from the former
+  # k8s/platform/oauth2-proxy.
+  - name: oauth2-proxy
+    version: 10.7.0
+    repository: https://oauth2-proxy.github.io/manifests
+  # Shared glue for that instance: the mittwald/reflector Secret. Library chart,
+  # renders nothing itself.
+  - name: oauth2-proxy-instance
+    version: 0.1.0
+    repository: file://../../charts/oauth2-proxy-instance

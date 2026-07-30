@@ -6,4 +6,4 @@ dependencies:
   repository: file://../../charts/oauth2-proxy-instance
   version: 0.1.0
 digest: sha256:1f275ddf0cea967f068e40f96f3eaf9b663a28ac1d48aa6d7fadf3c0fbec3914
-generated: "2026-07-29T19:36:44.685811-06:00"
+generated: "2026-07-29T19:44:41.20838-06:00"

@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -48,6 +49,37 @@ type HelmChart struct {
 	// ClusterValues is the optional cluster-values.yaml for template rendering.
 	// +private
 	ClusterValues *dagger.File
+	// SharedCharts is the optional k8s/charts directory holding library charts
+	// that consumers depend on via `repository: file://../../charts/<name>`.
+	// It is mounted alongside Source in a composed repo layout so those relative
+	// paths resolve; nil is fine for charts with no such dependency.
+	// +private
+	SharedCharts *dagger.Directory
+}
+
+// helmRepoRoot is where the composed repo layout is mounted in helm containers.
+// Charts are mounted at their real repo-relative path under it rather than at a
+// flat /chart, so a `file://../../charts/...` dependency resolves the same way
+// it does for ArgoCD's repo-server (which clones the whole repo).
+const helmRepoRoot = "/repo"
+
+// sharedChartsPath is the repo-relative directory holding library charts.
+const sharedChartsPath = "k8s/charts"
+
+// chartDir is the absolute path of this chart inside the helm container.
+func (hc *HelmChart) chartDir() string {
+	return path.Join(helmRepoRoot, hc.Path)
+}
+
+// newHelmChart builds a HelmChart with its scoped source plus the shared library
+// charts directory, so file:// dependencies resolve.
+func newHelmChart(source *dagger.Directory, chartPath string, clusterValues *dagger.File) *HelmChart {
+	return &HelmChart{
+		Path:          chartPath,
+		Source:        source.Directory(chartPath),
+		ClusterValues: clusterValues,
+		SharedCharts:  source.Directory(sharedChartsPath),
+	}
 }
 
 // HelmCharts returns all discovered Helm charts with scoped source directories.
@@ -65,11 +97,7 @@ func (m *Homelab) HelmCharts(
 	clusterValues := source.File("config/gen/cluster-values.yaml")
 
 	for _, chartPath := range discoverHelmChartPaths(ctx, source) {
-		charts = append(charts, &HelmChart{
-			Path:          chartPath,
-			Source:        source.Directory(chartPath),
-			ClusterValues: clusterValues,
-		})
+		charts = append(charts, newHelmChart(source, chartPath, clusterValues))
 	}
 	return charts
 }
@@ -84,7 +112,7 @@ func (hc *HelmChart) Validate(ctx context.Context) (string, error) {
 	prepared := hc.sourceWithDeps()
 
 	_, err := hc.container(prepared).
-		WithExec([]string{"helm", "lint", "/chart"}).
+		WithExec([]string{"helm", "lint", hc.chartDir()}).
 		Sync(ctx)
 	if err != nil {
 		return "", fmt.Errorf("helm lint failed for %s: %w", hc.Path, err)
@@ -145,7 +173,7 @@ func (hc *HelmChart) renderedManifest(ctx context.Context) (*dagger.File, error)
 		releaseName, namespace = parseApplicationYaml(appYaml, defaultName)
 	}
 
-	args := []string{"helm", "template", releaseName, "/chart", "--namespace", namespace, "--include-crds"}
+	args := []string{"helm", "template", releaseName, hc.chartDir(), "--namespace", namespace, "--include-crds"}
 
 	container := hc.container(prepared)
 	if hc.ClusterValues != nil {
@@ -159,11 +187,21 @@ func (hc *HelmChart) renderedManifest(ctx context.Context) (*dagger.File, error)
 }
 
 // container returns a helm container with the chart mounted and shared caches.
+//
+// chartSource is mounted at the chart's repo-relative path inside helmRepoRoot,
+// with SharedCharts alongside it, so that only the chart's own files (plus the
+// library charts) are in the build — per-chart caching is preserved, and a change
+// to a library chart correctly invalidates only its consumers.
 func (hc *HelmChart) container(chartSource *dagger.Directory) *dagger.Container {
+	composed := dag.Directory().WithDirectory(hc.Path, chartSource)
+	if hc.SharedCharts != nil && !strings.HasPrefix(hc.Path, sharedChartsPath+"/") {
+		composed = composed.WithDirectory(sharedChartsPath, hc.SharedCharts)
+	}
+
 	return dag.Container().
 		From(helmImage).
-		WithMountedDirectory("/chart", chartSource).
-		WithWorkdir("/chart").
+		WithMountedDirectory(helmRepoRoot, composed).
+		WithWorkdir(hc.chartDir()).
 		WithMountedCache("/root/.cache/helm/repository", dag.CacheVolume("helm-repo-cache")).
 		WithMountedCache("/root/.cache/helm/content", dag.CacheVolume("helm-content-cache")).
 		WithMountedCache("/root/.config/helm/registry", dag.CacheVolume("helm-registry-cache"))
@@ -187,7 +225,7 @@ func (hc *HelmChart) sourceWithDeps() *dagger.Directory {
 				helm dependency build --skip-refresh . 2>/dev/null || true
 			fi
 		`}).
-		Directory("/chart")
+		Directory(hc.chartDir())
 }
 
 // ValidateHelm runs helm lint on charts with dependency download.
@@ -212,10 +250,7 @@ func (m *Homelab) ValidateHelm(ctx context.Context,
 
 	g := new(errgroup.Group)
 	for _, chartPath := range helmChartPaths {
-		hc := &HelmChart{
-			Path:   chartPath,
-			Source: source.Directory(chartPath),
-		}
+		hc := newHelmChart(source, chartPath, nil)
 		g.Go(func() error {
 			_, err := hc.Validate(ctx)
 			return err
@@ -258,11 +293,7 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 
 	g := new(errgroup.Group)
 	for _, chartPath := range helmChartPaths {
-		hc := &HelmChart{
-			Path:          chartPath,
-			Source:        source.Directory(chartPath),
-			ClusterValues: clusterValues,
-		}
+		hc := newHelmChart(source, chartPath, clusterValues)
 		g.Go(func() error {
 			_, err := hc.Build(ctx)
 			return err

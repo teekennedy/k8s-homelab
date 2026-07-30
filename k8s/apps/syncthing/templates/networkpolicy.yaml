@@ -1,8 +1,8 @@
 ---
-# The GUI (:8384) has no built-in auth — access is gated by oauth2-proxy-internal,
-# which reverse-proxies it. This policy ensures the GUI can ONLY be reached from
-# that proxy's namespace, so nothing in-cluster can bypass the SSO gate by
-# hitting the Service/Pod directly. The sync protocol ports (22000) are
+# The GUI (:8384) has no built-in auth — access is gated by this chart's
+# oauth2-proxy instance, which reverse-proxies it. This policy ensures the GUI can
+# ONLY be reached from that proxy's pods, so nothing in-cluster can bypass the SSO
+# gate by hitting the Service/Pod directly. The sync protocol ports (22000) are
 # intentionally left open to all sources (they carry their own device-cert
 # mutual-auth TLS and are reached via the public LoadBalancer).
 apiVersion: networking.k8s.io/v1
@@ -18,11 +18,17 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    # GUI: only from the oauth2-proxy-internal namespace (the SSO reverse proxy).
+    # GUI: only from this chart's oauth2-proxy pods (the SSO reverse proxy). The
+    # proxy used to live in its own namespace, so a namespaceSelector alone was
+    # enough; now that it is a sibling in this namespace, the podSelector is what
+    # keeps the restriction meaningful.
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.guiProxyNamespace }}
+              kubernetes.io/metadata.name: {{ .Values.guiProxy.namespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Values.guiProxy.podName }}
       ports:
         - port: 8384
           protocol: TCP

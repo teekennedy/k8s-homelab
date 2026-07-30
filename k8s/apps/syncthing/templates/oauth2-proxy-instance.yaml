@@ -1,0 +1,11 @@
+{{/*
+The dedicated oauth2-proxy instance's Secret, from the shared
+oauth2-proxy-instance library chart. Configured under `oauth2ProxyInstance` in
+values.yaml.
+
+No middleware pair here: this instance is a reverse proxy that owns
+syncthing.msng.to via the subchart's HTTPRoute and forwards authenticated traffic
+to the GUI itself, so Traefik never does a forwardAuth subrequest.
+*/}}
+{{- include "oauth2ProxyInstance.secret" . }}
+{{- include "oauth2ProxyInstance.middleware" . }}

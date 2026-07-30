@@ -1,0 +1,18 @@
+{{/*
+The dedicated oauth2-proxy instance's Secret and its Traefik forwardAuth +
+errors middleware pair, from the shared oauth2-proxy-instance library chart.
+Configured under `oauth2ProxyInstance` in values.yaml.
+
+Only the auth subrequest goes to the proxy — request bodies go straight to
+copyparty, which is what makes multi-GB uploads viable.
+
+Traefik strips every header named in authResponseHeaders from the incoming
+request before copying in the auth response's values, so a client cannot smuggle
+its own X-Auth-Request-* headers past the middleware. That, plus copyparty's
+xff-src (pod CIDR only) and the NetworkPolicy restricting :3923 to Traefik, is
+what stands in for copyparty's --idp-h-key shared secret — a secret would have to
+be committed in cleartext to both the Middleware and the ConfigMap, which buys
+nothing over the three controls above.
+*/}}
+{{- include "oauth2ProxyInstance.secret" . }}
+{{- include "oauth2ProxyInstance.middleware" . }}

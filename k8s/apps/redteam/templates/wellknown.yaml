@@ -4,7 +4,8 @@
 # exists), hashes it, and substitutes the hash into security.txt — so the published
 # X-RedTeam-Auth-SHA256 always matches the live nonce with zero manual steps.
 # oauth2-proxy (the msng.to front door) routes /.well-known/ here and skips auth for
-# it (see k8s/platform/oauth2-proxy/values.yaml). Independent of session replicas.
+# it (see the oauth2-proxy block in k8s/apps/homepage/values.yaml). Independent of
+# session replicas.
 apiVersion: v1
 kind: ConfigMap
 metadata:

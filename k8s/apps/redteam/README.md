@@ -58,7 +58,7 @@ To rotate: delete the `redteam-nonce` secret (mittwald regenerates) and restart 
 
 `security.txt` is served by a tiny nginx (`wellknown.yaml`) — no dependency on
 homepage's asset handling. Since oauth2-proxy is the catch-all front door for msng.to,
-its config (`k8s/platform/oauth2-proxy/values.yaml`) **already** skips auth for
+its config (the `oauth2-proxy` block in `k8s/apps/homepage/values.yaml`) **already** skips auth for
 `/.well-known/` and routes it to this static server (`skip_auth_regex` + an extra
 `upstreams` entry). Just confirm `oauth2ProxyNamespace` in values.yaml matches the
 oauth2-proxy namespace so the well-known NetworkPolicy allows its ingress.
@@ -89,8 +89,8 @@ not on VPN block lists, and you can decide whether to whitelist it in CrowdSec t
 3. **Confirm** `kubeApiCidr` (`kubectl get svc kubernetes -n default`) and `oauth2ProxyNamespace`.
 4. **Wire up ArgoCD** — add `application.yaml` to your app-of-apps.
 
-_The oauth2-proxy `/.well-known/` change is already applied in
-`k8s/platform/oauth2-proxy/values.yaml`._
+_The oauth2-proxy `/.well-known/` change is already applied in the `oauth2-proxy`
+block of `k8s/apps/homepage/values.yaml`._
 
 _No Gitea credential is needed — the repo is unauthenticated-readable and the internal
 pod pre-clones it in an init container._

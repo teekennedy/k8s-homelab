@@ -1,0 +1,10 @@
+{{/*
+The public oauth2-proxy instance's Secret, from the shared oauth2-proxy-instance
+library chart. Configured under `oauth2ProxyInstance` in values.yaml.
+
+No middleware pair here: this instance is a reverse proxy that owns the apex
+msng.to via the subchart's Ingress and forwards authenticated traffic to the
+homepage Service itself, so Traefik never does a forwardAuth subrequest.
+*/}}
+{{- include "oauth2ProxyInstance.secret" . }}
+{{- include "oauth2ProxyInstance.middleware" . }}

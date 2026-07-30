@@ -10,11 +10,24 @@ spec:
     name: in-cluster
     namespace: syncthing
   project: default
+  ignoreDifferences:
+    # cookie-secret / client-secret are filled in-cluster by mittwald
+    # secret-generator; don't fight it.
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: syncthing-oauth2-proxy-secrets
+      namespace: syncthing
   source:
     path: k8s/apps/syncthing
     repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
+    # Label the namespace so the internal traefik-gateway's HTTPRoute
+    # namespacePolicy (from: Selector) permits this app's HTTPRoute to attach.
+    managedNamespaceMetadata:
+      labels:
+        internal-gateway-access: "true"
     automated:
       prune: true
     retry:

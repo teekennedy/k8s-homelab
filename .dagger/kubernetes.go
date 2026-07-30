@@ -172,11 +172,7 @@ func (m *Homelab) ValidatePolaris(ctx context.Context,
 
 	g := new(errgroup.Group)
 	for _, chartPath := range helmChartPaths {
-		hc := &HelmChart{
-			Path:          chartPath,
-			Source:        source.Directory(chartPath),
-			ClusterValues: clusterValues,
-		}
+		hc := newHelmChart(source, chartPath, clusterValues)
 		g.Go(func() error {
 			_, err := hc.Polaris(ctx)
 			return err
@@ -216,11 +212,7 @@ func (m *Homelab) ValidateKubeconform(ctx context.Context,
 
 	g := new(errgroup.Group)
 	for _, chartPath := range helmChartPaths {
-		hc := &HelmChart{
-			Path:          chartPath,
-			Source:        source.Directory(chartPath),
-			ClusterValues: clusterValues,
-		}
+		hc := newHelmChart(source, chartPath, clusterValues)
 		g.Go(func() error {
 			_, err := hc.Kubeconform(ctx)
 			return err

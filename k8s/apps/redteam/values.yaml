@@ -12,8 +12,9 @@ kubeApiCidr: "10.43.0.1/32"
 lanCidr: "10.69.0.0/16"
 
 # Namespace of the PUBLIC oauth2-proxy (front door for msng.to); the well-known
-# server allows ingress from here.
-oauth2ProxyNamespace: "oauth2-proxy"
+# server allows ingress from here. That proxy is a subchart of k8s/apps/homepage,
+# so this is the homepage namespace — NOT a namespace of its own.
+oauth2ProxyNamespace: "homepage"
 
 gluetun:
   image: qmcgaw/gluetun:v3.41.1

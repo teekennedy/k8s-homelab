@@ -63,10 +63,13 @@ persistence:
 
 # --- Networking / exposure -------------------------------------------------
 # The GUI (ClusterIP :8384) has no built-in auth (see initContainer) and is not
-# exposed directly. The oauth2-proxy-internal instance reverse-proxies it at
-# syncthing.msng.to with SSO (syncthing-admins group); the NetworkPolicy below
-# restricts :8384 to that proxy. Its namespace is referenced there.
-guiProxyNamespace: oauth2-proxy-internal
+# exposed directly. The dedicated oauth2-proxy instance below reverse-proxies it
+# at syncthing.msng.to with SSO (syncthing-admins group); the NetworkPolicy
+# restricts :8384 to that proxy's pods, which now live in this namespace.
+guiProxy:
+  namespace: syncthing
+  # Selector label the oauth2-proxy subchart puts on its pods.
+  podName: oauth2-proxy
 
 # Sync protocol (22000) exposed on the PUBLIC MetalLB pool so devices can sync
 # from anywhere. The protocol is device-cert mutual-auth TLS by design; the GUI
@@ -107,3 +110,103 @@ tolerations: []
 affinity: {}
 podAnnotations: {}
 podLabels: {}
+
+# --- SSO front door ---------------------------------------------------------
+# A dedicated oauth2-proxy instance reverse-proxying the GUI, which has no auth
+# of its own. Unlike homepage's public instance (which BYPASSES auth for internal
+# clients via trusted_ips), this instance has NO trusted_ips bypass: every
+# client — LAN included — must authenticate, and only members of
+# syncthing-admins are admitted. The value is SSO convenience: a syncthing-admin
+# already signed into Authelia reaches the GUI with no extra login and no
+# fetching a k8s secret.
+
+# The repo-specific glue, from the oauth2-proxy-instance library chart
+# (templates/oauth2-proxy-instance.yaml).
+oauth2ProxyInstance:
+  # Must equal the Authelia client_id and the oidcClientSecrets.clients key in
+  # k8s/platform/auth-system/values.yaml. Deliberately still
+  # `oauth2-proxy-internal` and not `syncthing`: renaming a client_id also means
+  # editing Authelia's clients list and the aggregate secret key, which is a
+  # separate change.
+  clientId: oauth2-proxy-internal
+  # Must equal oauth2-proxy.config.existingSecret below, and
+  # oidcClientSecrets.clients.oauth2-proxy-internal must point at
+  # syncthing/<this name>.
+  secretName: syncthing-oauth2-proxy-secrets
+  labelsTemplate: syncthing.labels
+  middleware:
+    # This instance is a reverse proxy, not a Traefik forwardAuth target: it owns
+    # syncthing.msng.to via the HTTPRoute below and forwards upstream itself.
+    enabled: false
+
+# https://github.com/oauth2-proxy/manifests/blob/main/helm/oauth2-proxy/values.yaml
+oauth2-proxy:
+  # Pin the Service/Deployment name so the HTTPRoute backendRef is stable, and so
+  # redirect_uris/cookies survived the move out of the old
+  # k8s/platform/oauth2-proxy-internal chart unchanged.
+  fullnameOverride: oauth2-proxy-internal
+  config:
+    existingSecret: syncthing-oauth2-proxy-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://syncthing.msng.to/oauth2/callback"
+      # Host-scoped cookie with a distinct name so it never collides with the
+      # public instance's Domain=msng.to cookie on this subdomain.
+      cookie_domains = ["syncthing.msng.to"]
+      cookie_name = "_oauth2_proxy_internal"
+      cookie_expire = "168h"
+      cookie_refresh = "1h"
+      cookie_secure = true
+      cookie_httponly = true
+      cookie_samesite = "lax"
+      whitelist_domains = ["syncthing.msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      pass_authorization_header = true
+      pass_access_token = true
+      set_xauthrequest = true
+      code_challenge_method = "S256"
+      # groups scope so allowed_groups can be enforced (Authelia's
+      # oauth2-proxy-internal client releases the groups claim).
+      scope = "openid profile email groups"
+      # NO trusted_ips: internal clients must authenticate.
+      real_client_ip_header = "X-Real-Ip"
+      skip_provider_button = true
+      # Only syncthing-admins may pass.
+      allowed_groups = ["syncthing-admins", "full-admin"]
+      # Reverse-proxy authenticated traffic to the syncthing GUI.
+      upstreams = ["http://syncthing.syncthing.svc.cluster.local:8384/"]
+      trusted_proxy_ips = ["10.42.0.0/16"]
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  # Exposed via the subchart's own HTTPRoute on the internal traefik-gateway's
+  # websecure listener, not an Ingress. No entrypoint annotation is set, which is
+  # what keeps the internal gateway (VIP 10.69.80.100) as the only one that picks
+  # it up; external-dns-internal resolves the hostname to that VIP.
+  #
+  # The HTTPRoute's namespace must carry the internal-gateway-access label for the
+  # gateway's namespacePolicy to admit it — see syncPolicy.managedNamespaceMetadata
+  # in application.yaml.
+  ingress:
+    enabled: false
+  gatewayApi:
+    enabled: true
+    gatewayRef:
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecure
+    hostnames:
+      - syncthing.msng.to

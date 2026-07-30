@@ -145,12 +145,35 @@ podLabels: {}
 # middleware (upstream = static://202; the file bodies never pass through it,
 # which matters for multi-GB uploads).
 #
-# Neither shared instance works here:
-#   * platform/oauth2-proxy bypasses auth for 10.69.0.0/16 (trusted_ips), so LAN
-#     clients would arrive with no identity headers and copyparty would treat
+# Neither of the other instances would work here:
+#   * homepage's public instance bypasses auth for 10.69.0.0/16 (trusted_ips), so
+#     LAN clients would arrive with no identity headers and copyparty would treat
 #     every one of them as anonymous — i.e. locked out of their own files.
-#   * platform/oauth2-proxy-internal is hard-wired to syncthing.msng.to and
-#     admits only syncthing-admins.
+#   * syncthing's instance is hard-wired to syncthing.msng.to and admits only
+#     syncthing-admins.
+
+# The repo-specific glue, from the oauth2-proxy-instance library chart
+# (templates/oauth2-proxy-instance.yaml).
+oauth2ProxyInstance:
+  # Must equal the Authelia client_id and the oidcClientSecrets.clients key in
+  # k8s/platform/auth-system/values.yaml.
+  clientId: copyparty
+  # Must equal oauth2-proxy.config.existingSecret below, and
+  # oidcClientSecrets.clients.copyparty must point at copyparty/<this name>.
+  secretName: copyparty-oauth2-proxy-secrets
+  labelsTemplate: copyparty.labels
+  middleware:
+    enabled: true
+    # Must equal oauth2-proxy.fullnameOverride below.
+    serviceName: copyparty-auth
+    authResponseHeaders:
+      # copyparty's --idp-h-usr reads these two (first one wins).
+      - X-Auth-Request-Preferred-Username
+      - X-Auth-Request-User
+      # --idp-h-grp; maps onto the @copyparty-* volume ACLs.
+      - X-Auth-Request-Groups
+      - X-Auth-Request-Email
+
 oauth2-proxy:
   # Pin the Service name so the Ingress/Middleware backendRefs are stable.
   fullnameOverride: copyparty-auth
