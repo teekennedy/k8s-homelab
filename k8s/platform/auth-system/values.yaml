@@ -274,7 +274,7 @@ authelia:
     identity_providers:
       oidc:
         enabled: true
-        enforce_pkce: always
+        enforce_pkce: public_clients_only
         hmac_secret:
           path: identity_providers.oidc.hmac.key
         authorization_policies:
@@ -287,11 +287,26 @@ authelia:
                 subject: "group:full-admin"
               - policy: one_factor
                 subject: "group:argocd-user"
+          grafana:
+            default_policy: deny
+            rules:
+              - policy: one_factor
+                subject: "group:grafana-viewers"
+              - policy: two_factor
+                subject: "group:grafana-editors"
+              - policy: two_factor
+                subject: "group:grafana-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
         clients:
           - client_id: argocd
             client_name: Argo CD
-            # Don't ask user for consent to provide their OIDC scopes to ArgoCD
-            consent_mode: implicit
+            # The offline_access scope forces Authelia's explicit-consent path
+            # regardless of consent_mode. Setting this to implicit would show a
+            # consent screen on every login. The pre-configured setting asks
+            # once and remembers it.
+            consent_mode: pre-configured
+            pre_configured_consent_duration: 100y
             public: true
             authorization_policy: argocd
             require_pkce: true
@@ -325,10 +340,12 @@ authelia:
             client_name: Grafana
             consent_mode: pre-configured
             pre_configured_consent_duration: 100y
+            # Grafana does not support PKCE, and the feature request to add it was closed.
+            require_pkce: false
             client_secret:
               path: /secrets/authelia-oidc-client-secrets/grafana
             token_endpoint_auth_method: client_secret_post
-            authorization_policy: one_factor
+            authorization_policy: grafana
             scopes:
               - openid
               - profile

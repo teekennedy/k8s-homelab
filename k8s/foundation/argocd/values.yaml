@@ -59,11 +59,15 @@ argo-cd:
         issuer: https://authelia.msng.to
         clientID: argocd
         enablePKCEAuthentication: true
+        # offline_access gets ArgoCD a refresh token, which it uses to silently
+        # refresh the session server-side (CheckAndRefreshToken) instead of
+        # hard-expiring the id_token and forcing a full login-page redirect.
         requestedScopes:
           - openid
           - profile
           - email
           - groups
+          - offline_access
         requestedIDTokenClaims:
           groups:
             essential: true
