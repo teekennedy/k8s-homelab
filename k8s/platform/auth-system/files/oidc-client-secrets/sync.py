@@ -58,6 +58,9 @@ MANAGED_BY_VALUE = "authelia-oidc-client-secrets-sync"
 CLIENT_ID_LABEL = "authelia.msng.to/oidc-client-id"
 
 REFLECTS_ANNOTATION = "reflector.v1.k8s.emberstack.com/reflects"
+# Written to a mirror purely to generate an event reflector will react to.
+# See Syncer.nudge_mirror for why that is necessary.
+NUDGE_ANNOTATION = "authelia.msng.to/reflection-nudge"
 
 
 class SourceRef:
@@ -237,6 +240,34 @@ class Syncer:
             )
         return name
 
+    def nudge_mirror(self, name: str) -> None:
+        """Patch a mirror's annotations so reflector re-evaluates it.
+
+        reflector decides whether a mirror is permitted while handling an event
+        for that mirror, and does NOT revisit one it rejected when the source
+        later starts granting permission — it only recovers on its hourly full
+        re-list. That rejection is the normal case here: this app can sync before
+        the app chart that adds reflection-allowed to the source, so the first
+        evaluation is legitimately refused with "Source ... does not permit it".
+
+        Without this, waiting is useless and so is retrying: ensure_mirror is a
+        no-op once the mirror exists with the right `reflects` annotation, so
+        nothing would ever generate the event reflector needs, and the sync would
+        block until reflector's next re-list. Writing an annotation produces a
+        fresh mirror event and reflector re-checks the source immediately.
+        """
+        self.api.patch_namespaced_secret(
+            name,
+            self.namespace,
+            {
+                "metadata": {
+                    "annotations": {
+                        NUDGE_ANNOTATION: datetime.now(timezone.utc).isoformat()
+                    }
+                }
+            },
+        )
+
     def wait_for_plaintexts(
         self, wanted: dict[str, tuple[str, SourceRef]]
     ) -> dict[str, str]:
@@ -245,7 +276,7 @@ class Syncer:
         deadline = time.monotonic() + self.timeout
 
         while True:
-            pending = []
+            pending: list[tuple[str, str]] = []
             for client_id, (name, source) in sorted(wanted.items()):
                 if client_id in plaintexts:
                     continue
@@ -257,20 +288,27 @@ class Syncer:
                         f"  reflected {client_id} from {source.reflects}:{source.key}"
                     )
                 else:
-                    pending.append(f"{client_id} ({source.reflects}:{source.key})")
+                    pending.append(
+                        (name, f"{client_id} ({source.reflects}:{source.key})")
+                    )
 
             if not pending:
                 return plaintexts
 
+            described = ", ".join(desc for _, desc in pending)
+
             if time.monotonic() >= deadline:
                 raise TimeoutError(
-                    f"reflector did not populate after {self.timeout}s: {', '.join(pending)}. "
+                    f"reflector did not populate after {self.timeout}s: {described}. "
                     "Check that each source Secret exists with the expected key, and carries "
                     "reflection-allowed=true plus reflection-allowed-namespaces including "
                     f"'{self.namespace}'."
                 )
 
-            print(f"  waiting on {len(pending)} mirror(s): {', '.join(pending)}")
+            for name, _ in pending:
+                self.nudge_mirror(name)
+
+            print(f"  waiting on {len(pending)} mirror(s): {described}")
             time.sleep(self.poll_interval)
 
     def read_target(self) -> dict[str, str]:

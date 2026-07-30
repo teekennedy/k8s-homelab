@@ -6,6 +6,7 @@ Kubernetes cluster is required.
 """
 
 import base64
+from types import SimpleNamespace
 
 import pytest
 
@@ -185,3 +186,105 @@ class TestMirrorName:
             sync.mirror_name("oidc-client-mirror-", "copyparty")
             == "oidc-client-mirror-copyparty"
         )
+
+
+class FakeSecretApi:
+    """Minimal stand-in for CoreV1Api that records patches.
+
+    `populate_after` makes a mirror start returning its plaintext only once it
+    has been nudged that many times, which is how reflector behaves when the
+    source is not yet permitted: it refuses the first evaluation and only
+    reconsiders when a fresh event arrives for the mirror.
+    """
+
+    def __init__(self, data=None, populate_after=None):
+        self.data = data or {}
+        self.populate_after = populate_after or {}
+        self.nudges = []
+
+    def read_namespaced_secret(self, name, namespace):
+        needed = self.populate_after.get(name)
+        if needed is not None and self.nudges.count(name) < needed:
+            return SimpleNamespace(data={})
+        raw = self.data.get(name, {})
+        encoded = {k: base64.b64encode(v.encode()).decode() for k, v in raw.items()}
+        return SimpleNamespace(data=encoded)
+
+    def patch_namespaced_secret(self, name, namespace, body):
+        ann = body.get("metadata", {}).get("annotations", {})
+        if sync.NUDGE_ANNOTATION in ann:
+            self.nudges.append(name)
+
+
+def make_syncer(api, timeout=5, poll_interval=0):
+    return sync.Syncer(
+        api,
+        apps=None,
+        cfg={
+            "namespace": "auth-system",
+            "target_secret": "authelia-oidc-client-secrets",
+            "mirror_prefix": "oidc-client-mirror-",
+            "deployment": "auth-system-authelia",
+            "timeout": timeout,
+            "poll_interval": poll_interval,
+            "cost": 4,
+        },
+    )
+
+
+class TestWaitForPlaintexts:
+    def _wanted(self, *client_ids):
+        return {
+            cid: (
+                f"oidc-client-mirror-{cid}",
+                sync.SourceRef(cid, f"{cid}-secrets", "client-secret"),
+            )
+            for cid in client_ids
+        }
+
+    def test_returns_plaintexts_when_already_reflected(self):
+        api = FakeSecretApi(
+            data={"oidc-client-mirror-alpha": {"client-secret": "s3cret"}}
+        )
+        syncer = make_syncer(api)
+        assert syncer.wait_for_plaintexts(self._wanted("alpha")) == {"alpha": "s3cret"}
+        assert api.nudges == []
+
+    def test_nudges_pending_mirror_until_reflector_permits_it(self):
+        # The regression this guards: reflector rejects a mirror while the source
+        # is not yet permitted and never revisits it, so without a nudge the wait
+        # can only ever time out.
+        api = FakeSecretApi(
+            data={"oidc-client-mirror-alpha": {"client-secret": "s3cret"}},
+            populate_after={"oidc-client-mirror-alpha": 2},
+        )
+        syncer = make_syncer(api)
+        assert syncer.wait_for_plaintexts(self._wanted("alpha")) == {"alpha": "s3cret"}
+        assert api.nudges == ["oidc-client-mirror-alpha"] * 2
+
+    def test_nudges_only_the_mirrors_still_pending(self):
+        api = FakeSecretApi(
+            data={
+                "oidc-client-mirror-alpha": {"client-secret": "a"},
+                "oidc-client-mirror-beta": {"client-secret": "b"},
+            },
+            populate_after={"oidc-client-mirror-beta": 1},
+        )
+        syncer = make_syncer(api)
+        assert syncer.wait_for_plaintexts(self._wanted("alpha", "beta")) == {
+            "alpha": "a",
+            "beta": "b",
+        }
+        assert api.nudges == ["oidc-client-mirror-beta"]
+
+    def test_times_out_with_actionable_message(self):
+        api = FakeSecretApi(data={"oidc-client-mirror-alpha": {}})
+        syncer = make_syncer(api, timeout=0)
+        with pytest.raises(TimeoutError, match="reflection-allowed"):
+            syncer.wait_for_plaintexts(self._wanted("alpha"))
+
+    def test_timeout_message_names_the_pending_source(self):
+        api = FakeSecretApi(data={"oidc-client-mirror-alpha": {}})
+        syncer = make_syncer(api, timeout=0)
+        with pytest.raises(TimeoutError, match=r"alpha \(alpha/alpha-secrets"):
+            syncer.wait_for_plaintexts(self._wanted("alpha"))

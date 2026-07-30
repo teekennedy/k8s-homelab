@@ -1,6 +1,6 @@
 apiVersion: v2
 name: authelia
-version: 0.0.26
+version: 0.0.27
 dependencies:
   - name: authelia
     version: 0.11.6

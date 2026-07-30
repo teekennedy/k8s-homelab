@@ -52,6 +52,16 @@ An ArgoCD PreSync hook on the auth-system Application. Each run:
    annotated `reflects: <ns>/<name>`) and waits for reflector to populate it.
    Mirrors are created by the job rather than templated, so ArgoCD has nothing to
    fight over and the job needs no cluster-wide secret read.
+
+   While a mirror is still empty, each poll writes a `reflection-nudge`
+   annotation to it. This is load-bearing, not a retry nicety: reflector decides
+   whether a mirror is permitted while handling an event *for that mirror*, and
+   never revisits one it rejected once the source starts permitting it — it only
+   recovers on its hourly full re-list. Seeing
+   `Could not update ... - Source ... does not permit it` in the reflector log is
+   the expected first outcome whenever this app syncs before the app chart that
+   annotates the source, and the nudge is what generates the event that makes
+   reflector look again.
 2. Verifies each stored hash against its plaintext with `bcrypt.checkpw` and only
    re-hashes on a mismatch. bcrypt is salted, so hashing unconditionally would
    rewrite the Secret and restart Authelia on every sync.
