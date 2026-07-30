@@ -321,11 +321,10 @@ authelia:
           # Grafana (k8s/platform/monitoring-system), authenticated via its
           # built-in auth.generic_oauth provider, which (like oauth2-proxy)
           # uses golang.org/x/oauth2 and so also wants client_secret_post.
-          # consent_mode implicit + offline_access keeps homelab logins to a
-          # single redirect and lets Grafana silently refresh its own tokens.
           - client_id: grafana
             client_name: Grafana
-            consent_mode: implicit
+            consent_mode: pre-configured
+            pre_configured_consent_duration: 100y
             client_secret:
               path: /secrets/authelia-oidc-client-secrets/grafana
             token_endpoint_auth_method: client_secret_post
@@ -365,11 +364,8 @@ authelia:
               - openid
               - profile
               - email
-              - groups
-              - offline_access
             grant_types:
               - authorization_code
-              - refresh_token
             response_types:
               - code
             redirect_uris:
@@ -390,10 +386,8 @@ authelia:
               - profile
               - email
               - groups
-              - offline_access
             grant_types:
               - authorization_code
-              - refresh_token
             response_types:
               - code
             redirect_uris:
@@ -419,10 +413,8 @@ authelia:
               - profile
               - email
               - groups
-              - offline_access
             grant_types:
               - authorization_code
-              - refresh_token
             response_types:
               - code
             redirect_uris:
