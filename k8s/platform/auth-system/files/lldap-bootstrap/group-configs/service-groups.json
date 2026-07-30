@@ -25,3 +25,9 @@
 {
   "name": "copyparty-admins"
 }
+{
+  "name": "gitea-users"
+}
+{
+  "name": "gitea-admins"
+}

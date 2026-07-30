@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"code.gitea.io/sdk/gitea"
 	"gopkg.in/yaml.v3"
@@ -20,7 +22,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type Team struct {
@@ -74,12 +78,34 @@ type OAuth2App struct {
 	SecretNamespace string   `yaml:"secretNamespace"`
 }
 
+type OIDCClient struct {
+	Name                  string
+	ClientID              string   `yaml:"clientID"`
+	ClientSecretName      string   `yaml:"clientSecretName"`
+	ClientSecretNamespace string   `yaml:"clientSecretNamespace"`
+	AutoDiscoverURL       string   `yaml:"autoDiscoverURL"`
+	Scopes                []string `yaml:"scopes"`
+	GroupClaimName        string   `yaml:"groupClaimName"`
+	AdminGroup            string   `yaml:"adminGroup"`
+}
+
+// PodExecTarget is where `gitea admin auth` and any future CLI-only
+// reconciliation runs: the running gitea pod, which has an already-generated
+// app.ini and DB connection. Shared across every config entry that needs pod
+// exec, rather than repeated per entry.
+type PodExecTarget struct {
+	Namespace     string
+	LabelSelector string `yaml:"labelSelector"`
+}
+
 type Config struct {
 	Organizations []Organization
 	Repositories  []Repository
 	Users         []User
 	Runners       []Runner
-	OAuth2Apps    []OAuth2App `yaml:"oauth2Apps"`
+	OAuth2Apps    []OAuth2App    `yaml:"oauth2Apps"`
+	PodExec       *PodExecTarget `yaml:"podExec"`
+	OIDC          *OIDCClient    `yaml:"oidc"`
 }
 
 const charset = "abcdefghijklmnopqrstuvwxyz" +
@@ -132,6 +158,124 @@ func getOrCreatePassword(ctx context.Context, k8sClient *kubernetes.Clientset, n
 		return string(passwordBytes[:]), nil
 	}
 	return password, err
+}
+
+func waitForSecretKey(ctx context.Context, k8sClient *kubernetes.Clientset, namespace, name, key string, timeout time.Duration) (string, error) {
+	secretClient := k8sClient.CoreV1().Secrets(namespace)
+	deadline := time.Now().Add(timeout)
+	for {
+		secret, err := secretClient.Get(ctx, name, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return "", fmt.Errorf("get secret %s in %s: %w", name, namespace, err)
+		}
+		if err == nil {
+			if value, ok := secret.Data[key]; ok && len(value) > 0 {
+				return string(value), nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("timed out waiting for key %s in secret %s/%s", key, namespace, name)
+		}
+		log.Printf("Waiting for key %s in secret %s/%s", key, namespace, name)
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func findPodByLabel(ctx context.Context, k8sClient *kubernetes.Clientset, namespace, labelSelector string) (string, error) {
+	pods, err := k8sClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+		FieldSelector: "status.phase=Running",
+	})
+	if err != nil {
+		return "", fmt.Errorf("list pods matching %q in %s: %w", labelSelector, namespace, err)
+	}
+	if len(pods.Items) == 0 {
+		return "", fmt.Errorf("no running pods matching %q in %s", labelSelector, namespace)
+	}
+	return pods.Items[0].Name, nil
+}
+
+// execInPod has no REST API equivalent for `gitea admin auth`, which reads
+// and writes auth sources directly against the DB via the running pod's
+// already-generated app.ini.
+func execInPod(ctx context.Context, k8sConfig *rest.Config, k8sClient *kubernetes.Clientset, namespace, podName, container string, command []string) (stdout, stderr string, err error) {
+	req := k8sClient.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec")
+	req.VersionedParams(&corev1.PodExecOptions{
+		Container: container,
+		Command:   command,
+		Stdout:    true,
+		Stderr:    true,
+	}, scheme.ParameterCodec)
+
+	executor, err := remotecommand.NewSPDYExecutor(k8sConfig, http.MethodPost, req.URL())
+	if err != nil {
+		return "", "", fmt.Errorf("create executor: %w", err)
+	}
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: &stdoutBuf,
+		Stderr: &stderrBuf,
+	})
+	return stdoutBuf.String(), stderrBuf.String(), err
+}
+
+// configureOIDCAuthSource is idempotent by reconciling flags into the source on every
+// run (unconditional update-oauth), the same way the rest of this job re-asserts state.
+func configureOIDCAuthSource(ctx context.Context, k8sConfig *rest.Config, k8sClient *kubernetes.Clientset, pod *PodExecTarget, oidc *OIDCClient, clientSecret string) error {
+	podName, err := findPodByLabel(ctx, k8sClient, pod.Namespace, pod.LabelSelector)
+	if err != nil {
+		return fmt.Errorf("find gitea pod: %w", err)
+	}
+
+	listOut, listErr, err := execInPod(ctx, k8sConfig, k8sClient, pod.Namespace, podName, "gitea",
+		[]string{"gitea", "admin", "auth", "list"})
+	if err != nil {
+		return fmt.Errorf("list auth sources: %w: %s", err, listErr)
+	}
+
+	var existingID string
+	for _, line := range strings.Split(strings.TrimSpace(listOut), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] == "ID" {
+			continue
+		}
+		if fields[1] == oidc.Name {
+			existingID = fields[0]
+			break
+		}
+	}
+
+	args := []string{"gitea", "admin", "auth"}
+	if existingID != "" {
+		args = append(args, "update-oauth", "--id", existingID)
+	} else {
+		args = append(args, "add-oauth")
+	}
+	args = append(args,
+		"--name", oidc.Name,
+		"--provider", "openidConnect",
+		"--key", oidc.ClientID,
+		"--secret", clientSecret,
+		"--auto-discover-url", oidc.AutoDiscoverURL,
+		"--scopes", strings.Join(oidc.Scopes, " "),
+	)
+	if oidc.GroupClaimName != "" {
+		args = append(args, "--group-claim-name", oidc.GroupClaimName)
+	}
+	if oidc.AdminGroup != "" {
+		args = append(args, "--admin-group", oidc.AdminGroup)
+	}
+
+	_, applyErr, err := execInPod(ctx, k8sConfig, k8sClient, pod.Namespace, podName, "gitea", args)
+	if err != nil {
+		return fmt.Errorf("%s: %w: %s", args[2], err, applyErr)
+	}
+	return nil
 }
 
 func getRunnerRegistrationToken(ctx context.Context, giteaHost, giteaUser, giteaPassword string) (string, error) {
@@ -230,6 +374,21 @@ func main() {
 	k8sClient, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
 		log.Fatalf("create k8s client: %v", err)
+	}
+
+	if config.OIDC != nil {
+		if config.PodExec == nil {
+			log.Print("OIDC client configured but podExec target is missing")
+		} else {
+			clientSecret, err := waitForSecretKey(ctx, k8sClient, config.OIDC.ClientSecretNamespace, config.OIDC.ClientSecretName, "client-secret", 3*time.Minute)
+			if err != nil {
+				log.Printf("Get OIDC client secret: %v", err)
+			} else if err := configureOIDCAuthSource(ctx, k8sConfig, k8sClient, config.PodExec, config.OIDC, clientSecret); err != nil {
+				log.Printf("Configure OIDC auth source %s: %v", config.OIDC.Name, err)
+			} else {
+				log.Printf("Configured OIDC auth source %s", config.OIDC.Name)
+			}
+		}
 	}
 
 	for _, org := range config.Organizations {

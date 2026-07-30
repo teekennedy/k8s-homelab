@@ -30,6 +30,7 @@ oidcClientSecrets:
   clients:
     jellyfin: jellyfin/jellyfin-oidc-authelia
     grafana: monitoring-system/grafana-oidc-authelia
+    gitea: gitea/gitea-oidc-authelia
     oauth2-proxy: homepage/homepage-oauth2-proxy-secrets
     oauth2-proxy-internal: syncthing/syncthing-oauth2-proxy-secrets
     copyparty: copyparty/copyparty-oauth2-proxy-secrets
@@ -274,7 +275,11 @@ authelia:
     identity_providers:
       oidc:
         enabled: true
-        enforce_pkce: always
+        # public_clients_only, not always: Gitea's OIDC client (goth) doesn't
+        # implement PKCE, so gitea's client below opts out. Every other
+        # client is confidential-with-explicit-require_pkce except jellyfin,
+        # which is given it explicitly here to keep its enforcement unchanged.
+        enforce_pkce: public_clients_only
         hmac_secret:
           path: identity_providers.oidc.hmac.key
         authorization_policies:
@@ -298,6 +303,15 @@ authelia:
                 subject: "group:grafana-admins"
               - policy: two_factor
                 subject: "group:full-admin"
+          gitea:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:gitea-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
+              - policy: one_factor
+                subject: "group:gitea-users"
         clients:
           - client_id: argocd
             client_name: Argo CD
@@ -331,6 +345,8 @@ authelia:
               path: /secrets/authelia-oidc-client-secrets/jellyfin
             token_endpoint_auth_method: client_secret_post
             authorization_policy: one_factor
+            require_pkce: true
+            pkce_challenge_method: S256
             redirect_uris:
               - https://jellyfin.msng.to/sso/OID/redirect/authelia
           # Grafana (k8s/platform/monitoring-system), authenticated via its
@@ -361,6 +377,31 @@ authelia:
               - code
             redirect_uris:
               - https://grafana.msng.to/login/generic_oauth
+          # Gitea (k8s/platform/gitea). Gitea's OAuth2 client (goth) doesn't
+          # implement PKCE, hence require_pkce: false, nor does it verify a
+          # signed userinfo/access token, only plain JSON, hence
+          # *_signed_response_alg: none.
+          - client_id: gitea
+            client_name: Gitea
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/gitea
+            token_endpoint_auth_method: client_secret_basic
+            access_token_signed_response_alg: none
+            userinfo_signed_response_alg: none
+            authorization_policy: gitea
+            consent_mode: implicit
+            require_pkce: false
+            scopes:
+              - openid
+              - profile
+              - email
+              - groups
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://git.msng.to/user/oauth2/authelia/callback
           # token_endpoint_auth_method: client_secret_post matches what
           # oauth2-proxy / golang.org/x/oauth2 sends at the token endpoint.
           # client_secret resolves to a bcrypt hash of the mittwald-generated
@@ -507,6 +548,8 @@ authelia:
         items:
           - key: copyparty
             path: copyparty
+          - key: gitea
+            path: gitea
           - key: grafana
             path: grafana
           - key: jellyfin

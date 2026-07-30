@@ -104,6 +104,10 @@ metadata:
 {{- $users := index .Values "gitea-resources" "users" | default (list) }}
 {{- $runners := index .Values "gitea-resources" "runners" | default (list) }}
 {{- $oauth2Apps := index .Values "gitea-resources" "oauth2Apps" | default (list) }}
+{{- $oidcClients := list }}
+{{- if index .Values "gitea-resources" "oidc" }}
+  {{- $oidcClients = list (index .Values "gitea-resources" "oidc") }}
+{{- end }}
 {{- $namespaceSecrets := dict }}
 
 {{- range $users }}
@@ -127,6 +131,15 @@ metadata:
 {{- range $oauth2Apps }}
   {{- $ns := .secretNamespace }}
   {{- $secret := .secretName }}
+  {{- if not (hasKey $namespaceSecrets $ns) }}
+    {{- $_ := set $namespaceSecrets $ns (list $secret) }}
+  {{- else }}
+    {{- $_ := set $namespaceSecrets $ns (append (get $namespaceSecrets $ns) $secret) }}
+  {{- end }}
+{{- end }}
+{{- range $oidcClients }}
+  {{- $ns := .clientSecretNamespace }}
+  {{- $secret := .clientSecretName }}
   {{- if not (hasKey $namespaceSecrets $ns) }}
     {{- $_ := set $namespaceSecrets $ns (list $secret) }}
   {{- else }}
@@ -159,6 +172,10 @@ rules:
 {{- $users := index .Values "gitea-resources" "users" | default (list) }}
 {{- $runners := index .Values "gitea-resources" "runners" | default (list) }}
 {{- $oauth2Apps := index .Values "gitea-resources" "oauth2Apps" | default (list) }}
+{{- $oidcClients := list }}
+{{- if index .Values "gitea-resources" "oidc" }}
+  {{- $oidcClients = list (index .Values "gitea-resources" "oidc") }}
+{{- end }}
 {{- $seenNamespaces := dict }}
 
 {{- range $users }}
@@ -220,4 +237,57 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
   {{- end }}
+{{- end }}
+{{- range $oidcClients }}
+  {{- $ns := .clientSecretNamespace }}
+  {{- if not (hasKey $seenNamespaces $ns) }}
+    {{- $_ := set $seenNamespaces $ns true }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-resources-secret-writer-binding
+  namespace: {{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: gitea-resources-job
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: gitea-resources-secret-writer
+  apiGroup: rbac.authorization.k8s.io
+---
+  {{- end }}
+{{- end }}
+
+# Grant the job exec access into the gitea pod, needed by config entries
+# (e.g. oidc) that reconcile state only reachable via `gitea admin` CLI
+# commands with no REST API equivalent.
+{{- if index .Values "gitea-resources" "podExec" }}
+{{- $podExec := index .Values "gitea-resources" "podExec" }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gitea-resources-pod-exec
+  namespace: {{ $podExec.namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-resources-pod-exec-binding
+  namespace: {{ $podExec.namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: gitea-resources-job
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: gitea-resources-pod-exec
+  apiGroup: rbac.authorization.k8s.io
 {{- end }}

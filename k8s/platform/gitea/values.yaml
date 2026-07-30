@@ -89,13 +89,25 @@ gitea:
         DISABLE_STARS: true
         DEFAULT_BRANCH: main
       service:
-        DISABLE_REGISTRATION: true
+        DISABLE_REGISTRATION: false
+        ALLOW_ONLY_EXTERNAL_REGISTRATION: true
+        SHOW_REGISTRATION_BUTTON: false
       service.explore:
         DISABLE_USERS_PAGE: true
       actions:
         ENABLED: true
       webhook:
         ALLOWED_HOST_LIST: private
+      oauth2_client:
+        ENABLE_AUTO_REGISTRATION: true
+        USERNAME: preferred_username
+        # LDAP's email is authoritative and Authelia is the only IdP, so
+        # silently linking by email on first OIDC login is safe here and
+        # preserves the existing tkennedy user (and its Gitea user ID, which
+        # Woodpecker keys repo ownership on).
+        ACCOUNT_LINKING: auto
+      openid:
+        ENABLE_OPENID_SIGNIN: false
 
 gitea-resources:
   users:
@@ -138,6 +150,24 @@ gitea-resources:
         - https://ci.msng.to/authorize
       secretName: woodpecker-gitea-oauth2
       secretNamespace: woodpecker
+  # Where `gitea admin auth` and any future exec-only reconciliation runs.
+  # Shared by every config entry below that needs it (currently just oidc).
+  podExec:
+    namespace: gitea
+    labelSelector: app.kubernetes.io/name=gitea
+  oidc:
+    name: authelia
+    clientID: gitea
+    clientSecretName: gitea-oidc-authelia
+    clientSecretNamespace: gitea
+    autoDiscoverURL: https://authelia.msng.to/.well-known/openid-configuration
+    scopes:
+      - openid
+      - profile
+      - email
+      - groups
+    groupClaimName: groups
+    adminGroup: gitea-admins
   organizations:
     - name: ops
       description: Operations
