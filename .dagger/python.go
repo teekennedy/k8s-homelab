@@ -12,6 +12,20 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// blackCmd is the single definition of how black is invoked. Every call site
+// uses it: lint, per-project format, and the aggregate format all have to agree
+// with each other and with the black pre-commit hook in devenv.nix. Three
+// hand-maintained copies of this argument list previously drifted apart, so the
+// `dagger check` gate and `dagger call format-python` disagreed on line length.
+//
+// No --line-length is passed on purpose. devenv.nix's hook doesn't pass one
+// either, so black's default governs both and there is no setting to keep in
+// sync. Adding a width here means adding the identical width there in the same
+// commit, or the two tools reformat each other's output forever.
+func blackCmd() []string {
+	return []string{"uv", "tool", "run", "--link-mode", "copy", "black", "."}
+}
+
 // discoverPythonProjectPaths finds all Python project directories in source.
 func discoverPythonProjectPaths(ctx context.Context, source *dagger.Directory) []string {
 	pyprojectFiles, _ := source.Glob(ctx, "**/pyproject.toml")
@@ -44,7 +58,7 @@ type PythonProject struct {
 func (m *Homelab) PythonProjects(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 ) []*PythonProject {
 	var projects []*PythonProject
@@ -87,7 +101,7 @@ func (pp *PythonProject) Lint(ctx context.Context) (string, error) {
 		From(uvImage).
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
-		WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "."}).
+		WithExec(blackCmd()).
 		Directory("/src")
 
 	changeset := formatted.Changes(pp.Source)
@@ -111,7 +125,7 @@ func (pp *PythonProject) Format() *dagger.Directory {
 		From(uvImage).
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
-		WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "."}).
+		WithExec(blackCmd()).
 		Directory("/src")
 }
 
@@ -122,7 +136,7 @@ func (pp *PythonProject) Format() *dagger.Directory {
 // +check
 func (m *Homelab) LintPython(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,
@@ -159,7 +173,7 @@ func (m *Homelab) LintPython(ctx context.Context,
 func (m *Homelab) FormatPython(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,
@@ -188,7 +202,7 @@ func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, pa
 	for _, dir := range pythonProjectPaths {
 		container = container.
 			WithWorkdir("/src/" + dir).
-			WithExec([]string{"uv", "tool", "run", "--link-mode", "copy", "black", "."})
+			WithExec(blackCmd())
 	}
 
 	return container.Directory("/src"), nil
@@ -200,7 +214,7 @@ func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, pa
 // +check
 func (m *Homelab) TestPython(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,

@@ -39,6 +39,16 @@ spec:
       kind: ConfigMap
       name: lldap-bootstrap-user-configs
       namespace: auth-system
+    # The OIDC client secret sync job restarts Authelia when a client secret is
+    # rotated, since Authelia only resolves its secret files at startup. Without
+    # this, the next sync would strip the annotation back off and cause a second,
+    # pointless rollout.
+    - jsonPointers:
+        - /spec/template/metadata/annotations/kubectl.kubernetes.io~1restartedAt
+      group: apps
+      kind: Deployment
+      name: auth-system-authelia
+      namespace: auth-system
 
   project: default
   source:

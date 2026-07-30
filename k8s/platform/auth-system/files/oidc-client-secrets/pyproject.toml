@@ -1,0 +1,21 @@
+[project]
+name = "authelia-oidc-client-secrets"
+version = "1.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "bcrypt>=4.2.0",
+    "kubernetes>=31.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "integration: marks tests as integration tests (require cluster, deselected by default)",
+]
+addopts = "-m 'not integration'"

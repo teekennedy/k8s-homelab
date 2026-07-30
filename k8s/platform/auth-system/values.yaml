@@ -1,3 +1,51 @@
+# Maps each Authelia OIDC client to the Secret holding its plaintext client
+# secret, so the PreSync sync job can bcrypt-hash it into the aggregate Secret
+# Authelia mounts (see templates/authelia-oidc-client-secrets.yaml and
+# files/oidc-client-secrets/README.md). Keys must match the file name in each
+# client's `client_secret.path`; a mismatch fails the render rather than the
+# sync. Nothing here has to be maintained by hand — no bcrypt hash is ever
+# committed to git.
+oidcClientSecrets:
+  # Aggregate Secret Authelia mounts at /secrets/<targetSecret>/<client_id>.
+  # Created and owned by the sync job, deliberately not templated.
+  targetSecret: authelia-oidc-client-secrets
+  # Prefix for the per-client reflector mirror Secrets the job creates.
+  mirrorPrefix: oidc-client-mirror-
+  # Key holding the plaintext in each source Secret. Matches the key mittwald
+  # secret-generator populates in the consuming charts.
+  sourceKey: client-secret
+  # Authelia's default bcrypt cost, matching `authelia crypto hash generate bcrypt`.
+  bcryptCost: 12
+  # How long to wait for reflector to mirror each plaintext before failing the
+  # hook. Generous, because on a fresh client this app can sync before the app
+  # chart that owns the plaintext exists.
+  reflectionTimeout: 180
+  # Deployment restarted when a client secret is rotated. Defaults to
+  # <release>-authelia. If you override it, also update the matching
+  # ignoreDifferences entry in application.yaml, which cannot be templated and
+  # so names the Deployment literally.
+  # autheliaDeployment: auth-system-authelia
+  # <client_id>: <namespace>/<secret-name>. Each source Secret must allow
+  # reflection into auth-system.
+  clients:
+    oauth2-proxy: oauth2-proxy/oauth2-proxy-secrets
+    oauth2-proxy-internal: oauth2-proxy-internal/oauth2-proxy-internal-secrets
+    copyparty: copyparty/copyparty-oauth2-proxy-secrets
+  image:
+    repository: ghcr.io/astral-sh/uv
+    tag: alpine
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  securityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    runAsUser: 65534
+
 # source https://github.com/authelia/chartrepo/tree/master/charts/authelia
 # yaml-language-server: $schema=https://raw.githubusercontent.com/authelia/chartrepo/refs/heads/master/charts/authelia/values.schema.json
 authelia:
@@ -262,9 +310,9 @@ authelia:
               - https://argocd.msng.to/pkce/verify
           # token_endpoint_auth_method: client_secret_post matches what
           # oauth2-proxy / golang.org/x/oauth2 sends at the token endpoint.
-          # client_secret is a bcrypt hash of the mittwald-generated secret in
-          # oauth2-proxy-secrets. The hash can be regenerated with:
-          # authelia crypto hash generate bcrypt --password <plaintext>
+          # client_secret resolves to a bcrypt hash of the mittwald-generated
+          # secret in oauth2-proxy-secrets, maintained by the sync job from the
+          # oidcClientSecrets.clients mapping at the top of this file.
           - client_id: oauth2-proxy
             client_name: OAuth2 Proxy
             consent_mode: implicit
@@ -288,14 +336,7 @@ authelia:
             redirect_uris:
               - https://msng.to/oauth2/callback
           # Internal oauth2-proxy (k8s/platform/oauth2-proxy-internal) fronting
-          # the syncthing GUI with no internal-network bypass. client_secret is a
-          # bcrypt hash of the mittwald-generated secret in
-          # oauth2-proxy-internal-secrets. BOOTSTRAP: the hash below is a
-          # placeholder — after first sync, regenerate it from the real value:
-          #   kubectl -n oauth2-proxy-internal get secret oauth2-proxy-internal-secrets \
-          #     -o jsonpath='{.data.client-secret}' | base64 -d
-          #   authelia crypto hash generate bcrypt --password <that-value>
-          # then commit the new hash here. (See oauth2-proxy-internal/README.md.)
+          # the syncthing GUI with no internal-network bypass.
           - client_id: oauth2-proxy-internal
             client_name: OAuth2 Proxy (internal)
             consent_mode: implicit
@@ -325,12 +366,6 @@ authelia:
           # inside copyparty, so the groups claim must be released here.
           # two_factor because this instance is internet-facing and fronts every
           # personal file; drop to one_factor if that proves too heavy.
-          # BOOTSTRAP: the client_secret hash below is a placeholder — after
-          # first sync, regenerate it from the real value:
-          #   kubectl -n copyparty get secret copyparty-oauth2-proxy-secrets \
-          #     -o jsonpath='{.data.client-secret}' | base64 -d
-          #   authelia crypto hash generate bcrypt --password <that-value>
-          # then commit the new hash here. (See k8s/apps/copyparty/README.md.)
           - client_id: copyparty
             client_name: copyparty
             consent_mode: implicit

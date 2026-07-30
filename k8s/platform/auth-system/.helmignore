@@ -1,0 +1,4 @@
+files/oidc-client-secrets/.venv
+files/oidc-client-secrets/__pycache__
+files/oidc-client-secrets/tests
+files/oidc-client-secrets/.pytest_cache

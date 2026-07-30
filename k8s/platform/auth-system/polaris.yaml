@@ -6,6 +6,15 @@ exemptions:
       - auth-system-authelia
     rules:
       - sensitiveContainerEnvVar
+  # The OIDC client secret sync job takes TARGET_SECRET and SOURCE_KEY env vars,
+  # whose names contain "SECRET"/"KEY" but whose values are a Secret name and a
+  # data key. Every actual secret value it handles is read from the API at
+  # runtime and never passed through the environment, so sensitiveContainerEnvVar
+  # is a false positive here for the same reason as authelia above.
+  - controllerNames:
+      - authelia-oidc-client-secrets-sync
+    rules:
+      - sensitiveContainerEnvVar
   # lldap-bootstrap runs as root to install kubectl via apk before bootstrapping
   # users/groups. See TODO comment in the template for planned rootless migration.
   - controllerNames:

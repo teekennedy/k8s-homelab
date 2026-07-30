@@ -2,7 +2,7 @@ apiVersion: v2
 name: oauth2-proxy
 description: oauth2-proxy as a Traefik forwardAuth middleware, fronting Authelia OIDC
 type: application
-version: 0.0.3
+version: 0.0.4
 dependencies:
   - name: oauth2-proxy
     version: 10.7.0

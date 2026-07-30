@@ -83,9 +83,12 @@ in {
     terraform-format.enable = true;
     # YAML linter
     yamllint.enable = true;
-    # Python formatter
+    # Python formatter. Deliberately no --line-length: this hook and the Dagger
+    # black invocation (.dagger/python.go) both have to produce identical output,
+    # and black's default is the one setting neither side can drift on. A flag
+    # here would need the exact same flag there, or the two reformat each other
+    # forever on every commit.
     black.enable = true;
-    black.settings.flags = "--line-length 79";
   };
 
   # See full reference at https://devenv.sh/reference/options/

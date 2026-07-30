@@ -1,0 +1,22 @@
+[project]
+name = "zfs-textfile-exporter"
+version = "1.0.0"
+description = "Exports ZFS pool metrics for the Prometheus node-exporter textfile collector on borg-2"
+requires-python = ">=3.11"
+# No runtime dependencies: the script is built with pkgs.writers.writePython3Bin
+# (see ../zfs-textfile-exporter.nix) and uses only the standard library, shelling
+# out to zpool via $ZPOOL_BIN.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "integration: marks tests as integration tests (require a real zpool, deselected by default)",
+]
+addopts = "-m 'not integration'"

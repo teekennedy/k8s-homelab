@@ -2,7 +2,7 @@ apiVersion: v2
 name: oauth2-proxy-internal
 description: Internal oauth2-proxy (no trusted_ips bypass) reverse-proxying syncthing with Authelia SSO
 type: application
-version: 0.0.1
+version: 0.0.2
 dependencies:
   - name: oauth2-proxy
     version: 10.7.0

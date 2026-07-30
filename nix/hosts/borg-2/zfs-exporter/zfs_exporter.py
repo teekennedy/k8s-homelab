@@ -149,16 +149,14 @@ def main():
 
         if scrub_age_lines:
             lines += [
-                "# HELP zpool_scrub_age_seconds"
-                " Seconds since last completed scrub",
+                "# HELP zpool_scrub_age_seconds" " Seconds since last completed scrub",
                 "# TYPE zpool_scrub_age_seconds gauge",
             ]
             lines += scrub_age_lines
 
         if scrub_err_lines:
             lines += [
-                "# HELP zpool_scrub_errors"
-                " Errors found in last completed scrub",
+                "# HELP zpool_scrub_errors" " Errors found in last completed scrub",
                 "# TYPE zpool_scrub_errors gauge",
             ]
             lines += scrub_err_lines
@@ -195,9 +193,7 @@ def main():
             ]
             for pn, vn, val in acc["slow"]:
                 lines.append(
-                    metric(
-                        "zpool_vdev_slow_ios", {"pool": pn, "vdev": vn}, val
-                    )
+                    metric("zpool_vdev_slow_ios", {"pool": pn, "vdev": vn}, val)
                 )
 
     tmp = OUTPUT + ".tmp"
@@ -209,4 +205,8 @@ def main():
         sys.exit(1)
 
 
-main()
+# Guarded so the module can be imported by the unit tests without shelling out
+# to zpool and writing the textfile. writePython3Bin runs this script directly,
+# so __name__ is "__main__" in production and behaviour is unchanged.
+if __name__ == "__main__":
+    main()

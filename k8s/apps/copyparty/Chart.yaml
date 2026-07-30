@@ -3,7 +3,7 @@ name: copyparty
 description: copyparty web file manager (Dropbox replacement), public at files.msng.to behind Authelia SSO.
 type: application
 # Bump on any change to the chart templates/values.
-version: 0.1.0
+version: 0.1.1
 # Tracks the copyparty/iv image tag deployed by this chart.
 appVersion: "1.20.19"
 dependencies:
