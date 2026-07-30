@@ -92,6 +92,11 @@ gitea:
         DISABLE_REGISTRATION: false
         ALLOW_ONLY_EXTERNAL_REGISTRATION: true
         SHOW_REGISTRATION_BUTTON: false
+        # Hide the password form so the login page
+        # shows just the "Sign in with authelia" button.
+        ENABLE_PASSWORD_SIGNIN_FORM: false
+        # Force users to log in to view any page or to use the API.
+        REQUIRE_SIGNIN_VIEW: true
       service.explore:
         DISABLE_USERS_PAGE: true
       actions:
@@ -161,6 +166,7 @@ gitea-resources:
     clientSecretName: gitea-oidc-authelia
     clientSecretNamespace: gitea
     autoDiscoverURL: https://authelia.msng.to/.well-known/openid-configuration
+    iconURL: https://cdn.jsdelivr.net/gh/selfhst/icons@main/svg/authelia.svg
     scopes:
       - openid
       - profile

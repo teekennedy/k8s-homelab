@@ -84,6 +84,7 @@ type OIDCClient struct {
 	ClientSecretName      string   `yaml:"clientSecretName"`
 	ClientSecretNamespace string   `yaml:"clientSecretNamespace"`
 	AutoDiscoverURL       string   `yaml:"autoDiscoverURL"`
+	IconURL               string   `yaml:"iconURL"`
 	Scopes                []string `yaml:"scopes"`
 	GroupClaimName        string   `yaml:"groupClaimName"`
 	AdminGroup            string   `yaml:"adminGroup"`
@@ -269,6 +270,9 @@ func configureOIDCAuthSource(ctx context.Context, k8sConfig *rest.Config, k8sCli
 	}
 	if oidc.AdminGroup != "" {
 		args = append(args, "--admin-group", oidc.AdminGroup)
+	}
+	if oidc.IconURL != "" {
+		args = append(args, "--icon-url", oidc.IconURL)
 	}
 
 	_, applyErr, err := execInPod(ctx, k8sConfig, k8sClient, pod.Namespace, podName, "gitea", args)
