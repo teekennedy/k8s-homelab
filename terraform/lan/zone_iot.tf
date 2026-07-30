@@ -66,3 +66,33 @@ resource "unifi_firewall_policy" "allow_esphome_api" {
     port_matching_type = "SPECIFIC"
   }
 }
+
+# Allow Voice Assistant to fetch TTS sound files from home assistant
+resource "unifi_firewall_policy" "allow_voice_assistant_tts" {
+  name        = "Allow Voice Assistant TTS"
+  description = "Allow Voice Assistant to fetch TTS sound files from home assistant"
+  action      = "ALLOW"
+  protocol    = "tcp"
+  ip_version  = "BOTH"
+
+  source = {
+    zone_id         = unifi_firewall_zone.iot.id
+    matching_target = "NETWORK"
+    network_ids = [
+      unifi_network.vlans["esphome"].id,
+    ]
+  }
+
+  destination = {
+    zone_id         = data.unifi_firewall_zone.internal.id
+    matching_target = "NETWORK"
+    network_ids = [
+      data.unifi_network.default.id,
+      # TODO remove default after Home Assistant is migrated
+      unifi_network.vlans["home_assistant"].id,
+    ]
+
+    port               = "443"
+    port_matching_type = "SPECIFIC"
+  }
+}
