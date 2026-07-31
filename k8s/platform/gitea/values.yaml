@@ -92,9 +92,7 @@ gitea:
         DISABLE_REGISTRATION: false
         ALLOW_ONLY_EXTERNAL_REGISTRATION: true
         SHOW_REGISTRATION_BUTTON: false
-        # Hide the password form so the login page
-        # shows just the "Sign in with authelia" button.
-        ENABLE_PASSWORD_SIGNIN_FORM: false
+        ENABLE_PASSWORD_SIGNIN_FORM: true
         # Force users to log in to view any page or to use the API.
         # REQUIRE_SIGNIN_VIEW: true
       service.explore:
