@@ -315,12 +315,7 @@ authelia:
         clients:
           - client_id: argocd
             client_name: Argo CD
-            # The offline_access scope forces Authelia's explicit-consent path
-            # regardless of consent_mode. Setting this to implicit would show a
-            # consent screen on every login. The pre-configured setting asks
-            # once and remembers it.
-            consent_mode: pre-configured
-            pre_configured_consent_duration: 100y
+            consent_mode: implicit
             public: true
             authorization_policy: argocd
             require_pkce: true
@@ -330,10 +325,8 @@ authelia:
               - profile
               - email
               - groups
-              - offline_access
             grant_types:
               - authorization_code
-              - refresh_token
             response_types:
               - code
             redirect_uris:
