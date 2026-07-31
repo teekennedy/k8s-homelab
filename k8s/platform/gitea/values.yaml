@@ -94,7 +94,7 @@ gitea:
         SHOW_REGISTRATION_BUTTON: false
         ENABLE_PASSWORD_SIGNIN_FORM: true
         # Force users to log in to view any page or to use the API.
-        # REQUIRE_SIGNIN_VIEW: true
+        REQUIRE_SIGNIN_VIEW: true
       service.explore:
         DISABLE_USERS_PAGE: true
       actions:
