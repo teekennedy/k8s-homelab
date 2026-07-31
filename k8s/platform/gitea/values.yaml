@@ -207,3 +207,14 @@ gitea-resources:
       owner: ops
       description: my bare-metal k8s homelab
       private: false
+      webhook:
+        # Gitea has no native ArgoCD hook type, but ArgoCD's /api/webhook
+        # endpoint natively understands the Gogs payload format, which Gitea
+        # can emit. Patches the shared secret into argocd-secret's
+        # webhook.gogs.secret key (additive, doesn't touch ArgoCD's other
+        # auto-managed keys there).
+        url: http://argocd-server.argocd.svc.cluster.local/api/webhook
+        branchFilter: main
+        secretName: argocd-secret
+        secretNamespace: argocd
+        secretKey: webhook.gogs.secret

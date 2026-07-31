@@ -48,6 +48,20 @@ type Repository struct {
 		Source string
 		Mirror bool
 	}
+	Webhook *RepoWebhook `yaml:"webhook"`
+}
+
+// RepoWebhook creates a Gogs-payload-compatible Gitea webhook (the format
+// ArgoCD's /api/webhook endpoint natively understands, since ArgoCD has no
+// Gitea-specific handler). The shared secret is generated once and stored
+// under SecretKey in the target Secret, which is expected to already exist
+// (e.g. argocd-secret) — patched additively so unrelated keys are untouched.
+type RepoWebhook struct {
+	URL             string `yaml:"url"`
+	BranchFilter    string `yaml:"branchFilter"`
+	SecretName      string `yaml:"secretName"`
+	SecretNamespace string `yaml:"secretNamespace"`
+	SecretKey       string `yaml:"secretKey"`
 }
 
 type AccessToken struct {
@@ -400,6 +414,56 @@ func upsertRepoCredentialSecret(ctx context.Context, k8sClient *kubernetes.Clien
 	return nil
 }
 
+func upsertRepoWebhook(ctx context.Context, client *gitea.Client, k8sClient *kubernetes.Clientset, owner, repo string, wh *RepoWebhook) error {
+	secretClient := k8sClient.CoreV1().Secrets(wh.SecretNamespace)
+	secret, err := secretClient.Get(ctx, wh.SecretName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get secret %s in %s: %w", wh.SecretName, wh.SecretNamespace, err)
+	}
+
+	sharedSecret := string(secret.Data[wh.SecretKey])
+	if sharedSecret == "" {
+		sharedSecret, err = generatePassword(48)
+		if err != nil {
+			return fmt.Errorf("generate webhook secret: %w", err)
+		}
+		patch := map[string]any{"stringData": map[string]string{wh.SecretKey: sharedSecret}}
+		patchBytes, _ := json.Marshal(patch)
+		_, err = secretClient.Patch(ctx, wh.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+		if err != nil {
+			return fmt.Errorf("patch secret %s in %s: %w", wh.SecretName, wh.SecretNamespace, err)
+		}
+	}
+
+	hooks, _, err := client.ListRepoHooks(owner, repo, gitea.ListHooksOptions{ListOptions: gitea.ListOptions{Page: -1}})
+	if err != nil {
+		return fmt.Errorf("list hooks for %s/%s: %w", owner, repo, err)
+	}
+	for _, h := range hooks {
+		if h.Config["url"] == wh.URL {
+			log.Printf("Webhook %s already exists on %s/%s", wh.URL, owner, repo)
+			return nil
+		}
+	}
+
+	_, _, err = client.CreateRepoHook(owner, repo, gitea.CreateHookOption{
+		Type: gitea.HookTypeGogs,
+		Config: map[string]string{
+			"url":          wh.URL,
+			"content_type": "json",
+			"secret":       sharedSecret,
+		},
+		Events:       []string{"push"},
+		BranchFilter: wh.BranchFilter,
+		Active:       true,
+	})
+	if err != nil {
+		return fmt.Errorf("create webhook for %s/%s: %w", owner, repo, err)
+	}
+	log.Printf("Created webhook %s for %s/%s", wh.URL, owner, repo)
+	return nil
+}
+
 func main() {
 	ctx := context.Background()
 	data, err := os.ReadFile("./config.yaml")
@@ -651,6 +715,12 @@ func main() {
 			})
 			if err != nil {
 				log.Printf("Create %s/%s: %v", repo.Owner, repo.Name, err)
+			}
+		}
+
+		if repo.Webhook != nil {
+			if err := upsertRepoWebhook(ctx, client, k8sClient, repo.Owner, repo.Name, repo.Webhook); err != nil {
+				log.Printf("Upsert webhook for %s/%s: %v", repo.Owner, repo.Name, err)
 			}
 		}
 	}

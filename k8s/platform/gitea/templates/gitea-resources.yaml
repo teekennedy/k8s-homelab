@@ -157,6 +157,17 @@ metadata:
     {{- $_ := set $namespaceSecrets $ns (append (get $namespaceSecrets $ns) $secret) }}
   {{- end }}
 {{- end }}
+{{- range index .Values "gitea-resources" "repositories" | default (list) }}
+  {{- if .webhook }}
+    {{- $ns := .webhook.secretNamespace }}
+    {{- $secret := .webhook.secretName }}
+    {{- if not (hasKey $namespaceSecrets $ns) }}
+      {{- $_ := set $namespaceSecrets $ns (list $secret) }}
+    {{- else }}
+      {{- $_ := set $namespaceSecrets $ns (append (get $namespaceSecrets $ns) $secret) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
 
 {{- range $ns, $secrets := $namespaceSecrets }}
 apiVersion: rbac.authorization.k8s.io/v1
@@ -289,6 +300,28 @@ roleRef:
   name: gitea-resources-secret-writer
   apiGroup: rbac.authorization.k8s.io
 ---
+  {{- end }}
+{{- end }}
+{{- range index .Values "gitea-resources" "repositories" | default (list) }}
+  {{- if .webhook }}
+    {{- $ns := .webhook.secretNamespace }}
+    {{- if not (hasKey $seenNamespaces $ns) }}
+      {{- $_ := set $seenNamespaces $ns true }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitea-resources-secret-writer-binding
+  namespace: {{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: gitea-resources-job
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: gitea-resources-secret-writer
+  apiGroup: rbac.authorization.k8s.io
+---
+    {{- end }}
   {{- end }}
 {{- end }}
 
