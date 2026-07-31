@@ -48,7 +48,7 @@ spec:
   project: default
   source:
     path: k8s/platform/csi-driver-smb
-    repoURL: http://gitea-http.gitea:3000/ops/k8s-homelab
+    repoURL: https://git.msng.to/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
     automated:
