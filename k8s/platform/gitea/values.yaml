@@ -96,7 +96,7 @@ gitea:
         # shows just the "Sign in with authelia" button.
         ENABLE_PASSWORD_SIGNIN_FORM: false
         # Force users to log in to view any page or to use the API.
-        REQUIRE_SIGNIN_VIEW: true
+        # REQUIRE_SIGNIN_VIEW: true
       service.explore:
         DISABLE_USERS_PAGE: true
       actions:
@@ -142,6 +142,15 @@ gitea-resources:
             - read:organization
             - read:repository
             - read:user
+    - name: argocd
+      fullName: ArgoCD
+      email: argocd@msng.to
+      secretName: argocd-gitea-credentials
+      secretNamespace: argocd
+      accessTokens:
+        - name: argocd
+          scopes:
+            - read:repository
     - name: tkennedy
       fullName: Terrance Kennedy
       email: terrance@missingtoken.net
