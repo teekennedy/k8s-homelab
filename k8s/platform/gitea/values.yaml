@@ -151,6 +151,14 @@ gitea-resources:
         - name: argocd
           scopes:
             - read:repository
+          # Writes the token into a separate labeled repository-credential
+          # Secret that ArgoCD auto-discovers by repo URL, keeping this
+          # token distinct from the account password used above (which
+          # gitea-resources itself needs for API login).
+          repoCredential:
+            secretName: argocd-repo-k8s-homelab
+            secretNamespace: argocd
+            url: http://gitea-http.gitea:3000/ops/k8s-homelab
     - name: tkennedy
       fullName: Terrance Kennedy
       email: terrance@missingtoken.net

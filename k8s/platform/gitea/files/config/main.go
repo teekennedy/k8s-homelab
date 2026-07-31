@@ -53,6 +53,16 @@ type Repository struct {
 type AccessToken struct {
 	Name   string
 	Scopes []string
+	// RepoCredential, if set, also writes the token into an ArgoCD
+	// repository-credential Secret (labeled argocd.argoproj.io/secret-type:
+	// repository) so ArgoCD can auto-discover it by repo URL.
+	RepoCredential *RepoCredential `yaml:"repoCredential"`
+}
+
+type RepoCredential struct {
+	SecretName      string `yaml:"secretName"`
+	SecretNamespace string `yaml:"secretNamespace"`
+	URL             string `yaml:"url"`
 }
 
 type User struct {
@@ -347,6 +357,49 @@ func upsertRunnerTokenSecret(ctx context.Context, k8sClient *kubernetes.Clientse
 	return nil
 }
 
+func upsertRepoCredentialSecret(ctx context.Context, k8sClient *kubernetes.Clientset, username, token string, target *RepoCredential) error {
+	secretClient := k8sClient.CoreV1().Secrets(target.SecretNamespace)
+	labels := map[string]string{"argocd.argoproj.io/secret-type": "repository"}
+	data := map[string]string{
+		"type":     "git",
+		"url":      target.URL,
+		"username": username,
+		"password": token,
+	}
+
+	_, err := secretClient.Get(ctx, target.SecretName, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("get secret %s in %s: %w", target.SecretName, target.SecretNamespace, err)
+		}
+		newSecret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      target.SecretName,
+				Namespace: target.SecretNamespace,
+				Labels:    labels,
+			},
+			StringData: data,
+		}
+		_, err = secretClient.Create(ctx, &newSecret, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("create secret %s in %s: %w", target.SecretName, target.SecretNamespace, err)
+		}
+		return nil
+	}
+
+	patch := map[string]any{
+		"metadata":   map[string]any{"labels": labels},
+		"stringData": data,
+	}
+	patchBytes, _ := json.Marshal(patch)
+
+	_, err = secretClient.Patch(ctx, target.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("update secret %s in %s: %w", target.SecretName, target.SecretNamespace, err)
+	}
+	return nil
+}
+
 func main() {
 	ctx := context.Background()
 	data, err := os.ReadFile("./config.yaml")
@@ -531,6 +584,7 @@ func main() {
 
 					if slices.Equal(scopes, currToken.Scopes) {
 						log.Printf("Existing access token %s matches expected scopes", currToken.Name)
+						continue
 					} else {
 						log.Printf("Existing access token %s differs from expected scopes. Deleting", currToken.Name)
 						_, err = userClient.DeleteAccessToken(currToken.ID)
@@ -563,6 +617,14 @@ func main() {
 					continue
 				}
 				log.Printf("Successfully created token %s and updated secret %s", token.Name, user.SecretName)
+
+				if token.RepoCredential != nil {
+					if err := upsertRepoCredentialSecret(ctx, k8sClient, user.Name, newToken.Token, token.RepoCredential); err != nil {
+						log.Printf("Upsert repo credential secret for token %s: %v", token.Name, err)
+						continue
+					}
+					log.Printf("Successfully updated repo credential secret %s", token.RepoCredential.SecretName)
+				}
 			}
 
 		}
