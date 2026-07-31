@@ -3,6 +3,7 @@
   "email": "terrance@missingtoken.net",
   "displayName": "Terrance",
   "groups": [
-    "full-admin"
+    "full-admin",
+    "gitea-admins"
   ]
 }
