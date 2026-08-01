@@ -23,7 +23,7 @@ spec:
   project: default
   source:
     path: k8s/foundation/cnpg-system
-    repoURL: https://github.com/teekennedy/k8s-homelab
+    repoURL: https://git.msng.to/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
     automated:
