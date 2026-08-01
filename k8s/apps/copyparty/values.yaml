@@ -132,7 +132,7 @@ resources:
   limits:
     # Thumbnailing (FFmpeg/libvips) and up2k hashing are the CPU-hungry bits.
     cpu: "4"
-    memory: 2Gi
+    memory: 6Gi
 
 nodeSelector: {}
 tolerations: []
