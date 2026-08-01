@@ -19,7 +19,7 @@ spec:
       namespace: redteam
   source:
     path: k8s/apps/redteam
-    repoURL: https://git.msng.to/ops/k8s-homelab
+    repoURL: https://github.com/teekennedy/k8s-homelab
     targetRevision: main
   syncPolicy:
     automated:

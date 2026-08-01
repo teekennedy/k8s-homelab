@@ -53,7 +53,7 @@ spec:
   project: default
   source:
     path: k8s/platform/auth-system
-    repoURL: https://git.msng.to/ops/k8s-homelab
+    repoURL: https://github.com/teekennedy/k8s-homelab
     targetRevision: main
   syncPolicy:
     automated:
