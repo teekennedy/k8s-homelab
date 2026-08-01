@@ -1,0 +1,28 @@
+exemptions:
+  # The configure-gitea init container sets GITEA_ADMIN_PASSWORD from a secretKeyRef, but polaris
+  # flags the env var name regardless of value source. Cannot fix without patching upstream chart.
+  - controllerNames:
+      - forgejo
+    rules:
+      - sensitiveContainerEnvVar
+  # Valkey and Sentinel take their passwords from secretKeyRefs; same false positive as above.
+  - controllerNames:
+      - valkey
+    rules:
+      - sensitiveContainerEnvVar
+  # forgejo-resources needs pods/exec to run `forgejo admin auth`, which has no
+  # REST API equivalent. The grant is deliberately minimal: one Role, scoped to
+  # the forgejo namespace only, bound to a single job ServiceAccount.
+  - controllerNames:
+      - forgejo-resources-pod-exec
+      - forgejo-resources-pod-exec-binding
+    rules:
+      - rolePodExecAttach
+      - rolebindingRolePodExecAttach
+  # Helm test pod uses busybox without a pinned tag and runs as root.
+  - controllerNames:
+      - forgejo-test-connection
+    rules:
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+      - tagNotSpecified

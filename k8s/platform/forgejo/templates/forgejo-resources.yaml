@@ -1,0 +1,203 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: forgejo-resources
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    helm.sh/hook: post-install,post-upgrade
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: forgejo-resources-job
+      restartPolicy: Never
+      containers:
+        - name: apply
+          image: golang:1.26-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65534
+          env:
+            - name: GOCACHE
+              value: /tmp/go-cache
+            - name: GOMODCACHE
+              value: /tmp/go-modules
+            - name: HOME
+              value: /tmp
+            - name: FORGEJO_HOST
+              value: http://forgejo-http:3000
+            - name: FORGEJO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forgejo.gitea.admin.existingSecret }}
+                  key: username
+            - name: FORGEJO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forgejo.gitea.admin.existingSecret }}
+                  key: password
+          workingDir: /go/src/forgejo-resources
+          command:
+            - sh
+            - -c
+          args:
+            - |
+              # wait for forgejo to become available
+              timeout 300 sh -c 'until wget -q "$FORGEJO_HOST" -O /dev/null; do sleep 5; done'
+              go run .
+          volumeMounts:
+            - name: source
+              mountPath: /go/src/forgejo-resources
+              readOnly: true
+            - name: go-cache
+              mountPath: /tmp/go-cache
+              subPath: go-cache
+            - name: go-modules
+              mountPath: /tmp/go-modules
+              subPath: go-modules
+      volumes:
+        - name: source
+          configMap:
+            name: forgejo-resources-config
+        - name: go-cache
+          persistentVolumeClaim:
+            claimName: forgejo-resources-go-cache
+        - name: go-modules
+          persistentVolumeClaim:
+            claimName: forgejo-resources-go-cache
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: forgejo-resources-go-cache
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: forgejo-resources-config
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yaml: |
+    {{- index .Values "forgejo-resources" | toYaml | nindent 4 }}
+  {{ (.Files.Glob "files/config/*").AsConfig | nindent 2 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: forgejo-resources-job
+  namespace: {{ .Release.Namespace }}
+---
+
+# Collect every Secret the job writes, grouped by namespace, so each namespace
+# gets exactly one Role scoped to just those secret names (plus one RoleBinding).
+{{- $cfg := index .Values "forgejo-resources" }}
+{{- $namespaceSecrets := dict }}
+{{- define "forgejo.recordSecret" -}}
+  {{- $acc := index . 0 }}
+  {{- $ns := index . 1 }}
+  {{- $secret := index . 2 }}
+  {{- if and $ns $secret }}
+    {{- $_ := set $acc $ns (append (get $acc $ns | default (list)) $secret | uniq) }}
+  {{- end }}
+{{- end }}
+
+{{- range $cfg.users | default (list) }}
+  {{- include "forgejo.recordSecret" (list $namespaceSecrets .secretNamespace .secretName) }}
+  {{- range .accessTokens | default (list) }}
+    {{- if .repoCredential }}
+      {{- include "forgejo.recordSecret" (list $namespaceSecrets .repoCredential.secretNamespace .repoCredential.secretName) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- range $cfg.runners | default (list) }}
+  {{- include "forgejo.recordSecret" (list $namespaceSecrets .secretNamespace .secretName) }}
+{{- end }}
+{{- range $cfg.oauth2Apps | default (list) }}
+  {{- include "forgejo.recordSecret" (list $namespaceSecrets .secretNamespace .secretName) }}
+{{- end }}
+{{- if $cfg.oidc }}
+  {{- include "forgejo.recordSecret" (list $namespaceSecrets $cfg.oidc.clientSecretNamespace $cfg.oidc.clientSecretName) }}
+{{- end }}
+{{- range $cfg.repositories | default (list) }}
+  {{- if .webhook }}
+    {{- include "forgejo.recordSecret" (list $namespaceSecrets .webhook.secretNamespace .webhook.secretName) }}
+  {{- end }}
+{{- end }}
+
+{{- range $ns, $secrets := $namespaceSecrets }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: forgejo-resources-secret-writer
+  namespace: {{ $ns }}
+rules:
+  # The create permission is incompatible with specific resource names
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+{{- range $secrets | sortAlpha }}
+      - {{ . }}
+{{- end }}
+    verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: forgejo-resources-secret-writer-binding
+  namespace: {{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: forgejo-resources-job
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: forgejo-resources-secret-writer
+  apiGroup: rbac.authorization.k8s.io
+---
+{{- end }}
+
+# Grant the job exec access into the forgejo pod, needed by config entries
+# (e.g. oidc) that reconcile state only reachable via `forgejo admin` CLI
+# commands with no REST API equivalent.
+{{- if $cfg.podExec }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: forgejo-resources-pod-exec
+  namespace: {{ $cfg.podExec.namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: forgejo-resources-pod-exec-binding
+  namespace: {{ $cfg.podExec.namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: forgejo-resources-job
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: forgejo-resources-pod-exec
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

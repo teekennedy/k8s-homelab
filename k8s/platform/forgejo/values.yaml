@@ -1,0 +1,270 @@
+psql:
+  clusterName: forgejo-psql
+  image: ghcr.io/cloudnative-pg/postgresql:18.4-standard-bookworm
+
+# Valkey replication set + Sentinel, ported from k8s/platform/auth-system.
+# Deliberately a *separate* instance from Authelia's rather than one shared
+# cluster: `maxmemory-policy` is instance-wide, and Forgejo's cache is exactly
+# the kind of churn that would start evicting Authelia's session keys under
+# memory pressure. It also keeps a Valkey incident from taking out login and
+# git at the same time.
+valkey:
+  # Sentinel monitor name; must match MASTER_NAME in the entrypoint scripts.
+  masterName: mymaster
+  replicas: 3
+  image: valkey/valkey:9-alpine
+  secretName: forgejo-valkey
+  persistence:
+    # longhorn-rc1 (single replica): Valkey's own replication provides the
+    # redundancy, so Longhorn cross-node replication would only add write
+    # amplification and fsync latency.
+    storageClass: longhorn-rc1
+    size: 5Gi
+
+forgejo:
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    runAsUser: 1000
+  image:
+    tag: "15.0.6"
+    rootless: true
+  ingress:
+    enabled: true
+    # Deliberately NOT carrying over the Gitea chart's
+    # `helm.sh/hook: post-install,post-upgrade` annotation. ArgoCD translates
+    # that to a PostSync hook with the default BeforeHookCreation delete policy,
+    # so the Ingress — and the cert-manager Certificate that ingress-shim owns
+    # from the tls block below — would be deleted and recreated on every sync.
+    # That is a re-issuance per sync against Let's Encrypt's 5-duplicate-certs-
+    # per-week limit. It arrived incidentally in abc4dac ("Setup gitea to use
+    # cnpg cluster") with no stated reason; if there was one, it needs writing
+    # down before it comes back.
+    hosts:
+      - host: &host git.msng.to
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - hosts:
+          - *host
+
+  persistence:
+    storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/backup: "enabled"
+
+  strategy:
+    type: Recreate
+
+  gitea:
+    admin:
+      existingSecret: forgejo-admin-secret
+    # These are rendered only into the init-app-ini container, which runs
+    # `environment-to-ini` to fold FORGEJO__* vars into app.ini. Keeping the
+    # Valkey passwords here (rather than in deployment.env) means the running
+    # Forgejo container carries no credentials in its own environment.
+    additionalConfigFromEnvs:
+      # Kubernetes expands $(VAR) from env vars declared earlier in the same
+      # container list, so the two passwords below are substituted into the
+      # connection strings at pod start and never appear in the rendered
+      # manifest. Order within this list is therefore load-bearing.
+      - name: VALKEY_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: forgejo-valkey
+            key: valkey-password
+      - name: SENTINEL_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: forgejo-valkey
+            key: sentinel-password
+      # db 0 = cache, db 1 = sessions. Forgejo strips underscores and dashes
+      # from query keys, so `mastername` is the canonical spelling.
+      - name: FORGEJO__CACHE__HOST
+        value: >-
+          redis+sentinel://:$(VALKEY_PASSWORD)@valkey-0.valkey-headless.forgejo.svc.cluster.local:26379,valkey-1.valkey-headless.forgejo.svc.cluster.local:26379,valkey-2.valkey-headless.forgejo.svc.cluster.local:26379/0?mastername=mymaster&sentinelpassword=$(SENTINEL_PASSWORD)
+      - name: FORGEJO__SESSION__PROVIDER_CONFIG
+        value: >-
+          redis+sentinel://:$(VALKEY_PASSWORD)@valkey-0.valkey-headless.forgejo.svc.cluster.local:26379,valkey-1.valkey-headless.forgejo.svc.cluster.local:26379,valkey-2.valkey-headless.forgejo.svc.cluster.local:26379/1?mastername=mymaster&sentinelpassword=$(SENTINEL_PASSWORD)
+      - name: FORGEJO__DATABASE__HOST
+        valueFrom:
+          secretKeyRef:
+            name: forgejo-psql-app
+            key: host
+      - name: FORGEJO__DATABASE__NAME
+        valueFrom:
+          secretKeyRef:
+            name: forgejo-psql-app
+            key: dbname
+      - name: FORGEJO__DATABASE__USER
+        valueFrom:
+          secretKeyRef:
+            name: forgejo-psql-app
+            key: username
+      - name: FORGEJO__DATABASE__PASSWD
+        valueFrom:
+          secretKeyRef:
+            name: forgejo-psql-app
+            key: password
+    config:
+      server:
+        HTTP_PORT: 3000
+        LANDING_PAGE: explore
+        ROOT_URL: https://git.msng.to
+        OFFLINE_MODE: true
+      database:
+        DB_TYPE: postgres
+      repository:
+        DISABLED_REPO_UNITS: repo.wiki,repo.projects,repo.packages
+        DISABLE_STARS: true
+        DEFAULT_BRANCH: main
+      service:
+        DISABLE_REGISTRATION: false
+        ALLOW_ONLY_EXTERNAL_REGISTRATION: true
+        SHOW_REGISTRATION_BUTTON: false
+        ENABLE_PASSWORD_SIGNIN_FORM: true
+        # Force users to log in to view any page or to use the API.
+        #
+        # Deliberately false for the migration: it lets ArgoCD clone
+        # ops/k8s-homelab (public) anonymously, so the repoURL cutover does not
+        # depend on argocd-repo-k8s-homelab being correct yet. Flip to true once
+        # that credential is confirmed working — see README, "Cutover runbook".
+        REQUIRE_SIGNIN_VIEW: false
+      service.explore:
+        DISABLE_USERS_PAGE: true
+      actions:
+        ENABLED: true
+      webhook:
+        ALLOWED_HOST_LIST: private
+      cache:
+        ADAPTER: redis
+      session:
+        PROVIDER: redis
+      # Deliberately *not* on Valkey. The instance runs maxmemory-policy
+      # allkeys-lru, and an evicted queue key is a silently lost job. Forgejo
+      # is a single replica with a persistent volume, so the local leveldb
+      # queue is both correct and durable here.
+      queue:
+        TYPE: level
+      oauth2_client:
+        ENABLE_AUTO_REGISTRATION: true
+        USERNAME: preferred_username
+        # LDAP's email is authoritative and Authelia is the only IdP, so
+        # silently linking by email on first OIDC login is safe here and
+        # preserves the forgejo-resources-provisioned tkennedy account (and its
+        # user ID, which Woodpecker keys repo ownership on).
+        ACCOUNT_LINKING: auto
+      openid:
+        ENABLE_OPENID_SIGNIN: false
+
+forgejo-resources:
+  users:
+    - name: renovate
+      fullName: Renovate
+      email: bot@renovateapp.com
+      secretName: renovate-forgejo-user
+      secretNamespace: renovate
+      accessTokens:
+        - name: renovate
+          scopes:
+            - write:repository
+            - read:user
+            - write:issue
+            - read:organization
+            - read:misc
+    - name: homepage
+      fullName: Homepage
+      email: homepage@msng.to
+      secretName: homepage-forgejo-credentials
+      secretNamespace: forgejo
+      accessTokens:
+        - name: homepage
+          scopes:
+            - read:issue
+            - read:notification
+            - read:organization
+            - read:repository
+            - read:user
+    - name: argocd
+      fullName: ArgoCD
+      email: argocd@msng.to
+      secretName: argocd-forgejo-credentials
+      secretNamespace: argocd
+      accessTokens:
+        - name: argocd
+          scopes:
+            - read:repository
+          # Writes the token into a separate labeled repository-credential
+          # Secret that ArgoCD auto-discovers by repo URL, keeping this
+          # token distinct from the account password used above (which
+          # forgejo-resources itself needs for API login).
+          repoCredential:
+            secretName: argocd-repo-k8s-homelab
+            secretNamespace: argocd
+            url: https://git.msng.to/ops/k8s-homelab
+    - name: tkennedy
+      fullName: Terrance Kennedy
+      email: terrance@missingtoken.net
+      secretName: tkennedy-forgejo-user
+      secretNamespace: forgejo
+      admin: true
+  runners: []
+  oauth2Apps:
+    - name: woodpecker
+      redirectURIs:
+        - https://ci.msng.to/authorize
+      secretName: woodpecker-forgejo-oauth2
+      secretNamespace: woodpecker
+      # Key names are the env vars Woodpecker's forgejo driver reads directly
+      # via extraSecretNamesForEnvFrom.
+      clientIDKey: WOODPECKER_FORGEJO_CLIENT
+      clientSecretKey: WOODPECKER_FORGEJO_SECRET
+  # Where `forgejo admin auth` and any future exec-only reconciliation runs.
+  # Shared by every config entry below that needs it (currently just oidc).
+  podExec:
+    namespace: forgejo
+    labelSelector: app.kubernetes.io/name=forgejo
+    container: forgejo
+  oidc:
+    name: authelia
+    clientID: forgejo
+    clientSecretName: forgejo-oidc-authelia
+    clientSecretNamespace: forgejo
+    autoDiscoverURL: https://authelia.msng.to/.well-known/openid-configuration
+    iconURL: https://cdn.jsdelivr.net/gh/selfhst/icons@main/svg/authelia.svg
+    scopes:
+      - openid
+      - profile
+      - email
+      - groups
+    groupClaimName: groups
+    adminGroup: forgejo-admins
+  organizations:
+    - name: ops
+      description: Operations
+      teams:
+        - name: Owners
+          members:
+            - tkennedy
+        - name: Bots
+          permission: write
+          members:
+            - renovate
+  repositories:
+    - name: k8s-homelab
+      owner: ops
+      description: my bare-metal k8s homelab
+      private: false
+      webhook:
+        # Forgejo has no native ArgoCD hook type, but ArgoCD's /api/webhook
+        # endpoint natively understands the Gogs payload format, which Forgejo
+        # can emit. Patches the shared secret into argocd-secret's
+        # webhook.gogs.secret key (additive, doesn't touch ArgoCD's other
+        # auto-managed keys there).
+        url: http://argocd-server.argocd.svc.cluster.local/api/webhook
+        branchFilter: main
+        secretName: argocd-secret
+        secretNamespace: argocd
+        secretKey: webhook.gogs.secret

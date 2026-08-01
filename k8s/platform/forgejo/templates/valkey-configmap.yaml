@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: valkey-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: valkey
+    app.kubernetes.io/component: valkey
+data:
+  # https://raw.githubusercontent.com/valkey-io/valkey/9.0/valkey.conf
+  valkey.conf: |
+    bind 0.0.0.0
+    port 6379
+    protected-mode yes
+    maxmemory-policy allkeys-lru
+    appendonly yes
+
+    # fsync writes to the Append Only File every second (default)
+    appendfsync everysec
+
+    # Embed the RDB (database backup) as a preamble to the AOF (write append log),
+    # and disable redundant separate RDB file.
+    save ""
+    aof-use-rdb-preamble yes
+
+    dir /data
+  valkey-entrypoint.sh: |
+{{ tpl (.Files.Get "files/valkey-entrypoint.sh") . | indent 4 }}
+  sentinel-entrypoint.sh: |
+{{ tpl (.Files.Get "files/sentinel-entrypoint.sh") . | indent 4 }}

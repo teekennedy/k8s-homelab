@@ -10,18 +10,12 @@ gitea:
   image:
     tag: "1.26.1"
     rootless: true
+  # git.msng.to now belongs to Forgejo (k8s/platform/forgejo). Gitea keeps
+  # running for the duration of the migration but claims no hostname, so the
+  # two never contend for the same Ingress host, DNS record, or certificate.
+  # Reach it with `kubectl -n gitea port-forward svc/gitea-http 3000:3000`.
   ingress:
-    enabled: true
-    annotations:
-      helm.sh/hook: post-install,post-upgrade
-    hosts:
-      - host: &host git.msng.to
-        paths:
-          - path: /
-            pathType: Prefix
-    tls:
-      - hosts:
-          - *host
+    enabled: false
   postgresql-ha:
     enabled: false
   postgresql:
@@ -112,107 +106,20 @@ gitea:
       openid:
         ENABLE_OPENID_SIGNIN: false
 
+# Gitea is being retired in favour of Forgejo (k8s/platform/forgejo) and this
+# job is deliberately inert for the rest of its life. It reconciled two shared
+# resources that forgejo-resources now owns — the argocd-repo-k8s-homelab
+# repository credential and argocd-secret's webhook.gogs.secret — both keyed on
+# https://git.msng.to/ops/k8s-homelab, which now resolves to Forgejo. Left
+# active, whichever job synced last would overwrite the other's credential and
+# break ArgoCD's clone or the push webhook.
+#
+# Gitea itself keeps running (reachable via
+# `kubectl -n gitea port-forward svc/gitea-http 3000:3000`, local admin login)
+# until the chart is deleted.
 gitea-resources:
-  users:
-    - name: renovate
-      fullName: Renovate
-      email: bot@renovateapp.com
-      secretName: renovate-gitea-user
-      secretNamespace: renovate
-      accessTokens:
-        - name: renovate
-          scopes:
-            - write:repository
-            - read:user
-            - write:issue
-            - read:organization
-            - read:misc
-    - name: homepage
-      fullName: Homepage
-      email: homepage@msng.to
-      secretName: homepage-gitea-credentials
-      secretNamespace: gitea
-      accessTokens:
-        - name: homepage
-          scopes:
-            - read:issue
-            - read:notification
-            - read:organization
-            - read:repository
-            - read:user
-    - name: argocd
-      fullName: ArgoCD
-      email: argocd@msng.to
-      secretName: argocd-gitea-credentials
-      secretNamespace: argocd
-      accessTokens:
-        - name: argocd
-          scopes:
-            - read:repository
-          # Writes the token into a separate labeled repository-credential
-          # Secret that ArgoCD auto-discovers by repo URL, keeping this
-          # token distinct from the account password used above (which
-          # gitea-resources itself needs for API login).
-          repoCredential:
-            secretName: argocd-repo-k8s-homelab
-            secretNamespace: argocd
-            url: https://git.msng.to/ops/k8s-homelab
-    - name: tkennedy
-      fullName: Terrance Kennedy
-      email: terrance@missingtoken.net
-      secretName: tkennedy-gitea-user
-      secretNamespace: gitea
-      admin: true
+  users: []
   runners: []
-  oauth2Apps:
-    - name: woodpecker
-      redirectURIs:
-        - https://ci.msng.to/authorize
-      secretName: woodpecker-gitea-oauth2
-      secretNamespace: woodpecker
-  # Where `gitea admin auth` and any future exec-only reconciliation runs.
-  # Shared by every config entry below that needs it (currently just oidc).
-  podExec:
-    namespace: gitea
-    labelSelector: app.kubernetes.io/name=gitea
-  oidc:
-    name: authelia
-    clientID: gitea
-    clientSecretName: gitea-oidc-authelia
-    clientSecretNamespace: gitea
-    autoDiscoverURL: https://authelia.msng.to/.well-known/openid-configuration
-    iconURL: https://cdn.jsdelivr.net/gh/selfhst/icons@main/svg/authelia.svg
-    scopes:
-      - openid
-      - profile
-      - email
-      - groups
-    groupClaimName: groups
-    adminGroup: gitea-admins
-  organizations:
-    - name: ops
-      description: Operations
-      teams:
-        - name: Owners
-          members:
-            - tkennedy
-        - name: Bots
-          permission: write
-          members:
-            - renovate
-  repositories:
-    - name: k8s-homelab
-      owner: ops
-      description: my bare-metal k8s homelab
-      private: false
-      webhook:
-        # Gitea has no native ArgoCD hook type, but ArgoCD's /api/webhook
-        # endpoint natively understands the Gogs payload format, which Gitea
-        # can emit. Patches the shared secret into argocd-secret's
-        # webhook.gogs.secret key (additive, doesn't touch ArgoCD's other
-        # auto-managed keys there).
-        url: http://argocd-server.argocd.svc.cluster.local/api/webhook
-        branchFilter: main
-        secretName: argocd-secret
-        secretNamespace: argocd
-        secretKey: webhook.gogs.secret
+  oauth2Apps: []
+  organizations: []
+  repositories: []
