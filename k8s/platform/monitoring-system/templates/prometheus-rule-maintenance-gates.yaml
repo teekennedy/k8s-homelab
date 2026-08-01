@@ -71,7 +71,7 @@ spec:
 
         - alert: CNPGInstanceNotReady
           expr: |
-            kube_pod_status_ready{condition="true", namespace=~"auth-system|crowdsec|forgejo|gitea", pod=~".*-psql-[0-9]+"} == 0
+            kube_pod_status_ready{condition="true", namespace=~"auth-system|crowdsec|forgejo", pod=~".*-psql-[0-9]+"} == 0
           for: 2m
           labels:
             severity: critical

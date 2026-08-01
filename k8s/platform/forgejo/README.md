@@ -155,7 +155,7 @@ groups, or any of the renames below.
    `k8s/foundation/s3-proxy/templates/s3proxy-credentials.yaml` and from the
    `CNPGInstanceNotReady` namespace regex in
    `k8s/platform/monitoring-system/templates/prometheus-rule-maintenance-gates.yaml`
-   (both currently list `forgejo` *and* `gitea` so the two can coexist).
+   (both list `forgejo` *and* `gitea` up to this point so the two can coexist).
 
 7. **Turn `REQUIRE_SIGNIN_VIEW` back on.** A one-line follow-up, not one of the
    six migration commits. Do it only once ArgoCD is demonstrably cloning with
