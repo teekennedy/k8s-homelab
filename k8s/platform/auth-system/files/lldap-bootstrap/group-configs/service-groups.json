@@ -26,8 +26,8 @@
   "name": "copyparty-admins"
 }
 {
-  "name": "gitea-users"
+  "name": "forgejo-users"
 }
 {
-  "name": "gitea-admins"
+  "name": "forgejo-admins"
 }

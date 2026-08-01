@@ -4,6 +4,6 @@
   "displayName": "Terrance",
   "groups": [
     "full-admin",
-    "gitea-admins"
+    "forgejo-admins"
   ]
 }

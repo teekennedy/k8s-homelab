@@ -30,7 +30,7 @@ oidcClientSecrets:
   clients:
     jellyfin: jellyfin/jellyfin-oidc-authelia
     grafana: monitoring-system/grafana-oidc-authelia
-    gitea: gitea/gitea-oidc-authelia
+    forgejo: forgejo/forgejo-oidc-authelia
     oauth2-proxy: homepage/homepage-oauth2-proxy-secrets
     oauth2-proxy-internal: syncthing/syncthing-oauth2-proxy-secrets
     copyparty: copyparty/copyparty-oauth2-proxy-secrets
@@ -275,8 +275,8 @@ authelia:
     identity_providers:
       oidc:
         enabled: true
-        # public_clients_only, not always: Gitea's OIDC client (goth) doesn't
-        # implement PKCE, so gitea's client below opts out. Every other
+        # public_clients_only, not always: Forgejo's OIDC client (goth) doesn't
+        # implement PKCE, so forgejo's client below opts out. Every other
         # client is confidential-with-explicit-require_pkce except jellyfin,
         # which is given it explicitly here to keep its enforcement unchanged.
         enforce_pkce: public_clients_only
@@ -303,15 +303,15 @@ authelia:
                 subject: "group:grafana-admins"
               - policy: two_factor
                 subject: "group:full-admin"
-          gitea:
+          forgejo:
             default_policy: deny
             rules:
               - policy: two_factor
-                subject: "group:gitea-admins"
+                subject: "group:forgejo-admins"
               - policy: two_factor
                 subject: "group:full-admin"
               - policy: one_factor
-                subject: "group:gitea-users"
+                subject: "group:forgejo-users"
         clients:
           - client_id: argocd
             client_name: Argo CD
@@ -370,18 +370,18 @@ authelia:
               - code
             redirect_uris:
               - https://grafana.msng.to/login/generic_oauth
-          # Gitea (k8s/platform/gitea). Gitea's OAuth2 client (goth) doesn't
-          # implement PKCE, hence require_pkce: false, nor does it verify a
-          # signed userinfo/access token, only plain JSON, hence
+          # Forgejo (k8s/platform/forgejo). Forgejo's OAuth2 client (goth)
+          # doesn't implement PKCE, hence require_pkce: false, nor does it
+          # verify a signed userinfo/access token, only plain JSON, hence
           # *_signed_response_alg: none.
-          - client_id: gitea
-            client_name: Gitea
+          - client_id: forgejo
+            client_name: Forgejo
             client_secret:
-              path: /secrets/authelia-oidc-client-secrets/gitea
+              path: /secrets/authelia-oidc-client-secrets/forgejo
             token_endpoint_auth_method: client_secret_basic
             access_token_signed_response_alg: none
             userinfo_signed_response_alg: none
-            authorization_policy: gitea
+            authorization_policy: forgejo
             consent_mode: implicit
             require_pkce: false
             scopes:
@@ -541,8 +541,8 @@ authelia:
         items:
           - key: copyparty
             path: copyparty
-          - key: gitea
-            path: gitea
+          - key: forgejo
+            path: forgejo
           - key: grafana
             path: grafana
           - key: jellyfin
