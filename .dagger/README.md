@@ -240,7 +240,7 @@ dagger check test-go
    ├─ GoModule{.dagger}.Test()       → Layer 1 cache hit (unchanged)
    ├─ GoModule{cmd/lab}.Test()       → Layer 1 cache MISS (file changed)
    ├─ GoModule{homepage/...}.Test()  → Layer 1 cache hit (unchanged)
-   └─ GoModule{gitea/...}.Test()     → Layer 1 cache hit (unchanged)
+   └─ GoModule{forgejo/...}.Test()     → Layer 1 cache hit (unchanged)
 ```
 
 ```
@@ -248,7 +248,7 @@ dagger call go-modules test
 ├─ GoModule{.dagger}.Test()       → Layer 1 cache hit (unchanged)
 ├─ GoModule{cmd/lab}.Test()       → Layer 1 cache MISS (file changed)
 ├─ GoModule{homepage/...}.Test()  → Layer 1 cache hit (unchanged)
-└─ GoModule{gitea/...}.Test()     → Layer 1 cache hit (unchanged)
+└─ GoModule{forgejo/...}.Test()     → Layer 1 cache hit (unchanged)
 ```
 
 ### Pre-Call Filtering (`+ignore`)

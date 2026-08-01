@@ -24,7 +24,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # git.msng.to API calls through Traefik
+    # git.msng.to (Forgejo) API calls through Traefik
     # the load balancer DNATs node-IP:443 to Traefik pod IPs, so we target
     # the pods directly rather than the pre-DNAT node IPs
     - to:

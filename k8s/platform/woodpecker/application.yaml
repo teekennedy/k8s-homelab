@@ -18,7 +18,7 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
-      name: woodpecker-gitea-oauth2
+      name: woodpecker-forgejo-oauth2
       namespace: woodpecker
     - jsonPointers:
         - /data

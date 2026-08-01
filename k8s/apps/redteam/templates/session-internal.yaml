@@ -29,7 +29,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
-        # Pre-clone the repo (Gitea allows unauthenticated read of ops/k8s-homelab)
+        # Pre-clone the repo (Forgejo hosts ops/k8s-homelab)
         # so it's ready in /work/k8s-homelab when the session starts. Treat as public
         # (mirrored to GitHub). No credentials needed.
         - name: clone-repo

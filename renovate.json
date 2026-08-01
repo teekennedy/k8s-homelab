@@ -151,16 +151,18 @@
       "extractVersionTemplate": "^v(?<version>.*)$"
     },
     {
-      "description": "Sync Gitea appVersion with GitHub releases",
+      "description": "Sync Forgejo appVersion and pinned image tag with Forgejo releases. Both files are matched by one manager so the two can never drift apart (the Gitea chart they replace had appVersion 1.27.0 while actually running image 1.26.1).",
       "customType": "regex",
       "managerFilePatterns": [
-        "k8s/platform/gitea/Chart.yaml"
+        "k8s/platform/forgejo/Chart.yaml",
+        "k8s/platform/forgejo/values.yaml"
       ],
       "matchStrings": [
-        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?",
+        "image:\\s*\\n\\s*tag:\\s*\"(?<currentValue>[^\"]+)\""
       ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "go-gitea/gitea",
+      "datasourceTemplate": "forgejo-releases",
+      "depNameTemplate": "forgejo/forgejo",
       "extractVersionTemplate": "^v(?<version>.*)$"
     },
     {

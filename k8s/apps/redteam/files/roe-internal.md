@@ -53,7 +53,7 @@ locked down than it is (even if the current state technically matches intent).
 | Longhorn UI | longhorn.msng.to | internal only | **basic auth** | destructive if breached — must stay locked |
 | Prometheus | prometheus.msng.to | internal only | **none** | *believed* fine — challenge this; should he worry? |
 | Grafana | (monitoring) | ? | ? | verify |
-| Gitea | git.msng.to | internal only | login | see 3b |
+| Forgejo | git.msng.to | internal only | login | see 3b |
 | Woodpecker CI | (platform) | internal | ? | see 3b |
 | Dagger engine | (platform) | internal | ? | see 3b |
 | Terraria world UI | terraria.msng.to | public | none | see external engagement |
@@ -66,7 +66,7 @@ ArgoCD deploys whatever lands on `main` of `ops/k8s-homelab`, so **anything that
 an untrusted actor influence `main` is effectively full cluster control.** Investigate,
 from your internal position and read-only starting creds:
 
-1. Can you get a commit onto `main` of the repo? (misconfigured Gitea perms, push
+1. Can you get a commit onto `main` of the repo? (misconfigured Forgejo perms, push
    with the read-only token, protected-branch gaps, ArgoCD reading an unexpected
    source, webhook abuse, etc.)
 2. Can you make **Woodpecker CI** run a pipeline for a branch/commit/PR you control as

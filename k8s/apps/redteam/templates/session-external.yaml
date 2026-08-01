@@ -6,7 +6,7 @@
 #   kubectl exec -it deploy/redteam-external -n redteam -c session -- tmux new -A -s rt
 # then run `claude --model fable`. Scaled to 0 by default.
 #
-# This pod is REPO-BLIND by design (reaching internal gitea through a public VPN is a
+# This pod is REPO-BLIND by design (reaching internal forgejo through a public VPN is a
 # split-horizon mess); its only internal reach is the kube API oracle, carved out of
 # the tunnel via Gluetun FIREWALL_OUTBOUND_SUBNETS.
 apiVersion: apps/v1

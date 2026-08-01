@@ -1,6 +1,6 @@
 # CloudNative-PG (CNPG)
 
-CloudNative-PG operator for managing PostgreSQL clusters as Kubernetes-native resources. Used by crowdsec, gitea, and authelia.
+CloudNative-PG operator for managing PostgreSQL clusters as Kubernetes-native resources. Used by crowdsec, forgejo, and authelia.
 
 ## Runbooks
 
@@ -11,10 +11,10 @@ PVC `storageClass` is immutable in Kubernetes — CNPG cannot migrate a live clu
 **Before you start**: identify the cluster you're migrating. The steps below use shell variables throughout.
 
 ```bash
-NAMESPACE=<namespace>          # e.g. gitea
-CLUSTER=<cluster-name>         # e.g. gitea-psql
-DB=<database-name>             # e.g. gitea
-ARGOCD_APP=<argocd-app-name>   # e.g. gitea
+NAMESPACE=<namespace>          # e.g. forgejo
+CLUSTER=<cluster-name>         # e.g. forgejo-psql
+DB=<database-name>             # e.g. forgejo
+ARGOCD_APP=<argocd-app-name>   # e.g. forgejo
 ```
 
 Find the current primary pod:

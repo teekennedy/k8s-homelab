@@ -19,7 +19,7 @@ renovate:
       allowPrivilegeEscalation: false
     config: |
       {
-        "platform": "gitea",
+        "platform": "forgejo",
         "endpoint": "https://git.msng.to/api/v1",
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
         "autodiscover": true,
@@ -56,7 +56,7 @@ renovate:
     - name: RENOVATE_TOKEN
       valueFrom:
         secretKeyRef:
-          name: renovate-gitea-user
+          name: renovate-forgejo-user
           key: token
     # GPG commit signing key (bootstrapped by gpg-bootstrap-job)
     - name: RENOVATE_GIT_PRIVATE_KEY

@@ -24,16 +24,19 @@
           key: "{{HOMEPAGE_VAR_JELLYSEERR_API_KEY}}"
           cache: 3
 - Apps:
-    - Gitea:
-        icon: sh-gitea.svg
+    - Forgejo:
+        icon: sh-forgejo.svg
         href: https://git.msng.to
         description: Git repository host
-        namespace: gitea
-        app: gitea
+        namespace: forgejo
+        app: forgejo
         widget:
+          # Homepage has no forgejo widget type yet
+          # (gethomepage/homepage#3433). Forgejo's API is Gitea-compatible, so
+          # the gitea widget works against it unchanged.
           type: gitea
           url: https://git.msng.to
-          key: "{{HOMEPAGE_VAR_GITEA_API_KEY}}"
+          key: "{{HOMEPAGE_VAR_FORGEJO_API_KEY}}"
           cache: 3
     - Spoolman:
         icon: sh-spoolman.svg

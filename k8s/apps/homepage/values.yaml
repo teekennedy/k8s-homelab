@@ -94,10 +94,10 @@ secret-sync:
         namespace: jellyfin
         name: api-keys
         key: PROWLARR_API_KEY
-    - env: HOMEPAGE_VAR_GITEA_API_KEY
+    - env: HOMEPAGE_VAR_FORGEJO_API_KEY
       source:
-        namespace: gitea
-        name: homepage-gitea-credentials
+        namespace: forgejo
+        name: homepage-forgejo-credentials
         key: token
     - env: HOMEPAGE_VAR_JELLYFIN_API_KEY
       source:

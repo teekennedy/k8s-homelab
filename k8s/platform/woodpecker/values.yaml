@@ -8,12 +8,14 @@ woodpecker:
       allowPrivilegeEscalation: false
     env:
       WOODPECKER_HOST: "https://ci.msng.to"
-      WOODPECKER_GITEA: "true"
-      WOODPECKER_GITEA_URL: "https://git.msng.to"
+      WOODPECKER_FORGEJO: "true"
+      WOODPECKER_FORGEJO_URL: "https://git.msng.to"
       WOODPECKER_ADMIN: "tkennedy"
     extraSecretNamesForEnvFrom:
       - woodpecker-default-agent-secret
-      - woodpecker-gitea-oauth2
+      # WOODPECKER_FORGEJO_CLIENT / _SECRET, written by the forgejo-resources
+      # job (see forgejo-resources.oauth2Apps in k8s/platform/forgejo).
+      - woodpecker-forgejo-oauth2
     persistentVolume:
       storageClass: longhorn
       labels:

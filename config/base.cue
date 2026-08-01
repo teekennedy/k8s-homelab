@@ -38,7 +38,7 @@ _productionApps: {
 			"csi-driver-nfs":    true
 			"csi-driver-smb":    true
 			"dagger-engine":     true
-			"gitea":             true
+			"forgejo":           true
 			"monitoring-system": true
 			"oauth2-proxy":      true
 			"renovate":          true
@@ -83,7 +83,7 @@ _stagingApps: {
 			"csi-driver-nfs":    false
 			"csi-driver-smb":    false
 			"dagger-engine":     false
-			"gitea":             true
+			"forgejo":           true
 			"monitoring-system": false
 			"oauth2-proxy":      false
 			"renovate":          false

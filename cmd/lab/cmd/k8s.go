@@ -220,10 +220,10 @@ Uses helm template piped through kubectl diff for semantic comparison.
 Examples:
   lab k8s diff                    # Diff all tiers
   lab k8s diff foundation         # Diff entire foundation tier
-  lab k8s diff platform/gitea     # Diff specific app
-  lab k8s diff gitea              # Diff app (auto-detect tier)
+  lab k8s diff platform/forgejo   # Diff specific app
+  lab k8s diff forgejo            # Diff app (auto-detect tier)
   lab k8s diff --watch            # Watch for changes and re-diff
-  lab k8s diff gitea --watch      # Watch specific app`,
+  lab k8s diff forgejo --watch    # Watch specific app`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			envName, _ := cmd.Flags().GetString("env")
@@ -263,8 +263,8 @@ func newK8sSyncCmd() *cobra.Command {
 
 Examples:
   lab k8s sync foundation         # Sync entire foundation tier
-  lab k8s sync platform/gitea     # Sync specific app
-  lab k8s sync gitea --argocd     # Sync via ArgoCD`,
+  lab k8s sync platform/forgejo   # Sync specific app
+  lab k8s sync forgejo --argocd   # Sync via ArgoCD`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			envName, _ := cmd.Flags().GetString("env")

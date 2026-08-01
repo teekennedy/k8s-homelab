@@ -29,8 +29,8 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
-      name: gitea-admin-secret
-      namespace: gitea
+      name: forgejo-admin-secret
+      namespace: forgejo
     - jsonPointers:
         - /data
       kind: Secret

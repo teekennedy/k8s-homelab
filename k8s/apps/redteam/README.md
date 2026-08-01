@@ -92,7 +92,7 @@ not on VPN block lists, and you can decide whether to whitelist it in CrowdSec t
 _The oauth2-proxy `/.well-known/` change is already applied in the `oauth2-proxy`
 block of `k8s/apps/homepage/values.yaml`._
 
-_No Gitea credential is needed — the repo is unauthenticated-readable and the internal
+_No Forgejo credential is needed — the repo is unauthenticated-readable and the internal
 pod pre-clones it in an init container._
 
 ## Cost / audit / teardown
