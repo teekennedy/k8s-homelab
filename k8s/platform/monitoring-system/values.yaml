@@ -121,10 +121,29 @@ kube-prometheus-stack:
     enabled: true
 
     alertmanagerSpec:
+      replicas: 3
       secrets:
         - alertmanager-secrets
       configMaps:
         - alert-templates
+      nodeSelector:
+        node.msng.to/cnpg-storage: "true"
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: alertmanager
+                  app.kubernetes.io/instance: monitoring-system-kube-pro
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: longhorn-strict-local
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 2Gi
 
     config:
       templates:

@@ -9,7 +9,7 @@ metadata:
   labels:
     app.kubernetes.io/name: kured-webhook
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: kured-webhook
@@ -17,8 +17,17 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: kured-webhook
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/kured-webhook-configmap.yaml") . | sha256sum }}
     spec:
       serviceAccountName: kured-webhook
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: kured-webhook
       containers:
         - name: webhook
           image: "{{ .Values.webhook.image.repository }}:{{ .Values.webhook.image.tag }}"
