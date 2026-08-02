@@ -1,0 +1,102 @@
+{{/*
+Rolls the homepage Deployment whenever files/homepage-configs/* changes.
+
+The usual trick — a `checksum/config` annotation on the pod template — isn't
+available here: the Deployment belongs to the upstream `homepage` subchart, and
+Helm cannot pass a render-time value into this subchart.
+
+Instead, the config hash goes into this Job's *name*. ArgoCD creates the Job only
+when the name changes, i.e. only when the config content actually changes, and
+`prune: true` deletes the previous one. sync-wave 1 puts it after the ConfigMap
+(wave 0) so the restarted pods pick up the new content.
+*/}}
+{{- $configHash := (.Files.Glob "files/homepage-configs/*").AsConfig | sha256sum | trunc 8 -}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: homepage-config-rollout
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: homepage-config-rollout
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+    resourceNames:
+      - homepage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: homepage-config-rollout
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: homepage-config-rollout
+subjects:
+  - kind: ServiceAccount
+    name: homepage-config-rollout
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: homepage-config-rollout-{{ $configHash }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    # Job.spec.template is immutable, so an edit to this Job that isn't a config
+    # change (a Renovate bump of the kubectl image, a resources tweak) would keep
+    # the same name with a different pod spec and be rejected on apply. Replace
+    # makes ArgoCD delete+recreate instead. Same pattern as the secret-sync Job.
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: homepage-config-rollout
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: rollout
+          image: alpine/kubectl:1.36.0
+          command: ["kubectl"]
+          args:
+            - rollout
+            - restart
+            - deployment/homepage
+            - --namespace
+            - {{ .Release.Namespace }}
+          env:
+            # kubectl writes its cache under $HOME; root filesystem is read-only.
+            - name: HOME
+              value: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
