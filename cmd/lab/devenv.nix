@@ -7,7 +7,7 @@
     pname = "lab";
     version = "0.2.3";
     src = ./.;
-    vendorHash = "sha256-Al3/Yqqp0D1hWIHuxhgmhXfJ9hj8fi76nZQAjxmZk1I=";
+    vendorHash = "sha256-dnnX0KlWNUXVHyZDORxDCsNla9EY7b417+uNTLhUQmE=";
 
     postInstall = ''
       installShellCompletion --cmd lab \
