@@ -327,6 +327,13 @@
       "versioning": "semver"
     },
     {
+      "description": "Forgejo releases on codeberg link out to a separate release-notes markdown doc instead of inlining notes; point changelogUrl at that doc directly.",
+      "matchPackageNames": [
+        "forgejo/forgejo"
+      ],
+      "changelogUrl": "https://codeberg.org/forgejo/forgejo/src/branch/forgejo/release-notes-published/{{newVersion}}.md"
+    },
+    {
       "description": "Automerge all non-major (minor/patch) updates.",
       "automerge": true,
       "automergeType": "pr",
