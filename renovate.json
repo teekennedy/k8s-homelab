@@ -331,7 +331,8 @@
       "matchPackageNames": [
         "forgejo/forgejo"
       ],
-      "changelogUrl": "https://codeberg.org/forgejo/forgejo/src/branch/forgejo/release-notes-published/{{newVersion}}.md"
+      "changelogUrl": "https://codeberg.org/forgejo/forgejo/src/branch/forgejo/release-notes-published/{{newVersion}}.md",
+      "sourceUrl": "https://codeberg.org/forgejo/forgejo"
     },
     {
       "description": "Automerge all non-major (minor/patch) updates.",
