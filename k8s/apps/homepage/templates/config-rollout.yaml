@@ -50,10 +50,7 @@ metadata:
   name: homepage-config-rollout-{{ $configHash }}
   namespace: {{ .Release.Namespace }}
   annotations:
-    # Job.spec.template is immutable, so an edit to this Job that isn't a config
-    # change (a Renovate bump of the kubectl image, a resources tweak) would keep
-    # the same name with a different pod spec and be rejected on apply. Replace
-    # makes ArgoCD delete+recreate instead. Same pattern as the secret-sync Job.
+    # Job.spec.template is immutable. Replace resource to avoid apply errors.
     argocd.argoproj.io/sync-options: Replace=true,Force=true
     argocd.argoproj.io/sync-wave: "1"
 spec:
