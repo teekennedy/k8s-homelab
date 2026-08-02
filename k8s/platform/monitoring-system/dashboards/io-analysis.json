@@ -265,35 +265,116 @@
       ]
     },
     {
-      "type": "row",
-      "title": "Node Logs",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
-      "collapsed": true,
-      "panels": [
-        {
-          "type": "logs",
-          "title": "Logs for $node",
-          "datasource": { "type": "loki", "uid": "$loki" },
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 37 },
-          "options": {
-            "showTime": true,
-            "showLabels": false,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
-          },
-          "targets": [
-            {
-              "datasource": { "type": "loki", "uid": "$loki" },
-              "expr": "{node_name=~\"$node\"}",
-              "refId": "A"
+      "kind": "Panel",
+      "spec": {
+        "id": 15,
+        "title": "IO Timeouts by Host",
+        "description": "",
+        "links": [],
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "query": {
+                    "kind": "DataQuery",
+                    "version": "v0",
+                    "group": "loki",
+                    "datasource": {
+                      "name": "$loki"
+                    },
+                    "spec": {
+                      "expr": "sum by (host) (count_over_time({job=\"dmesg\"} |= \"nvme0\" |= \"timeout\" [$__interval]))",
+                      "editorMode": "code",
+                      "queryType": "range",
+                      "direction": "backward",
+                      "legendFormat": "{{host}}"
+                    }
+                  },
+                  "refId": "A",
+                  "hidden": false
+                }
+              }
+            ],
+            "transformations": [],
+            "queryOptions": {}
+          }
+        },
+        "vizConfig": {
+          "kind": "VizConfig",
+          "group": "barchart",
+          "version": "13.1.1",
+          "spec": {
+            "options": {
+              "orientation": "auto",
+              "xTickLabelRotation": 0,
+              "xTickLabelSpacing": 0,
+              "showValue": "auto",
+              "stacking": "none",
+              "groupWidth": 0.7,
+              "barWidth": 0.97,
+              "barRadius": 0,
+              "fullHighlight": false,
+              "tooltip": {
+                "mode": "single",
+                "sort": "none",
+                "hideZeros": false
+              },
+              "legend": {
+                "showLegend": true,
+                "displayMode": "list",
+                "placement": "bottom",
+                "overflow": "ellipsis",
+                "calcs": []
+              }
+            },
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "lineWidth": 1,
+                  "fillOpacity": 80,
+                  "gradientMode": "none",
+                  "axisPlacement": "auto",
+                  "axisLabel": "",
+                  "axisColorMode": "text",
+                  "axisBorderShow": false,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "axisCenteredZero": false,
+                  "hideFrom": {
+                    "tooltip": false,
+                    "viz": false,
+                    "legend": false
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "value": null,
+                      "color": "green"
+                    },
+                    {
+                      "value": 80,
+                      "color": "red"
+                    }
+                  ]
+                }
+              },
+              "overrides": []
             }
-          ]
+          }
         }
-      ]
+      }
     }
   ]
 }

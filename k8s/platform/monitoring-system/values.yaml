@@ -44,6 +44,7 @@ kube-prometheus-stack:
     additionalDataSources:
       - name: Loki
         type: loki
+        uid: loki
         access: proxy
         url: http://monitoring-system-loki:3100
         isDefault: false
@@ -374,6 +375,14 @@ loki:
       rule_path: /tmp/ruler-scratch
       alertmanager_url: http://monitoring-system-kube-pro-alertmanager.monitoring-system.svc.cluster.local:9093
       enable_alertmanager_v2: true
+      # Used to build the "Links: [query]" explore URL on fired alerts:
+      # external_url + "/explore?left=...". Must be the plain Grafana base
+      # URL (classic Explore route), not the grafana-lokiexplore-app path.
+      # datasource_uid must match the Loki datasource's uid below so the
+      # generated link actually loads the query instead of falling back to
+      # the default Explore view.
+      external_url: https://grafana.msng.to
+      datasource_uid: loki
       ring:
         kvstore:
           store: inmemory

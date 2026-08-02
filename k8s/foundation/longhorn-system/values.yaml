@@ -8,7 +8,7 @@ longhorn:
     # -- Maximum number of engines that are allowed to concurrently upgrade on each node after Longhorn Manager is upgraded. When the value is "0", Longhorn does not automatically upgrade volume engines to the new default engine image version.
     concurrentAutomaticEngineUpgradePerNodeLimit: "1"
     # -- Maximum number of replicas that can be concurrently rebuilt on each node. Increase this to speed up replica evacuation during node drains.
-    concurrentReplicaRebuildPerNodeLimit: "3"
+    concurrentReplicaRebuildPerNodeLimit: "1"
     # -- Policy for handling node drains. "always-allow" lets drains proceed without blocking on replica eviction, avoiding PDB deadlocks during kured reboots.
     nodeDrainPolicy: always-allow
     # -- Default number of replicas for new volumes. With 3 nodes and good backup coverage, 2 replicas provides better fault tolerance during node maintenance.
