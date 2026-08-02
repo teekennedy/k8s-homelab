@@ -401,7 +401,7 @@ loki:
       # generated link actually loads the query instead of falling back to
       # the default Explore view.
       external_url: https://grafana.msng.to
-      datasource_uid: loki
+      # datasource_uid: loki
       ring:
         kvstore:
           store: inmemory
