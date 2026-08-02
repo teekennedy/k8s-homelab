@@ -1,7 +1,7 @@
 apiVersion: v2
 name: forgejo
 version: 0.0.1
-appVersion: 15.0.6
+appVersion: 16.0.1
 dependencies:
   - name: forgejo
     version: 17.1.4
