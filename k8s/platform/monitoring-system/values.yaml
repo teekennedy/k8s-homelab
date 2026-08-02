@@ -53,6 +53,7 @@ kube-prometheus-stack:
           timeInterval: 30s
       - name: VictoriaMetrics
         type: prometheus
+        uid: victoriametrics
         access: proxy
         url: http://victoria-metrics-server.victoria-metrics.svc:8428
         isDefault: false
@@ -401,7 +402,7 @@ loki:
       # generated link actually loads the query instead of falling back to
       # the default Explore view.
       external_url: https://grafana.msng.to
-      # datasource_uid: loki
+      datasource_uid: loki
       ring:
         kvstore:
           store: inmemory
