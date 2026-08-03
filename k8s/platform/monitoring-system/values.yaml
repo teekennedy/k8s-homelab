@@ -142,6 +142,9 @@ kube-prometheus-stack:
           spec:
             storageClassName: longhorn-strict-local
             accessModes: ["ReadWriteOnce"]
+            labels:
+              recurring-job.longhorn.io/source: "enabled"
+              recurring-job-group.longhorn.io/ephemeral: "enabled"
             resources:
               requests:
                 storage: 2Gi
