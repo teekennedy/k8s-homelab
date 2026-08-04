@@ -1,23 +1,8 @@
 {
-  "name": "grafana-viewers"
-}
-{
-  "name": "grafana-editors"
-}
-{
-  "name": "grafana-admins"
-}
-{
   "name": "argocd-user"
 }
 {
   "name": "argocd-admin"
-}
-{
-  "name": "full-admin"
-}
-{
-  "name": "syncthing-admins"
 }
 {
   "name": "copyparty-users"
@@ -30,4 +15,25 @@
 }
 {
   "name": "forgejo-admins"
+}
+{
+  "name": "full-admin"
+}
+{
+  "name": "grafana-viewers"
+}
+{
+  "name": "grafana-editors"
+}
+{
+  "name": "grafana-admins"
+}
+{
+  "name": "jellyfin-users"
+}
+{
+  "name": "jellyfin-admins"
+}
+{
+  "name": "syncthing-admins"
 }

@@ -413,6 +413,22 @@ app-template:
             JELLYFIN_CACHE_DIR: "/data/cache"
             JELLYFIN_LOG_DIR: "/data/log"
           probes:
+            # Gates liveness/readiness until the app is actually up, so those two can
+            # use tight periods without racing a slow first boot (library scan, plugin
+            # migrations). Normal boot completes in ~5s (`Startup complete` in the logs);
+            # 20 * 5s = 100s of headroom covers a slow one before anything is marked
+            # unhealthy or removed from the Service.
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /health
+                  port: 8096
+                failureThreshold: 20
+                periodSeconds: 5
+                successThreshold: 1
+                timeoutSeconds: 3
             liveness:
               enabled: true
               custom: true
@@ -421,7 +437,6 @@ app-template:
                   path: /health
                   port: 8096
                 failureThreshold: 3
-                initialDelaySeconds: 30
                 periodSeconds: 30
                 successThreshold: 1
                 timeoutSeconds: 10
@@ -429,13 +444,13 @@ app-template:
               enabled: true
               custom: true
               spec:
-                tcpSocket:
+                httpGet:
+                  path: /health
                   port: 8096
-                failureThreshold: 5
-                initialDelaySeconds: 30
+                failureThreshold: 3
                 periodSeconds: 10
                 successThreshold: 1
-                timeoutSeconds: 1
+                timeoutSeconds: 5
           resources:
             requests:
               cpu: 1000m

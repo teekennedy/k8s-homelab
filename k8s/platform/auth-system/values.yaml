@@ -292,6 +292,15 @@ authelia:
                 subject: "group:full-admin"
               - policy: one_factor
                 subject: "group:argocd-user"
+          forgejo:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:forgejo-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
+              - policy: one_factor
+                subject: "group:forgejo-users"
           grafana:
             default_policy: deny
             rules:
@@ -303,15 +312,15 @@ authelia:
                 subject: "group:grafana-admins"
               - policy: two_factor
                 subject: "group:full-admin"
-          forgejo:
+          jellyfin:
             default_policy: deny
             rules:
               - policy: two_factor
-                subject: "group:forgejo-admins"
+                subject: "group:jellyfin-admins"
               - policy: two_factor
                 subject: "group:full-admin"
               - policy: one_factor
-                subject: "group:forgejo-users"
+                subject: "group:jellyfin-users"
         clients:
           - client_id: argocd
             client_name: Argo CD
@@ -337,7 +346,7 @@ authelia:
             client_secret:
               path: /secrets/authelia-oidc-client-secrets/jellyfin
             token_endpoint_auth_method: client_secret_post
-            authorization_policy: one_factor
+            authorization_policy: jellyfin
             require_pkce: true
             pkce_challenge_method: S256
             redirect_uris:
