@@ -159,6 +159,17 @@ traefik:
   nodeSelector:
     node-role.kubernetes.io/control-plane: "true"
   ports:
+    # Ingress resources without an explicit router.entrypoints annotation are
+    # attached to every entrypoint, including this default internal one - not
+    # just `webpublic`/`wspublic`. Since Ingress-published DNS records point at
+    # the internal VIP (traefik's default Service), that made plain HTTP on
+    # `web` a silent bypass of the redirect configured on `webpublic`.
+    web:
+      http:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
     websecure:
       http3:
         enabled: true
