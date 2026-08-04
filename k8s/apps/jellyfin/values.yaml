@@ -951,6 +951,9 @@ app-template:
             - path: /data/config/logging.json
               readOnly: true
               subPath: logging.json
+            - path: /jellyfin/jellyfin-web/config.json
+              readOnly: true
+              subPath: web-config.json
     cleanuparr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
