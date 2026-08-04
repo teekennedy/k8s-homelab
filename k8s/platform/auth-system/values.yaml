@@ -341,16 +341,6 @@ authelia:
             redirect_uris:
               - https://argocd.msng.to/auth/callback
               - https://argocd.msng.to/pkce/verify
-          - client_id: jellyfin
-            client_name: Jellyfin
-            client_secret:
-              path: /secrets/authelia-oidc-client-secrets/jellyfin
-            token_endpoint_auth_method: client_secret_post
-            authorization_policy: jellyfin
-            require_pkce: true
-            pkce_challenge_method: S256
-            redirect_uris:
-              - https://jellyfin.msng.to/sso/OID/redirect/authelia
           # Grafana (k8s/platform/monitoring-system), authenticated via its
           # built-in auth.generic_oauth provider, which (like oauth2-proxy)
           # uses golang.org/x/oauth2 and so also wants client_secret_post.
@@ -423,6 +413,17 @@ authelia:
               - code
             redirect_uris:
               - https://msng.to/oauth2/callback
+          - client_id: jellyfin
+            client_name: Jellyfin
+            consent_mode: implicit
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/jellyfin
+            token_endpoint_auth_method: client_secret_post
+            authorization_policy: jellyfin
+            require_pkce: true
+            pkce_challenge_method: S256
+            redirect_uris:
+              - https://jellyfin.msng.to/sso/OID/redirect/authelia
           # Internal oauth2-proxy (k8s/apps/syncthing) fronting
           # the syncthing GUI with no internal-network bypass.
           - client_id: oauth2-proxy-internal
