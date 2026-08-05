@@ -10,6 +10,7 @@
   "displayName": "User",
   "groups": [
     "argocd-user",
+    "jellyfin-users",
     "grafana-viewers"
   ]
 }
