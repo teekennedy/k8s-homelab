@@ -801,6 +801,9 @@ app-template:
   ingress:
     jellyfin:
       enabled: true
+      className: traefik
+      annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: wspublic
       hosts:
         - host: &jellyfinHost jellyfin.msng.to
           paths:
