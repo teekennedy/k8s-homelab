@@ -93,7 +93,7 @@
               ./nix/modules/samba/server.nix
               ({...}: {
                 disko.devices.disk.main.device = "/dev/disk/by-id/nvme-WD_BLACK_SN770_1TB_23011J801757";
-                disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FFD004T_TPBF2404020050100710";
+                disko.longhornDevice = "/dev/disk/by-id/nvme-Samsung_SSD_990_PRO_4TB_S7KGNU0YC07868H";
                 system.stateVersion = "25.05";
                 systemd.network.networks."10-ethernet-static" = {
                   matchConfig = {
