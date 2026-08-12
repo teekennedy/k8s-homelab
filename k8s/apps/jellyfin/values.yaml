@@ -602,7 +602,7 @@ app-template:
           # https://cleanuparr.github.io/Cleanuparr/
           image:
             repository: ghcr.io/cleanuparr/cleanuparr
-            tag: 2.10.2
+            tag: 2.10.5
           env:
             TZ: America/Denver
             PORT: "11011"
@@ -673,7 +673,7 @@ app-template:
         gluetun:
           image:
             repository: docker.io/qmcgaw/gluetun
-            tag: v3.41.1
+            tag: v3.41.3
           resources:
             requests:
               cpu: 250m
@@ -753,7 +753,7 @@ app-template:
         configarr:
           image:
             repository: ghcr.io/raydak-labs/configarr
-            tag: 1.30.1
+            tag: 1.30.2
             pullPolicy: IfNotPresent
           tty: true # for color support
           env:
