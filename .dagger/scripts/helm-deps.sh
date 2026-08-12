@@ -14,7 +14,7 @@ for chart_yaml in $(find $SEARCH_PATHS -name Chart.yaml -not -path "*/charts/*" 
         helm repo add "$repo_name" "$repo_url" 2>/dev/null || true
     done
 done
-helm repo update 2>/dev/null || true
+helm repo update
 echo ""
 
 # Build dependencies for all charts
@@ -22,7 +22,7 @@ for chart_yaml in $(find $SEARCH_PATHS -name Chart.yaml -not -path "*/charts/*" 
     chart_dir=$(dirname "$chart_yaml")
     if grep -q 'dependencies:' "$chart_yaml"; then
         echo "Building dependencies for $chart_dir..."
-        helm dependency build --skip-refresh "$chart_dir" 2>/dev/null || true
+        helm dependency build --skip-refresh "$chart_dir"
     fi
 done
 echo "Dependencies built."

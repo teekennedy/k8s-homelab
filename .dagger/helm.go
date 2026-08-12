@@ -221,8 +221,8 @@ func (hc *HelmChart) sourceWithDeps() *dagger.Directory {
 					repo_name="repo-$(echo "$repo_url" | md5sum | cut -c1-8)"
 					helm repo add "$repo_name" "$repo_url" 2>/dev/null || true
 				done
-				helm repo update 2>/dev/null || true
-				helm dependency build --skip-refresh . 2>/dev/null || true
+				helm repo update
+				helm dependency build --skip-refresh .
 			fi
 		`}).
 		Directory(hc.chartDir())
