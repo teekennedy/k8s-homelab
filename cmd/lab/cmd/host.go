@@ -104,6 +104,7 @@ func newHostDeployCmd() *cobra.Command {
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			skipChecks, _ := cmd.Flags().GetBool("skip-checks")
 			boot, _ := cmd.Flags().GetBool("boot")
+			kuredReboot, _ := cmd.Flags().GetBool("kured-reboot")
 
 			repoRoot, err := validateHost(hostname)
 			if err != nil {
@@ -127,7 +128,7 @@ func newHostDeployCmd() *cobra.Command {
 			if dryRun {
 				deployArgs = append(deployArgs, "--dry-activate")
 			}
-			if boot {
+			if boot || kuredReboot {
 				deployArgs = append(deployArgs, "--boot")
 			}
 
@@ -139,6 +140,18 @@ func newHostDeployCmd() *cobra.Command {
 
 			if err := deployCmd.Run(); err != nil {
 				return fmt.Errorf("deploy failed: %w", err)
+			}
+
+			if kuredReboot && !dryRun {
+				rebootCmd := exec.Command("ssh", hostname, "sudo", "touch", "/var/run/reboot-required")
+				rebootCmd.Stdout = os.Stdout
+				rebootCmd.Stderr = os.Stderr
+				rebootCmd.Stdin = os.Stdin
+				rebootCmd.Dir = repoRoot
+				if err := rebootCmd.Run(); err != nil {
+					return fmt.Errorf("creating reboot sentinel file failed: %w", err)
+				}
+				fmt.Println("Successfully created kured reboot sentinel file")
 			}
 
 			if jsonOutput {
@@ -157,7 +170,8 @@ func newHostDeployCmd() *cobra.Command {
 
 	cmd.Flags().Bool("dry-run", false, "Perform a dry run without making changes")
 	cmd.Flags().Bool("skip-checks", false, "Skip deploy-rs checks")
-	cmd.Flags().Bool("boot", false, "Activate the deployment on next boot")
+	cmd.Flags().Bool("boot", false, "Activate the system on next boot")
+	cmd.Flags().Bool("kured-reboot", false, "Reboot into new system using kured (implies --boot)")
 
 	return cmd
 }

@@ -5,7 +5,7 @@
 }: let
   lab = pkgs.buildGoModule {
     pname = "lab";
-    version = "0.2.3";
+    version = "0.2.4";
     src = ./.;
     vendorHash = "sha256-dnnX0KlWNUXVHyZDORxDCsNla9EY7b417+uNTLhUQmE=";
 

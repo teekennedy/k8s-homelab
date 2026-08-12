@@ -1,16 +1,12 @@
 {
   description = "teekennedy's homelab";
   inputs = {
+    # To avoid unnecessary rebuilds, deploy-rs nixpkgs input is not configured
+    # to follow this flake.
     deploy-rs.url = "github:serokell/deploy-rs?ref=master";
-    deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
     determinate.url = "github:DeterminateSystems/determinate";
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules?ref=main";
-    # TEMPORARY: pinned to PR #540857 (KiaraGrouwstra/nixpkgs@modular-reload-fixes)
-    # which fixes a modular-services (system.services.*) eval regression that
-    # otherwise breaks tlshd / nix/modules/nfs-mtls on every borg host. Revert to
-    # "github:NixOS/nixpkgs/nixos-unstable" once the PR lands in nixos-unstable.
-    # NB: this branch is based on nixpkgs master, not nixos-unstable.
-    nixpkgs.url = "github:KiaraGrouwstra/nixpkgs/ae9994806ca939447a8a6adc4f94d12cbdf06e01";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     disko.url = "github:nix-community/disko?ref=master";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence?ref=master";
