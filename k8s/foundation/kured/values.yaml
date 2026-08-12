@@ -44,8 +44,14 @@ webhook:
     - LonghornInstanceManagerCPUUsageWarning
     - LonghornManagerNotReady
     - LonghornCSINotReady
+    - HighDiskIOUtilization
     - HighDiskLatency
     - HighDiskQueueDepth
+    # Rebooting a node drops iSCSI sessions to any Longhorn replicas it hosts,
+    # causing transient I/O errors + EXT4 journal aborts on OTHER nodes that
+    # have volumes attached to those replicas until the session reconnects.
+    - NodeBlockDeviceIOError
+    - NodeFilesystemError
   postRebootSilenceDuration: 15m
   rebootAlertTtl: 6h
   postRebootSilenceAlerts:
