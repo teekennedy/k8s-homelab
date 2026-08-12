@@ -129,22 +129,16 @@ kube-prometheus-stack:
         - alert-templates
       nodeSelector:
         node.msng.to/cnpg-storage: "true"
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchLabels:
-                  app.kubernetes.io/name: alertmanager
-                  app.kubernetes.io/instance: monitoring-system-kube-pro
+      podAntiAffinity: hard
       storage:
         volumeClaimTemplate:
-          spec:
-            storageClassName: longhorn-strict-local
-            accessModes: ["ReadWriteOnce"]
+          metadata:
             labels:
               recurring-job.longhorn.io/source: "enabled"
               recurring-job-group.longhorn.io/ephemeral: "enabled"
+          spec:
+            storageClassName: longhorn-strict-local
+            accessModes: ["ReadWriteOnce"]
             resources:
               requests:
                 storage: 2Gi
