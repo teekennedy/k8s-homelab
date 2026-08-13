@@ -27,6 +27,14 @@ oidcClientSecrets:
   # autheliaDeployment: auth-system-authelia
   # <client_id>: <namespace>/<secret-name>. Each source Secret must allow
   # reflection into auth-system.
+  #
+  # A new client needs FOUR entries, and missing the last one is the easy
+  # mistake: here, an authorization_policy, an identity_providers.oidc.clients
+  # entry, and a key in secret.additionalSecrets.authelia-oidc-client-secrets.
+  # That last list is what Authelia actually mounts — a client_secret.path
+  # pointing at a key that isn't projected fails the config *template*, which
+  # blanks the whole configuration and makes every unrelated option report
+  # itself as missing.
   clients:
     jellyfin: jellyfin/jellyfin-oidc-authelia
     grafana: monitoring-system/grafana-oidc-authelia

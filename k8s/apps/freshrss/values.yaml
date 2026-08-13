@@ -77,14 +77,25 @@ app-template:
               - port: 53
                 protocol: TCP
           # The IdP. mod_auth_openidc calls the issuer server-side (metadata
-          # discovery, token exchange, JWKS), and that address falls inside the
-          # private ranges the feed-fetching rule below excludes, so it needs an
-          # explicit allow.
+          # discovery, token exchange, JWKS) over its public URL, which the
+          # feed-fetching rule below cannot cover since it excludes private
+          # ranges.
+          #
+          # It has to be expressed as the ingress controller's *pods*, not as
+          # the load balancer address: kube-proxy DNATs the service address to a
+          # backend pod IP and port before egress policy is evaluated, so a rule
+          # naming the external address never matches and the connection is
+          # refused. The port here is therefore the container port behind the
+          # public entrypoint, not 443.
           - to:
-              - ipBlock:
-                  cidr: 10.69.80.120/32
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+                podSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: traefik
             ports:
-              - port: 443
+              - port: 8444
                 protocol: TCP
           # Feed fetching: the public internet only.
           - to:
@@ -218,9 +229,11 @@ app-template:
             # The request arrives as plain HTTP from the proxy. Without this,
             # mod_auth_openidc builds an http:// redirect_uri from it, the IdP
             # rejects it as unregistered, and the login loop never completes.
-            # Listing a header the request doesn't carry logs a warning per
-            # request, so this is the minimum that reconstructs the public URL.
-            OIDC_X_FORWARDED_HEADERS: X-Forwarded-Host X-Forwarded-Proto
+            # It must list every X-Forwarded-* header the proxy actually
+            # sends: mod_auth_openidc warns once per request both for a header
+            # it is configured for but doesn't receive, and for one it receives
+            # but isn't configured for (it will not trust an unlisted one).
+            OIDC_X_FORWARDED_HEADERS: X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
 
             # --- Unattended install ---
             # Runs `cli/do-install.php` on first start only (it exits 3 =
