@@ -1,0 +1,29 @@
+---
+# The whole host goes to FreshRSS as one rule: path-level exceptions would only
+# weaken things, since Apache's mod_auth_openidc — not this route — decides
+# which paths need an identity.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    # external-dns selector; not read by the router.
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.route.entrypoint }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.route.gateway.name }}
+      namespace: {{ .Values.route.gateway.namespace }}
+      sectionName: {{ .Values.route.gateway.sectionName }}
+  hostnames:
+    - {{ .Values.route.host | quote }}
+  rules:
+    - backendRefs:
+        - name: {{ .Release.Name }}
+          port: {{ (index .Values "app-template" "service" "freshrss" "ports" "http" "port") }}

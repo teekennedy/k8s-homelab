@@ -4,6 +4,7 @@
   "displayName": "Terrance",
   "groups": [
     "full-admin",
-    "forgejo-admins"
+    "forgejo-admins",
+    "freshrss-admins"
   ]
 }

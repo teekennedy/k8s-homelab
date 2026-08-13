@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: freshrss
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: freshrss
+  project: default
+  ignoreDifferences:
+    # client-secret / crypto-key are filled in-cluster by mittwald
+    # secret-generator; don't fight it.
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: freshrss-oidc-authelia
+      namespace: freshrss
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: freshrss-oidc-crypto
+      namespace: freshrss
+    - jsonPointers:
+        - /spec/volumeName
+        - /spec/storageClassName
+        # Longhorn stores the expanded capacity in bytes rather than the
+        # human-readable form, which ArgoCD sees as a diff and tries to patch
+        # back — a patch Kubernetes rejects as reducing the storage request.
+        - /spec/resources/requests/storage
+      kind: PersistentVolumeClaim
+  source:
+    path: k8s/apps/freshrss
+    repoURL: https://git.msng.to/ops/k8s-homelab
+    targetRevision: main
+  syncPolicy:
+    # Opts the namespace into public exposure; without it the HTTPRoute is not
+    # admitted by the gateway.
+    managedNamespaceMetadata:
+      labels:
+        external-gateway-access: "true"
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true

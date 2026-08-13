@@ -1,0 +1,475 @@
+# Default values for freshrss.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-4.0.1/charts/library/common/values.schema.json
+# Docs: https://bjw-s-labs.github.io/helm-charts/docs/app-template/
+#
+# FreshRSS is internet-facing, and every default here assumes that:
+#
+#   * Apache's mod_auth_openidc gates the application directory BEFORE any PHP
+#     runs, so an unauthenticated request never reaches FreshRSS itself.
+#   * The IdP decides who may complete that flow (see the `freshrss`
+#     authorization policy in k8s/platform/auth-system/values.yaml). There is no
+#     FreshRSS-local password login and no self-service signup.
+#   * Anonymous reading is off (`--allow-anonymous false`).
+#
+# The image is the Debian one on purpose: it is the only FreshRSS image that
+# ships libapache2-mod-auth-openidc, i.e. the only one that can do OIDC at all.
+
+route:
+  host: rss.msng.to
+  # Selects the public entrypoint. Consumed by external-dns, not by the router.
+  entrypoint: wspublic
+  gateway:
+    name: traefik-gateway
+    namespace: kube-system
+    sectionName: websecurepublic
+
+app-template:
+  service:
+    freshrss:
+      controller: freshrss
+      ports:
+        http:
+          # Not 80: the pod runs as an unprivileged uid and cannot bind a
+          # privileged port, so Apache is moved here via LISTEN below.
+          port: &httpPort 8080
+
+  # --- NetworkPolicy --------------------------------------------------------
+  # FreshRSS fetches arbitrary user-supplied feed URLs, which makes SSRF the
+  # headline vulnerability class for a feed reader. The egress rules are the
+  # enforcement half of that (the app-level half is INTERNAL_HOST_ALLOWLIST,
+  # left at its blocking default below): the pods may reach the public internet
+  # on 80/443, DNS, and the IdP — and nothing else. Private ranges and
+  # link-local (cloud/hypervisor metadata) are carved out, so a malicious feed
+  # URL cannot reach the LAN, another namespace, or the Kubernetes API.
+  #
+  # Both controllers fetch feeds, so both need the same egress. A pod matched by
+  # no policy is unrestricted, which would quietly hand the refresh job — the
+  # one that actually does the fetching on a schedule — the whole network.
+  networkpolicies:
+    freshrss:
+      controller: freshrss
+      policyTypes:
+        - Ingress
+        - Egress
+      rules:
+        ingress:
+          # Nothing else in-cluster can bypass the OIDC gate by talking to the
+          # app directly.
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+            ports:
+              - port: *httpPort
+                protocol: TCP
+        egress: &egressRules
+          # Cluster DNS.
+          - to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+                podSelector:
+                  matchLabels:
+                    k8s-app: kube-dns
+            ports:
+              - port: 53
+                protocol: UDP
+              - port: 53
+                protocol: TCP
+          # The IdP. mod_auth_openidc calls the issuer server-side (metadata
+          # discovery, token exchange, JWKS), and that address falls inside the
+          # private ranges the feed-fetching rule below excludes, so it needs an
+          # explicit allow.
+          - to:
+              - ipBlock:
+                  cidr: 10.69.80.120/32
+            ports:
+              - port: 443
+                protocol: TCP
+          # Feed fetching: the public internet only.
+          - to:
+              - ipBlock:
+                  cidr: 0.0.0.0/0
+                  except:
+                    - 10.0.0.0/8
+                    - 172.16.0.0/12
+                    - 192.168.0.0/16
+                    - 169.254.0.0/16
+            ports:
+              - port: 443
+                protocol: TCP
+              - port: 80
+                protocol: TCP
+    refresh:
+      controller: refresh
+      policyTypes:
+        - Ingress
+        - Egress
+      rules:
+        # Nothing talks to a refresh job.
+        ingress: []
+        egress: *egressRules
+
+  controllers:
+    freshrss:
+      # Single writer: SQLite on an RWO volume, shared with the refresh job.
+      # Never let a second app pod open the same database.
+      strategy: Recreate
+
+      initContainers:
+        # The image's entrypoint mutates root-owned paths at startup: it seds
+        # php.ini (/etc/php) and the Apache vhost for LISTEN/TRUSTED_PROXY
+        # (/etc/apache2), and runs `a2enmod auth_openidc`, which needs both
+        # /etc/apache2/mods-enabled and Debian's module state dir under
+        # /var/lib/apache2. Miss that last one and a2enmod creates the symlink
+        # but still exits 1 ("Failed to enable auth_openidc module!"), which
+        # only survives because the entrypoint's `exit 12` sits in a subshell.
+        # Without the module Apache refuses to start at all, since the vhost's
+        # `<IfModule !auth_openidc_module> Error` fires under -D OIDC_ENABLED.
+        #
+        # A non-root container on a read-only root filesystem can write none of
+        # those. Rather than give either property up, this init container copies
+        # all three trees into an emptyDir that the app container mounts back
+        # over the originals.
+        #
+        # --no-preserve=ownership because a uid-33 process cannot reproduce the
+        # root:root ownership `cp -a` would otherwise try to preserve; the file
+        # modes and symlinks (mods-enabled -> mods-available) are kept, which is
+        # what actually matters.
+        copy-etc:
+          image:
+            repository: freshrss/freshrss
+            tag: &imageTag "1.29.1"
+            pullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /overlay/apache2 /overlay/php /overlay/lib-apache2
+              cp -a --no-preserve=ownership /etc/apache2/. /overlay/apache2/
+              cp -a --no-preserve=ownership /etc/php/. /overlay/php/
+              cp -a --no-preserve=ownership /var/lib/apache2/. /overlay/lib-apache2/
+          securityContext: &containerSecurityContext
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+
+      containers:
+        app:
+          image:
+            repository: freshrss/freshrss
+            tag: *imageTag
+            pullPolicy: IfNotPresent
+          # No command/args: the image's ENTRYPOINT (Docker/entrypoint.sh) does
+          # the OIDC module enablement and the unattended install, and its CMD
+          # passes `-D OIDC_ENABLED` to Apache. Overriding either breaks OIDC.
+          env:
+            TZ: &tz America/Denver
+            # Unprivileged port, since the pod is not root. Must match the
+            # service port above.
+            LISTEN: "0.0.0.0:8080"
+            DATA_PATH: &dataPath /var/www/FreshRSS/data
+            # mod_remoteip: trust X-Forwarded-For only from the pod network,
+            # i.e. only from the ingress controller. Without this every log line
+            # sees the proxy IP instead of the real client, and with it set too
+            # wide a client could spoof its own address.
+            TRUSTED_PROXY: 10.42.0.0/16
+            # Deliberately NOT set: INTERNAL_HOST_ALLOWLIST. Its empty default
+            # makes FreshRSS refuse to fetch feeds on private/loopback
+            # addresses, which is the app-level SSRF guard that pairs with the
+            # egress rules above. Do not set it to "*".
+            #
+            # Also deliberately NOT set: CRON_MIN. The image's built-in cron
+            # runs `su www-data`, which needs root; the refresh CronJob below
+            # does the same job unprivileged, and fails loudly.
+
+            # --- OIDC ---
+            OIDC_ENABLED: "1"
+            OIDC_PROVIDER_METADATA_URL: https://authelia.msng.to/.well-known/openid-configuration
+            # Must match the client_id registered with the IdP.
+            OIDC_CLIENT_ID: freshrss
+            OIDC_CLIENT_SECRET:
+              valueFrom:
+                secretKeyRef:
+                  name: freshrss-oidc-authelia
+                  key: client-secret
+            # mod_auth_openidc's own passphrase for encrypting session state.
+            # Unrelated to the client secret; generated in-cluster, never shared
+            # with the IdP.
+            OIDC_CLIENT_CRYPTO_KEY:
+              valueFrom:
+                secretKeyRef:
+                  name: freshrss-oidc-crypto
+                  key: crypto-key
+            # `profile` carries preferred_username, which becomes REMOTE_USER
+            # and therefore the FreshRSS account name. Groups are not requested:
+            # the vhost hardcodes `Require valid-user`, so group enforcement
+            # can only happen at the IdP.
+            OIDC_SCOPES: openid profile email
+            OIDC_REMOTE_USER_CLAIM: preferred_username
+            # The request arrives as plain HTTP from the proxy. Without this,
+            # mod_auth_openidc builds an http:// redirect_uri from it, the IdP
+            # rejects it as unregistered, and the login loop never completes.
+            # Listing a header the request doesn't carry logs a warning per
+            # request, so this is the minimum that reconstructs the public URL.
+            OIDC_X_FORWARDED_HEADERS: X-Forwarded-Host X-Forwarded-Proto
+
+            # --- Unattended install ---
+            # Runs `cli/do-install.php` on first start only (it exits 3 =
+            # "already installed" and the entrypoint treats that as a no-op), so
+            # there is never a first-run wizard sitting on a public hostname.
+            #
+            # auth-type http_auth is how FreshRSS consumes OIDC: mod_auth_openidc
+            # authenticates the request and exports REMOTE_USER, FreshRSS trusts
+            # it.
+            #
+            # default-user is deliberately a placeholder that no IdP identity
+            # maps to, so nobody can ever log in as it. FreshRSS grants the admin
+            # pages to `default_user === currentUser || is_admin` and refuses to
+            # delete default_user, so naming a real person here would weld the
+            # admin bit onto that account forever. Parking it on a placeholder
+            # keeps every human account ordinary and deletable; admin is granted
+            # per account with is_admin instead (see README).
+            #
+            # Auto-registration is left at its default (on): anyone the IdP
+            # admits gets an account on first login. That is the intended
+            # "signup" path, and group membership is what gates it.
+            FRESHRSS_INSTALL: >-
+              --default-user freshrss-admin
+              --auth-type http_auth
+              --environment production
+              --base-url https://rss.msng.to/
+              --language en
+              --title FreshRSS
+              --allow-anonymous false
+              --allow-anonymous-refresh false
+              --allow-robots false
+              --api-enabled true
+              --db-type sqlite
+            # do-install.php only records who the default user *will be*; it
+            # does not create the account ("Remember to create the default
+            # user: …"), and FreshRSS misbehaves if default_user names an
+            # account that does not exist. This creates it, on first start only
+            # — create-user.php exits 3 when the user already exists and the
+            # entrypoint treats that as a no-op.
+            #
+            # No --password: under auth_type http_auth there is no password
+            # login at all, which is what makes this account unreachable.
+            # --no-default-feeds because nothing will ever read it, and the
+            # refresh job would otherwise poll FreshRSS's starter feeds forever
+            # on behalf of an account with no user.
+            FRESHRSS_USER: >-
+              --user freshrss-admin
+              --language en
+              --no-default-feeds
+          securityContext: *containerSecurityContext
+          probes:
+            # TCP, not HTTP: every HTTP path either redirects into the OIDC flow
+            # or is served by Apache under mod_auth_openidc, so an HTTP probe
+            # would be asserting things about the auth config rather than about
+            # whether the app is up.
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: *httpPort
+                initialDelaySeconds: 30
+                periodSeconds: 30
+                failureThreshold: 5
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: *httpPort
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                failureThreshold: 3
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: *httpPort
+                periodSeconds: 10
+                # The first start runs the installer and the SQLite schema
+                # creation before Apache binds.
+                failureThreshold: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+
+    # Feed refresh. Replaces the image's built-in cron (which needs root to
+    # `su www-data`) with the same script as a CronJob, so a failure surfaces as
+    # a failed Job — something the standard alert rules already watch — instead
+    # of being swallowed by a retry loop nobody reads. Nothing here traps
+    # errors: a non-zero exit is the whole point.
+    #
+    # The job writes to the same SQLite database as the app, so it mounts the
+    # same RWO volumes and must therefore land on the same node as the app pod
+    # (podAffinity below). Consequences worth knowing:
+    #   * While a job runs, the app pod cannot move to another node — it would
+    #     wait on the volumes. activeDeadlineSeconds bounds that wait.
+    #   * If the app pod is not running, the job cannot schedule and eventually
+    #     fails the deadline. That is a true statement about feed refresh, so
+    #     letting it alert is correct.
+    refresh:
+      type: cronjob
+      cronjob:
+        schedule: "*/15 * * * *"
+        # Refreshes must not overlap on one database.
+        concurrencyPolicy: Forbid
+        # One retry absorbs a transient fetch or scheduling blip; a second
+        # consecutive failure is real and should page.
+        backoffLimit: 1
+        # Also bounds how long a hung refresh can pin the volumes to a node.
+        activeDeadlineSeconds: 600
+        ttlSecondsAfterFinished: 300
+        successfulJobsHistory: 1
+        failedJobsHistory: 3
+        startingDeadlineSeconds: 300
+      pod:
+        restartPolicy: Never
+        affinity:
+          podAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: freshrss
+                    app.kubernetes.io/instance: freshrss
+                    app.kubernetes.io/controller: freshrss
+      containers:
+        refresh:
+          image:
+            repository: freshrss/freshrss
+            tag: *imageTag
+            pullPolicy: IfNotPresent
+          # Overriding command bypasses the image ENTRYPOINT on purpose: this
+          # pod must not re-run the installer or touch the Apache config, and it
+          # needs none of the /etc rewriting that entails.
+          command:
+            - php
+            - /var/www/FreshRSS/app/actualize_script.php
+          env:
+            TZ: *tz
+            DATA_PATH: *dataPath
+          securityContext: *containerSecurityContext
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+
+  defaultPodOptions:
+    automountServiceAccountToken: false
+    securityContext:
+      runAsNonRoot: true
+      # www-data in the Debian image; the volumes are fsGroup'd to it so the
+      # entrypoint never needs the root-only chown in cli/access-permissions.sh.
+      runAsUser: 33
+      runAsGroup: 33
+      fsGroup: 33
+      fsGroupChangePolicy: OnRootMismatch
+      seccompProfile:
+        type: RuntimeDefault
+
+  persistence:
+    # The SQLite database (feeds AND articles — FreshRSS keeps both in one
+    # per-user database, so they cannot be split), config.php, user profiles,
+    # API tokens, extension data. This is the volume worth backing up; article
+    # retention is a purge setting, not a volume-layout question.
+    data:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      size: 10Gi
+      storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
+      advancedMounts:
+        freshrss:
+          app:
+            - path: *dataPath
+        refresh:
+          refresh:
+            - path: *dataPath
+    # The two pure caches FreshRSS keeps under DATA_PATH: fetched HTTP
+    # responses (CACHE_PATH) and downloaded favicons. Both are rebuilt on
+    # demand, so they live on their own volume that is deliberately NOT in the
+    # backup group — losing it costs some refetching and nothing else. Shared
+    # with the refresh job because that is what populates them.
+    cache:
+      accessMode: ReadWriteOnce
+      type: persistentVolumeClaim
+      size: 5Gi
+      storageClass: longhorn
+      advancedMounts:
+        freshrss:
+          app: &cacheMounts
+            - path: /var/www/FreshRSS/data/cache
+              subPath: cache
+            - path: /var/www/FreshRSS/data/favicons
+              subPath: favicons
+        refresh:
+          refresh: *cacheMounts
+    # Writable copies of the config trees the entrypoint rewrites. Populated by
+    # the copy-etc init container, mounted over the image's own copies in the
+    # app container. See that container's comment.
+    etc-overlay:
+      type: emptyDir
+      advancedMounts:
+        freshrss:
+          copy-etc:
+            - path: /overlay
+          app:
+            - path: /etc/apache2
+              subPath: apache2
+            - path: /etc/php
+              subPath: php
+            - path: /var/lib/apache2
+              subPath: lib-apache2
+    # Remaining writable paths needed by Apache under a read-only rootfs: the
+    # pid/socket dir, the mutex lock dir, PHP's session store, and /tmp.
+    run:
+      type: emptyDir
+      advancedMounts:
+        freshrss:
+          app:
+            - path: /run/apache2
+    lock:
+      type: emptyDir
+      advancedMounts:
+        freshrss:
+          app:
+            - path: /var/lock/apache2
+    php-sessions:
+      type: emptyDir
+      advancedMounts:
+        freshrss:
+          app:
+            - path: /var/lib/php/sessions
+    tmp:
+      type: emptyDir
+      advancedMounts:
+        freshrss:
+          app:
+            - path: /tmp
+        refresh:
+          refresh:
+            - path: /tmp

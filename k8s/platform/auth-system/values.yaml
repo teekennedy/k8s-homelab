@@ -34,6 +34,7 @@ oidcClientSecrets:
     homepage: homepage/homepage-oauth2-proxy-secrets
     oauth2-proxy-internal: syncthing/syncthing-oauth2-proxy-secrets
     copyparty: copyparty/copyparty-oauth2-proxy-secrets
+    freshrss: freshrss/freshrss-oidc-authelia
   image:
     repository: ghcr.io/astral-sh/uv
     tag: alpine
@@ -312,6 +313,15 @@ authelia:
                 subject: "group:grafana-admins"
               - policy: two_factor
                 subject: "group:full-admin"
+          freshrss:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:freshrss-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
+              - policy: one_factor
+                subject: "group:freshrss-users"
           jellyfin:
             default_policy: deny
             rules:
@@ -473,6 +483,37 @@ authelia:
               - code
             redirect_uris:
               - https://files.msng.to/oauth2/callback
+          # FreshRSS (k8s/apps/freshrss). No oauth2-proxy in front: its Apache
+          # runs mod_auth_openidc directly and hands FreshRSS the
+          # preferred_username claim as REMOTE_USER — so the `profile` scope is
+          # what supplies the account name, and it must match the lldap uid.
+          #
+          # mod_auth_openidc negotiates PKCE from the provider metadata even
+          # though the image's vhost never sets OIDCPKCEMethod — verified by
+          # running the image and reading the authorization request it emits
+          # (code_challenge_method=S256) — so this client requires it.
+          #
+          # The redirect URI is not configurable: the vhost hardcodes
+          # `OIDCRedirectURI /i/oidc/`, trailing slash included.
+          - client_id: freshrss
+            client_name: FreshRSS
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/freshrss
+            token_endpoint_auth_method: client_secret_basic
+            authorization_policy: freshrss
+            consent_mode: implicit
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://rss.msng.to/i/oidc/
         jwks:
           - key_id: RS256
             algorithm: RS256
