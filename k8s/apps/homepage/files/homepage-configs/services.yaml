@@ -60,6 +60,12 @@
         description: File host
         namespace: copyparty
         app: copyparty
+    - FreshRSS:
+        icon: sh-freshrss.svg
+        href: https://rss.msng.to
+        description: RSS feed reader
+        namespace: freshrss
+        app: freshrss
 - Cluster:
     - Grafana:
         icon: sh-grafana.svg
