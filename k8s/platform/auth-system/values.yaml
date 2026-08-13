@@ -585,6 +585,8 @@ authelia:
             path: copyparty
           - key: forgejo
             path: forgejo
+          - key: freshrss
+            path: freshrss
           - key: grafana
             path: grafana
           - key: jellyfin
