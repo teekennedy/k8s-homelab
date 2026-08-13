@@ -845,8 +845,10 @@ app-template:
     # Jellyseerr was renamed to Seerr upstream, and the service moved from
     # jellyseerr.msng.to to seerr.msng.to. This Ingress keeps the old hostname
     # resolvable (external-dns reads the host, Traefik terminates TLS for it) so
-    # bookmarks and app-configured URLs get a 301 to the new host instead of a
-    # dead name. The backend is never reached: the middleware redirects first.
+    # bookmarks and app-configured URLs get a permanent redirect to the new host
+    # instead of a dead name. Traefik's redirectRegex answers `permanent: true`
+    # with a 308, not a 301, so the method and body survive the hop.
+    # The backend is never reached: the middleware redirects first.
     seerr-legacy-redirect:
       enabled: true
       annotations:
