@@ -229,11 +229,16 @@ app-template:
             # The request arrives as plain HTTP from the proxy. Without this,
             # mod_auth_openidc builds an http:// redirect_uri from it, the IdP
             # rejects it as unregistered, and the login loop never completes.
-            # It must list every X-Forwarded-* header the proxy actually
-            # sends: mod_auth_openidc warns once per request both for a header
-            # it is configured for but doesn't receive, and for one it receives
-            # but isn't configured for (it will not trust an unlisted one).
-            OIDC_X_FORWARDED_HEADERS: X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
+            # Host and Proto only, and X-Forwarded-Port must NOT be added.
+            # mod_auth_openidc logs a warning per request for a forwarded header
+            # it receives but isn't configured to trust, which is tempting to
+            # "fix" — don't. Trusting the port makes it build an explicit
+            # `https://<host>:443/i/oidc/` redirect_uri, and the IdP matches
+            # redirect_uris as exact strings, so every login then fails with
+            # "'redirect_uri' parameter does not match any of the OAuth 2.0
+            # Client's pre-registered 'redirect_uris'". The warning is the
+            # cheaper of the two.
+            OIDC_X_FORWARDED_HEADERS: X-Forwarded-Host X-Forwarded-Proto
 
             # --- Unattended install ---
             # Runs `cli/do-install.php` on first start only (it exits 3 =

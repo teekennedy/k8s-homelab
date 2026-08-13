@@ -3,7 +3,7 @@ name: freshrss
 description: FreshRSS self-hosted feed reader, publicly exposed behind OIDC auth.
 type: application
 # Bump on any change to the chart templates/values.
-version: 0.1.1
+version: 0.1.2
 # Tracks the freshrss/freshrss image tag deployed by this chart. Must be the
 # Debian image (the tag below is), which is the only one shipping
 # libapache2-mod-auth-openidc — i.e. the only one that can do OIDC.
