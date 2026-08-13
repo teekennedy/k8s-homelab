@@ -24,10 +24,6 @@ exemptions:
       - privilegeEscalationAllowed
       - runAsRootAllowed
   - controllerNames:
-      - jellyfin-jellyseerr
-    rules:
-      - privilegeEscalationAllowed
-  - controllerNames:
       - jellyfin-main
     rules:
       - privilegeEscalationAllowed
@@ -41,6 +37,10 @@ exemptions:
       - jellyfin-qbittorrent-update-password
     rules:
       - sensitiveConfigmapContent
+  - controllerNames:
+      - jellyfin-seerr
+    rules:
+      - privilegeEscalationAllowed
   - controllerNames:
       - jellyfin-unpackerr
     rules:

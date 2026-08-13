@@ -1,0 +1,19 @@
+---
+# Jellyseerr was renamed to Seerr upstream (https://docs.seerr.dev/migration-guide/),
+# and the service moved from jellyseerr.msng.to to seerr.msng.to. The old hostname is
+# kept alive by the `seerr-legacy-redirect` Ingress in values.yaml, which attaches this
+# middleware to send every request on to the matching path under the new host.
+#
+# The host is matched as [^/]+ rather than spelled out: the Ingress router already
+# constrains it, and this way a bare https://jellyseerr.msng.to (no trailing slash)
+# still matches instead of falling through unredirected.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: seerr-legacy-redirect
+  namespace: {{ .Release.Namespace }}
+spec:
+  redirectRegex:
+    regex: "^https?://[^/]+/?(.*)"
+    replacement: "https://seerr.msng.to/${1}"
+    permanent: true

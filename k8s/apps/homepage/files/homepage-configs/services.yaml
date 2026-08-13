@@ -11,17 +11,17 @@
           url: https://jellyfin.msng.to
           key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
           cache: 3
-    - Jellyseerr:
-        icon: sh-jellyseerr.svg
-        href: https://jellyseerr.msng.to
+    - Seerr:
+        icon: sh-seerr.svg
+        href: https://seerr.msng.to
         description: Request media
         namespace: jellyfin
         app: jellyfin
-        podSelector: "app.kubernetes.io/controller=jellyseerr"
+        podSelector: "app.kubernetes.io/controller=seerr"
         widget:
-          type: jellyseerr
-          url: https://jellyseerr.msng.to
-          key: "{{HOMEPAGE_VAR_JELLYSEERR_API_KEY}}"
+          type: seerr
+          url: https://seerr.msng.to
+          key: "{{HOMEPAGE_VAR_SEERR_API_KEY}}"
           cache: 3
 - Apps:
     - Forgejo:

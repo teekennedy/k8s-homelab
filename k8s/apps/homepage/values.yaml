@@ -68,7 +68,7 @@ secret-sync:
     namespace: homepage
     type: Opaque
   mappings:
-    - env: HOMEPAGE_VAR_JELLYSEERR_API_KEY
+    - env: HOMEPAGE_VAR_SEERR_API_KEY
       source:
         namespace: jellyfin
         name: api-keys
