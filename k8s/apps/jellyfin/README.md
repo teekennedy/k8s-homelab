@@ -62,6 +62,12 @@ Dashboard → Plugins → LDAP-Auth):
 | Admin Base DN / Admin Filter | *(both empty)* |
 | Allow Password Change | off |
 
+The plugin also has an `LdapRootCaPath`. Pointing it at a mount of the existing
+`cluster-ca-bundle` (internal CA only) would work just as well and would let
+`system-ca-bundle` be deleted — a smaller footprint, at the cost of one more
+plugin setting to remember. Either is fine; the current setup uses the trust
+store so nothing plugin-side has to be configured for TLS.
+
 Two of those are load-bearing:
 
 - **`LDAP Username Attribute` must be `uid`.** It defaults to `cn`, which in
