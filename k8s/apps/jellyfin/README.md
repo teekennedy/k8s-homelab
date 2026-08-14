@@ -78,8 +78,15 @@ Two of those are load-bearing:
 - **The search filter scopes login to the jellyfin groups**, so service accounts
   like `authelia_bind_user` cannot log in.
 
-Admin/Filter are left empty deliberately: no admin rights come from LDAP, so
-`T` and `breakglass-admin` stay local accounts and remain usable if LLDAP is down.
+Admin/Filter are left empty deliberately: no admin rights are *granted* by LDAP.
+An account that is already an administrator keeps that flag when it moves onto
+the LDAP provider, so `tkennedy` is still an admin — but a new LDAP user can
+never become one by editing a group in LLDAP.
+
+`breakglass-admin` is the local account that stays behind: it is the way back in
+if LLDAP is unavailable, so it must never be moved onto the LDAP provider.
+`Homepage` and `jellyseerr` are service accounts and stay local for the same
+reason.
 
 **SSO plugin:** `AllowExistingAccountLink` must be **enabled**. Whichever method
 a user logs in with first creates their Jellyfin account; with linking off, the
@@ -105,3 +112,13 @@ If the Jellyfin username does not already equal the LLDAP uid, rename the
 Jellyfin account *first* (`POST /Users/{id}` with the new `Name`) — that keeps
 the account GUID and therefore the watch history. Creating a fresh account and
 letting the old one rot loses both.
+
+The rename matters for SSO too, not just LDAP: the SSO plugin finds the account
+by `preferred_username`, so an admin account named `T` for LLDAP uid `tkennedy`
+would have caused SSO to provision a *second* admin account instead of reusing
+the existing one. `Ky` → `cleek` and `T` → `tkennedy` were both migrated for
+this reason.
+
+The plugin keeps its own link list (`LdapUsers` in its config) separate from the
+policy field, but it populates that automatically on first successful login — a
+flipped account does not need to be added to it by hand.
