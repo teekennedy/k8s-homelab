@@ -5,6 +5,7 @@
   "groups": [
     "full-admin",
     "forgejo-admins",
-    "freshrss-admins"
+    "freshrss-admins",
+    "jellyfin-admins"
   ]
 }
