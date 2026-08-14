@@ -1,0 +1,9 @@
+{
+  "id": "jellyfin_bind_user",
+  "email": "jellyfin@msng.to",
+  "displayName": "Jellyfin",
+  "passwordRef": "lldap-jellyfin-bind-user:password",
+  "groups": [
+    "lldap_strict_readonly"
+  ]
+}

@@ -981,6 +981,25 @@ app-template:
         main:
           jellyfin:
             - path: /data/cache
+    # Replaces the image's CA bundle with "public roots + our internal CA" so
+    # the LDAP-Auth plugin can validate LLDAP's LDAPS cert, which is issued by
+    # the internal-ca ClusterIssuer. The plugin has no CA-file setting of its
+    # own and validates against the system store, and .NET on Linux reads that
+    # store from OpenSSL's default path (/usr/lib/ssl/cert.pem, a symlink to
+    # this file) -- so overriding the file is the whole integration.
+    #
+    # ConfigMap comes from the system-ca-bundle Bundle in k8s/foundation/cert-system.
+    # subPath means a CA rotation needs a pod restart to land; internal-ca is a
+    # 10 year cert, so that is a fair trade for not shadowing /etc/ssl/certs.
+    system-ca-bundle:
+      type: configMap
+      name: system-ca-bundle
+      advancedMounts:
+        main:
+          jellyfin:
+            - path: /etc/ssl/certs/ca-certificates.crt
+              readOnly: true
+              subPath: ca-certificates.crt
     jellyfin-configs:
       type: configMap
       name: jellyfin-configs

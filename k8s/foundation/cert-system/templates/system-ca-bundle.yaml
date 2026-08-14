@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://github.com/datreeio/CRDs-catalog/raw/refs/heads/main/trust.cert-manager.io/bundle_v1alpha1.json
+# A drop-in replacement for a container's /etc/ssl/certs/ca-certificates.crt:
+# the public roots trust-manager ships plus our internal CA, so a workload that
+# mounts this trusts internal certs *without* losing the public internet.
+#
+# cluster-ca-bundle (internal CA only) stays as-is for workloads that want just
+# the internal root; this one is for workloads whose TLS client has no
+# "extra CA file" knob and can only be pointed at one bundle. Jellyfin's
+# LDAP-Auth plugin is the first: it validates LDAPS against the system store
+# with no CA setting of its own.
+#
+# Scoped by namespace rather than cluster-wide because the bundle is ~230KB and
+# would otherwise be copied into every namespace. kubernetes.io/metadata.name is
+# set automatically by the apiserver on every namespace, so consumers are opted
+# in here with no manual labelling.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: system-ca-bundle  # Name also used as the target ConfigMap name in each namespace
+  namespace: {{ .Release.Namespace }}
+spec:
+  sources:
+    - useDefaultCAs: true
+    - secret:
+        name: "internal-ca-cert"
+        key: "ca.crt"
+  target:
+    configMap:
+      key: "ca-certificates.crt"
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values:
+            - jellyfin
