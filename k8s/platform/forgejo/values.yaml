@@ -1,6 +1,6 @@
 psql:
   clusterName: forgejo-psql
-  image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-bookworm
+  image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
 
 # Valkey replication set + Sentinel, ported from k8s/platform/auth-system.
 # Deliberately a *separate* instance from Authelia's rather than one shared
