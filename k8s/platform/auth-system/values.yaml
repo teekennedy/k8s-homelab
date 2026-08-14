@@ -1,3 +1,7 @@
+psql:
+  # Deliberately in values.yaml so that renovate can pick it up.
+  image: ghcr.io/cloudnative-pg/postgresql:17.5-standard-bookworm
+
 # Maps each Authelia OIDC client to the Secret holding its plaintext client
 # secret, so the PreSync sync job can bcrypt-hash it into the aggregate Secret
 # Authelia mounts (see templates/authelia-oidc-client-secrets.yaml and

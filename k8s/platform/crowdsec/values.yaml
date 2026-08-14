@@ -1,6 +1,10 @@
 # CrowdSec Helm Chart Values
 # https://github.com/crowdsecurity/helm-charts/blob/main/charts/crowdsec/README.md
 
+psql:
+  # Deliberately in values.yaml so that renovate can pick it up.
+  image: ghcr.io/cloudnative-pg/postgresql:17.5-standard-bookworm
+
 crowdsec:
   # Container runtime used by k3s
   container_runtime: containerd
