@@ -56,7 +56,7 @@ Dashboard → Plugins → LDAP-Auth):
 | LDAP Bind Password | `kubectl get secret -n auth-system lldap-jellyfin-bind-user -o jsonpath='{.data.password}' \| base64 -d` |
 | LDAP Base DN | `ou=people,dc=msng,dc=to` |
 | LDAP Search Filter | `(&(objectClass=person)(\|(memberOf=cn=jellyfin-users,ou=groups,dc=msng,dc=to)(memberOf=cn=jellyfin-admins,ou=groups,dc=msng,dc=to)))` |
-| LDAP Search Attributes | `uid, mail` |
+| LDAP Search Attributes | `uid, mail` — username *or* email, mirroring Authelia's `users_filter`; verified that both resolve to the same account rather than creating a second one |
 | LDAP Uid Attribute | `uid` |
 | **LDAP Username Attribute** | **`uid`** |
 | Admin Base DN / Admin Filter | *(both empty)* |
@@ -92,9 +92,9 @@ reason.
 a user logs in with first creates their Jellyfin account; with linking off, the
 *other* method is then refused with "a pre-existing unlinked Jellyfin account
 exists". It is safe here because both methods take the username from the same
-LLDAP `uid` — but it does mean an LLDAP uid matching a local account name
-(`T`, `breakglass-admin`, `Homepage`, `jellyseerr`) would link to it, so avoid
-creating those uids in LLDAP.
+LLDAP `uid` — but it does mean an LLDAP uid matching one of the remaining local
+account names (`breakglass-admin`, `Homepage`, `jellyseerr`) would link to it,
+so avoid creating those uids in LLDAP.
 
 ### Moving an existing user onto LDAP
 
