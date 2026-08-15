@@ -15,16 +15,15 @@ After deploying the helm chart, you'll need to do some manual steps to setup use
   Assuming a username of `admin`, you can copy the password to your clipboard and use the following command to setup the secret:
   `kubectl -n jellyfin create secret generic qbittorrent-credentials --from-literal=username="admin" --from-literal=password="$(pbpaste)"`
 
-## Login: SSO and username/password both backed by LLDAP
+## Login: SSO and username/password both backed by LDAP
 
 Jellyfin accepts two logins and they share one password, because both ultimately
-read the same LLDAP:
+read the same LDAP server as a single source of truth:
 
-- **SSO** (`Community SSO for Jellyfin`) via Authelia — used by the web UI and
-  anything that can open a browser.
-- **Username / password** (`LDAP-Auth`) via LLDAP over LDAPS — used by the
-  official Jellyfin client apps, which do not support the SSO flow. Before this,
-  those clients were stuck on Quick Connect.
+- **SSO** (`Community SSO for Jellyfin`): used by the web UI and anything that
+  can open a browser.
+- **Username / password** (`LDAP-Auth`): used by the official Jellyfin client
+  apps, which do not support the SSO flow.
 
 LLDAP is the single source of truth. A user changes their password in Authelia
 and both logins follow; there is no separate Jellyfin password to keep in sync.
