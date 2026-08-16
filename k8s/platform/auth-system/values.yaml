@@ -421,7 +421,11 @@ authelia:
             consent_mode: implicit
             client_secret:
               path: /secrets/authelia-oidc-client-secrets/homepage
-            token_endpoint_auth_method: client_secret_post
+            # Homepage's NextAuth OIDC provider (src/pages/api/auth/[...nextauth].js
+            # upstream) doesn't set an explicit client auth method, which puts
+            # openid-client on its default: HTTP Basic. client_secret_post (what
+            # oauth2-proxy needed) fails token exchange under native OIDC.
+            token_endpoint_auth_method: client_secret_basic
             authorization_policy: one_factor
             require_pkce: true
             pkce_challenge_method: S256
@@ -434,7 +438,9 @@ authelia:
             response_types:
               - code
             redirect_uris:
-              - https://msng.to/oauth2/callback
+              # NextAuth's OIDC callback path is /api/auth/callback/<provider id>;
+              # homepage's provider id is "homepage-oidc" (hardcoded upstream).
+              - https://msng.to/api/auth/callback/homepage-oidc
           - client_id: jellyfin
             client_name: Jellyfin
             consent_mode: implicit

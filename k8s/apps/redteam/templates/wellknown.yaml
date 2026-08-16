@@ -3,9 +3,10 @@
 # mittwald-generated NONCE (required: the pod will not start until the secret value
 # exists), hashes it, and substitutes the hash into security.txt — so the published
 # X-RedTeam-Auth-SHA256 always matches the live nonce with zero manual steps.
-# oauth2-proxy (the msng.to front door) routes /.well-known/ here and skips auth for
-# it (see the oauth2-proxy block in k8s/apps/homepage/values.yaml). Independent of
-# session replicas.
+# A dedicated IngressRoute below routes msng.to's /.well-known/ here, ahead of and
+# unauthenticated by homepage's own OIDC login — Traefik routers aren't
+# namespace-scoped, so this works from the redteam namespace without a
+# cross-namespace service reference. Independent of session replicas.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -100,7 +101,8 @@ spec:
       targetPort: 8080
 ---
 # The well-known server is the one pod in the namespace that SHOULD accept ingress
-# (from oauth2-proxy). default-deny-all covers everything else.
+# (from Traefik, via the IngressRoute below). default-deny-all covers everything
+# else.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -114,7 +116,57 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.oauth2ProxyNamespace }}
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
       ports:
         - port: 8080
           protocol: TCP
+---
+# This path used to inherit homepage-public-rate-limit by virtue of traversing
+# oauth2-proxy's single Ingress for all of msng.to. Now that it has its own
+# IngressRoute, it needs its own rate limit to keep the same protection —
+# same average/burst as templates/traefik-rate-limit.yaml in k8s/apps/homepage.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: wellknown-rate-limit
+spec:
+  rateLimit:
+    average: 20
+    burst: 40
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/traefik.io/ingressroute_v1alpha1.json
+#
+# Routes msng.to's /.well-known/ straight here, unauthenticated, ahead of
+# homepage's own OIDC-gated `/` router — homepage no longer sits behind a
+# reverse proxy that can carve out this bypass itself (see the oauth2-proxy
+# removal in k8s/apps/homepage), so this chart now owns the routing decision.
+# Traefik routers are matched cluster-wide regardless of which namespace the
+# IngressRoute object lives in, so living here next to redteam-wellknown's own
+# Service needs no cross-namespace service reference.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: redteam-wellknown
+  annotations:
+    # Not functional for an IngressRoute (entryPoints live in the spec) — this is
+    # the annotation the external-dns instances filter on to decide which zone
+    # this name belongs in. msng.to already has a record from homepage's own
+    # Ingress; this just documents the entrypoint for anyone reading the object.
+    traefik.ingress.kubernetes.io/router.entrypoints: wspublic
+spec:
+  entryPoints:
+    - wspublic
+  routes:
+    - kind: Rule
+      match: Host(`msng.to`) && PathPrefix(`/.well-known/`)
+      # Explicit priority so this beats homepage's own `/` router.
+      priority: 1000
+      middlewares:
+        - name: wellknown-rate-limit
+      services:
+        - name: redteam-wellknown
+          port: 80
+  tls: {}

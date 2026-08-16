@@ -47,7 +47,7 @@ locked down than it is (even if the current state technically matches intent).
 
 | Service | Host | Expected exposure | Expected auth | Operator's stance |
 |---|---|---|---|---|
-| Homepage | homepage/msng.to | public | oauth2-proxy + Authelia | must stay locked |
+| Homepage | homepage/msng.to | public | built-in OIDC (Authelia) | must stay locked |
 | Authelia | authelia | public | self | must stay locked |
 | Spoolman | spoolman.msng.to | internal only | **none** | fine — losing spool inventory is acceptable |
 | Longhorn UI | longhorn.msng.to | internal only | **basic auth** | destructive if breached — must stay locked |

@@ -45,7 +45,7 @@ oracle. When in doubt, prove it from the attack path.
 ## 3. Scope
 
 **In scope — the internet-facing surface:**
-- `homepage` dashboard (behind oauth2-proxy / Authelia)
+- `homepage` dashboard (gated by its own built-in OIDC login, via Authelia)
 - `authelia` itself
 - the Terraria game server (port-forwarded)
 - the Terraria world-state Node.js web UI (`terraria.msng.to`)
@@ -77,9 +77,10 @@ Primary question: **how safe is this from an internet attacker?** Concretely:
      internal services?
    - can the compromised pod download and execute code from the internet (i.e.
      could it be turned into a cryptominer / C2 implant)?
-4. **Auth bypass / fail-open.** Can you get past oauth2-proxy/Authelia to the msng.to
-   dashboard? **DoS is in scope** — e.g. does hammering oauth2-proxy make it
-   *fail open* and serve the dashboard without login? You may knock services over.
+4. **Auth bypass / fail-open.** Can you get past homepage's OIDC login (backed by
+   Authelia) to the msng.to dashboard? **DoS is in scope** — e.g. does hammering
+   homepage or Authelia make it *fail open* and serve the dashboard without login?
+   You may knock services over.
 5. **Host-level access.** Any path to shell or host-level access on a `borg` node
    (direct, via a mounted volume, cache poisoning, etc.) is high-value and in scope.
 

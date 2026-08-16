@@ -21,17 +21,16 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
-    # oauth2-proxy reverse-proxies authenticated traffic from the public
-    # msng.to ingress into homepage. Traefik no longer talks to homepage
-    # directly — it forwards to oauth2-proxy, which forwards here.
-    #
-    # The proxy is a sibling in THIS namespace (it used to have its own), so this
-    # is a bare podSelector. Adding a namespaceSelector back would stop matching
-    # and make homepage unreachable.
+    # Homepage now owns the public msng.to Ingress directly (its built-in OIDC
+    # login replaced the dedicated oauth2-proxy reverse proxy that used to sit
+    # in front), so Traefik talks straight to homepage.
     - from:
-        - podSelector:
+        - namespaceSelector:
             matchLabels:
-              app.kubernetes.io/name: oauth2-proxy
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
       ports:
         - protocol: TCP
           port: 3000
@@ -56,7 +55,9 @@ spec:
       ports:
         - protocol: TCP
           port: 6443
-    # Widget API calls through Traefik
+    # Widget API calls through Traefik, and now also homepage's own
+    # server-side OIDC calls to authelia.msng.to (discovery, token exchange,
+    # JWKS) — both are just HTTPS to a public msng.to subdomain.
     # servicelb DNATs node-IP:443 to Traefik pod IPs, so we target
     # the pods directly rather than the pre-DNAT node IPs
     - to:

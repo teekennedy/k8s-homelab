@@ -23,12 +23,17 @@ spec:
       kind: Secret
       name: homepage-secrets
       namespace: homepage
-    # cookie-secret / client-secret are filled in-cluster by mittwald
+    # client-secret / auth-secret are filled in-cluster by mittwald
     # secret-generator; don't fight it.
     - jsonPointers:
         - /data
       kind: Secret
       name: homepage-oauth2-proxy-secrets
+      namespace: homepage
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: homepage-auth-secret
       namespace: homepage
   project: default
   source:
