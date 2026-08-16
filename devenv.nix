@@ -11,8 +11,7 @@ in {
   cachix.pull = ["pre-commit-hooks"];
 
   overlays = [
-    (_: prev: {deploy-rs = inputs.deploy-rs.outputs.packages.${prev.stdenv.hostPlatform.system}.deploy-rs;})
-    (_: prev: rec {
+    (_: prev: {
       kubernetes-helm = prev.wrapHelm prev.kubernetes-helm {
         plugins = with prev.kubernetes-helmPlugins; [
           helm-secrets

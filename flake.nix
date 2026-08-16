@@ -24,17 +24,29 @@
   }:
     flake-parts.lib.mkFlake {
       inherit inputs;
-    } {
+    } ({withSystem, ...}: {
       imports = [./nix/modules/builders/flake-module.nix];
       systems = ["aarch64-darwin" "x86_64-linux"];
-      perSystem = {system, ...}: {
-        _module.args.pkgs = import inputs.nixpkgs {
+      perSystem = {system, ...}: let
+        # Unmodified nixpkgs, used to pull the cached deploy-rs package below.
+        basePkgs = import inputs.nixpkgs {inherit system;};
+        # nixpkgs with the deploy-rs overlay, but deploy-rs itself forced back
+        # to nixpkgs' own build so we hit cache.nixos.org instead of building
+        # deploy-rs (and its rust deps) from the deploy-rs flake's own pin.
+        deployPkgs = import inputs.nixpkgs {
           inherit system;
-
           overlays = [
-            (_: prev: {deploy-rs = inputs.deploy-rs.outputs.packages.${prev.stdenv.hostPlatform.system}.deploy-rs;})
+            inputs.deploy-rs.overlays.default
+            (_: prev: {
+              deploy-rs = {
+                inherit (basePkgs) deploy-rs;
+                lib = prev.deploy-rs.lib;
+              };
+            })
           ];
         };
+      in {
+        _module.args.pkgs = deployPkgs;
       };
 
       flake = let
@@ -175,7 +187,7 @@
                 hostname = host.hostname;
                 profiles.system = {
                   user = "root";
-                  path = inputs.deploy-rs.lib.${host.system}.activate.nixos self.nixosConfigurations.${host.hostname};
+                  path = withSystem host.system ({pkgs, ...}: pkgs.deploy-rs.lib.activate.nixos self.nixosConfigurations.${host.hostname});
                 };
               };
             })
@@ -272,5 +284,5 @@
             };
           };
       };
-    };
+    });
 }
