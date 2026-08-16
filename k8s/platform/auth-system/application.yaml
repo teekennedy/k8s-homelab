@@ -26,6 +26,11 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
+      name: lldap-jellyfin-bind-user
+      namespace: auth-system
+    - jsonPointers:
+        - /data
+      kind: Secret
       name: authelia-secrets
       namespace: auth-system
     - jsonPointers:
