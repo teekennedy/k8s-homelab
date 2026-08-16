@@ -519,9 +519,8 @@
     /^[a-z0-9][a-z0-9-]{0,29}$/.test(label);
 
   if (named) {
-    var name = label.toUpperCase();
+    var name = label.charAt(0).toUpperCase() + label.slice(1);
     document.getElementById("svc").textContent = name;
-    document.title = name + " — We’ll be right back";
   }
 
   // One reason per load. The 60s meta refresh means a fresh one every minute a
