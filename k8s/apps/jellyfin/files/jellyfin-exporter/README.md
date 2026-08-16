@@ -30,6 +30,13 @@ constantly and would make the series unbounded.
 `jellyfin_active_streams` backs the `JellyfinStreamActive` alert which blocks
 kured from rebooting a node.
 
+That alert notifies nobody, by design: it is a gate, and somebody watching a
+film is not news. Alertmanager routes it to the `null` receiver alongside
+`ResticBackupRunning` (see `alertmanager.config.route` in
+`k8s/platform/monitoring-system/values.yaml`). kured reads firing alerts from
+Prometheus directly, not from Alertmanager, so dropping the notification does
+not weaken the gate — and unlike a silence, it stays in git and never expires.
+
 Paused sessions are excluded on purpose. If a stream is paused it will remain
 active until the user closes the app and Jellyfin's idle-reaper reaps the
 session, or until the stream has been paused for `InactiveSessionThreshold`

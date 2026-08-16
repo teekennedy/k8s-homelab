@@ -158,9 +158,14 @@ kube-prometheus-stack:
           - receiver: "null"
             matchers:
               - alertname = "Watchdog"
+          # Maintenance gates: these exist to block kured, not to tell anyone
+          # anything. kured reads firing alerts from Prometheus directly, so
+          # dropping them here silences the notification without weakening the
+          # gate. JellyfinStuckSession is deliberately not in this list -- a
+          # session stuck for twelve hours is a real problem worth a ping.
           - receiver: "null"
             matchers:
-              - alertname = "ResticBackupRunning"
+              - alertname =~ "ResticBackupRunning|JellyfinStreamActive"
 
       receivers:
         - name: "null"

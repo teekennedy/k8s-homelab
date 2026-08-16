@@ -751,17 +751,10 @@ app-template:
           jellyfin:
             - path: /data/cache
     # Transcode segments are regenerated on demand and are worthless across a
-    # restart, so they do not belong on a replicated, snapshotted Longhorn
-    # volume -- they were 17GB of it. Node-local disk also spares Longhorn the
-    # write amplification of a live transcode.
-    #
-    # sizeLimit is the tradeoff: past it the kubelet evicts the pod, which cuts
-    # off playback. Without it a runaway transcode fills the node's disk and
-    # takes its neighbours with it. Jellyfin's own transcode throttling should
-    # keep it well under this.
+    # restart, so they can live on an emptyDir.
     jellyfin-transcodes:
       type: emptyDir
-      sizeLimit: 30Gi
+      sizeLimit: 50Gi
       advancedMounts:
         main:
           jellyfin:
