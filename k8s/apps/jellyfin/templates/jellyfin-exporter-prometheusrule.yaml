@@ -1,0 +1,56 @@
+{{- $exporter := (index .Values "app-template" "controllers" "exporter") | default dict }}
+{{- if and $exporter.enabled .Values.monitoring.exporter.prometheusRule.enabled }}
+{{- /*
+These are maintenance gates as much as alerts: kured reads firing alert names
+straight off the Prometheus API, so JellyfinStreamActive blocks a node reboot
+while somebody is watching. Renaming an alert here silently unblocks reboots --
+the names are matched in k8s/foundation/kured/values.yaml.
+*/}}
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: jellyfin-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: jellyfin
+      interval: 30s
+      rules:
+        - alert: JellyfinStreamActive
+          # Block node reboots while somebody is watching.
+          expr: max_over_time(jellyfin_active_streams[10m]) > 0
+          labels:
+            severity: info
+            component: media
+          annotations:
+            summary: {{ "Jellyfin has active playback" | quote }}
+            description: {{ "At least one unpaused Jellyfin stream has been playing within the last 10 minutes." | quote }}
+            custom_link_text: "Jellyfin"
+            custom_link_url: "https://jellyfin.msng.to/web/#/dashboard"
+
+        - alert: JellyfinStuckSession
+          expr: min_over_time(jellyfin_active_streams[12h]) > 0
+          labels:
+            severity: warning
+            component: media
+          annotations:
+            summary: {{ "Jellyfin stream session likely stuck" | quote }}
+            description: {{ "jellyfin_active_streams has been above zero for twelve hours without a single gap. Check for a session that is stuck reporting playback." | quote }}
+            custom_link_text: "Jellyfin"
+            custom_link_url: "https://jellyfin.msng.to/web/#/dashboard"
+
+        - alert: JellyfinExporterDown
+          expr: jellyfin_up == 0 or absent(jellyfin_up)
+          for: 15m
+          labels:
+            severity: warning
+            component: media
+          annotations:
+            summary: {{ "Jellyfin exporter down" | quote }}
+            description: {{ "The Jellyfin session exporter has been unable to query Jellyfin for 15 minutes." | quote }}
+{{- end }}

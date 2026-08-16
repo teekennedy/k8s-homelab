@@ -1,6 +1,7 @@
 {self, ...}: {
   imports = [
     ./hardware.nix
+    ./intel-gpu-exporter.nix
     ./packages.nix
     ./powersave.nix
   ];

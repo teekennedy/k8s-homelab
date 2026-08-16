@@ -14,7 +14,8 @@ kured:
     # How often to check for sentinel file
     period: "3m0s"
     rebootCommand: "/run/current-system/sw/bin/systemctl reboot"
-    alertFilterRegexp: "^(KubeVersionMismatch|LonghornVolumeActualSpaceUsedWarning|LonghornNodeStorageWarning|LonghornDiskStorageWarning|CPUThrottlingHigh|ZFSScrubTooOld)$"
+    # Alerts kured should ignore.
+    alertFilterRegexp: "^(KubeVersionMismatch|LonghornVolumeActualSpaceUsedWarning|LonghornNodeStorageWarning|LonghornDiskStorageWarning|CPUThrottlingHigh|ZFSScrubTooOld|JellyfinExporterDown)$"
     # Only firing alerts should block reboot
     alertFiringOnly: true
     # Give drain operation up to 30 minutes to complete (for Longhorn replica evacuation)

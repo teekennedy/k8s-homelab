@@ -14,6 +14,18 @@ After deploying the helm chart, you'll need to do some manual steps to setup use
   Add the username and password to the `qbittorrent-credentials` secret.
   Assuming a username of `admin`, you can copy the password to your clipboard and use the following command to setup the secret:
   `kubectl -n jellyfin create secret generic qbittorrent-credentials --from-literal=username="admin" --from-literal=password="$(pbpaste)"`
+- Create an API key named `jellyfin-exporter` on the same dashboard page and store it for the metrics exporter:
+
+  `kubectl -n jellyfin create secret generic jellyfin-exporter-api-key --from-literal=JELLYFIN_API_KEY="$(pbpaste)"`
+- Set `InactiveSessionThreshold` to `60` minutes in Jellyfin's `/data/config/config.xml` (the setting cannot be edited via the UI). It defaults to `0`,
+  which disables paused-session cleanup. This could lead to 'stuck' sessions that block reboot indefinitely.
+
+## Observability
+
+The `jellyfin-exporter` deployment exports metrics to Prometheus. Its
+ServiceMonitor and alert rules ship with this chart and can be turned on or off
+under `monitoring:` in `values.yaml`. See
+[files/jellyfin-exporter/README.md](files/jellyfin-exporter/README.md).
 
 ## Login: SSO and username/password both backed by LDAP
 

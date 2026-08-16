@@ -13,62 +13,6 @@ spec:
     - name: maintenance-gates
       interval: 30s
       rules:
-        - alert: CoreDNSUnavailable
-          expr: kube_deployment_status_replicas_available{namespace="kube-system", deployment="coredns"} < 1
-          for: 1m
-          labels:
-            severity: critical
-            component: dns
-          annotations:
-            summary: {{ "CoreDNS has no available replicas" | quote }}
-            description: {{ "CoreDNS has had zero available replicas for at least 1 minute. Automated node reboots should stop because service discovery is impaired." | quote }}
-
-        - alert: PrometheusUnavailable
-          expr: kube_statefulset_status_replicas_ready{namespace="monitoring-system", statefulset="prometheus-monitoring-system-kube-pro"} < 1
-          for: 1m
-          labels:
-            severity: critical
-            component: monitoring
-          annotations:
-            summary: {{ "Prometheus is not ready" | quote }}
-            description: {{ "Prometheus has had no ready replicas for at least 1 minute. Kured should also fail closed when it cannot query Prometheus, but this alert makes the outage visible." | quote }}
-
-        - alert: KubeStateMetricsUnavailable
-          expr: |
-            absent(kube_deployment_status_replicas_available{namespace="monitoring-system", deployment="monitoring-system-kube-state-metrics"})
-            or kube_deployment_status_replicas_available{namespace="monitoring-system", deployment="monitoring-system-kube-state-metrics"} < 1
-          for: 1m
-          labels:
-            severity: critical
-            component: monitoring
-          annotations:
-            summary: {{ "kube-state-metrics is not available" | quote }}
-            description: {{ "kube-state-metrics is absent or has zero available replicas. Many Kubernetes health alerts depend on it, so automated node reboots should stop." | quote }}
-
-        - alert: LonghornManagerNotReady
-          expr: |
-            kube_daemonset_status_number_ready{namespace="longhorn-system", daemonset="longhorn-manager"}
-              < kube_daemonset_status_desired_number_scheduled{namespace="longhorn-system", daemonset="longhorn-manager"}
-          for: 1m
-          labels:
-            severity: critical
-            component: storage
-          annotations:
-            summary: {{ "Longhorn manager is not ready on every scheduled node" | quote }}
-            description: {{ "Longhorn manager DaemonSet readiness is below desired for at least 1 minute. Automated node reboots should stop until Longhorn control-plane recovery completes." | quote }}
-
-        - alert: LonghornCSINotReady
-          expr: |
-            kube_daemonset_status_number_ready{namespace="longhorn-system", daemonset="longhorn-csi-plugin"}
-              < kube_daemonset_status_desired_number_scheduled{namespace="longhorn-system", daemonset="longhorn-csi-plugin"}
-          for: 1m
-          labels:
-            severity: critical
-            component: storage
-          annotations:
-            summary: {{ "Longhorn CSI plugin is not ready on every scheduled node" | quote }}
-            description: {{ "Longhorn CSI readiness is below desired for at least 1 minute. Automated node reboots should stop because volume attach and mount operations may fail." | quote }}
-
         - alert: CNPGInstanceNotReady
           expr: |
             kube_pod_status_ready{condition="true", namespace=~"auth-system|crowdsec|forgejo", pod=~".*-psql-[0-9]+"} == 0
@@ -78,7 +22,11 @@ spec:
             component: database
           annotations:
             summary: {{ "CloudNativePG instance {{ $labels.namespace }}/{{ $labels.pod }} is not ready" | quote }}
-            description: {{ "A CloudNativePG Postgres instance pod has been unready for at least 2 minutes. Automated node reboots should stop until database readiness recovers." | quote }}
+            description: {{ "A CloudNativePG Postgres instance pod has been unready for at least 2 minutes." | quote }}
+
+        # Jellyfin's gates (JellyfinStreamActive and friends) are not here:
+        # they ship with the jellyfin chart, in
+        # k8s/apps/jellyfin/templates/jellyfin-exporter-prometheusrule.yaml.
 
         - alert: ResticBackupRunning
           expr: node_systemd_unit_state{name=~"restic-backups-.+\\.service", state="active"} == 1

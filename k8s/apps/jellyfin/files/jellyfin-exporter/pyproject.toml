@@ -1,0 +1,20 @@
+[project]
+name = "jellyfin-exporter"
+version = "0.1.0"
+description = "Prometheus exporter for Jellyfin playback sessions"
+requires-python = ">=3.12"
+dependencies = [
+    "websockets>=17.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+# Integration tests run by default against the stub server in
+# tests/conftest.py. The marker stays registered so `-m integration` can
+# still select them when pointing at a real server.
+markers = ["integration: exercises a whole Jellyfin server (stub, or real)"]

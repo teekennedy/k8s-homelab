@@ -1,0 +1,22 @@
+[project]
+name = "intel-gpu-textfile-exporter"
+version = "1.0.0"
+description = "Exports Intel iGPU engine metrics for the Prometheus node-exporter textfile collector"
+requires-python = ">=3.11"
+# No runtime dependencies: the script is built with pkgs.writers.writePython3Bin
+# (see ../intel-gpu-exporter.nix) and uses only the standard library, shelling
+# out to intel_gpu_top via $INTEL_GPU_TOP_BIN.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "integration: marks tests as integration tests (require a real Intel GPU, deselected by default)",
+]
+addopts = "-m 'not integration'"

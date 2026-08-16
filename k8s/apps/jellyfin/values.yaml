@@ -1,5 +1,25 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-3.2.0/charts/library/common/values.schema.json
 # Docs: https://bjw-s-labs.github.io/helm-charts/docs/app-template/
+
+# Prometheus resources this chart owns. They live here rather than in
+# monitoring-system so that a jellyfin deployment carries its own scrape
+# targets and alerts.
+#
+# Everything scoped to jellyfin-exporter also requires
+# app-template.controllers.exporter.enabled; turning the exporter off takes its
+# ServiceMonitor and alert rules with it, whatever these flags say.
+monitoring:
+  exporter:
+    serviceMonitor:
+      enabled: true
+    # JellyfinStreamActive is what blocks kured from rebooting a node while
+    # somebody is watching. Without it, reboots are ungated.
+    prometheusRule:
+      enabled: true
+  qbittorrent:
+    serviceMonitor:
+      enabled: true
+
 app-template:
   defaultPodOptions:
     automountServiceAccountToken: false
@@ -95,6 +115,109 @@ app-template:
               cpu: 4000m
               memory: 6Gi
               gpu.intel.com/i915: "1"
+    # Exports Jellyfin metrics to Prometheus.
+    #
+    # This `enabled` flag is the switch for the exporter. The chart's own
+    # ConfigMap, ServiceMonitor and alert rules read it directly, so they follow
+    # it. app-template's resources cannot: a subchart's values are not
+    # templatable from here, so turning the exporter off means setting
+    # `enabled: false` on all four of
+    #
+    #   controllers.exporter
+    #   service.exporter
+    #   persistence.jellyfin-exporter
+    #   persistence.jellyfin-exporter-project
+    #
+    # (app-template errors out on a volume mounted into a disabled controller,
+    # so it will tell you if you miss one).
+    exporter:
+      enabled: true
+      replicas: 1
+      pod:
+        securityContext:
+          runAsUser: 1200
+          runAsGroup: *gid
+          runAsNonRoot: true
+      containers:
+        exporter:
+          image:
+            # The python-flavoured tag ships an interpreter, so a pod start
+            # only has to fetch exporter.py's own dependencies. The bare `uv`
+            # image would download a whole CPython first.
+            repository: ghcr.io/astral-sh/uv
+            tag: python3.14-alpine
+          command:
+            - sh
+            - -c
+            - |-
+              set -eu
+              # uv builds the script's environment beside the script, and /app
+              # is a read-only ConfigMap mount, so run from a writable copy.
+              cp -rL /app/. /project/
+              mkdir -p /project/tmp
+              cd /project
+              uv run --no-cache --link-mode copy --script exporter.py
+          env:
+            JELLYFIN_URL: http://jellyfin-main:8096
+            JELLYFIN_API_KEY:
+              valueFrom:
+                secretKeyRef:
+                  name: jellyfin-exporter-api-key
+                  key: JELLYFIN_API_KEY
+            # uv keeps its state under HOME and unpacks wheels through a temp
+            # directory; the root filesystem is read-only, so both point at the
+            # emptyDir.
+            HOME: /project
+            TMPDIR: /project/tmp
+            # Block-buffered stdout would hold log lines until the process
+            # exits, which for a long-running server means forever.
+            PYTHONUNBUFFERED: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          probes:
+            # The first thing the container does is resolve and install its
+            # dependencies from PyPI, so hold liveness off until it is serving
+            # rather than restarting it midway through a slow install.
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /healthz
+                  port: 9101
+                failureThreshold: 30
+                periodSeconds: 5
+                timeoutSeconds: 3
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /healthz
+                  port: 9101
+                failureThreshold: 3
+                periodSeconds: 30
+                timeoutSeconds: 5
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /healthz
+                  port: 9101
+                failureThreshold: 3
+                periodSeconds: 10
+                timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
     seerr:
       replicas: 1
       pod:
@@ -414,6 +537,14 @@ app-template:
         http:
           port: 8096
           protocol: HTTP
+    exporter:
+      # Keep in step with controllers.exporter.enabled.
+      enabled: true
+      controller: exporter
+      ports:
+        metrics:
+          port: 9101
+          protocol: HTTP
     seerr:
       controller: seerr
       ports:
@@ -606,7 +737,10 @@ app-template:
     jellyfin-cache:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
-      # As of 2026-01-07 this was using 2.6GB
+      # As of 2026-01-07 this was using 2.6GB, almost all of it transcodes,
+      # which now live on the emptyDir below. The image cache that remains was
+      # 245MB as of 2026-08-15, so this is oversized -- but Longhorn volumes
+      # cannot shrink, and unused space in it costs nothing but disk.
       size: 20Gi
       storageClass: longhorn
       labels:
@@ -616,6 +750,22 @@ app-template:
         main:
           jellyfin:
             - path: /data/cache
+    # Transcode segments are regenerated on demand and are worthless across a
+    # restart, so they do not belong on a replicated, snapshotted Longhorn
+    # volume -- they were 17GB of it. Node-local disk also spares Longhorn the
+    # write amplification of a live transcode.
+    #
+    # sizeLimit is the tradeoff: past it the kubelet evicts the pod, which cuts
+    # off playback. Without it a runaway transcode fills the node's disk and
+    # takes its neighbours with it. Jellyfin's own transcode throttling should
+    # keep it well under this.
+    jellyfin-transcodes:
+      type: emptyDir
+      sizeLimit: 30Gi
+      advancedMounts:
+        main:
+          jellyfin:
+            - path: /data/cache/transcodes
     # Replace the image's CA bundle with our cluster CA bundle so the LDAP-Auth
     # plugin can validate LLDAP's LDAPS cert, which is issued by the
     # internal-ca ClusterIssuer. The plugin validates against the system CA
@@ -630,6 +780,24 @@ app-template:
             - path: /etc/ssl/certs/ca-certificates.crt
               readOnly: true
               subPath: ca-certificates.crt
+    jellyfin-exporter:
+      enabled: true
+      type: configMap
+      name: jellyfin-exporter
+      advancedMounts:
+        exporter:
+          exporter:
+            - path: /app
+              readOnly: true
+    # Writable working copy of /app: uv creates the script's environment in the
+    # working directory and its own state under HOME, and both point here.
+    jellyfin-exporter-project:
+      enabled: true
+      type: emptyDir
+      advancedMounts:
+        exporter:
+          exporter:
+            - path: /project
     jellyfin-configs:
       type: configMap
       name: jellyfin-configs

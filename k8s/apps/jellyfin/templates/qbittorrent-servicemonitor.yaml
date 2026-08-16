@@ -1,13 +1,12 @@
+{{- if .Values.monitoring.qbittorrent.serviceMonitor.enabled }}
 # yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/servicemonitor_v1.json
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: qbittorrent-metrics
+  namespace: {{ .Release.Namespace }}
 spec:
-  namespaceSelector:
-    matchNames:
-      - jellyfin
   selector:
     matchLabels:
       app.kubernetes.io/name: jellyfin
@@ -15,3 +14,4 @@ spec:
   endpoints:
     - port: qbittorrent-metrics
       path: /metrics
+{{- end }}

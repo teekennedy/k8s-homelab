@@ -1,0 +1,21 @@
+{{- $exporter := (index .Values "app-template" "controllers" "exporter") | default dict }}
+{{- if and $exporter.enabled .Values.monitoring.exporter.serviceMonitor.enabled }}
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/servicemonitor_v1.json
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jellyfin-exporter
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jellyfin
+      app.kubernetes.io/service: jellyfin-exporter
+  endpoints:
+    # Kept well under the exporter's staleness window so a single missed
+    # scrape cannot make an active stream look finished to the reboot gate.
+    - port: metrics
+      path: /metrics
+      interval: 30s
+{{- end }}
