@@ -51,9 +51,9 @@ in {
       kubectl-cnpg
       kubeconform
       kubernetes-helm
+      kubernetes-polaris
       kubetail
       kustomize
-      polaris
       nixos-anywhere
       opentofu
       sops
