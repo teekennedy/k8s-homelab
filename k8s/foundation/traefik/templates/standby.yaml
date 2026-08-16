@@ -1,0 +1,155 @@
+{{- if .Values.standby.enabled }}
+{{- $name := "traefik-standby" }}
+---
+# "Please stand by" page for 503s.
+#
+# When a router's load balancer has no healthy endpoints, Traefik answers with a
+# bare `No available servers` in plain text. The `errors` middleware below
+# intercepts that response and serves this page's body instead, keeping the
+# original 503 status code (see the statusRewrites note in
+# k8s/charts/oauth2-proxy-instance/templates/_middleware.tpl — the body is
+# replaced, the status is not).
+#
+# The page is deliberately self-contained: no webfonts, no CDN, no images. It is
+# served precisely when the cluster is degraded, so anything it has to fetch is
+# something that can fail.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/component: error-page
+data:
+  index.html: |
+{{ .Files.Get "files/standby/index.html" | indent 4 }}
+  nginx.conf: |
+{{ .Files.Get "files/standby/nginx.conf" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/component: error-page
+spec:
+  replicas: {{ .Values.standby.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/component: error-page
+      annotations:
+        # Roll the pods when the page or the nginx config changes; both are
+        # mounted from the ConfigMap, which would otherwise update in place
+        # without nginx reloading.
+        checksum/config: {{ printf "%s%s" (.Files.Get "files/standby/index.html") (.Files.Get "files/standby/nginx.conf") | sha256sum }}
+    spec:
+      # Mirrors traefik's own placement: this page is only reachable through
+      # Traefik, so co-locating it avoids depending on worker-node health that
+      # Traefik itself does not depend on.
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ $name }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          image: "{{ .Values.standby.image.repository }}:{{ .Values.standby.image.tag }}"
+          # Bypass the image's docker-entrypoint.sh, which writes to /etc/nginx
+          # and so fails under a read-only root filesystem.
+          command: ["nginx", "-c", "/etc/nginx/nginx.conf", "-g", "daemon off;"]
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            {{- toYaml .Values.standby.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/nginx/html/index.html
+              subPath: index.html
+              readOnly: true
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $name }}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/component: error-page
+spec:
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# Attached as a default middleware on the websecure/wspublic entrypoints (see
+# `ports` in values.yaml), so every router on them inherits it without each app
+# having to opt in.
+#
+# Scoped to 503 alone rather than 500-599: Traefik cannot distinguish its own
+# "no healthy endpoints" 503 from one an app returns deliberately, and a page
+# that says "please stand by" is only ever the right answer for the former.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/component: error-page
+spec:
+  errors:
+    status:
+      - "503"
+    service:
+      name: {{ $name }}
+      port: 80
+    query: "/"
+{{- end }}

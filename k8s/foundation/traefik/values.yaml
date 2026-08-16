@@ -1,3 +1,19 @@
+# "Please stand by" page served in place of Traefik's bare `No available
+# servers` text when a router has no healthy backends. See
+# templates/standby.yaml; the middleware is attached to entrypoints below.
+standby:
+  enabled: true
+  replicas: 2
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.31.3-alpine
+  resources:
+    requests:
+      cpu: 5m
+      memory: 16Mi
+    limits:
+      memory: 64Mi
+
 # https://github.com/traefik/traefik-helm-chart/blob/master/traefik/VALUES.md
 traefik:
   service:
@@ -174,6 +190,9 @@ traefik:
       http3:
         enabled: true
         advertisedPort: 443
+      http:
+        middlewares:
+          - kube-system-traefik-standby@kubernetescrd
     webpublic:
       port: 8001
       expose:
@@ -201,6 +220,9 @@ traefik:
         tls:
           enabled: true
         middlewares:
+          # Listed before the bouncer so it wraps it: the errors middleware only
+          # sees a response it sits outside of.
+          - kube-system-traefik-standby@kubernetescrd
           - crowdsec-crowdsec-bouncer@kubernetescrd
       http3:
         enabled: true
