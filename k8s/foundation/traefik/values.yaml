@@ -220,10 +220,9 @@ traefik:
         tls:
           enabled: true
         middlewares:
-          # Listed before the bouncer so it wraps it: the errors middleware only
-          # sees a response it sits outside of.
-          - kube-system-traefik-standby@kubernetescrd
           - crowdsec-crowdsec-bouncer@kubernetescrd
+          # Custom 503 error page
+          - kube-system-traefik-standby@kubernetescrd
       http3:
         enabled: true
         advertisedPort: 443
