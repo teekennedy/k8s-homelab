@@ -23,8 +23,6 @@ spec:
       kind: Secret
       name: homepage-secrets
       namespace: homepage
-    # client-secret / auth-secret are filled in-cluster by mittwald
-    # secret-generator; don't fight it.
     - jsonPointers:
         - /data
       kind: Secret

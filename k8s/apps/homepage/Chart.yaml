@@ -3,13 +3,8 @@ name: homepage
 description: Homepage dashboard
 type: application
 version: 0.3.0
-appVersion: "v1.8.0"
+appVersion: "v2.0.0"
 dependencies:
-  # v5.0.0 tracks upstream homepage v2.0.0, which added built-in OIDC login
-  # (see templates/oidc-secret.yaml and the HOMEPAGE_OIDC_* / HOMEPAGE_AUTH_*
-  # env vars in values.yaml). The dedicated oauth2-proxy reverse-proxy instance
-  # that used to front msng.to is gone; homepage now owns the Ingress and gates
-  # itself.
   - name: homepage
     version: 5.0.0
     repository: oci://ghcr.io/m0nsterrr/helm-charts

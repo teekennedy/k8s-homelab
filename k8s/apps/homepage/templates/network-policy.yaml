@@ -21,9 +21,6 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
-    # Homepage now owns the public msng.to Ingress directly (its built-in OIDC
-    # login replaced the dedicated oauth2-proxy reverse proxy that used to sit
-    # in front), so Traefik talks straight to homepage.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -55,9 +52,7 @@ spec:
       ports:
         - protocol: TCP
           port: 6443
-    # Widget API calls through Traefik, and now also homepage's own
-    # server-side OIDC calls to authelia.msng.to (discovery, token exchange,
-    # JWKS) — both are just HTTPS to a public msng.to subdomain.
+    # Widget API calls and OIDC requests go through Traefik.
     # servicelb DNATs node-IP:443 to Traefik pod IPs, so we target
     # the pods directly rather than the pre-DNAT node IPs
     - to:
