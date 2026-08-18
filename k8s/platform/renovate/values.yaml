@@ -13,13 +13,16 @@ renovate:
     # kubectl is fetched here rather than in an initContainer so it runs as the
     # same unprivileged uid in the same container, needing no extra image, no
     # securityContext of its own, and no polaris exemption.
+    # kubectl goes in tools/ rather than alongside the wrapper in bin/: kubelet
+    # creates the parent directory of a nested mount root-owned 0755, so
+    # /opt/dagger/bin is NOT writable by uid 12021 even though the emptyDir root
+    # is. tools/ is created here inside the emptyDir, so it inherits fsGroup.
     preCommand: |
-      export PATH="/opt/dagger/bin:$PATH"
-      # Already created by the nested wrapper mount; belt and braces.
-      mkdir -p /opt/dagger/bin
-      curl -fsSL -o /opt/dagger/bin/kubectl \
+      export PATH="/opt/dagger/bin:/opt/dagger/tools:$PATH"
+      mkdir -p /opt/dagger/tools
+      curl -fsSL -o /opt/dagger/tools/kubectl \
         "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-      chmod +x /opt/dagger/bin/kubectl
+      chmod +x /opt/dagger/tools/kubectl
   # pod-level securityContext
   securityContext:
     runAsUser: 12021
@@ -31,11 +34,12 @@ renovate:
   serviceAccount:
     create: true
     name: renovate
-  # Scratch space for kubectl (bin/) and the real dagger CLIs the wrapper
+  # Scratch space for kubectl (tools/) and the real dagger CLIs the wrapper
   # downloads per engineVersion (versions/). Mounted at /opt/dagger rather than
-  # /opt/dagger/bin so both live inside the writable volume. emptyDir gets group
-  # ownership from the pod's fsGroup (1000) and mode 0775, so uid 12021 can
-  # write to it without running as root.
+  # /opt/dagger/bin so both live inside the writable volume. The emptyDir root
+  # gets group ownership from the pod's fsGroup (1000) and mode 0775, so uid
+  # 12021 can create directories under it without running as root — but note
+  # that this does NOT extend to bin/, see the preCommand comment above.
   extraVolumes:
     - name: dagger-bin
       emptyDir: {}
