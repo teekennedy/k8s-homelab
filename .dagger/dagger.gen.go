@@ -102,10 +102,12 @@ func (r HelmChart) MarshalJSON() ([]byte, error) {
 		Path          string
 		Source        *dagger.Directory
 		ClusterValues *dagger.File
+		SharedCharts  *dagger.Directory
 	}
 	concrete.Path = r.Path
 	concrete.Source = r.Source
 	concrete.ClusterValues = r.ClusterValues
+	concrete.SharedCharts = r.SharedCharts
 	return json.Marshal(&concrete)
 }
 
@@ -114,6 +116,7 @@ func (r *HelmChart) UnmarshalJSON(bs []byte) error {
 		Path          string
 		Source        *dagger.Directory
 		ClusterValues *dagger.File
+		SharedCharts  *dagger.Directory
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
@@ -122,6 +125,7 @@ func (r *HelmChart) UnmarshalJSON(bs []byte) error {
 	r.Path = concrete.Path
 	r.Source = concrete.Source
 	r.ClusterValues = concrete.ClusterValues
+	r.SharedCharts = concrete.SharedCharts
 	return nil
 }
 
