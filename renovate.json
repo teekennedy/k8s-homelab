@@ -335,7 +335,7 @@
       "sourceUrl": "https://codeberg.org/forgejo/forgejo"
     },
     {
-      "description": "The OTel logs API (otel/log, otel/sdk/log, and the otlplog exporters) is still pre-1.0 and offers no compatibility guarantee between minor versions. In .dagger/go.mod these are only present to satisfy what github.com/dagger/otel-go requires internally, and otel-go itself only moves via `dagger develop` regenerating the SDK bindings (not independent bumps). Renovate bumping these standalone broke the build once already (v1.45.0 dagger update: otel/log v0.20.0 -> v0.21.0 removed KeyValue/Value, which otel-go@v1.43.0 depends on). Leave them pinned; bump by hand alongside a dagger/otel-go update.",
+      "description": "The dagger SDK's own dependencies are owned by `dagger develop`, which rewrites them to whatever the pinned CLI wants. `dagger develop` runs as a post-upgrade task, which would overwrite renovate's changest to these packages.",
       "matchManagers": [
         "gomod"
       ],
@@ -343,12 +343,38 @@
         ".dagger/go.mod"
       ],
       "matchPackageNames": [
-        "go.opentelemetry.io/otel/log",
-        "go.opentelemetry.io/otel/sdk/log",
+        "github.com/Khan/genqlient",
+        "github.com/dagger/otel-go",
+        "github.com/dagger/querybuilder",
+        "github.com/vektah/gqlparser/v2",
         "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc",
-        "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+        "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp",
+        "go.opentelemetry.io/otel/log",
+        "go.opentelemetry.io/otel/sdk/log"
       ],
       "enabled": false
+    },
+    {
+      "description": "Regenerate dagger's own artifacts after any update inside .dagger. `dagger develop` handles the generated SDK bindings (dagger.gen.go, internal/**), while `dagger generate` handles changes to other source code that result from upgrading tooling, e.g. when an updated cue formats files differently than the previous version.",
+      "matchFileNames": [
+        ".dagger/**"
+      ],
+      "automerge": false,
+      "postUpgradeTasks": {
+        "commands": [
+          "dagger develop",
+          "dagger generate homelab:export-cue homelab:fix-cue homelab:format-cue homelab:format-go homelab:format-nix homelab:format-python -y"
+        ],
+        "fileFilters": [
+          ".dagger/**",
+          "dagger.json",
+          "config/**",
+          "**/*.go",
+          "**/*.nix",
+          "**/*.py"
+        ],
+        "executionMode": "branch"
+      }
     },
     {
       "description": "Automerge all non-major (minor/patch) updates.",

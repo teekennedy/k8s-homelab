@@ -51,6 +51,7 @@ func (m *Homelab) LintNix(
 
 // FormatNix formats Nix files with alejandra and removes dead code with deadnix.
 // Returns a changeset. Use `dagger call format-nix --auto-apply` to apply.
+// +generate
 func (m *Homelab) FormatNix(
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.nix", ".devenv*", ".devenv/**", "devenv.local.*"]

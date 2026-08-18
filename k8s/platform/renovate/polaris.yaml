@@ -1,4 +1,15 @@
 exemptions:
+  # Renovate's post-upgrade tasks exec into the Dagger Engine pod to regenerate
+  # dagger's own artifacts. The renovate-dagger-exec Role grants pods/exec in the
+  # dagger-engine namespace, mirroring the woodpecker chart's dagger-pipeline grant.
+  - controllerNames:
+      - renovate-dagger-exec
+    rules:
+      - rolePodExecAttach
+  - controllerNames:
+      - renovate-dagger-exec-binding
+    rules:
+      - rolebindingRolePodExecAttach
   # gpg-bootstrap is a one-shot ArgoCD sync hook that installs gnupg via apk and generates
   # a GPG key for Renovate commit signing. The apk install requires root; the Job is
   # ephemeral (deleted on HookSucceeded) so the risk window is minimal.

@@ -34,6 +34,17 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: traefik
+    # Kubernetes apiserver, for the `dagger` post-upgrade tasks. The kube-pod://
+    # runner transport is `kubectl exec` through the apiserver rather than a
+    # pod-to-pod connection, and the apiserver is host-networked, so this has to
+    # be an ipBlock on the node/VIP addresses — a podSelector cannot match it.
+    # Without this the 10.0.0.0/8 exception below blocks it.
+    - to:
+        - ipBlock:
+            cidr: 10.69.80.0/25
+      ports:
+        - protocol: TCP
+          port: 6443
     - to:
         # Public internet addresses (to check for package updates)
         - ipBlock:

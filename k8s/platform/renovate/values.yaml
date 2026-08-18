@@ -5,25 +5,84 @@ renovate:
     ttlSecondsAfterFinished: 259200 # 3 days
     concurrencyPolicy: Forbid
     jobBackoffLimit: 1
+    # Put the dagger wrapper (mounted from the renovate-dagger-wrapper
+    # ConfigMap) and kubectl on PATH for renovate and everything it spawns, so
+    # the post-upgrade tasks in renovate.json can find them. See
+    # files/dagger.sh for why the wrapper exists.
+    #
+    # kubectl is fetched here rather than in an initContainer so it runs as the
+    # same unprivileged uid in the same container, needing no extra image, no
+    # securityContext of its own, and no polaris exemption.
+    preCommand: |
+      export PATH="/opt/dagger/bin:$PATH"
+      # Already created by the nested wrapper mount; belt and braces.
+      mkdir -p /opt/dagger/bin
+      curl -fsSL -o /opt/dagger/bin/kubectl \
+        "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      chmod +x /opt/dagger/bin/kubectl
   # pod-level securityContext
   securityContext:
     runAsUser: 12021
     # fsGroup: 1000 is added by default when persistent cache is enabled
     fsGroup: 1000
     fsGroupChangePolicy: "OnRootMismatch"
+  # A named ServiceAccount (rather than the namespace default) so the
+  # renovate-dagger-exec RoleBinding in dagger-engine has a subject to target.
+  serviceAccount:
+    create: true
+    name: renovate
+  # Scratch space for kubectl (bin/) and the real dagger CLIs the wrapper
+  # downloads per engineVersion (versions/). Mounted at /opt/dagger rather than
+  # /opt/dagger/bin so both live inside the writable volume. emptyDir gets group
+  # ownership from the pod's fsGroup (1000) and mode 0775, so uid 12021 can
+  # write to it without running as root.
+  extraVolumes:
+    - name: dagger-bin
+      emptyDir: {}
+    - name: dagger-wrapper
+      configMap:
+        name: renovate-dagger-wrapper
+        # 0555: executable for everyone, writable by no one. This is why
+        # preCommand does not need to chmod the wrapper — and could not, since
+        # a ConfigMap mount is read-only.
+        defaultMode: 0555
+  extraVolumeMounts:
+    - name: dagger-bin
+      mountPath: /opt/dagger
+    # Nested inside the emptyDir above. Kubelet orders mounts by path depth, so
+    # the emptyDir is mounted first and the wrapper is then bind-mounted into
+    # it; subPath is what makes this a single file rather than a directory that
+    # would shadow kubectl.
+    - name: dagger-wrapper
+      mountPath: /opt/dagger/bin/dagger
+      subPath: dagger
+      readOnly: true
   renovate:
     # container-level securityContext for the renovate container
     securityContext:
       runAsNonRoot: true
       runAsUser: 12021
       allowPrivilegeEscalation: false
+    # This is renovate's self-hosted (global) config. allowedCommands is an
+    # admin-only option and is ignored if placed in the repo's renovate.json,
+    # so the allowlist for postUpgradeTasks live here. Keep allowedCommands
+    # regexes tight and unambiguous to prevent arbitrary code execution.
+    #
+    # The dagger vars go in customEnvVariables, NOT in the container env below.
+    # Renovate does not pass the container's environment through to the commands
+    # it executes.
     config: |
       {
         "platform": "forgejo",
         "endpoint": "https://git.msng.to/api/v1",
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
         "autodiscover": true,
-        "httpCacheTtlDays": 7
+        "httpCacheTtlDays": 7,
+        "allowedCommands": ["^dagger (develop|generate)( [^;&|]*)?$"],
+        "customEnvVariables": {
+          "_EXPERIMENTAL_DAGGER_RUNNER_HOST": "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine",
+          "DAGGER_NO_NAG": "1"
+        }
       }
     persistence:
       cache:

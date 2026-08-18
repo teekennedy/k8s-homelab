@@ -1,0 +1,13 @@
+---
+# The `dagger` shim that renovate's postUpgradeTasks invoke. Keyed as "dagger"
+# (no extension) because it is mounted onto PATH under that exact name; the
+# source file keeps its .sh suffix so editors treat it as shell.
+# See files/dagger.sh for why the wrapper exists.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: renovate-dagger-wrapper
+  namespace: {{ .Release.Namespace }}
+data:
+  dagger: |
+{{ .Files.Get "files/dagger.sh" | indent 4 }}

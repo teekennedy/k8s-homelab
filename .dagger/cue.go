@@ -22,6 +22,7 @@ func cueContainer(source *dagger.Directory) *dagger.Container {
 
 // FormatCue formats CUE files with cue fmt.
 // Returns a changeset. Use `dagger call format-cue --auto-apply` to apply.
+// +generate
 func (m *Homelab) FormatCue(
 	// +defaultPath="/"
 	// +ignore=["*", "!config/**/*.cue"]
@@ -35,6 +36,7 @@ func (m *Homelab) FormatCue(
 
 // FixCue upgrades CUE syntax to the current language version using cue fix.
 // Returns a changeset. Use `dagger call fix-cue --auto-apply` to apply.
+// +generate
 func (m *Homelab) FixCue(
 	// +defaultPath="/"
 	// +ignore=["*", "!config/**/*.cue"]
@@ -49,6 +51,7 @@ func (m *Homelab) FixCue(
 // TrimCue removes redundant values implied by schema constraints using cue trim.
 // Returns a changeset. Use `dagger call trim-cue --auto-apply` to apply.
 // Advisory only — no corresponding check function.
+// +generate
 func (m *Homelab) TrimCue(
 	// +defaultPath="/"
 	// +ignore=["*", "!config/**/*.cue"]
@@ -63,6 +66,7 @@ func (m *Homelab) TrimCue(
 // ExportCue exports each CUE environment to config/gen/<env>/env.json.
 // Environments are discovered dynamically from the package's exported top-level values.
 // Returns a changeset. Use `dagger call export-cue --auto-apply` to apply.
+// +generate
 func (m *Homelab) ExportCue(
 	ctx context.Context,
 	// +defaultPath="/"

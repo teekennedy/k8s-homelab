@@ -170,6 +170,7 @@ func (m *Homelab) LintPython(ctx context.Context,
 
 // FormatPython formats Python files with black across all discovered projects.
 // Returns a changeset. Use `dagger call format-python --auto-apply` to apply.
+// +generate
 func (m *Homelab) FormatPython(
 	ctx context.Context,
 	// +defaultPath="/"

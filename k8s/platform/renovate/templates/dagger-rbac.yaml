@@ -1,0 +1,31 @@
+---
+# Renovate's post-upgrade tasks run `dagger develop` / `dagger generate`, which
+# reach the shared engine over `kube-pod://` — that is `kubectl exec` through the
+# apiserver, so the renovate ServiceAccount needs pods/exec in dagger-engine.
+# Mirrors the dagger-pipeline grant in the woodpecker chart.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: renovate-dagger-exec
+  namespace: dagger-engine
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: renovate-dagger-exec-binding
+  namespace: dagger-engine
+subjects:
+  - kind: ServiceAccount
+    name: renovate
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: renovate-dagger-exec
+  apiGroup: rbac.authorization.k8s.io

@@ -142,6 +142,7 @@ func (m *Homelab) LintGo(ctx context.Context,
 
 // FormatGo formats Go files with go fmt across all discovered modules.
 // Returns a changeset. Use `dagger call format-go --auto-apply` to apply.
+// +generate
 func (m *Homelab) FormatGo(
 	ctx context.Context,
 	// +defaultPath="/"
