@@ -335,6 +335,22 @@
       "sourceUrl": "https://codeberg.org/forgejo/forgejo"
     },
     {
+      "description": "The OTel logs API (otel/log, otel/sdk/log, and the otlplog exporters) is still pre-1.0 and offers no compatibility guarantee between minor versions. In .dagger/go.mod these are only present to satisfy what github.com/dagger/otel-go requires internally, and otel-go itself only moves via `dagger develop` regenerating the SDK bindings (not independent bumps). Renovate bumping these standalone broke the build once already (v1.45.0 dagger update: otel/log v0.20.0 -> v0.21.0 removed KeyValue/Value, which otel-go@v1.43.0 depends on). Leave them pinned; bump by hand alongside a dagger/otel-go update.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchFileNames": [
+        ".dagger/go.mod"
+      ],
+      "matchPackageNames": [
+        "go.opentelemetry.io/otel/log",
+        "go.opentelemetry.io/otel/sdk/log",
+        "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc",
+        "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Automerge all non-major (minor/patch) updates.",
       "automerge": true,
       "automergeType": "pr",
