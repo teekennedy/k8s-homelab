@@ -1,8 +1,8 @@
 apiVersion: v2
 name: woodpecker
-version: 0.0.4
+version: 0.0.5
 appVersion: 3.13.0
 dependencies:
   - name: woodpecker
-    version: 3.7.0
+    version: 3.7.1
     repository: oci://ghcr.io/woodpecker-ci/helm
