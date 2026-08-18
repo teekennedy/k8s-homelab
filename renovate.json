@@ -236,16 +236,6 @@
         "docker"
       ],
       "matchPackageNames": [
-        "alpine"
-      ],
-      "allowedVersions": "/^latest$/",
-      "pinDigests": false
-    },
-    {
-      "matchDatasources": [
-        "docker"
-      ],
-      "matchPackageNames": [
         "lissy93/dashy"
       ],
       "versioning": "regex:^release-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
@@ -355,6 +345,18 @@
       "enabled": false
     },
     {
+      "description": "Automerge all non-major (minor/patch) updates.",
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchPackageNames": [
+        "*"
+      ]
+    },
+    {
       "description": "Regenerate dagger's own artifacts after any update inside .dagger. `dagger develop` handles the generated SDK bindings (dagger.gen.go, internal/**), while `dagger generate` handles changes to other source code that result from upgrading tooling, e.g. when an updated cue formats files differently than the previous version.",
       "matchFileNames": [
         ".dagger/**"
@@ -375,18 +377,6 @@
         ],
         "executionMode": "branch"
       }
-    },
-    {
-      "description": "Automerge all non-major (minor/patch) updates.",
-      "automerge": true,
-      "automergeType": "pr",
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "matchPackageNames": [
-        "*"
-      ]
     }
   ]
 }

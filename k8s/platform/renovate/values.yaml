@@ -75,6 +75,14 @@ renovate:
     # The dagger vars go in customEnvVariables, NOT in the container env below.
     # Renovate does not pass the container's environment through to the commands
     # it executes.
+    #
+    # KUBERNETES_SERVICE_HOST/PORT are here for the same reason, and are not
+    # optional: dagger reaches the engine by shelling out to `kubectl exec`, and
+    # kubectl only discovers its in-cluster config from those two variables.
+    # Kubernetes injects them into the container, but renovate strips them from
+    # the child env, so kubectl falls back to localhost:8080 and every dial
+    # fails. The .svc name is used rather than the ClusterIP so this does not
+    # hardcode the service CIDR; it is covered by the apiserver cert SANs.
     config: |
       {
         "platform": "forgejo",
@@ -85,7 +93,9 @@ renovate:
         "allowedCommands": ["^dagger (develop|generate)( [^;&|]*)?$"],
         "customEnvVariables": {
           "_EXPERIMENTAL_DAGGER_RUNNER_HOST": "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine",
-          "DAGGER_NO_NAG": "1"
+          "DAGGER_NO_NAG": "1",
+          "KUBERNETES_SERVICE_HOST": "kubernetes.default.svc",
+          "KUBERNETES_SERVICE_PORT": "443"
         }
       }
     persistence:
