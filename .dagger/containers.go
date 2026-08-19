@@ -24,8 +24,8 @@ const (
 	helmImage = "alpine/helm:4.2.4"
 	// renovate: datasource=docker depName=alpine
 	alpineImage = "alpine:3.24.1"
-	// renovate: datasource=docker depName=quay.io/fairwinds/polaris
-	polarisImage = "quay.io/fairwinds/polaris:10.1.8"
+	// renovate: datasource=docker depName=us-docker.pkg.dev/fairwinds-ops/oss/polaris
+	polarisImage = "us-docker.pkg.dev/fairwinds-ops/oss/polaris:v10.2.0"
 	// renovate: datasource=docker depName=ghcr.io/yannh/kubeconform
 	kubeconformImage = "ghcr.io/yannh/kubeconform:v0.8.0"
 )

@@ -34,6 +34,7 @@ func (hc *HelmChart) Polaris(ctx context.Context) (string, error) {
 		"polaris", "audit",
 		"--audit-path", "/rendered.yaml",
 		"--format", "pretty",
+		"--only-show-failed-tests", "true",
 		"--set-exit-code-on-danger",
 		"--config", "/polaris.yaml",
 		"--merge-config",
@@ -133,9 +134,11 @@ func kubeconformContainerWithSchemas() *dagger.Container {
 		From(alpineImage).
 		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
 		WithExec([]string{"mkdir", "/schemas"}).
-		WithExec([]string{"sh", "-c",
+		WithExec([]string{
+			"sh", "-c",
 			"curl -sSfL https://github.com/datreeio/CRDs-catalog/archive/refs/heads/main.tar.gz" +
-				" | tar -xz --strip-components=1 -C /schemas"}).
+				" | tar -xz --strip-components=1 -C /schemas",
+		}).
 		Directory("/schemas")
 
 	kubeconformBin := dag.Container().From(kubeconformImage).File("/kubeconform")
