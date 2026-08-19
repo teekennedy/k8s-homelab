@@ -13,14 +13,10 @@
   }:
     (flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      labMod = import ./devenv.nix {
-        inherit pkgs;
-        lib = pkgs.lib;
-      };
     in {
       packages = {
         default = self.packages.${system}.lab;
-        lab = builtins.head labMod.packages;
+        lab = pkgs.callPackage ./default.nix {};
       };
 
       apps.default = {

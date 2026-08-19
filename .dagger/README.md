@@ -116,6 +116,9 @@ dagger call format-nix --auto-apply
 dagger call format-go --auto-apply
 dagger call format-python --auto-apply
 
+# Regenerate the nix vendorHash for cmd/lab after a Go dependency changes
+dagger call update-go-vendor-hash --auto-apply
+
 # Build lab CLI
 dagger call build-cli --source=.        # Using Nix (production)
 dagger call build-cli-go --source=.     # Using Go (faster)
@@ -191,6 +194,10 @@ siblings via relative paths (e.g., `../k8s-secret`).
   - Filters: `terraform/**/*`
 - `ValidateWoodpecker(source, paths)` - Woodpecker CI pipeline validation
   - Filters: `.woodpecker/*.yaml`
+- `CheckGoVendorHash(source)` - Validates `cmd/lab/gomod.json` against the vendorHash
+  nix computes for the lab CLI's Go dependencies
+  - Filters: `cmd/lab/**/*`
+  - Fix: `dagger call update-go-vendor-hash --auto-apply`
 
 #### Build Checks
 - `BuildCli(source)` - Build lab CLI (using Nix)
@@ -206,6 +213,9 @@ siblings via relative paths (e.g., `../k8s-secret`).
 - `FormatNix(source, paths)` - Format Nix files (`dagger call format-nix --auto-apply`)
 - `FormatGo(source)` - Format Go files (`dagger call format-go --auto-apply`)
 - `FormatPython(source, paths)` - Format Python files (`dagger call format-python --auto-apply`)
+- `UpdateGoVendorHash(source)` - Recompute the nix buildGoModule vendorHash for `cmd/lab`
+  into `cmd/lab/gomod.json` (`dagger call update-go-vendor-hash --auto-apply`).
+  Renovate runs this as a post-upgrade task whenever it bumps a `cmd/lab` Go dependency.
 
 ### Other Functions
 - `BuildCliGo(source)` - Build lab CLI (using Go, faster)

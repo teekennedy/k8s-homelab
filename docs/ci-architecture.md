@@ -78,21 +78,25 @@ lab ci
 
 ### Fixing a Broken Lab Build
 ```bash
-# If lab's flake.nix breaks (e.g., wrong vendorHash)
+# If lab's nix build breaks because the vendorHash no longer matches
+# go.mod/go.sum (Renovate bumping a dependency is the usual cause):
 
-# Option 1: Fix manually
+# Option 1: Regenerate the hash (run from the repo root)
+dagger call update-go-vendor-hash --auto-apply
+# Rewrites cmd/lab/gomod.json, which cmd/lab/default.nix imports.
+# `dagger check check-go-vendor-hash` verifies it in CI, and Renovate
+# runs the generator as a post-upgrade task on cmd/lab dependency PRs.
+
+# Option 2: Fix manually
 cd cmd/lab
-# Edit flake.nix to set vendorHash = pkgs.lib.fakeHash
+# Set "vendorHash" in gomod.json to sha256-AAAA...(43 A's)=
 nix build
-# Get correct hash from error, update flake.nix
+# Copy the "got:" hash from the error into gomod.json
 nix build  # Should succeed now
 
-# Option 2: Use Dagger directly (doesn't need lab)
+# Option 3: Use Dagger directly (doesn't need lab)
 dagger call build-cli --source=.
 # Dagger builds lab using Nix in a clean container
-
-# Option 3: Update vendorHash automatically (future enhancement)
-dagger call fix-lab-vendor-hash --source=.
 ```
 
 ## Architecture Diagram
@@ -186,24 +190,6 @@ dagger call cli-nix --source=. export --path=./lab
 5. **Self-Healing**: CI can fix and rebuild lab automatically
 
 ## Future Enhancements
-
-### Auto-fix vendorHash
-Add a Dagger function that automatically updates vendorHash:
-
-```go
-// FixLabVendorHash builds lab, extracts the correct vendorHash, and updates flake.nix
-func (m *Homelab) FixLabVendorHash(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
-    // Try to build with fake hash
-    // Parse error to get correct hash
-    // Update flake.nix
-    // Return updated source directory
-}
-```
-
-Usage:
-```bash
-dagger call fix-lab-vendor-hash --source=. export --path=.
-```
 
 ### CI Container Entry
 Make `lab ci` commands actually enter the CI container:

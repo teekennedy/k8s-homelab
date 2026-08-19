@@ -357,6 +357,21 @@
       ]
     },
     {
+      "description": "Recompute the nix buildGoModule vendorHash after anything under cmd/lab changes. Renovate rewrites go.mod/go.sum which breaks the nix package.",
+      "matchFileNames": [
+        "cmd/lab/**"
+      ],
+      "postUpgradeTasks": {
+        "commands": [
+          "dagger generate homelab:update-go-vendor-hash -y"
+        ],
+        "fileFilters": [
+          "cmd/lab/**"
+        ],
+        "executionMode": "branch"
+      }
+    },
+    {
       "description": "Regenerate dagger's own artifacts after any update inside .dagger. `dagger develop` handles the generated SDK bindings (dagger.gen.go, internal/**), while `dagger generate` handles changes to other source code that result from upgrading tooling, e.g. when an updated cue formats files differently than the previous version.",
       "matchFileNames": [
         ".dagger/**"

@@ -114,7 +114,7 @@ func (m *Homelab) LintYaml(ctx context.Context,
 // +check
 func (m *Homelab) ValidateNix(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock"]
+	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,

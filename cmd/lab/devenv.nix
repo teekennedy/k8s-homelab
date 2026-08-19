@@ -1,31 +1,5 @@
-{
-  pkgs,
-  lib,
-  ...
-}: let
-  lab = pkgs.buildGoModule {
-    pname = "lab";
-    version = "0.2.4";
-    src = ./.;
-    vendorHash = "sha256-dnnX0KlWNUXVHyZDORxDCsNla9EY7b417+uNTLhUQmE=";
-
-    postInstall = ''
-      installShellCompletion --cmd lab \
-        --bash <($out/bin/lab completion bash) \
-        --zsh <($out/bin/lab completion zsh) \
-        --fish <($out/bin/lab completion fish)
-    '';
-
-    nativeBuildInputs = with pkgs; [installShellFiles];
-
-    meta = with lib; {
-      description = "Unified CLI for k8s-homelab management";
-      homepage = "https://github.com/teekennedy/homelab";
-      license = licenses.mit;
-      maintainers = [];
-      mainProgram = "lab";
-    };
-  };
+{pkgs, ...}: let
+  lab = pkgs.callPackage ./default.nix {};
 in {
   packages = [lab];
 
