@@ -34,7 +34,10 @@ in {
   # Don't prompt me to sign up for dagger cloud
   env.DAGGER_NO_NAG = "1";
 
-  enterShell = ''sops decrypt "$DEVENV_ROOT/config/kubeconfig/production.enc.yaml" --output "$KUBECONFIG"'';
+  enterShell = ''
+    mkdir -p "$(dirname "$KUBECONFIG")"
+    sops decrypt "$DEVENV_ROOT/config/kubeconfig/production.enc.yaml" --output "$KUBECONFIG"
+  '';
 
   # https://devenv.sh/packages/
   packages = with pkgs;
