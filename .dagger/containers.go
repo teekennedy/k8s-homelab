@@ -17,7 +17,7 @@ const (
 	// renovate: datasource=docker depName=cytopia/yamllint
 	yamllintImage = "cytopia/yamllint:1"
 	// renovate: datasource=docker depName=ghcr.io/opentofu/opentofu
-	opentofuImage = "ghcr.io/opentofu/opentofu:1.12.5"
+	opentofuImage = "ghcr.io/opentofu/opentofu:1.12.6"
 	// renovate: datasource=docker depName=woodpeckerci/woodpecker-cli
 	woodpeckerImage = "woodpeckerci/woodpecker-cli:v3"
 	// renovate: datasource=docker depName=alpine/helm
@@ -25,7 +25,7 @@ const (
 	// renovate: datasource=docker depName=alpine
 	alpineImage = "alpine:3.24.1"
 	// renovate: datasource=docker depName=us-docker.pkg.dev/fairwinds-ops/oss/polaris
-	polarisImage = "us-docker.pkg.dev/fairwinds-ops/oss/polaris:v10.2.0"
+	polarisImage = "us-docker.pkg.dev/fairwinds-ops/oss/polaris:v10.2.2"
 	// renovate: datasource=docker depName=ghcr.io/yannh/kubeconform
 	kubeconformImage = "ghcr.io/yannh/kubeconform:v0.8.0"
 )
