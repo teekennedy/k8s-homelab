@@ -345,18 +345,6 @@
       "enabled": false
     },
     {
-      "description": "Automerge all non-major (minor/patch) updates.",
-      "automerge": true,
-      "automergeType": "pr",
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "matchPackageNames": [
-        "*"
-      ]
-    },
-    {
       "description": "Recompute the nix buildGoModule vendorHash after anything under cmd/lab changes. Renovate rewrites go.mod/go.sum which breaks the nix package.",
       "matchFileNames": [
         "cmd/lab/**"
@@ -376,7 +364,6 @@
       "matchFileNames": [
         ".dagger/**"
       ],
-      "automerge": false,
       "postUpgradeTasks": {
         "commands": [
           "dagger develop",
@@ -392,6 +379,18 @@
         ],
         "executionMode": "branch"
       }
+    },
+    {
+      "description": "Automerge all non-major (minor/patch) updates.",
+      "automerge": true,
+      "automergeType": "pr",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchPackageNames": [
+        "*"
+      ]
     }
   ]
 }
