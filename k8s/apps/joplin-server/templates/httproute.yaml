@@ -1,0 +1,28 @@
+---
+# The whole host goes to Joplin Server as one rule: it does its own auth for
+# both the web admin UI and the sync API (the desktop/mobile apps
+# authenticate directly against the API with email+password), so there's no
+# OIDC gate to carve exceptions around the way freshrss's route has.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "joplin-server.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    # external-dns selector; not read by the router.
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.route.entrypoint }}
+  labels:
+    {{- include "joplin-server.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.route.gateway.name }}
+      namespace: {{ .Values.route.gateway.namespace }}
+      sectionName: {{ .Values.route.gateway.sectionName }}
+  hostnames:
+    - {{ .Values.route.host | quote }}
+  rules:
+    - backendRefs:
+        - name: {{ include "joplin-server.fullname" . }}
+          port: {{ .Values.service.port }}

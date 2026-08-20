@@ -1,0 +1,8 @@
+apiVersion: v2
+name: joplin-server
+description: Self-hosted Joplin Server, replacing the Joplin Cloud subscription.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the joplin/server image tag deployed by this chart.
+appVersion: "3.7.1"

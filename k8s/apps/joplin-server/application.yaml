@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: joplin-server
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: joplin-server
+  ignoreDifferences:
+    - jsonPointers:
+        - /spec/volumeName
+        - /spec/storageClassName
+        # Longhorn stores the expanded capacity in bytes (e.g. 10737418240) rather
+        # than the human-readable form (e.g. 10Gi), causing ArgoCD to see a diff
+        # and attempt a patch that Kubernetes rejects as reducing the storage request.
+        - /spec/resources/requests/storage
+      kind: PersistentVolumeClaim
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: cnpg-s3-credentials
+      namespace: joplin-server
+  project: default
+  source:
+    path: k8s/apps/joplin-server
+    repoURL: https://git.msng.to/ops/k8s-homelab
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
