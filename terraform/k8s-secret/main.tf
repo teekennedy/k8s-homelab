@@ -18,9 +18,9 @@ resource "kubernetes_secret_v1" "external" {
     name      = var.name
     namespace = terraform_data.create_namespace.output
 
-    annotations = {
+    annotations = merge({
       "app.kubernetes.io/managed-by" = "Terraform"
-    }
+    }, var.annotations)
   }
 
   data = var.data

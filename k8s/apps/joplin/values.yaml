@@ -40,6 +40,15 @@ appBaseUrl: https://joplin.msng.to
 # deployment.yaml.
 storageDriver: "Type=Filesystem; Path=/data"
 
+# Mailer, needed for notebook-share invitations. Credentials come from the
+# smtp-creds secret (reflected from auth-system; see terraform/main.tf).
+smtp:
+  host: email-smtp.us-west-2.amazonaws.com
+  port: 587
+  security: starttls
+  senderName: "Joplin Server"
+  senderEmail: joplin@msng.to
+
 podSecurityContext:
   runAsNonRoot: true
   # The image doesn't pin a UID in its Dockerfile; confirmed by inspection

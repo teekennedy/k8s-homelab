@@ -28,6 +28,12 @@ module "smtp_secret" {
     username = module.smtp.smtp_access_key_id
     password = module.smtp.smtp_secret_access_key
   }
+  annotations = {
+    # Joplin Server's notebook-sharing invitations need a mailer; reflect
+    # these SES creds into its namespace rather than minting a second set.
+    "reflector.v1.k8s.emberstack.com/reflection-allowed"            = "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces" = "joplin"
+  }
 }
 
 module "backup" {

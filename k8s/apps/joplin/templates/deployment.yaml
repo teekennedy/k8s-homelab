@@ -60,8 +60,31 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.psql.clusterName }}-app
                   key: password
-          # No mailer configured — invitations to a shared notebook are
-          # accepted in-app, not via emailed links.
+            # Notebook-share invitations require a working mailer to be
+            # discoverable/acceptable at all — there's no reliable in-app
+            # fallback without one.
+            - name: MAILER_ENABLED
+              value: "1"
+            - name: MAILER_HOST
+              value: {{ .Values.smtp.host | quote }}
+            - name: MAILER_PORT
+              value: {{ .Values.smtp.port | quote }}
+            - name: MAILER_SECURITY
+              value: {{ .Values.smtp.security | quote }}
+            - name: MAILER_NOREPLY_NAME
+              value: {{ .Values.smtp.senderName | quote }}
+            - name: MAILER_NOREPLY_EMAIL
+              value: {{ .Values.smtp.senderEmail | quote }}
+            - name: MAILER_AUTH_USER
+              valueFrom:
+                secretKeyRef:
+                  name: smtp-creds
+                  key: username
+            - name: MAILER_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smtp-creds
+                  key: password
           livenessProbe:
             tcpSocket:
               port: http

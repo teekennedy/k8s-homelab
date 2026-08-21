@@ -9,3 +9,8 @@ variable "namespace" {
 variable "data" {
   type = map(string)
 }
+
+variable "annotations" {
+  type    = map(string)
+  default = {}
+}

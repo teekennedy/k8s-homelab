@@ -17,14 +17,6 @@ data "aws_iam_policy_document" "send_mail" {
     sid       = "AllowSendMail"
     actions   = ["ses:SendRawEmail"]
     resources = ["arn:${data.aws_partition.this.partition}:ses:${var.aws_region}:${local.account_id}:identity/*"]
-
-    condition {
-      test     = "StringLike"
-      variable = "ses:FromAddress"
-      values = [
-        "*@${var.domain}"
-      ]
-    }
   }
 }
 

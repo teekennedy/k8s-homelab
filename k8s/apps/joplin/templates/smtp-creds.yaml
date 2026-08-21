@@ -1,0 +1,11 @@
+# SES SMTP credentials, reflected from the auth-system smtp-creds secret
+# (terraform/main.tf) so Joplin Server can email notebook-share invitations.
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smtp-creds
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    reflector.v1.k8s.emberstack.com/reflects: "auth-system/smtp-creds"
+data: {}
