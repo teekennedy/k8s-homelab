@@ -1,6 +1,7 @@
 package kubeconfig
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -54,20 +55,20 @@ func TestExists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configDir := filepath.Join(tmpDir, "config")
 	cacheDir := filepath.Join(tmpDir, "cache")
 	kubeconfigDir := filepath.Join(configDir, "kubeconfig")
 
 	// Create the kubeconfig directory
-	if err := os.MkdirAll(kubeconfigDir, 0755); err != nil {
+	if err := os.MkdirAll(kubeconfigDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a test kubeconfig file
 	testFile := filepath.Join(kubeconfigDir, "production.enc.yaml")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,14 +91,14 @@ func TestListEnvironments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configDir := filepath.Join(tmpDir, "config")
 	cacheDir := filepath.Join(tmpDir, "cache")
 	kubeconfigDir := filepath.Join(configDir, "kubeconfig")
 
 	// Create the kubeconfig directory
-	if err := os.MkdirAll(kubeconfigDir, 0755); err != nil {
+	if err := os.MkdirAll(kubeconfigDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
@@ -105,7 +106,7 @@ func TestListEnvironments(t *testing.T) {
 	testFiles := []string{"production.enc.yaml", "staging.enc.yaml"}
 	for _, f := range testFiles {
 		testFile := filepath.Join(kubeconfigDir, f)
-		if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte("test"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -141,14 +142,14 @@ func TestCleanupAll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configDir := filepath.Join(tmpDir, "config")
 	cacheDir := filepath.Join(tmpDir, "cache")
 	kubeconfigCacheDir := filepath.Join(cacheDir, "kubeconfig")
 
 	// Create the kubeconfig cache directory
-	if err := os.MkdirAll(kubeconfigCacheDir, 0755); err != nil {
+	if err := os.MkdirAll(kubeconfigCacheDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
@@ -156,7 +157,7 @@ func TestCleanupAll(t *testing.T) {
 	testFiles := []string{"production.yaml", "staging.yaml"}
 	for _, f := range testFiles {
 		testFile := filepath.Join(kubeconfigCacheDir, f)
-		if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte("test"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -196,7 +197,7 @@ func TestDecryptMissingFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configDir := filepath.Join(tmpDir, "config")
 	cacheDir := filepath.Join(tmpDir, "cache")
@@ -204,7 +205,7 @@ func TestDecryptMissingFile(t *testing.T) {
 	mgr := NewManager(WithConfigDir(configDir), WithCacheDir(cacheDir))
 
 	// Try to decrypt a non-existent environment
-	_, err = mgr.Decrypt("nonexistent")
+	_, err = mgr.Decrypt(context.Background(), "nonexistent")
 	if err == nil {
 		t.Error("expected error when decrypting non-existent environment")
 	}
@@ -216,27 +217,27 @@ func TestSetupPersistentCreatesDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configDir := filepath.Join(tmpDir, "config")
 	cacheDir := filepath.Join(tmpDir, "cache")
 	kubeconfigDir := filepath.Join(configDir, "kubeconfig")
 
 	// Create the kubeconfig directory with a mock encrypted file
-	if err := os.MkdirAll(kubeconfigDir, 0755); err != nil {
+	if err := os.MkdirAll(kubeconfigDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a mock encrypted file (this will fail sops decrypt, but we're testing dir creation)
 	testFile := filepath.Join(kubeconfigDir, "test.enc.yaml")
-	if err := os.WriteFile(testFile, []byte("apiVersion: v1\nkind: Config\n"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("apiVersion: v1\nkind: Config\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	mgr := NewManager(WithConfigDir(configDir), WithCacheDir(cacheDir))
 
 	// This will fail at sops decrypt, but that's ok - we're testing path logic
-	_ = mgr.SetupPersistent("test")
+	_ = mgr.SetupPersistent(context.Background(), "test")
 
 	// Check if cache directory would be created (it will be since we call MkdirAll)
 	kubeconfigCacheDir := filepath.Join(cacheDir, "kubeconfig")
@@ -252,20 +253,20 @@ func TestCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configDir := filepath.Join(tmpDir, "config")
 	cacheDir := filepath.Join(tmpDir, "cache")
 	kubeconfigCacheDir := filepath.Join(cacheDir, "kubeconfig")
 
 	// Create the kubeconfig cache directory
-	if err := os.MkdirAll(kubeconfigCacheDir, 0755); err != nil {
+	if err := os.MkdirAll(kubeconfigCacheDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a test file
 	testFile := filepath.Join(kubeconfigCacheDir, "test.yaml")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -275,7 +276,9 @@ func TestCleanup(t *testing.T) {
 
 	// Set an original env var
 	origKubeconfig := os.Getenv("KUBECONFIG")
-	os.Setenv("KUBECONFIG", "/some/path")
+	if err := os.Setenv("KUBECONFIG", "/some/path"); err != nil {
+		t.Fatal(err)
+	}
 	mgr.originalEnv = origKubeconfig
 
 	// Run cleanup

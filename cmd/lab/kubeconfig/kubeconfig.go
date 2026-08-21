@@ -2,6 +2,8 @@
 package kubeconfig
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -69,7 +71,7 @@ func (m *Manager) Exists(env string) bool {
 }
 
 // Decrypt decrypts the kubeconfig for the given environment and returns the content
-func (m *Manager) Decrypt(env string) ([]byte, error) {
+func (m *Manager) Decrypt(ctx context.Context, env string) ([]byte, error) {
 	encPath := m.GetEncryptedPath(env)
 
 	if _, err := os.Stat(encPath); os.IsNotExist(err) {
@@ -77,10 +79,11 @@ func (m *Manager) Decrypt(env string) ([]byte, error) {
 	}
 
 	// Use sops to decrypt
-	cmd := exec.Command("sops", "decrypt", encPath)
+	cmd := exec.CommandContext(ctx, "sops", "decrypt", encPath)
 	output, err := cmd.Output()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			return nil, fmt.Errorf("sops decrypt failed: %s", string(exitErr.Stderr))
 		}
 		return nil, fmt.Errorf("sops decrypt failed: %w", err)
@@ -92,7 +95,7 @@ func (m *Manager) Decrypt(env string) ([]byte, error) {
 // Setup decrypts the kubeconfig and sets up the environment for kubectl/helm commands
 // It writes the decrypted kubeconfig to a temp file and sets KUBECONFIG env var
 // Returns a cleanup function that should be called when done
-func (m *Manager) Setup(env string) (cleanup func(), err error) {
+func (m *Manager) Setup(ctx context.Context, env string) (cleanup func(), err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -101,26 +104,26 @@ func (m *Manager) Setup(env string) (cleanup func(), err error) {
 	m.activeEnv = env
 
 	// Decrypt the kubeconfig
-	content, err := m.Decrypt(env)
+	content, err := m.Decrypt(ctx, env)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create the cache directory if it doesn't exist
 	kubeconfigCacheDir := filepath.Join(m.cacheDir, "kubeconfig")
-	if err := os.MkdirAll(kubeconfigCacheDir, 0700); err != nil {
+	if err := os.MkdirAll(kubeconfigCacheDir, 0o700); err != nil {
 		return nil, fmt.Errorf("create kubeconfig cache dir: %w", err)
 	}
 
 	// Write to temp file with restricted permissions
 	tempPath := m.GetDecryptedPath(env)
-	if err := os.WriteFile(tempPath, content, 0600); err != nil {
+	if err := os.WriteFile(tempPath, content, 0o600); err != nil {
 		return nil, fmt.Errorf("write decrypted kubeconfig: %w", err)
 	}
 	m.tempFile = tempPath
 
 	// Set KUBECONFIG environment variable
-	os.Setenv("KUBECONFIG", tempPath)
+	_ = os.Setenv("KUBECONFIG", tempPath)
 
 	// Return cleanup function
 	cleanup = func() {
@@ -129,15 +132,15 @@ func (m *Manager) Setup(env string) (cleanup func(), err error) {
 
 		// Remove the temp file
 		if m.tempFile != "" {
-			os.Remove(m.tempFile)
+			_ = os.Remove(m.tempFile)
 			m.tempFile = ""
 		}
 
 		// Restore original KUBECONFIG
 		if m.originalEnv != "" {
-			os.Setenv("KUBECONFIG", m.originalEnv)
+			_ = os.Setenv("KUBECONFIG", m.originalEnv)
 		} else {
-			os.Unsetenv("KUBECONFIG")
+			_ = os.Unsetenv("KUBECONFIG")
 		}
 		m.activeEnv = ""
 	}
@@ -147,30 +150,30 @@ func (m *Manager) Setup(env string) (cleanup func(), err error) {
 
 // SetupPersistent sets up the kubeconfig without automatic cleanup
 // The decrypted file will persist until explicitly cleaned up
-func (m *Manager) SetupPersistent(env string) error {
+func (m *Manager) SetupPersistent(ctx context.Context, env string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// Decrypt the kubeconfig
-	content, err := m.Decrypt(env)
+	content, err := m.Decrypt(ctx, env)
 	if err != nil {
 		return err
 	}
 
 	// Create the cache directory if it doesn't exist
 	kubeconfigCacheDir := filepath.Join(m.cacheDir, "kubeconfig")
-	if err := os.MkdirAll(kubeconfigCacheDir, 0700); err != nil {
+	if err := os.MkdirAll(kubeconfigCacheDir, 0o700); err != nil {
 		return fmt.Errorf("create kubeconfig cache dir: %w", err)
 	}
 
 	// Write to file with restricted permissions
 	decPath := m.GetDecryptedPath(env)
-	if err := os.WriteFile(decPath, content, 0600); err != nil {
+	if err := os.WriteFile(decPath, content, 0o600); err != nil {
 		return fmt.Errorf("write decrypted kubeconfig: %w", err)
 	}
 
 	// Set KUBECONFIG environment variable
-	os.Setenv("KUBECONFIG", decPath)
+	_ = os.Setenv("KUBECONFIG", decPath)
 	m.activeEnv = env
 	m.tempFile = decPath
 
@@ -190,14 +193,14 @@ func (m *Manager) Cleanup() {
 	defer m.mu.Unlock()
 
 	if m.tempFile != "" {
-		os.Remove(m.tempFile)
+		_ = os.Remove(m.tempFile)
 		m.tempFile = ""
 	}
 
 	if m.originalEnv != "" {
-		os.Setenv("KUBECONFIG", m.originalEnv)
+		_ = os.Setenv("KUBECONFIG", m.originalEnv)
 	} else {
-		os.Unsetenv("KUBECONFIG")
+		_ = os.Unsetenv("KUBECONFIG")
 	}
 	m.activeEnv = ""
 }
@@ -211,12 +214,12 @@ func (m *Manager) CleanupAll() error {
 
 	entries, err := os.ReadDir(kubeconfigCacheDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("read kubeconfig cache dir: %w", err)
 	}
 
 	for _, entry := range entries {
 		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".yaml" {
-			os.Remove(filepath.Join(kubeconfigCacheDir, entry.Name()))
+			_ = os.Remove(filepath.Join(kubeconfigCacheDir, entry.Name()))
 		}
 	}
 
@@ -232,7 +235,7 @@ func (m *Manager) ListEnvironments() ([]string, error) {
 
 	entries, err := os.ReadDir(kubeconfigDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read kubeconfig dir: %w", err)
 	}
 
 	var envs []string
@@ -252,8 +255,8 @@ func (m *Manager) ListEnvironments() ([]string, error) {
 
 // WithKubeconfig executes a function with the kubeconfig for the given environment
 // The kubeconfig is automatically set up and cleaned up
-func (m *Manager) WithKubeconfig(env string, fn func() error) error {
-	cleanup, err := m.Setup(env)
+func (m *Manager) WithKubeconfig(ctx context.Context, env string, fn func() error) error {
+	cleanup, err := m.Setup(ctx, env)
 	if err != nil {
 		return err
 	}
@@ -264,7 +267,7 @@ func (m *Manager) WithKubeconfig(env string, fn func() error) error {
 
 // GetKubeconfigEnv returns the KUBECONFIG path for the given environment
 // without modifying the current environment
-func (m *Manager) GetKubeconfigEnv(env string) (string, error) {
+func (m *Manager) GetKubeconfigEnv(ctx context.Context, env string) (string, error) {
 	// Check if already decrypted
 	decPath := m.GetDecryptedPath(env)
 	if _, err := os.Stat(decPath); err == nil {
@@ -272,19 +275,19 @@ func (m *Manager) GetKubeconfigEnv(env string) (string, error) {
 	}
 
 	// Need to decrypt first
-	content, err := m.Decrypt(env)
+	content, err := m.Decrypt(ctx, env)
 	if err != nil {
 		return "", err
 	}
 
 	// Create the cache directory if it doesn't exist
 	kubeconfigCacheDir := filepath.Join(m.cacheDir, "kubeconfig")
-	if err := os.MkdirAll(kubeconfigCacheDir, 0700); err != nil {
+	if err := os.MkdirAll(kubeconfigCacheDir, 0o700); err != nil {
 		return "", fmt.Errorf("create kubeconfig cache dir: %w", err)
 	}
 
 	// Write to file
-	if err := os.WriteFile(decPath, content, 0600); err != nil {
+	if err := os.WriteFile(decPath, content, 0o600); err != nil {
 		return "", fmt.Errorf("write decrypted kubeconfig: %w", err)
 	}
 

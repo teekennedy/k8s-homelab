@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
+	"dagger/homelab/internal/dagger"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -57,10 +56,7 @@ func (m *Homelab) TerraformModules(
 	tfDir := source.Directory("terraform")
 	var modules []*TerraformModule
 	for _, modPath := range discoverTerraformModulePaths(ctx, source) {
-		name := modPath
-		if strings.HasPrefix(name, "terraform/") {
-			name = strings.TrimPrefix(name, "terraform/")
-		}
+		name, _ := strings.CutPrefix(modPath, "terraform/")
 		modules = append(modules, &TerraformModule{
 			Path:   modPath,
 			Name:   name,
@@ -111,10 +107,7 @@ func (m *Homelab) ValidateTerraform(ctx context.Context,
 
 	g := new(errgroup.Group)
 	for _, modPath := range modulePaths {
-		name := modPath
-		if strings.HasPrefix(name, "terraform/") {
-			name = strings.TrimPrefix(name, "terraform/")
-		}
+		name, _ := strings.CutPrefix(modPath, "terraform/")
 		tm := &TerraformModule{
 			Path:   modPath,
 			Name:   name,
@@ -127,7 +120,7 @@ func (m *Homelab) ValidateTerraform(ctx context.Context,
 	}
 
 	if err := g.Wait(); err != nil {
-		return "", err
+		return "", fmt.Errorf("terraform validation failed: %w", err)
 	}
 
 	return "Terraform validation passed", nil

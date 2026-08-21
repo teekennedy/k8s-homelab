@@ -2,6 +2,7 @@
 package env
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -106,7 +107,7 @@ func (m *Manager) saveState(env *Environment) error {
 	statePath := m.getStatePath(env.Name)
 	stateDir := filepath.Dir(statePath)
 
-	if err := os.MkdirAll(stateDir, 0700); err != nil {
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
 		return fmt.Errorf("create state directory: %w", err)
 	}
 
@@ -115,7 +116,7 @@ func (m *Manager) saveState(env *Environment) error {
 		return fmt.Errorf("marshal state: %w", err)
 	}
 
-	if err := os.WriteFile(statePath, data, 0600); err != nil {
+	if err := os.WriteFile(statePath, data, 0o600); err != nil {
 		return fmt.Errorf("write state: %w", err)
 	}
 
@@ -125,7 +126,7 @@ func (m *Manager) saveState(env *Environment) error {
 // loadState loads environment state from disk
 func (m *Manager) loadState(name string) (*Environment, error) {
 	statePath := m.getStatePath(name)
-	data, err := os.ReadFile(statePath)
+	data, err := os.ReadFile(statePath) //nolint:gosec // statePath is derived from the XDG cache dir + env name, not user-supplied paths
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("environment %q not found", name)
@@ -142,7 +143,7 @@ func (m *Manager) loadState(name string) (*Environment, error) {
 }
 
 // Create creates a new Kind-based environment
-func (m *Manager) Create(name, fromEnv string, workers int) (*Environment, error) {
+func (m *Manager) Create(ctx context.Context, name, fromEnv string, workers int) (*Environment, error) {
 	// Check if environment already exists
 	if _, err := m.loadState(name); err == nil {
 		return nil, fmt.Errorf("environment %q already exists", name)
@@ -176,14 +177,14 @@ func (m *Manager) Create(name, fromEnv string, workers int) (*Environment, error
 	// Generate Kind configuration
 	kindConfig := m.generateKindConfig(env)
 	kindConfigPath := m.getKindConfigPath(name)
-	if err := os.WriteFile(kindConfigPath, []byte(kindConfig), 0600); err != nil {
+	if err := os.WriteFile(kindConfigPath, []byte(kindConfig), 0o600); err != nil {
 		env.Status = StatusError
-		m.saveState(env)
+		_ = m.saveState(env)
 		return nil, fmt.Errorf("write kind config: %w", err)
 	}
 
 	// Create the Kind cluster
-	cmd := exec.Command("kind", "create", "cluster",
+	cmd := exec.CommandContext(ctx, "kind", "create", "cluster",
 		"--name", env.Config.KindClusterName,
 		"--config", kindConfigPath,
 		"--kubeconfig", env.Config.Kubeconfig,
@@ -193,7 +194,7 @@ func (m *Manager) Create(name, fromEnv string, workers int) (*Environment, error
 
 	if err := cmd.Run(); err != nil {
 		env.Status = StatusError
-		m.saveState(env)
+		_ = m.saveState(env)
 		return nil, fmt.Errorf("create kind cluster: %w", err)
 	}
 
@@ -245,7 +246,7 @@ nodes:
 }
 
 // Start starts a stopped environment
-func (m *Manager) Start(name string) error {
+func (m *Manager) Start(ctx context.Context, name string) error {
 	env, err := m.loadState(name)
 	if err != nil {
 		return err
@@ -257,7 +258,7 @@ func (m *Manager) Start(name string) error {
 
 	// Check if Kind cluster exists but is stopped
 	// Kind doesn't really support pause/resume, so we check if cluster exists
-	cmd := exec.Command("kind", "get", "clusters")
+	cmd := exec.CommandContext(ctx, "kind", "get", "clusters")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("get kind clusters: %w", err)
@@ -275,7 +276,7 @@ func (m *Manager) Start(name string) error {
 	if !found {
 		// Cluster doesn't exist, need to recreate
 		kindConfigPath := m.getKindConfigPath(name)
-		cmd := exec.Command("kind", "create", "cluster",
+		cmd := exec.CommandContext(ctx, "kind", "create", "cluster",
 			"--name", env.Config.KindClusterName,
 			"--config", kindConfigPath,
 			"--kubeconfig", env.Config.Kubeconfig,
@@ -294,7 +295,7 @@ func (m *Manager) Start(name string) error {
 }
 
 // Stop stops a running environment
-func (m *Manager) Stop(name string, preserveState bool) error {
+func (m *Manager) Stop(ctx context.Context, name string, preserveState bool) error {
 	env, err := m.loadState(name)
 	if err != nil {
 		return err
@@ -306,7 +307,7 @@ func (m *Manager) Stop(name string, preserveState bool) error {
 
 	if !preserveState {
 		// Delete the Kind cluster but keep state
-		cmd := exec.Command("kind", "delete", "cluster",
+		cmd := exec.CommandContext(ctx, "kind", "delete", "cluster",
 			"--name", env.Config.KindClusterName,
 		)
 		cmd.Stdout = os.Stdout
@@ -323,20 +324,20 @@ func (m *Manager) Stop(name string, preserveState bool) error {
 }
 
 // Delete permanently deletes an environment
-func (m *Manager) Delete(name string) error {
+func (m *Manager) Delete(ctx context.Context, name string) error {
 	env, err := m.loadState(name)
 	if err != nil {
 		return err
 	}
 
 	// Delete the Kind cluster if it exists
-	cmd := exec.Command("kind", "delete", "cluster",
+	cmd := exec.CommandContext(ctx, "kind", "delete", "cluster",
 		"--name", env.Config.KindClusterName,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	// Ignore errors - cluster might not exist
-	cmd.Run()
+	_ = cmd.Run()
 
 	// Remove state directory
 	stateDir := filepath.Dir(m.getStatePath(name))
@@ -348,7 +349,7 @@ func (m *Manager) Delete(name string) error {
 }
 
 // List returns all managed environments
-func (m *Manager) List() ([]*Environment, error) {
+func (m *Manager) List(ctx context.Context) ([]*Environment, error) {
 	// Always include production as a "virtual" environment
 	envs := []*Environment{
 		{
@@ -380,7 +381,7 @@ func (m *Manager) List() ([]*Environment, error) {
 
 		// Update status by checking if Kind cluster is actually running
 		if env.Type == TypeKind {
-			env.Status = m.getKindClusterStatus(env.Config.KindClusterName)
+			env.Status = m.getKindClusterStatus(ctx, env.Config.KindClusterName)
 		}
 
 		envs = append(envs, env)
@@ -390,8 +391,8 @@ func (m *Manager) List() ([]*Environment, error) {
 }
 
 // getKindClusterStatus checks if a Kind cluster is running
-func (m *Manager) getKindClusterStatus(clusterName string) EnvironmentStatus {
-	cmd := exec.Command("kind", "get", "clusters")
+func (m *Manager) getKindClusterStatus(ctx context.Context, clusterName string) EnvironmentStatus {
+	cmd := exec.CommandContext(ctx, "kind", "get", "clusters")
 	output, err := cmd.Output()
 	if err != nil {
 		return StatusError
@@ -408,7 +409,7 @@ func (m *Manager) getKindClusterStatus(clusterName string) EnvironmentStatus {
 }
 
 // Get returns a specific environment
-func (m *Manager) Get(name string) (*Environment, error) {
+func (m *Manager) Get(ctx context.Context, name string) (*Environment, error) {
 	if name == "production" {
 		return &Environment{
 			Name:   "production",
@@ -424,7 +425,7 @@ func (m *Manager) Get(name string) (*Environment, error) {
 
 	// Update status
 	if env.Type == TypeKind {
-		env.Status = m.getKindClusterStatus(env.Config.KindClusterName)
+		env.Status = m.getKindClusterStatus(ctx, env.Config.KindClusterName)
 	}
 
 	return env, nil

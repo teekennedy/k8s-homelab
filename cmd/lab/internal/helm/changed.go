@@ -1,6 +1,8 @@
 package helm
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,25 +11,40 @@ import (
 
 // ChangedChartPaths returns chart paths that have changes relative to the given git ref.
 // If gitRef is empty, defaults to HEAD.
-func ChangedChartPaths(gitRef string) ([]string, error) {
+func ChangedChartPaths(ctx context.Context, gitRef string) ([]string, error) {
 	if gitRef == "" {
 		gitRef = "HEAD"
 	}
 
-	cmd := exec.Command("git", "diff", "--name-only", gitRef)
+	cmd := exec.CommandContext(ctx, "git", "diff", "--name-only", gitRef)
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("git diff: %w", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 
-	for _, line := range lines {
-		if strings.HasPrefix(line, "config/") && strings.HasSuffix(line, ".cue") {
-			return []string{"k8s"}, nil
-		}
+	if hasCueConfigChange(lines) {
+		return []string{"k8s"}, nil
 	}
 
+	return findChangedChartDirs(lines), nil
+}
+
+// hasCueConfigChange reports whether any changed line is a CUE config file,
+// which can affect every chart's generated values.
+func hasCueConfigChange(lines []string) bool {
+	for _, line := range lines {
+		if strings.HasPrefix(line, "config/") && strings.HasSuffix(line, ".cue") {
+			return true
+		}
+	}
+	return false
+}
+
+// findChangedChartDirs returns the chart directories (nearest ancestor containing a
+// Chart.yaml, excluding vendored charts/ subdirectories) for each changed k8s/ line.
+func findChangedChartDirs(lines []string) []string {
 	chartDirs := map[string]bool{}
 	for _, line := range lines {
 		if line == "" || !strings.HasPrefix(line, "k8s/") {
@@ -51,7 +68,7 @@ func ChangedChartPaths(gitRef string) ([]string, error) {
 	for dir := range chartDirs {
 		result = append(result, dir)
 	}
-	return result, nil
+	return result
 }
 
 func isInsideChartsDir(path string) bool {

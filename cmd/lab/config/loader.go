@@ -171,12 +171,12 @@ func exportYAML(env *Environment) (string, error) {
 	// Simple YAML export - for production, use gopkg.in/yaml.v3
 	jsonBytes, err := json.Marshal(env)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("marshal environment: %w", err)
 	}
 
 	var data map[string]interface{}
 	if err := json.Unmarshal(jsonBytes, &data); err != nil {
-		return "", err
+		return "", fmt.Errorf("unmarshal environment: %w", err)
 	}
 
 	return toYAML(data, 0), nil

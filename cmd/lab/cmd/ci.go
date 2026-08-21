@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -48,7 +49,7 @@ Examples:
 
 				daggerArgs := []string{"call", args[0], "--source=."}
 
-				paths, err := changedFiles()
+				paths, err := changedFiles(cmd.Context())
 				if err != nil {
 					return fmt.Errorf("detect changes: %w", err)
 				}
@@ -63,7 +64,7 @@ Examples:
 					fmt.Printf("Changed files: %s\n", strings.Join(paths, ", "))
 				}
 
-				return runDagger(daggerArgs...)
+				return runDagger(cmd.Context(), daggerArgs...)
 			}
 
 			// Lint checks return changesets with formatting fixes.
@@ -76,7 +77,7 @@ Examples:
 				daggerArgs = append(daggerArgs, args[0]+"*")
 			}
 
-			return runDagger(daggerArgs...)
+			return runDagger(cmd.Context(), daggerArgs...)
 		},
 	}
 
@@ -87,10 +88,10 @@ Examples:
 }
 
 // changedFiles returns file paths changed in the working tree relative to HEAD.
-func changedFiles() ([]string, error) {
-	out, err := exec.Command("git", "diff", "--name-only", "HEAD").Output()
+func changedFiles(ctx context.Context) ([]string, error) {
+	out, err := exec.CommandContext(ctx, "git", "diff", "--name-only", "HEAD").Output()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting changed files: %w", err)
 	}
 	text := strings.TrimSpace(string(out))
 	if text == "" {
@@ -99,8 +100,8 @@ func changedFiles() ([]string, error) {
 	return strings.Split(text, "\n"), nil
 }
 
-func runDagger(args ...string) error {
-	cmd := exec.Command("dagger", args...)
+func runDagger(ctx context.Context, args ...string) error {
+	cmd := exec.CommandContext(ctx, "dagger", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -109,5 +110,8 @@ func runDagger(args ...string) error {
 		fmt.Printf("Running: dagger %v\n", args)
 	}
 
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("running dagger %v: %w", args, err)
+	}
+	return nil
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -36,9 +37,9 @@ activates it immediately and also sets it as the boot default. Add
 			target := resolveHostTarget(hostname)
 
 			if !switchSet || list {
-				return runGenerationsList(hostname, target)
+				return runGenerationsList(cmd.Context(), hostname, target)
 			}
-			return runGenerationsSwitch(hostname, target, switchGen, boot)
+			return runGenerationsSwitch(cmd.Context(), hostname, target, switchGen, boot)
 		},
 	}
 
@@ -69,9 +70,9 @@ type generation struct {
 	Current bool   `json:"current"`
 }
 
-func runGenerationsList(hostname, target string) error {
+func runGenerationsList(ctx context.Context, hostname, target string) error {
 	// This needs to run as root so nix can create a lockfile for the system profile
-	sshCmd := exec.Command("ssh", target,
+	sshCmd := exec.CommandContext(ctx, "ssh", target,
 		"sudo", "nix-env", "--list-generations", "--profile", "/nix/var/nix/profiles/system")
 	sshCmd.Stderr = os.Stderr
 
@@ -92,7 +93,10 @@ func runGenerationsList(hostname, target string) error {
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	return enc.Encode(gens)
+	if err := enc.Encode(gens); err != nil {
+		return fmt.Errorf("encoding generations: %w", err)
+	}
+	return nil
 }
 
 func parseGenerations(out []byte) ([]generation, error) {
@@ -112,15 +116,37 @@ func parseGenerations(out []byte) ([]generation, error) {
 		current := len(fields) > 3 && strings.Contains(fields[3], "current")
 		gens = append(gens, generation{Number: num, Date: date, Current: current})
 	}
-	return gens, scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanning generations output: %w", err)
+	}
+	return gens, nil
 }
 
-func runGenerationsSwitch(hostname, target string, genNum int, bootOnly bool) error {
+func runGenerationsSwitch(ctx context.Context, hostname, target string, genNum int, bootOnly bool) error {
+	if err := switchHostGeneration(ctx, hostname, target, genNum); err != nil {
+		return err
+	}
+
+	if !bootOnly {
+		if err := activateHostGeneration(ctx, hostname, target, genNum); err != nil {
+			return err
+		}
+	}
+
+	if err := setHostBootGeneration(ctx, hostname, target, genNum); err != nil {
+		return err
+	}
+
+	return printGenerationSwitchResult(hostname, genNum, bootOnly)
+}
+
+// switchHostGeneration switches the active nix-env generation on target to genNum.
+func switchHostGeneration(ctx context.Context, hostname, target string, genNum int) error {
 	if !jsonOutput {
 		fmt.Printf("Switching %s to generation %d...\n", hostname, genNum)
 	}
 
-	switchCmd := exec.Command("ssh", target,
+	switchCmd := exec.CommandContext(ctx, "ssh", target,
 		"sudo", "nix-env", "--switch-generation", strconv.Itoa(genNum),
 		"--profile", "/nix/var/nix/profiles/system")
 	switchCmd.Stdout = os.Stdout
@@ -128,31 +154,42 @@ func runGenerationsSwitch(hostname, target string, genNum int, bootOnly bool) er
 	if err := switchCmd.Run(); err != nil {
 		return fmt.Errorf("switch generation on %s: %w", hostname, err)
 	}
+	return nil
+}
 
-	if !bootOnly {
-		if !jsonOutput {
-			fmt.Printf("Activating generation %d on %s...\n", genNum, hostname)
-		}
-		activateCmd := exec.Command("ssh", target,
-			"sudo", "/nix/var/nix/profiles/system/bin/switch-to-configuration", "switch")
-		activateCmd.Stdout = os.Stdout
-		activateCmd.Stderr = os.Stderr
-		if err := activateCmd.Run(); err != nil {
-			return fmt.Errorf("activate generation on %s: %w", hostname, err)
-		}
+// activateHostGeneration activates the switched-to generation on target immediately.
+func activateHostGeneration(ctx context.Context, hostname, target string, genNum int) error {
+	if !jsonOutput {
+		fmt.Printf("Activating generation %d on %s...\n", genNum, hostname)
 	}
+	activateCmd := exec.CommandContext(ctx, "ssh", target,
+		"sudo", "/nix/var/nix/profiles/system/bin/switch-to-configuration", "switch")
+	activateCmd.Stdout = os.Stdout
+	activateCmd.Stderr = os.Stderr
+	if err := activateCmd.Run(); err != nil {
+		return fmt.Errorf("activate generation on %s: %w", hostname, err)
+	}
+	return nil
+}
 
+// setHostBootGeneration sets the switched-to generation as the boot default on target.
+func setHostBootGeneration(ctx context.Context, hostname, target string, genNum int) error {
 	if !jsonOutput {
 		fmt.Printf("Setting generation %d as boot default on %s...\n", genNum, hostname)
 	}
-	bootCmd := exec.Command("ssh", target,
+	bootCmd := exec.CommandContext(ctx, "ssh", target,
 		"sudo", "/nix/var/nix/profiles/system/bin/switch-to-configuration", "boot")
 	bootCmd.Stdout = os.Stdout
 	bootCmd.Stderr = os.Stderr
 	if err := bootCmd.Run(); err != nil {
 		return fmt.Errorf("set boot generation on %s: %w", hostname, err)
 	}
+	return nil
+}
 
+// printGenerationSwitchResult prints the outcome of a generation switch in the
+// appropriate output format.
+func printGenerationSwitchResult(hostname string, genNum int, bootOnly bool) error {
 	if jsonOutput {
 		result := map[string]any{
 			"host":       hostname,
@@ -162,7 +199,10 @@ func runGenerationsSwitch(hostname, target string, genNum int, bootOnly bool) er
 		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		return enc.Encode(result)
+		if err := enc.Encode(result); err != nil {
+			return fmt.Errorf("encoding result: %w", err)
+		}
+		return nil
 	}
 
 	if bootOnly {

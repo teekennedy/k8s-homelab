@@ -44,7 +44,10 @@ It provides commands for:
 }
 
 func Execute() error {
-	return newRootCmd().Execute()
+	if err := newRootCmd().Execute(); err != nil {
+		return fmt.Errorf("executing command: %w", err)
+	}
+	return nil
 }
 
 func getConfigDir() string {
@@ -62,5 +65,8 @@ func getConfigDir() string {
 func printJSON(v any) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	return enc.Encode(v)
+	if err := enc.Encode(v); err != nil {
+		return fmt.Errorf("encoding JSON: %w", err)
+	}
+	return nil
 }

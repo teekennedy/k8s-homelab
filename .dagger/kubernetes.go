@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
+	"dagger/homelab/internal/dagger"
 	"fmt"
 	"strings"
-
-	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -20,15 +19,8 @@ func (hc *HelmChart) Polaris(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
 	}
 
-	manifest, err := hc.renderedManifest(ctx)
-	if err != nil {
-		return "", fmt.Errorf("helm template failed for %s: %w", hc.Path, err)
-	}
-
-	container, err := hc.polarisContainer(ctx, manifest)
-	if err != nil {
-		return "", err
-	}
+	manifest := hc.renderedManifest(ctx)
+	container := hc.polarisContainer(ctx, manifest)
 
 	args := []string{
 		"polaris", "audit",
@@ -53,7 +45,7 @@ func (hc *HelmChart) Polaris(ctx context.Context) (string, error) {
 // missingNetworkPolicy and linuxHardening, which crash polaris 10.x with a nil pointer
 // when pod templates have no labels/annotations (polaris bug in their Go template renderer).
 // Per-chart exemptions from polaris.yaml are appended when present.
-func (hc *HelmChart) polarisContainer(ctx context.Context, manifest *dagger.File) (*dagger.Container, error) {
+func (hc *HelmChart) polarisContainer(ctx context.Context, manifest *dagger.File) *dagger.Container {
 	cfg := "checks:\n  missingNetworkPolicy: ignore\n  linuxHardening: ignore\n"
 
 	if chartCfg, err := hc.Source.File("polaris.yaml").Contents(ctx); err == nil && chartCfg != "" {
@@ -63,7 +55,7 @@ func (hc *HelmChart) polarisContainer(ctx context.Context, manifest *dagger.File
 	return dag.Container().
 		From(polarisImage).
 		WithFile("/rendered.yaml", manifest).
-		WithNewFile("/polaris.yaml", cfg), nil
+		WithNewFile("/polaris.yaml", cfg)
 }
 
 // Kubeconform validates this chart's rendered manifests against JSON schemas in strict mode.
@@ -78,27 +70,12 @@ func (hc *HelmChart) Kubeconform(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
 	}
 
-	manifest, err := hc.renderedManifest(ctx)
-	if err != nil {
-		return "", fmt.Errorf("helm template failed for %s: %w", hc.Path, err)
-	}
+	manifest := hc.renderedManifest(ctx)
 
 	// Parse per-chart skip list
 	var skipKinds []string
 	if cfg, err := hc.Source.File("kubeconform.yaml").Contents(ctx); err == nil && cfg != "" {
-		for _, line := range strings.Split(cfg, "\n") {
-			line = strings.TrimSpace(line)
-			if !strings.HasPrefix(line, "- ") {
-				continue
-			}
-			kind := strings.TrimSpace(strings.TrimPrefix(line, "- "))
-			if idx := strings.Index(kind, "#"); idx >= 0 {
-				kind = strings.TrimSpace(kind[:idx])
-			}
-			if kind != "" {
-				skipKinds = append(skipKinds, kind)
-			}
-		}
+		skipKinds = parseKubeconformSkipKinds(cfg)
 	}
 
 	args := []string{
@@ -123,6 +100,29 @@ func (hc *HelmChart) Kubeconform(ctx context.Context) (string, error) {
 	}
 
 	return fmt.Sprintf("Kubeconform passed for %s", hc.Path), nil
+}
+
+// parseKubeconformSkipKinds parses the skipKinds list out of a kubeconform.yaml's
+// contents, e.g.:
+//
+//	skipKinds:
+//	  - SomeKind # stale schema in the catalog
+func parseKubeconformSkipKinds(cfg string) []string {
+	var skipKinds []string
+	for _, line := range strings.Split(cfg, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "- ") {
+			continue
+		}
+		kind := strings.TrimSpace(strings.TrimPrefix(line, "- "))
+		if idx := strings.Index(kind, "#"); idx >= 0 {
+			kind = strings.TrimSpace(kind[:idx])
+		}
+		if kind != "" {
+			skipKinds = append(skipKinds, kind)
+		}
+	}
+	return skipKinds
 }
 
 // kubeconformContainerWithSchemas builds a kubeconform container with the datreeio CRDs-catalog
@@ -183,7 +183,7 @@ func (m *Homelab) ValidatePolaris(ctx context.Context,
 	}
 
 	if err := g.Wait(); err != nil {
-		return "", err
+		return "", fmt.Errorf("polaris validation failed: %w", err)
 	}
 
 	return fmt.Sprintf("Polaris validation passed (%d charts)", len(helmChartPaths)), nil
@@ -223,7 +223,7 @@ func (m *Homelab) ValidateKubeconform(ctx context.Context,
 	}
 
 	if err := g.Wait(); err != nil {
-		return "", err
+		return "", fmt.Errorf("kubeconform validation failed: %w", err)
 	}
 
 	return fmt.Sprintf("Kubeconform validation passed (%d charts)", len(helmChartPaths)), nil

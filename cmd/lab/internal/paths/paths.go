@@ -3,6 +3,7 @@ package paths
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -61,7 +62,7 @@ func ProjectConfigDir() string {
 func RepoRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getting working directory: %w", err)
 	}
 
 	for {
@@ -69,7 +70,7 @@ func RepoRoot() (string, error) {
 		if _, err := os.Stat(gitPath); err == nil {
 			return dir, nil
 		} else if !errors.Is(err, os.ErrNotExist) {
-			return "", err
+			return "", fmt.Errorf("checking for .git: %w", err)
 		}
 
 		parent := filepath.Dir(dir)

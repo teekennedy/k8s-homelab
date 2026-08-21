@@ -53,16 +53,28 @@ type Rollout struct {
 	Annotation string `yaml:"annotation"`
 }
 
-const defaultConfigPath = "/config/config.yaml"
-const defaultRolloutAnnotation = "homepage-secret-sync/restarted-at"
+const (
+	defaultConfigPath        = "/config/config.yaml"
+	defaultRolloutAnnotation = "homepage-secret-sync/restarted-at"
+)
 
 func main() {
+	cfg := loadConfig()
+	client := newClient()
+	ctx := context.Background()
+
+	outputData := collectSecretData(ctx, client, cfg.Mappings)
+
+	syncOutputSecret(ctx, client, cfg, outputData)
+}
+
+func loadConfig() Config {
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
 		configPath = defaultConfigPath
 	}
 
-	data, err := os.ReadFile(configPath)
+	data, err := readConfigFile(configPath)
 	if err != nil {
 		log.Fatalf("read config: %v", err)
 	}
@@ -78,6 +90,20 @@ func main() {
 		log.Fatalf("invalid config: %v", err)
 	}
 
+	return cfg
+}
+
+// readConfigFile reads the config file at path, which is operator-controlled
+// via the CONFIG_PATH env var (container configuration, not external input).
+func readConfigFile(path string) ([]byte, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // operator-controlled config path, not user input
+	if err != nil {
+		return nil, fmt.Errorf("reading config file %s: %w", path, err)
+	}
+	return data, nil
+}
+
+func newClient() *kubernetes.Clientset {
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatalf("create in-cluster config: %v", err)
@@ -87,11 +113,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("create k8s client: %v", err)
 	}
+	return client
+}
 
-	ctx := context.Background()
+func collectSecretData(ctx context.Context, client *kubernetes.Clientset, mappings []Mapping) map[string][]byte {
 	outputData := make(map[string][]byte)
-
-	for _, mapping := range cfg.Mappings {
+	for _, mapping := range mappings {
 		value, ok, err := readSecretKey(ctx, client, mapping)
 		if err != nil {
 			log.Fatalf("read %s from %s/%s: %v", mapping.Source.Key, mapping.Source.Namespace, mapping.Source.Name, err)
@@ -101,7 +128,10 @@ func main() {
 		}
 		outputData[mapping.Env] = value
 	}
+	return outputData
+}
 
+func syncOutputSecret(ctx context.Context, client *kubernetes.Clientset, cfg Config, outputData map[string][]byte) {
 	secretClient := client.CoreV1().Secrets(cfg.OutputSecret.Namespace)
 	existing, err := secretClient.Get(ctx, cfg.OutputSecret.Name, metav1.GetOptions{})
 	if err != nil {
@@ -115,39 +145,55 @@ func main() {
 	if err != nil {
 		log.Fatalf("update secret %s/%s: %v", cfg.OutputSecret.Namespace, cfg.OutputSecret.Name, err)
 	}
-	if updated {
-		log.Printf("updated secret %s/%s", cfg.OutputSecret.Namespace, cfg.OutputSecret.Name)
-		if cfg.Rollout.Enabled {
-			if err := rolloutDeployment(ctx, client, cfg.Rollout); err != nil {
-				log.Fatalf("rollout deployment %s/%s: %v", cfg.Rollout.Namespace, cfg.Rollout.Deployment, err)
-			}
-			log.Printf("rolled out deployment %s/%s", cfg.Rollout.Namespace, cfg.Rollout.Deployment)
-		}
+	if !updated {
+		log.Printf("secret %s/%s is already up to date", cfg.OutputSecret.Namespace, cfg.OutputSecret.Name)
 		return
 	}
-	log.Printf("secret %s/%s is already up to date", cfg.OutputSecret.Namespace, cfg.OutputSecret.Name)
+
+	log.Printf("updated secret %s/%s", cfg.OutputSecret.Namespace, cfg.OutputSecret.Name)
+	if !cfg.Rollout.Enabled {
+		return
+	}
+	if err := rolloutDeployment(ctx, client, cfg.Rollout); err != nil {
+		log.Fatalf("rollout deployment %s/%s: %v", cfg.Rollout.Namespace, cfg.Rollout.Deployment, err)
+	}
+	log.Printf("rolled out deployment %s/%s", cfg.Rollout.Namespace, cfg.Rollout.Deployment)
 }
 
 func validateConfig(cfg Config) error {
-	if cfg.OutputSecret.Name == "" {
+	if err := validateOutputSecret(cfg.OutputSecret); err != nil {
+		return err
+	}
+	if err := validateMappings(cfg.Mappings); err != nil {
+		return err
+	}
+	if cfg.Rollout.Enabled && cfg.Rollout.Deployment == "" {
+		return errors.New("rollout.deployment is required when rollout is enabled")
+	}
+	return nil
+}
+
+func validateOutputSecret(output OutputSecret) error {
+	if output.Name == "" {
 		return errors.New("output-secret.name is required")
 	}
-	if cfg.OutputSecret.Namespace == "" {
+	if output.Namespace == "" {
 		return errors.New("output-secret.namespace is required")
 	}
-	if len(cfg.Mappings) == 0 {
+	return nil
+}
+
+func validateMappings(mappings []Mapping) error {
+	if len(mappings) == 0 {
 		return errors.New("at least one mapping is required")
 	}
-	for i, mapping := range cfg.Mappings {
+	for i, mapping := range mappings {
 		if mapping.Env == "" {
 			return fmt.Errorf("mappings[%d].env is required", i)
 		}
 		if mapping.Source.Namespace == "" || mapping.Source.Name == "" || mapping.Source.Key == "" {
 			return fmt.Errorf("mappings[%d].source requires namespace, name, and key", i)
 		}
-	}
-	if cfg.Rollout.Enabled && cfg.Rollout.Deployment == "" {
-		return errors.New("rollout.deployment is required when rollout is enabled")
 	}
 	return nil
 }
@@ -171,7 +217,7 @@ func readSecretKey(ctx context.Context, client *kubernetes.Clientset, mapping Ma
 			log.Printf("optional secret %s/%s not found", mapping.Source.Namespace, mapping.Source.Name)
 			return nil, false, nil
 		}
-		return nil, false, err
+		return nil, false, fmt.Errorf("get secret %s/%s: %w", mapping.Source.Namespace, mapping.Source.Name, err)
 	}
 
 	value, ok := secret.Data[mapping.Source.Key]
@@ -207,7 +253,10 @@ func updateSecret(ctx context.Context, secretClient corev1client.SecretInterface
 	}
 
 	_, err := secretClient.Update(ctx, updated, metav1.UpdateOptions{})
-	return true, err
+	if err != nil {
+		return true, fmt.Errorf("update secret %s/%s: %w", updated.Namespace, updated.Name, err)
+	}
+	return true, nil
 }
 
 func rolloutDeployment(ctx context.Context, client *kubernetes.Clientset, cfg Rollout) error {
@@ -230,5 +279,8 @@ func rolloutDeployment(ctx context.Context, client *kubernetes.Clientset, cfg Ro
 	}
 
 	_, err = client.AppsV1().Deployments(cfg.Namespace).Patch(ctx, cfg.Deployment, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	return err
+	if err != nil {
+		return fmt.Errorf("patch deployment %s/%s: %w", cfg.Namespace, cfg.Deployment, err)
+	}
+	return nil
 }

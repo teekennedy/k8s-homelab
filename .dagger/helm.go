@@ -2,14 +2,12 @@ package main
 
 import (
 	"context"
-	_ "embed"
+	"dagger/homelab/internal/dagger"
 	"fmt"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -26,15 +24,6 @@ func discoverHelmChartPaths(ctx context.Context, source *dagger.Directory) []str
 	sort.Strings(paths)
 	return paths
 }
-
-//go:embed scripts/helm-deps.sh
-var helmDepsScript string
-
-//go:embed scripts/helm-template.sh
-var helmTemplateScript string
-
-//go:embed scripts/helm-lint.sh
-var helmLintScript string
 
 // HelmChart is a Helm chart with a scoped source directory.
 // Each HelmChart carries only the files for its chart, enabling
@@ -128,10 +117,7 @@ func (hc *HelmChart) Build(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
 	}
 
-	manifest, err := hc.renderedManifest(ctx)
-	if err != nil {
-		return "", fmt.Errorf("helm template failed for %s: %w", hc.Path, err)
-	}
+	manifest := hc.renderedManifest(ctx)
 
 	if _, err := manifest.Sync(ctx); err != nil {
 		return "", fmt.Errorf("helm template failed for %s: %w", hc.Path, err)
@@ -164,7 +150,7 @@ func parseApplicationYaml(content, defaultName string) (releaseName, namespace s
 // renderedManifest runs helm template and returns the rendered YAML as a file.
 // The manifest is written to /rendered.yaml inside the container, then extracted.
 // Build, Polaris, and Kubeconform all call this so the render is cached once per chart.
-func (hc *HelmChart) renderedManifest(ctx context.Context) (*dagger.File, error) {
+func (hc *HelmChart) renderedManifest(ctx context.Context) *dagger.File {
 	prepared := hc.sourceWithDeps()
 	defaultName := filepath.Base(hc.Path)
 	releaseName, namespace := defaultName, defaultName
@@ -183,7 +169,7 @@ func (hc *HelmChart) renderedManifest(ctx context.Context) (*dagger.File, error)
 
 	// Redirect helm template stdout to a file so validators can consume it
 	cmd := strings.Join(args, " ") + " > /rendered.yaml"
-	return container.WithExec([]string{"sh", "-c", cmd}).File("/rendered.yaml"), nil
+	return container.WithExec([]string{"sh", "-c", cmd}).File("/rendered.yaml")
 }
 
 // container returns a helm container with the chart mounted and shared caches.
@@ -258,7 +244,7 @@ func (m *Homelab) ValidateHelm(ctx context.Context,
 	}
 
 	if err := g.Wait(); err != nil {
-		return "", err
+		return "", fmt.Errorf("helm validation failed: %w", err)
 	}
 
 	return "Helm validation passed", nil
@@ -301,33 +287,10 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 	}
 
 	if err := g.Wait(); err != nil {
-		return "", err
+		return "", fmt.Errorf("helm template rendering failed: %w", err)
 	}
 
 	return "Helm template rendering passed", nil
-}
-
-// helmContainer returns a helm container with shared cache volumes mounted.
-// Used by top-level functions that operate on the full source tree.
-func (m *Homelab) helmContainer(source *dagger.Directory) *dagger.Container {
-	return dag.Container().
-		From(helmImage).
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src").
-		WithMountedCache("/root/.cache/helm/repository", dag.CacheVolume("helm-repo-cache")).
-		WithMountedCache("/root/.cache/helm/content", dag.CacheVolume("helm-content-cache")).
-		WithMountedCache("/root/.config/helm/registry", dag.CacheVolume("helm-registry-cache"))
-}
-
-// helmSourceWithDeps registers helm repos and builds chart dependencies,
-// returning the source directory with dependency tarballs populated in charts/ dirs.
-// Used by top-level aggregate functions and tests.
-func (m *Homelab) helmSourceWithDeps(source *dagger.Directory, searchPaths string) *dagger.Directory {
-	return m.helmContainer(source).
-		WithNewFile("/deps.sh", helmDepsScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
-		WithEnvVariable("SEARCH_PATHS", searchPaths).
-		WithExec([]string{"/deps.sh"}).
-		Directory("/src")
 }
 
 // matchChartPaths returns chart paths that contain any of the given file paths.

@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -62,7 +63,7 @@ func TestSaveAndLoadState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mgr := NewManager(WithStateDir(tmpDir), WithConfigDir(tmpDir))
 
@@ -112,7 +113,7 @@ func TestLoadStateNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mgr := NewManager(WithStateDir(tmpDir), WithConfigDir(tmpDir))
 
@@ -135,7 +136,7 @@ func TestExistsNonexistent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mgr := NewManager(WithStateDir(tmpDir), WithConfigDir(tmpDir))
 
@@ -147,7 +148,7 @@ func TestExistsNonexistent(t *testing.T) {
 func TestGetProduction(t *testing.T) {
 	mgr := NewManager(WithStateDir("/state"), WithConfigDir("/config"))
 
-	env, err := mgr.Get("production")
+	env, err := mgr.Get(context.Background(), "production")
 	if err != nil {
 		t.Fatalf("get production failed: %v", err)
 	}
@@ -213,11 +214,11 @@ func TestListIncludesProduction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mgr := NewManager(WithStateDir(tmpDir), WithConfigDir(tmpDir))
 
-	envs, err := mgr.List()
+	envs, err := mgr.List(context.Background())
 	if err != nil {
 		t.Fatalf("list failed: %v", err)
 	}
@@ -240,7 +241,7 @@ func TestListWithSavedEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mgr := NewManager(WithStateDir(tmpDir), WithConfigDir(tmpDir))
 
@@ -257,7 +258,7 @@ func TestListWithSavedEnvironment(t *testing.T) {
 		t.Fatalf("save state failed: %v", err)
 	}
 
-	envs, err := mgr.List()
+	envs, err := mgr.List(context.Background())
 	if err != nil {
 		t.Fatalf("list failed: %v", err)
 	}
@@ -284,11 +285,11 @@ func TestCreateReservedName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mgr := NewManager(WithStateDir(tmpDir), WithConfigDir(tmpDir))
 
-	_, err = mgr.Create("production", "", 0)
+	_, err = mgr.Create(context.Background(), "production", "", 0)
 	if err == nil {
 		t.Error("expected error when creating production environment")
 	}
@@ -299,7 +300,7 @@ func TestDeleteState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mgr := NewManager(WithStateDir(tmpDir), WithConfigDir(tmpDir))
 
@@ -322,7 +323,7 @@ func TestDeleteState(t *testing.T) {
 	}
 
 	// Delete it
-	if err := mgr.Delete("test"); err != nil {
+	if err := mgr.Delete(context.Background(), "test"); err != nil {
 		t.Fatalf("delete failed: %v", err)
 	}
 

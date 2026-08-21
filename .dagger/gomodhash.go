@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
+	"dagger/homelab/internal/dagger"
 	_ "embed"
 	"fmt"
-
-	"dagger/homelab/internal/dagger"
 )
 
 //go:embed scripts/go-vendor-hash.sh

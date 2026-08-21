@@ -48,7 +48,8 @@ in {
       cue
       dagger
       deploy-rs
-      go_1_26
+      go
+      golangci-lint
       k9s
       kind
       kubecolor

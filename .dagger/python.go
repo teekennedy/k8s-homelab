@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
+	"dagger/homelab/internal/dagger"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -162,7 +161,7 @@ func (m *Homelab) LintPython(ctx context.Context,
 	}
 
 	if err := g.Wait(); err != nil {
-		return "", err
+		return "", fmt.Errorf("python lint failed: %w", err)
 	}
 
 	return "Python lint passed", nil
@@ -178,22 +177,19 @@ func (m *Homelab) FormatPython(
 	source *dagger.Directory,
 	// +optional
 	paths []string,
-) (*dagger.Changeset, error) {
-	formatted, err := m.pythonFormat(ctx, source, paths)
-	if err != nil {
-		return nil, err
-	}
-	return formatted.Changes(source), nil
+) *dagger.Changeset {
+	formatted := m.pythonFormat(ctx, source, paths)
+	return formatted.Changes(source)
 }
 
 // pythonFormat runs black on all Python projects, returning the formatted directory.
-func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, paths []string) (*dagger.Directory, error) {
+func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, paths []string) *dagger.Directory {
 	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
 	if len(paths) > 0 {
 		pythonProjectPaths = matchProjectPaths(paths, pythonProjectPaths)
 	}
 	if len(pythonProjectPaths) == 0 {
-		return source, nil
+		return source
 	}
 
 	container := dag.Container().
@@ -206,7 +202,7 @@ func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, pa
 			WithExec(blackCmd())
 	}
 
-	return container.Directory("/src"), nil
+	return container.Directory("/src")
 }
 
 // TestPython runs pytest for all discovered Python projects.

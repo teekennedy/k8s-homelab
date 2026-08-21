@@ -15,17 +15,17 @@ func TestDiscoverCharts(t *testing.T) {
 	k8sDir := filepath.Join(tmp, "k8s")
 
 	appDir := filepath.Join(k8sDir, "apps", "myapp")
-	require.NoError(t, os.MkdirAll(appDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(appDir, "Chart.yaml"), []byte("apiVersion: v2\nname: myapp\n"), 0o644))
+	require.NoError(t, os.MkdirAll(appDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(appDir, "Chart.yaml"), []byte("apiVersion: v2\nname: myapp\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(appDir, "application.yaml"), []byte(`
 spec:
   destination:
     namespace: my-namespace
-`), 0o644))
+`), 0o600))
 
 	depDir := filepath.Join(appDir, "charts", "dep")
-	require.NoError(t, os.MkdirAll(depDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(depDir, "Chart.yaml"), []byte("apiVersion: v2\nname: dep\n"), 0o644))
+	require.NoError(t, os.MkdirAll(depDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(depDir, "Chart.yaml"), []byte("apiVersion: v2\nname: dep\n"), 0o600))
 
 	charts, err := DiscoverCharts(k8sDir)
 	require.NoError(t, err)
@@ -42,8 +42,8 @@ func TestDiscoverChartsWithReleaseName(t *testing.T) {
 	k8sDir := filepath.Join(tmp, "k8s")
 
 	appDir := filepath.Join(k8sDir, "foundation", "traefik")
-	require.NoError(t, os.MkdirAll(appDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(appDir, "Chart.yaml"), []byte("apiVersion: v2\nname: traefik\n"), 0o644))
+	require.NoError(t, os.MkdirAll(appDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(appDir, "Chart.yaml"), []byte("apiVersion: v2\nname: traefik\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(appDir, "application.yaml"), []byte(`
 spec:
   destination:
@@ -51,7 +51,7 @@ spec:
   source:
     helm:
       releaseName: traefik
-`), 0o644))
+`), 0o600))
 
 	charts, err := DiscoverCharts(k8sDir)
 	require.NoError(t, err)
@@ -63,7 +63,7 @@ spec:
 
 func TestParseChartInfoNoApplicationYaml(t *testing.T) {
 	tmp := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(tmp, "Chart.yaml"), []byte("apiVersion: v2\nname: standalone\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmp, "Chart.yaml"), []byte("apiVersion: v2\nname: standalone\n"), 0o600))
 
 	info, err := ParseChartInfo(tmp)
 	require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestParseChartInfoNoApplicationYaml(t *testing.T) {
 
 func TestNeedsDependencyBuild_NoDeps(t *testing.T) {
 	tmp := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(tmp, "Chart.yaml"), []byte("apiVersion: v2\nname: nodeps\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmp, "Chart.yaml"), []byte("apiVersion: v2\nname: nodeps\n"), 0o600))
 
 	needs, err := NeedsDependencyBuild(tmp)
 	require.NoError(t, err)
@@ -89,7 +89,7 @@ dependencies:
   - name: foo
     version: 1.0.0
     repository: https://example.com
-`), 0o644))
+`), 0o600))
 
 	needs, err := NeedsDependencyBuild(tmp)
 	require.NoError(t, err)
@@ -104,10 +104,10 @@ dependencies:
   - name: foo
     version: 1.0.0
     repository: https://example.com
-`), 0o644))
+`), 0o600))
 	chartsDir := filepath.Join(tmp, "charts")
-	require.NoError(t, os.MkdirAll(chartsDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "foo-1.0.0.tgz"), []byte("fake"), 0o644))
+	require.NoError(t, os.MkdirAll(chartsDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "foo-1.0.0.tgz"), []byte("fake"), 0o600))
 
 	needs, err := NeedsDependencyBuild(tmp)
 	require.NoError(t, err)
@@ -122,10 +122,10 @@ dependencies:
   - name: foo
     version: 2.0.0
     repository: https://example.com
-`), 0o644))
+`), 0o600))
 	chartsDir := filepath.Join(tmp, "charts")
-	require.NoError(t, os.MkdirAll(chartsDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "foo-1.0.0.tgz"), []byte("fake"), 0o644))
+	require.NoError(t, os.MkdirAll(chartsDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "foo-1.0.0.tgz"), []byte("fake"), 0o600))
 
 	needs, err := NeedsDependencyBuild(tmp)
 	require.NoError(t, err)
@@ -140,11 +140,11 @@ dependencies:
   - name: foo
     version: 1.0.0
     repository: https://example.com
-`), 0o644))
+`), 0o600))
 	chartsDir := filepath.Join(tmp, "charts")
-	require.NoError(t, os.MkdirAll(chartsDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "foo-1.0.0.tgz"), []byte("fake"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "bar-1.0.0.tgz"), []byte("stale"), 0o644))
+	require.NoError(t, os.MkdirAll(chartsDir, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "foo-1.0.0.tgz"), []byte("fake"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "bar-1.0.0.tgz"), []byte("stale"), 0o600))
 
 	needs, err := NeedsDependencyBuild(tmp)
 	require.NoError(t, err)
@@ -159,17 +159,17 @@ dependencies:
   - name: foo
     version: 1.0.0
     repository: https://example.com
-`), 0o644))
+`), 0o600))
 	chartsDir := filepath.Join(tmp, "charts")
-	require.NoError(t, os.MkdirAll(chartsDir, 0o755))
+	require.NoError(t, os.MkdirAll(chartsDir, 0o750))
 
 	tgzPath := filepath.Join(chartsDir, "foo-1.0.0.tgz")
-	require.NoError(t, os.WriteFile(tgzPath, []byte("fake"), 0o644))
+	require.NoError(t, os.WriteFile(tgzPath, []byte("fake"), 0o600))
 	oldTime := time.Now().Add(-1 * time.Hour)
 	require.NoError(t, os.Chtimes(tgzPath, oldTime, oldTime))
 
 	lockPath := filepath.Join(tmp, "Chart.lock")
-	require.NoError(t, os.WriteFile(lockPath, []byte("digest: sha256:abc123\n"), 0o644))
+	require.NoError(t, os.WriteFile(lockPath, []byte("digest: sha256:abc123\n"), 0o600))
 
 	needs, err := NeedsDependencyBuild(tmp)
 	require.NoError(t, err)
@@ -184,16 +184,16 @@ dependencies:
   - name: foo
     version: 1.0.0
     repository: https://example.com
-`), 0o644))
+`), 0o600))
 	chartsDir := filepath.Join(tmp, "charts")
-	require.NoError(t, os.MkdirAll(chartsDir, 0o755))
+	require.NoError(t, os.MkdirAll(chartsDir, 0o750))
 
 	lockPath := filepath.Join(tmp, "Chart.lock")
-	require.NoError(t, os.WriteFile(lockPath, []byte("digest: sha256:abc123\n"), 0o644))
+	require.NoError(t, os.WriteFile(lockPath, []byte("digest: sha256:abc123\n"), 0o600))
 	oldTime := time.Now().Add(-1 * time.Hour)
 	require.NoError(t, os.Chtimes(lockPath, oldTime, oldTime))
 
-	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "foo-1.0.0.tgz"), []byte("fake"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(chartsDir, "foo-1.0.0.tgz"), []byte("fake"), 0o600))
 
 	needs, err := NeedsDependencyBuild(tmp)
 	require.NoError(t, err)

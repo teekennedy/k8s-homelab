@@ -34,7 +34,7 @@ func newTFPlanCmd() *cobra.Command {
 
 			fmt.Printf("Planning Terraform module %s (env=%s)...\n", module, env)
 
-			tofuCmd := exec.Command("tofu", "plan")
+			tofuCmd := exec.CommandContext(cmd.Context(), "tofu", "plan")
 			tofuCmd.Dir = fmt.Sprintf("terraform/%s", module)
 			tofuCmd.Stdout = os.Stdout
 			tofuCmd.Stderr = os.Stderr
@@ -65,7 +65,7 @@ func newTFApplyCmd() *cobra.Command {
 				applyArgs = append(applyArgs, "-auto-approve")
 			}
 
-			tofuCmd := exec.Command("tofu", applyArgs...)
+			tofuCmd := exec.CommandContext(cmd.Context(), "tofu", applyArgs...)
 			tofuCmd.Dir = fmt.Sprintf("terraform/%s", module)
 			tofuCmd.Stdout = os.Stdout
 			tofuCmd.Stderr = os.Stderr

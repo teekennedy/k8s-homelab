@@ -59,7 +59,7 @@ Examples:
 
 			fmt.Printf("Creating environment %q...\n", name)
 
-			e, err := mgr.Create(name, fromEnv, workers)
+			e, err := mgr.Create(cmd.Context(), name, fromEnv, workers)
 			if err != nil {
 				return fmt.Errorf("create environment: %w", err)
 			}
@@ -95,13 +95,13 @@ If the Kind cluster was deleted, it will be recreated using the saved configurat
 
 			fmt.Printf("Starting environment %q...\n", name)
 
-			if err := mgr.Start(name); err != nil {
+			if err := mgr.Start(cmd.Context(), name); err != nil {
 				return fmt.Errorf("start environment: %w", err)
 			}
 
 			fmt.Printf("Environment %q started successfully.\n", name)
 
-			e, _ := mgr.Get(name)
+			e, _ := mgr.Get(cmd.Context(), name)
 			if e != nil && e.Config.Kubeconfig != "" {
 				fmt.Println("\nTo use this environment:")
 				fmt.Printf("  export KUBECONFIG=%s\n", e.Config.Kubeconfig)
@@ -128,7 +128,7 @@ Use --preserve-state to keep the cluster running but mark it as stopped.`,
 
 			fmt.Printf("Stopping environment %q...\n", name)
 
-			if err := mgr.Stop(name, preserveState); err != nil {
+			if err := mgr.Stop(cmd.Context(), name, preserveState); err != nil {
 				return fmt.Errorf("stop environment: %w", err)
 			}
 
@@ -151,7 +151,7 @@ func newEnvListCmd() *cobra.Command {
 			mgr := getEnvManager()
 			cmd.SilenceUsage = true
 
-			envs, err := mgr.List()
+			envs, err := mgr.List(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("list environments: %w", err)
 			}
@@ -161,15 +161,22 @@ func newEnvListCmd() *cobra.Command {
 			}
 
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NAME\tTYPE\tSTATUS\tFROM")
+			if _, err := fmt.Fprintln(w, "NAME\tTYPE\tSTATUS\tFROM"); err != nil {
+				return fmt.Errorf("writing header: %w", err)
+			}
 			for _, e := range envs {
 				from := e.FromEnv
 				if from == "" {
 					from = "-"
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.Name, e.Type, e.Status, from)
+				if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.Name, e.Type, e.Status, from); err != nil {
+					return fmt.Errorf("writing row: %w", err)
+				}
 			}
-			return w.Flush()
+			if err := w.Flush(); err != nil {
+				return fmt.Errorf("flushing output: %w", err)
+			}
+			return nil
 		},
 	}
 }
@@ -196,7 +203,8 @@ This action cannot be undone.`,
 				fmt.Printf("Are you sure you want to delete environment %q? This cannot be undone.\n", name)
 				fmt.Print("Type 'yes' to confirm: ")
 				var confirm string
-				fmt.Scanln(&confirm)
+				// Ignore scan errors (e.g. blank input): confirm stays empty, which aborts below.
+				_, _ = fmt.Scanln(&confirm)
 				if confirm != "yes" {
 					fmt.Println("Aborted.")
 					return nil
@@ -205,7 +213,7 @@ This action cannot be undone.`,
 
 			fmt.Printf("Deleting environment %q...\n", name)
 
-			if err := mgr.Delete(name); err != nil {
+			if err := mgr.Delete(cmd.Context(), name); err != nil {
 				return fmt.Errorf("delete environment: %w", err)
 			}
 
@@ -230,7 +238,7 @@ func newEnvStatusCmd() *cobra.Command {
 			name := args[0]
 			cmd.SilenceUsage = true
 
-			e, err := mgr.Get(name)
+			e, err := mgr.Get(cmd.Context(), name)
 			if err != nil {
 				return fmt.Errorf("get environment: %w", err)
 			}

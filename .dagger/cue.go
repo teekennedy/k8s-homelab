@@ -3,12 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"dagger/homelab/internal/dagger"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
-
-	"dagger/homelab/internal/dagger"
 )
 
 // cueContainer returns a base CUE container with source mounted at /src,
@@ -118,7 +117,7 @@ func (m *Homelab) LintCue(
 	// +ignore=["*", "!config/**/*.cue"]
 	source *dagger.Directory,
 	// +optional
-	paths []string,
+	paths []string, //nolint:unparam // accepted for CI --changed uniformity (lab ci passes --paths to every +check); CUE lint always checks the whole tree
 ) (string, error) {
 	// Check formatting via changeset.
 	formatted := cueContainer(source).

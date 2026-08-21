@@ -70,8 +70,11 @@ func DiscoverCharts(basePath string) ([]ChartInfo, error) {
 		charts = append(charts, info)
 		return nil
 	})
+	if err != nil {
+		return nil, fmt.Errorf("walk %s: %w", basePath, err)
+	}
 
-	return charts, err
+	return charts, nil
 }
 
 // ParseChartInfo extracts chart metadata from the directory.
@@ -92,7 +95,7 @@ func ParseChartInfo(chartDir string) (ChartInfo, error) {
 	info.ReleaseName = info.Name
 
 	appYaml := filepath.Join(chartDir, "application.yaml")
-	data, err := os.ReadFile(appYaml)
+	data, err := os.ReadFile(appYaml) //nolint:gosec // chartDir is an internal repo-relative path, not user input
 	if err != nil {
 		if os.IsNotExist(err) {
 			info.Namespace = info.Name
@@ -125,28 +128,57 @@ func ParseChartInfo(chartDir string) (ChartInfo, error) {
 //   - A Chart.lock exists and is newer than the newest .tgz file
 //   - A .tgz exists that doesn't match any declared dependency (stale artifact)
 func NeedsDependencyBuild(chartDir string) (bool, error) {
-	chartYamlPath := filepath.Join(chartDir, "Chart.yaml")
-	data, err := os.ReadFile(chartYamlPath)
+	deps, err := readChartDependencies(chartDir)
 	if err != nil {
 		return false, err
 	}
-
-	var chart chartYaml
-	if err := yaml.Unmarshal(data, &chart); err != nil {
-		return false, err
-	}
-
-	if len(chart.Dependencies) == 0 {
+	if len(deps) == 0 {
 		return false, nil
 	}
 
 	chartsDir := filepath.Join(chartDir, "charts")
-	entries, err := os.ReadDir(chartsDir)
+	tgzFiles, newestTgz, err := scanTgzFiles(chartsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return true, nil
 		}
-		return false, err
+		return false, fmt.Errorf("read charts dir: %w", err)
+	}
+
+	if depsMissingOrStaleTgz(deps, tgzFiles) {
+		return true, nil
+	}
+
+	lockPath := filepath.Join(chartDir, "Chart.lock")
+	lockInfo, err := os.Stat(lockPath)
+	if err == nil && !newestTgz.IsZero() && lockInfo.ModTime().After(newestTgz) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// readChartDependencies reads and parses the dependencies declared in chartDir's Chart.yaml.
+func readChartDependencies(chartDir string) ([]chartDependency, error) {
+	chartYamlPath := filepath.Join(chartDir, "Chart.yaml")
+	data, err := os.ReadFile(chartYamlPath) //nolint:gosec // chartDir is an internal repo-relative path, not user input
+	if err != nil {
+		return nil, fmt.Errorf("read Chart.yaml: %w", err)
+	}
+
+	var chart chartYaml
+	if err := yaml.Unmarshal(data, &chart); err != nil {
+		return nil, fmt.Errorf("parse Chart.yaml: %w", err)
+	}
+	return chart.Dependencies, nil
+}
+
+// scanTgzFiles returns the .tgz filenames present in chartsDir and the most recent
+// modification time among them.
+func scanTgzFiles(chartsDir string) (map[string]bool, time.Time, error) {
+	entries, err := os.ReadDir(chartsDir)
+	if err != nil {
+		return nil, time.Time{}, err //nolint:wrapcheck // returned as-is so callers can still check os.IsNotExist(err)
 	}
 
 	tgzFiles := map[string]bool{}
@@ -160,24 +192,19 @@ func NeedsDependencyBuild(chartDir string) (bool, error) {
 			}
 		}
 	}
+	return tgzFiles, newestTgz, nil
+}
 
-	for _, dep := range chart.Dependencies {
+// depsMissingOrStaleTgz reports whether deps has any dependency without a matching .tgz
+// in tgzFiles, or whether tgzFiles has any leftover .tgz not matching a declared dependency.
+// tgzFiles is mutated: matched entries are removed.
+func depsMissingOrStaleTgz(deps []chartDependency, tgzFiles map[string]bool) bool {
+	for _, dep := range deps {
 		expectedTgz := dep.Name + "-" + dep.Version + ".tgz"
 		if !tgzFiles[expectedTgz] {
-			return true, nil
+			return true
 		}
 		delete(tgzFiles, expectedTgz)
 	}
-
-	if len(tgzFiles) > 0 {
-		return true, nil
-	}
-
-	lockPath := filepath.Join(chartDir, "Chart.lock")
-	lockInfo, err := os.Stat(lockPath)
-	if err == nil && !newestTgz.IsZero() && lockInfo.ModTime().After(newestTgz) {
-		return true, nil
-	}
-
-	return false, nil
+	return len(tgzFiles) > 0
 }

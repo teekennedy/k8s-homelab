@@ -67,6 +67,21 @@ func TestProjectConfigDir(t *testing.T) {
 	}
 }
 
+// assertXDGCompliant checks that dir (as returned for subcommand "test" by one of the
+// XDG dir functions) contains 'lab', is under homeDir, and ends with lab/test.
+func assertXDGCompliant(t *testing.T, kind, dir, homeDir string) {
+	t.Helper()
+	if !strings.Contains(dir, "lab") {
+		t.Errorf("expected %s dir to contain 'lab', got %s", kind, dir)
+	}
+	if !strings.HasPrefix(dir, homeDir) {
+		t.Errorf("expected %s dir to be under home directory, got %s", kind, dir)
+	}
+	if !strings.HasSuffix(dir, filepath.Join("lab", "test")) {
+		t.Errorf("expected %s dir to end with lab/test, got %s", kind, dir)
+	}
+}
+
 func TestXDGCompliance(t *testing.T) {
 	// Test that we get valid XDG-compliant paths
 	homeDir, err := os.UserHomeDir()
@@ -74,41 +89,9 @@ func TestXDGCompliance(t *testing.T) {
 		t.Skip("cannot get home directory")
 	}
 
-	// ConfigDir should contain 'lab' and be under home
-	configDir := ConfigDir("test")
-	if !strings.Contains(configDir, "lab") {
-		t.Errorf("expected config dir to contain 'lab', got %s", configDir)
-	}
-	if !strings.HasPrefix(configDir, homeDir) {
-		t.Errorf("expected config dir to be under home directory, got %s", configDir)
-	}
-	if !strings.HasSuffix(configDir, filepath.Join("lab", "test")) {
-		t.Errorf("expected config dir to end with lab/test, got %s", configDir)
-	}
-
-	// CacheDir should contain 'lab' and be under home
-	cacheDir := CacheDir("test")
-	if !strings.Contains(cacheDir, "lab") {
-		t.Errorf("expected cache dir to contain 'lab', got %s", cacheDir)
-	}
-	if !strings.HasPrefix(cacheDir, homeDir) {
-		t.Errorf("expected cache dir to be under home directory, got %s", cacheDir)
-	}
-	if !strings.HasSuffix(cacheDir, filepath.Join("lab", "test")) {
-		t.Errorf("expected cache dir to end with lab/test, got %s", cacheDir)
-	}
-
-	// StateDir should contain 'lab' and be under home
-	stateDir := StateDir("test")
-	if !strings.Contains(stateDir, "lab") {
-		t.Errorf("expected state dir to contain 'lab', got %s", stateDir)
-	}
-	if !strings.HasPrefix(stateDir, homeDir) {
-		t.Errorf("expected state dir to be under home directory, got %s", stateDir)
-	}
-	if !strings.HasSuffix(stateDir, filepath.Join("lab", "test")) {
-		t.Errorf("expected state dir to end with lab/test, got %s", stateDir)
-	}
+	assertXDGCompliant(t, "config", ConfigDir("test"), homeDir)
+	assertXDGCompliant(t, "cache", CacheDir("test"), homeDir)
+	assertXDGCompliant(t, "state", StateDir("test"), homeDir)
 }
 
 func TestRepoRoot(t *testing.T) {
@@ -118,7 +101,7 @@ func TestRepoRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get working directory: %v", err)
 	}
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	// Test 1: Empty directory without .git should return an error
 	err = os.Chdir(tempDir)
@@ -133,7 +116,7 @@ func TestRepoRoot(t *testing.T) {
 
 	// Test 2: Create a .git file and verify RepoRoot returns the test directory
 	gitFile := filepath.Join(tempDir, ".git")
-	if writeErr := os.WriteFile(gitFile, []byte{}, 0o644); writeErr != nil {
+	if writeErr := os.WriteFile(gitFile, []byte{}, 0o600); writeErr != nil {
 		t.Fatalf("failed to create .git file: %v", writeErr)
 	}
 

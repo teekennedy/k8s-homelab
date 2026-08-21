@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -61,7 +62,7 @@ Prerequisites:
 				hostname: hostname,
 				ip:       ip,
 			}
-			return b.run()
+			return b.run(cmd.Context())
 		},
 	}
 
@@ -75,7 +76,7 @@ func (b *bootstrapper) logStep(format string, a ...any) {
 	fmt.Printf("\n==> "+format+"\n", a...)
 }
 
-func (b *bootstrapper) run() error {
+func (b *bootstrapper) run(ctx context.Context) error {
 	var err error
 	b.repoRoot, err = paths.RepoRoot()
 	if err != nil {
@@ -90,11 +91,11 @@ func (b *bootstrapper) run() error {
 	if err != nil {
 		return fmt.Errorf("create temp dir: %w", err)
 	}
-	defer os.RemoveAll(b.tempDir)
+	defer func() { _ = os.RemoveAll(b.tempDir) }()
 
 	steps := []struct {
 		name string
-		fn   func() error
+		fn   func(context.Context) error
 	}{
 		{"Validating host in flake.nix", b.validateFlakeHost},
 		{"Creating host directory", b.createHostDir},
@@ -111,7 +112,7 @@ func (b *bootstrapper) run() error {
 
 	for _, step := range steps {
 		b.logStep(step.name)
-		if err := step.fn(); err != nil {
+		if err := step.fn(ctx); err != nil {
 			return fmt.Errorf("%s: %w", step.name, err)
 		}
 	}
@@ -121,8 +122,8 @@ func (b *bootstrapper) run() error {
 	return nil
 }
 
-func (b *bootstrapper) validateFlakeHost() error {
-	cmd := exec.Command("nix", "eval",
+func (b *bootstrapper) validateFlakeHost(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "nix", "eval",
 		".#nixosConfigurations",
 		"--apply", fmt.Sprintf(`x: builtins.hasAttr "%s" x`, b.hostname),
 		"--json")
@@ -138,11 +139,11 @@ func (b *bootstrapper) validateFlakeHost() error {
 	return nil
 }
 
-func (b *bootstrapper) createHostDir() error {
+func (b *bootstrapper) createHostDir(ctx context.Context) error {
 	if info, err := os.Stat(b.hostDir); err == nil && info.IsDir() {
 		fmt.Printf("Host directory already exists: %s\n", b.hostDir)
 	} else {
-		if err := os.MkdirAll(b.hostDir, 0o755); err != nil {
+		if err := os.MkdirAll(b.hostDir, 0o750); err != nil {
 			return fmt.Errorf("create directory: %w", err)
 		}
 		fmt.Printf("Created %s\n", b.hostDir)
@@ -151,102 +152,25 @@ func (b *bootstrapper) createHostDir() error {
 	// Ensure default.nix exists (required by flake.nix's module import)
 	defaultNix := filepath.Join(b.hostDir, "default.nix")
 	if _, err := os.Stat(defaultNix); err != nil {
-		if err := os.WriteFile(defaultNix, []byte("{...}: {}\n"), 0o644); err != nil {
+		if err := os.WriteFile(defaultNix, []byte("{...}: {}\n"), 0o600); err != nil {
 			return fmt.Errorf("create default.nix: %w", err)
 		}
 		fmt.Println("Created default.nix")
-		return b.gitAdd(defaultNix)
+		return b.gitAdd(ctx, defaultNix)
 	}
 	fmt.Println("default.nix already exists")
 	return nil
 }
 
-func (b *bootstrapper) ensureSecrets() error {
-	existingSecrets := make(map[string]string)
-	needsUpdate := false
-	isEncrypted := false
-
-	if _, err := os.Stat(b.secretsPath); err == nil {
-		// File exists - try decrypting first (might be encrypted from previous run)
-		decryptCmd := exec.Command("sops", "decrypt", b.secretsPath)
-		decryptCmd.Dir = b.repoRoot
-		if output, decryptErr := decryptCmd.Output(); decryptErr == nil {
-			isEncrypted = true
-			if err := yaml.Unmarshal(output, &existingSecrets); err != nil {
-				return fmt.Errorf("parse decrypted secrets: %w", err)
-			}
-		} else {
-			// Maybe plaintext from a previous partial run
-			data, err := os.ReadFile(b.secretsPath)
-			if err != nil {
-				return fmt.Errorf("read secrets.yaml: %w", err)
-			}
-			if err := yaml.Unmarshal(data, &existingSecrets); err != nil {
-				return fmt.Errorf("secrets.yaml exists but cannot be parsed (encrypted without matching sops rule, or invalid YAML): %w", err)
-			}
-		}
+func (b *bootstrapper) ensureSecrets(ctx context.Context) error {
+	existingSecrets, isEncrypted, err := b.loadExistingSecrets(ctx)
+	if err != nil {
+		return err
 	}
 
-	// Check SSH keys
-	if existingSecrets["ssh_host_public_key"] == "" || existingSecrets["ssh_host_private_key"] == "" {
-		fmt.Println("Generating SSH host key pair...")
-		keyPath := filepath.Join(b.tempDir, "ssh_host_ed25519_key")
-		cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-C", b.hostname, "-N", "", "-f", keyPath)
-		if verbose {
-			cmd.Stdout = os.Stdout
-		}
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("ssh-keygen: %w", err)
-		}
-
-		pubKey, err := os.ReadFile(keyPath + ".pub")
-		if err != nil {
-			return fmt.Errorf("read public key: %w", err)
-		}
-		privKey, err := os.ReadFile(keyPath)
-		if err != nil {
-			return fmt.Errorf("read private key: %w", err)
-		}
-		existingSecrets["ssh_host_public_key"] = strings.TrimSpace(string(pubKey))
-		existingSecrets["ssh_host_private_key"] = string(privKey)
-		needsUpdate = true
-	} else {
-		fmt.Println("SSH keys already present")
-	}
-
-	// Check password hash
-	if existingSecrets["default_user_hashed_password"] == "" {
-		password, err := readPassword(fmt.Sprintf("Password for %s default user: ", b.hostname))
-		if err != nil {
-			return err
-		}
-		if password == "" {
-			return fmt.Errorf("password cannot be empty")
-		}
-
-		hashCmd := exec.Command("mkpasswd", "--method=SHA-512", password)
-		hashOutput, err := hashCmd.Output()
-		if err != nil {
-			return fmt.Errorf("mkpasswd: %w", err)
-		}
-		existingSecrets["default_user_hashed_password"] = strings.TrimSpace(string(hashOutput))
-		needsUpdate = true
-	} else {
-		fmt.Println("Password hash already present")
-	}
-
-	// Check restic repo password
-	if existingSecrets["restic_repo_password"] == "" {
-		password, err := generateSecurePassword(24)
-		if err != nil {
-			return fmt.Errorf("generate restic password: %w", err)
-		}
-		existingSecrets["restic_repo_password"] = password
-		needsUpdate = true
-		fmt.Println("Generated restic_repo_password")
-	} else {
-		fmt.Println("Restic repo password already present")
+	needsUpdate, err := b.ensureSecretFields(ctx, existingSecrets)
+	if err != nil {
+		return err
 	}
 
 	b.sshPubKey = existingSecrets["ssh_host_public_key"]
@@ -258,8 +182,32 @@ func (b *bootstrapper) ensureSecrets() error {
 		return nil
 	}
 
-	// Write plaintext secrets (will be encrypted in a later step)
-	data, err := yaml.Marshal(existingSecrets)
+	return b.writePlaintextSecrets(existingSecrets)
+}
+
+// ensureSecretFields ensures the SSH keys, password hash, and restic password
+// fields are all populated in existingSecrets, generating any that are missing.
+// Returns true if any field was newly generated.
+func (b *bootstrapper) ensureSecretFields(ctx context.Context, existingSecrets map[string]string) (bool, error) {
+	sshUpdated, err := b.ensureSSHKeys(ctx, existingSecrets)
+	if err != nil {
+		return false, err
+	}
+	passwordUpdated, err := b.ensurePasswordHash(ctx, existingSecrets)
+	if err != nil {
+		return false, err
+	}
+	resticUpdated, err := ensureResticPassword(existingSecrets)
+	if err != nil {
+		return false, err
+	}
+	return sshUpdated || passwordUpdated || resticUpdated, nil
+}
+
+// writePlaintextSecrets writes secrets to secretsPath in plaintext, to be
+// encrypted by a later bootstrap step.
+func (b *bootstrapper) writePlaintextSecrets(secrets map[string]string) error {
+	data, err := yaml.Marshal(secrets)
 	if err != nil {
 		return fmt.Errorf("marshal secrets: %w", err)
 	}
@@ -270,9 +218,114 @@ func (b *bootstrapper) ensureSecrets() error {
 	return nil
 }
 
-func (b *bootstrapper) updateSopsAgeKey() error {
+// loadExistingSecrets loads secrets.yaml if present, trying sops decryption first
+// and falling back to plaintext (e.g. from a previous partial run).
+func (b *bootstrapper) loadExistingSecrets(ctx context.Context) (map[string]string, bool, error) {
+	existingSecrets := make(map[string]string)
+
+	if _, err := os.Stat(b.secretsPath); err != nil {
+		return existingSecrets, false, nil
+	}
+
+	// File exists - try decrypting first (might be encrypted from previous run)
+	decryptCmd := exec.CommandContext(ctx, "sops", "decrypt", b.secretsPath)
+	decryptCmd.Dir = b.repoRoot
+	output, decryptErr := decryptCmd.Output()
+	if decryptErr == nil {
+		if err := yaml.Unmarshal(output, &existingSecrets); err != nil {
+			return nil, false, fmt.Errorf("parse decrypted secrets: %w", err)
+		}
+		return existingSecrets, true, nil
+	}
+
+	// Maybe plaintext from a previous partial run
+	data, err := os.ReadFile(b.secretsPath)
+	if err != nil {
+		return nil, false, fmt.Errorf("read secrets.yaml: %w", err)
+	}
+	if err := yaml.Unmarshal(data, &existingSecrets); err != nil {
+		return nil, false, fmt.Errorf("secrets.yaml exists but cannot be parsed (encrypted without matching sops rule, or invalid YAML): %w", err)
+	}
+	return existingSecrets, false, nil
+}
+
+// ensureSSHKeys generates an SSH host key pair into existingSecrets if not already present.
+// Returns true if a new key pair was generated.
+func (b *bootstrapper) ensureSSHKeys(ctx context.Context, existingSecrets map[string]string) (bool, error) {
+	if existingSecrets["ssh_host_public_key"] != "" && existingSecrets["ssh_host_private_key"] != "" {
+		fmt.Println("SSH keys already present")
+		return false, nil
+	}
+
+	fmt.Println("Generating SSH host key pair...")
+	keyPath := filepath.Join(b.tempDir, "ssh_host_ed25519_key")
+	cmd := exec.CommandContext(ctx, "ssh-keygen", "-t", "ed25519", "-C", b.hostname, "-N", "", "-f", keyPath)
+	if verbose {
+		cmd.Stdout = os.Stdout
+	}
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("ssh-keygen: %w", err)
+	}
+
+	pubKey, err := os.ReadFile(keyPath + ".pub") //nolint:gosec // keyPath is generated internally, not user input
+	if err != nil {
+		return false, fmt.Errorf("read public key: %w", err)
+	}
+	privKey, err := os.ReadFile(keyPath) //nolint:gosec // keyPath is generated internally, not user input
+	if err != nil {
+		return false, fmt.Errorf("read private key: %w", err)
+	}
+	existingSecrets["ssh_host_public_key"] = strings.TrimSpace(string(pubKey))
+	existingSecrets["ssh_host_private_key"] = string(privKey)
+	return true, nil
+}
+
+// ensurePasswordHash prompts for and hashes the default user's password into
+// existingSecrets if not already present. Returns true if a new hash was generated.
+func (b *bootstrapper) ensurePasswordHash(ctx context.Context, existingSecrets map[string]string) (bool, error) {
+	if existingSecrets["default_user_hashed_password"] != "" {
+		fmt.Println("Password hash already present")
+		return false, nil
+	}
+
+	password, err := readPassword(ctx, fmt.Sprintf("Password for %s default user: ", b.hostname))
+	if err != nil {
+		return false, err
+	}
+	if password == "" {
+		return false, fmt.Errorf("password cannot be empty")
+	}
+
+	hashCmd := exec.CommandContext(ctx, "mkpasswd", "--method=SHA-512", password)
+	hashOutput, err := hashCmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("mkpasswd: %w", err)
+	}
+	existingSecrets["default_user_hashed_password"] = strings.TrimSpace(string(hashOutput))
+	return true, nil
+}
+
+// ensureResticPassword generates a restic repo password into existingSecrets if not
+// already present. Returns true if a new password was generated.
+func ensureResticPassword(existingSecrets map[string]string) (bool, error) {
+	if existingSecrets["restic_repo_password"] != "" {
+		fmt.Println("Restic repo password already present")
+		return false, nil
+	}
+
+	password, err := generateSecurePassword(24)
+	if err != nil {
+		return false, fmt.Errorf("generate restic password: %w", err)
+	}
+	existingSecrets["restic_repo_password"] = password
+	fmt.Println("Generated restic_repo_password")
+	return true, nil
+}
+
+func (b *bootstrapper) updateSopsAgeKey(ctx context.Context) error {
 	// Convert SSH public key to age key
-	cmd := exec.Command("ssh-to-age")
+	cmd := exec.CommandContext(ctx, "ssh-to-age")
 	cmd.Stdin = strings.NewReader(b.sshPubKey + "\n")
 	ageOutput, err := cmd.Output()
 	if err != nil {
@@ -316,7 +369,7 @@ func (b *bootstrapper) updateSopsAgeKey() error {
 	return b.saveSopsConfig(doc)
 }
 
-func (b *bootstrapper) ensureHostCreationRule() error {
+func (b *bootstrapper) ensureHostCreationRule(context.Context) error {
 	doc, err := b.loadSopsConfig()
 	if err != nil {
 		return err
@@ -328,14 +381,9 @@ func (b *bootstrapper) ensureHostCreationRule() error {
 	}
 
 	expectedRegex := fmt.Sprintf(`nix/hosts/%s/secrets\.yaml`, b.hostname)
-
-	// Check if rule already exists
-	for _, rule := range rules.Content {
-		pr := findMapValue(rule, "path_regex")
-		if pr != nil && pr.Value == expectedRegex {
-			fmt.Println("Creation rule already exists")
-			return nil
-		}
+	if creationRuleExists(rules, expectedRegex) {
+		fmt.Println("Creation rule already exists")
+		return nil
 	}
 
 	// Find common keys (user PGP + personal age) from an existing host rule
@@ -344,27 +392,49 @@ func (b *bootstrapper) ensureHostCreationRule() error {
 		return fmt.Errorf("find common keys: %w", err)
 	}
 
-	// Find the host's anchored key node
 	keys := findMapValue(root, "keys")
 	hostAnchor := "host_" + b.hostname
-	var hostKeyNode *yaml.Node
-	for _, n := range keys.Content {
-		if n.Anchor == hostAnchor {
-			hostKeyNode = n
-			break
-		}
-	}
+	hostKeyNode := findKeyByAnchor(keys, hostAnchor)
 	if hostKeyNode == nil {
 		return fmt.Errorf("host age key &%s not found in .sops.yaml keys", hostAnchor)
 	}
 
-	// Build PGP alias sequence
+	newRule := buildHostCreationRule(expectedRegex, commonPGP, commonAge, hostKeyNode)
+	insertHostRule(rules, newRule)
+
+	fmt.Printf("Added creation rule for %s\n", expectedRegex)
+	return b.saveSopsConfig(doc)
+}
+
+// findKeyByAnchor returns the child of keys with the given YAML anchor, or nil if not found.
+func findKeyByAnchor(keys *yaml.Node, anchor string) *yaml.Node {
+	for _, n := range keys.Content {
+		if n.Anchor == anchor {
+			return n
+		}
+	}
+	return nil
+}
+
+// creationRuleExists reports whether rules already contains a rule with the given path_regex.
+func creationRuleExists(rules *yaml.Node, expectedRegex string) bool {
+	for _, rule := range rules.Content {
+		pr := findMapValue(rule, "path_regex")
+		if pr != nil && pr.Value == expectedRegex {
+			return true
+		}
+	}
+	return false
+}
+
+// buildHostCreationRule builds a new sops creation_rules entry for expectedRegex,
+// granting access to the common PGP/age keys plus the host's own age key.
+func buildHostCreationRule(expectedRegex string, commonPGP, commonAge []*yaml.Node, hostKeyNode *yaml.Node) *yaml.Node {
 	pgpSeq := &yaml.Node{Kind: yaml.SequenceNode}
 	for _, k := range commonPGP {
 		pgpSeq.Content = append(pgpSeq.Content, &yaml.Node{Kind: yaml.AliasNode, Value: k.Anchor, Alias: k})
 	}
 
-	// Build age alias sequence (common keys + host key)
 	ageSeq := &yaml.Node{Kind: yaml.SequenceNode}
 	for _, k := range commonAge {
 		ageSeq.Content = append(ageSeq.Content, &yaml.Node{Kind: yaml.AliasNode, Value: k.Anchor, Alias: k})
@@ -381,7 +451,7 @@ func (b *bootstrapper) ensureHostCreationRule() error {
 		},
 	}
 
-	newRule := &yaml.Node{
+	return &yaml.Node{
 		Kind: yaml.MappingNode,
 		Content: []*yaml.Node{
 			{Kind: yaml.ScalarNode, Value: "path_regex"},
@@ -390,8 +460,11 @@ func (b *bootstrapper) ensureHostCreationRule() error {
 			{Kind: yaml.SequenceNode, Content: []*yaml.Node{keyGroup}},
 		},
 	}
+}
 
-	// Insert after the last host rule (before modules/terraform rules)
+// insertHostRule inserts newRule into rules immediately after the last existing
+// nix/hosts/ rule (keeping host rules grouped ahead of modules/terraform rules).
+func insertHostRule(rules *yaml.Node, newRule *yaml.Node) {
 	insertIdx := 0
 	for i, rule := range rules.Content {
 		pr := findMapValue(rule, "path_regex")
@@ -405,12 +478,9 @@ func (b *bootstrapper) ensureHostCreationRule() error {
 	content = append(content, newRule)
 	content = append(content, rules.Content[insertIdx:]...)
 	rules.Content = content
-
-	fmt.Printf("Added creation rule for %s\n", expectedRegex)
-	return b.saveSopsConfig(doc)
 }
 
-func (b *bootstrapper) encryptSecrets() error {
+func (b *bootstrapper) encryptSecrets(ctx context.Context) error {
 	data, err := os.ReadFile(b.secretsPath)
 	if err != nil {
 		return fmt.Errorf("read secrets.yaml: %w", err)
@@ -424,10 +494,10 @@ func (b *bootstrapper) encryptSecrets() error {
 	// sops-encrypted files contain a "sops" metadata key
 	if _, hasSops := contents["sops"]; hasSops {
 		fmt.Println("secrets.yaml is already encrypted")
-		return b.gitAdd(b.secretsPath)
+		return b.gitAdd(ctx, b.secretsPath)
 	}
 
-	cmd := exec.Command("sops", "encrypt", "--in-place", b.secretsPath)
+	cmd := exec.CommandContext(ctx, "sops", "encrypt", "--in-place", b.secretsPath)
 	cmd.Dir = b.repoRoot
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -436,10 +506,10 @@ func (b *bootstrapper) encryptSecrets() error {
 	}
 
 	fmt.Println("Encrypted secrets.yaml")
-	return b.gitAdd(b.secretsPath, b.sopsConfigPath)
+	return b.gitAdd(ctx, b.secretsPath, b.sopsConfigPath)
 }
 
-func (b *bootstrapper) updateModulesCreationRule() error {
+func (b *bootstrapper) updateModulesCreationRule(ctx context.Context) error {
 	doc, err := b.loadSopsConfig()
 	if err != nil {
 		return err
@@ -448,55 +518,27 @@ func (b *bootstrapper) updateModulesCreationRule() error {
 	rules := findMapValue(root, "creation_rules")
 	keys := findMapValue(root, "keys")
 
-	// Find the modules creation rule
-	var modulesRule *yaml.Node
-	for _, rule := range rules.Content {
-		pr := findMapValue(rule, "path_regex")
-		if pr != nil && strings.Contains(pr.Value, "nix/modules") {
-			modulesRule = rule
-			break
-		}
-	}
+	modulesRule := findRuleByPathSubstring(rules, "nix/modules")
 	if modulesRule == nil {
 		return fmt.Errorf("no creation rule found for nix/modules in .sops.yaml")
 	}
 
-	// Find host's anchored key node
 	hostAnchor := "host_" + b.hostname
-	var hostKeyNode *yaml.Node
-	for _, n := range keys.Content {
-		if n.Anchor == hostAnchor {
-			hostKeyNode = n
-			break
-		}
-	}
+	hostKeyNode := findKeyByAnchor(keys, hostAnchor)
 	if hostKeyNode == nil {
 		return fmt.Errorf("host key &%s not found in .sops.yaml", hostAnchor)
 	}
 
-	// Check if host key is already in the modules rule
-	keyGroups := findMapValue(modulesRule, "key_groups")
-	if keyGroups == nil || len(keyGroups.Content) == 0 {
-		return fmt.Errorf("no key_groups in modules creation rule")
-	}
-	firstGroup := keyGroups.Content[0]
-	ageSeq := findMapValue(firstGroup, "age")
-	if ageSeq == nil {
-		return fmt.Errorf("no 'age' key group in modules creation rule")
+	ageSeq, err := modulesRuleAgeSeq(modulesRule)
+	if err != nil {
+		return err
 	}
 
-	for _, k := range ageSeq.Content {
-		resolved := k
-		if k.Kind == yaml.AliasNode {
-			resolved = k.Alias
-		}
-		if resolved.Anchor == hostAnchor {
-			fmt.Println("Host key already in modules creation rule")
-			return nil
-		}
+	if ageSeqHasAnchor(ageSeq, hostAnchor) {
+		fmt.Println("Host key already in modules creation rule")
+		return nil
 	}
 
-	// Add host key alias to the age sequence
 	ageSeq.Content = append(ageSeq.Content, &yaml.Node{
 		Kind:  yaml.AliasNode,
 		Value: hostKeyNode.Anchor,
@@ -508,16 +550,67 @@ func (b *bootstrapper) updateModulesCreationRule() error {
 	}
 	fmt.Println("Added host key to modules creation rule")
 
-	// Re-encrypt all existing module encrypted files
 	moduleFiles, err := filepath.Glob(filepath.Join(b.repoRoot, "nix", "modules", "*", "*.enc.yaml"))
 	if err != nil {
+		return fmt.Errorf("globbing module encrypted files: %w", err)
+	}
+
+	if err := b.reEncryptFiles(ctx, moduleFiles); err != nil {
 		return err
 	}
 
-	for _, f := range moduleFiles {
+	// Stage all modified files
+	gitPaths := []string{b.sopsConfigPath}
+	gitPaths = append(gitPaths, moduleFiles...)
+	return b.gitAdd(ctx, gitPaths...)
+}
+
+// findRuleByPathSubstring returns the first rule in rules whose path_regex contains substr.
+func findRuleByPathSubstring(rules *yaml.Node, substr string) *yaml.Node {
+	for _, rule := range rules.Content {
+		pr := findMapValue(rule, "path_regex")
+		if pr != nil && strings.Contains(pr.Value, substr) {
+			return rule
+		}
+	}
+	return nil
+}
+
+// modulesRuleAgeSeq returns the "age" key sequence from a creation rule's first key group.
+func modulesRuleAgeSeq(rule *yaml.Node) (*yaml.Node, error) {
+	keyGroups := findMapValue(rule, "key_groups")
+	if keyGroups == nil || len(keyGroups.Content) == 0 {
+		return nil, fmt.Errorf("no key_groups in modules creation rule")
+	}
+	ageSeq := findMapValue(keyGroups.Content[0], "age")
+	if ageSeq == nil {
+		return nil, fmt.Errorf("no 'age' key group in modules creation rule")
+	}
+	return ageSeq, nil
+}
+
+// ageSeqHasAnchor reports whether ageSeq already contains a key (or alias to a key)
+// with the given anchor.
+func ageSeqHasAnchor(ageSeq *yaml.Node, anchor string) bool {
+	for _, k := range ageSeq.Content {
+		resolved := k
+		if k.Kind == yaml.AliasNode {
+			resolved = k.Alias
+		}
+		if resolved.Anchor == anchor {
+			return true
+		}
+	}
+	return false
+}
+
+// reEncryptFiles runs `sops updatekeys` on each file to bring it in line with
+// the current .sops.yaml creation rules.
+func (b *bootstrapper) reEncryptFiles(ctx context.Context, files []string) error {
+	for _, f := range files {
 		rel, _ := filepath.Rel(b.repoRoot, f)
 		fmt.Printf("Re-encrypting %s\n", rel)
-		reEncryptCmd := exec.Command("sops", "updatekeys", "-y", f)
+		reEncryptCmd := exec.CommandContext(ctx, "sops", "updatekeys", "-y", f)
 		reEncryptCmd.Dir = b.repoRoot
 		reEncryptCmd.Stdout = os.Stdout
 		reEncryptCmd.Stderr = os.Stderr
@@ -525,21 +618,17 @@ func (b *bootstrapper) updateModulesCreationRule() error {
 			return fmt.Errorf("re-encrypt %s: %w", rel, err)
 		}
 	}
-
-	// Stage all modified files
-	gitPaths := []string{b.sopsConfigPath}
-	gitPaths = append(gitPaths, moduleFiles...)
-	return b.gitAdd(gitPaths...)
+	return nil
 }
 
-func (b *bootstrapper) generateFacterConfig() error {
+func (b *bootstrapper) generateFacterConfig(ctx context.Context) error {
 	if _, err := os.Stat(b.facterPath); err == nil {
 		fmt.Println("facter.json already exists, skipping hardware config generation")
-		return b.gitAdd(b.facterPath)
+		return b.gitAdd(ctx, b.facterPath)
 	}
 
 	facterRelPath := fmt.Sprintf("nix/hosts/%s/facter.json", b.hostname)
-	cmd := exec.Command("nixos-anywhere",
+	cmd := exec.CommandContext(ctx, "nixos-anywhere",
 		"--flake", fmt.Sprintf(".#%s", b.hostname),
 		"--generate-hardware-config", "nixos-facter", facterRelPath,
 		"--phases", "",
@@ -554,16 +643,16 @@ func (b *bootstrapper) generateFacterConfig() error {
 	}
 
 	fmt.Println("Generated facter.json")
-	return b.gitAdd(b.facterPath)
+	return b.gitAdd(ctx, b.facterPath)
 }
 
-func (b *bootstrapper) checkDiskoConfig() error {
+func (b *bootstrapper) checkDiskoConfig(ctx context.Context) error {
 	// Ensure files are staged before nix eval
-	if err := b.gitAdd(b.secretsPath, b.facterPath, b.sopsConfigPath); err != nil {
+	if err := b.gitAdd(ctx, b.secretsPath, b.facterPath, b.sopsConfigPath); err != nil {
 		return err
 	}
 
-	cmd := exec.Command("nix", "eval",
+	cmd := exec.CommandContext(ctx, "nix", "eval",
 		fmt.Sprintf(".#nixosConfigurations.%s.config.disko.devices.disk.main.device", b.hostname),
 		"--raw")
 	cmd.Dir = b.repoRoot
@@ -611,14 +700,14 @@ func (b *bootstrapper) checkDiskoConfig() error {
 	return fmt.Errorf("disko.devices.disk.main.device not configured for %s", b.hostname)
 }
 
-func (b *bootstrapper) buildAndVerify() error {
+func (b *bootstrapper) buildAndVerify(ctx context.Context) error {
 	// Ensure all files are staged for flake evaluation
-	if err := b.gitAdd(b.secretsPath, b.facterPath, b.sopsConfigPath); err != nil {
+	if err := b.gitAdd(ctx, b.secretsPath, b.facterPath, b.sopsConfigPath); err != nil {
 		return err
 	}
 
 	fmt.Println("Building NixOS configuration...")
-	buildCmd := exec.Command("nix", "build",
+	buildCmd := exec.CommandContext(ctx, "nix", "build",
 		fmt.Sprintf(".#nixosConfigurations.%s.config.system.build.toplevel", b.hostname),
 		"--no-link")
 	buildCmd.Dir = b.repoRoot
@@ -630,7 +719,7 @@ func (b *bootstrapper) buildAndVerify() error {
 	fmt.Println("Build successful")
 
 	// Verify stateVersion
-	evalCmd := exec.Command("nix", "eval",
+	evalCmd := exec.CommandContext(ctx, "nix", "eval",
 		fmt.Sprintf(".#nixosConfigurations.%s.config.system.stateVersion", b.hostname),
 		"--raw")
 	evalCmd.Dir = b.repoRoot
@@ -642,7 +731,7 @@ func (b *bootstrapper) buildAndVerify() error {
 
 	// Run flake check
 	fmt.Println("Running nix flake check...")
-	checkCmd := exec.Command("nix", "flake", "check")
+	checkCmd := exec.CommandContext(ctx, "nix", "flake", "check")
 	checkCmd.Dir = b.repoRoot
 	checkCmd.Stdout = os.Stdout
 	checkCmd.Stderr = os.Stderr
@@ -656,7 +745,7 @@ func (b *bootstrapper) buildAndVerify() error {
 	return nil
 }
 
-func (b *bootstrapper) install() error {
+func (b *bootstrapper) install(ctx context.Context) error {
 	fmt.Printf("\nReady to install NixOS on %s at %s\n", b.hostname, b.ip)
 	fmt.Println("WARNING: This will format disks and install NixOS on the target machine.")
 	if !confirm("Proceed with installation?") {
@@ -667,13 +756,13 @@ func (b *bootstrapper) install() error {
 	// Extract SSH host key from encrypted secrets so nixos-anywhere can install
 	// it on the target. Without this, the host would generate a new SSH key that
 	// doesn't match the age key used to encrypt its secrets.
-	extraFilesDir, err := b.prepareExtraFiles()
+	extraFilesDir, err := b.prepareExtraFiles(ctx)
 	if err != nil {
 		return fmt.Errorf("prepare extra files: %w", err)
 	}
-	defer os.RemoveAll(extraFilesDir)
+	defer func() { _ = os.RemoveAll(extraFilesDir) }()
 
-	cmd := exec.Command("nixos-anywhere",
+	cmd := exec.CommandContext(ctx, "nixos-anywhere",
 		"--extra-files", extraFilesDir,
 		"--flake", fmt.Sprintf(".#%s", b.hostname),
 		"--target-host", fmt.Sprintf("root@%s", b.ip),
@@ -682,16 +771,19 @@ func (b *bootstrapper) install() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("running nixos-anywhere: %w", err)
+	}
+	return nil
 }
 
 // prepareExtraFiles decrypts secrets.yaml and writes the SSH host key to a
 // temporary directory tree that nixos-anywhere will copy to the target via
 // --extra-files. The key is placed at persistent/etc/ssh/ssh_host_ed25519_key
 // so it ends up at /persistent/etc/ssh/ on the installed system.
-func (b *bootstrapper) prepareExtraFiles() (string, error) {
+func (b *bootstrapper) prepareExtraFiles(ctx context.Context) (string, error) {
 	// Decrypt secrets
-	decryptCmd := exec.Command("sops", "decrypt", b.secretsPath)
+	decryptCmd := exec.CommandContext(ctx, "sops", "decrypt", b.secretsPath)
 	decryptCmd.Dir = b.repoRoot
 	output, err := decryptCmd.Output()
 	if err != nil {
@@ -711,25 +803,25 @@ func (b *bootstrapper) prepareExtraFiles() (string, error) {
 
 	extraDir, err := os.MkdirTemp("", "lab-extra-files-*")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("creating temp dir: %w", err)
 	}
 
 	sshDir := filepath.Join(extraDir, "persistent", "etc", "ssh")
-	if err := os.MkdirAll(sshDir, 0o755); err != nil {
-		os.RemoveAll(extraDir)
-		return "", err
+	if err := os.MkdirAll(sshDir, 0o750); err != nil {
+		_ = os.RemoveAll(extraDir)
+		return "", fmt.Errorf("creating ssh dir: %w", err)
 	}
 
 	privKeyPath := filepath.Join(sshDir, "ssh_host_ed25519_key")
 	if err := os.WriteFile(privKeyPath, []byte(privKey), 0o600); err != nil {
-		os.RemoveAll(extraDir)
-		return "", err
+		_ = os.RemoveAll(extraDir)
+		return "", fmt.Errorf("writing ssh private key: %w", err)
 	}
 
 	pubKeyPath := filepath.Join(sshDir, "ssh_host_ed25519_key.pub")
-	if err := os.WriteFile(pubKeyPath, []byte(pubKey+"\n"), 0o644); err != nil {
-		os.RemoveAll(extraDir)
-		return "", err
+	if err := os.WriteFile(pubKeyPath, []byte(pubKey+"\n"), 0o600); err != nil {
+		_ = os.RemoveAll(extraDir)
+		return "", fmt.Errorf("writing ssh public key: %w", err)
 	}
 
 	return extraDir, nil
@@ -737,9 +829,9 @@ func (b *bootstrapper) prepareExtraFiles() (string, error) {
 
 // --- Helpers ---
 
-func readPassword(prompt string) (string, error) {
+func readPassword(ctx context.Context, prompt string) (string, error) {
 	fmt.Fprint(os.Stderr, prompt)
-	cmd := exec.Command("bash", "-c", `IFS= read -rs pw && printf '%s' "$pw"`)
+	cmd := exec.CommandContext(ctx, "bash", "-c", `IFS= read -rs pw && printf '%s' "$pw"`)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
@@ -760,55 +852,61 @@ func confirm(prompt string) bool {
 
 // generateSecurePassword creates a random password of the given length
 // guaranteed to contain at least one uppercase, lowercase, digit, and special character.
+const (
+	passwordUpper   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	passwordLower   = "abcdefghijklmnopqrstuvwxyz"
+	passwordDigits  = "0123456789"
+	passwordSpecial = "!@#$%^&*()-_=+"
+	passwordAll     = passwordUpper + passwordLower + passwordDigits + passwordSpecial
+)
+
 func generateSecurePassword(length int) (string, error) {
-	const (
-		upper   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		lower   = "abcdefghijklmnopqrstuvwxyz"
-		digits  = "0123456789"
-		special = "!@#$%^&*()-_=+"
-		all     = upper + lower + digits + special
-	)
-
-	randChar := func(charset string) (byte, error) {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-		if err != nil {
-			return 0, err
-		}
-		return charset[n.Int64()], nil
-	}
-
 	for {
-		pw := make([]byte, length)
-		for i := range pw {
-			c, err := randChar(all)
-			if err != nil {
-				return "", err
-			}
-			pw[i] = c
+		pw, err := randomPassword(length)
+		if err != nil {
+			return "", err
 		}
-
-		hasUpper, hasLower, hasDigit, hasSpecial := false, false, false, false
-		for _, c := range pw {
-			switch {
-			case strings.ContainsRune(upper, rune(c)):
-				hasUpper = true
-			case strings.ContainsRune(lower, rune(c)):
-				hasLower = true
-			case strings.ContainsRune(digits, rune(c)):
-				hasDigit = true
-			case strings.ContainsRune(special, rune(c)):
-				hasSpecial = true
-			}
-		}
-		if hasUpper && hasLower && hasDigit && hasSpecial {
+		if hasPasswordComplexity(pw) {
 			return string(pw), nil
 		}
 	}
 }
 
-func (b *bootstrapper) gitAdd(filePaths ...string) error {
+// randomPassword generates a random password of the given length drawn from passwordAll.
+func randomPassword(length int) ([]byte, error) {
+	pw := make([]byte, length)
+	for i := range pw {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(passwordAll))))
+		if err != nil {
+			return nil, fmt.Errorf("generating random index: %w", err)
+		}
+		pw[i] = passwordAll[n.Int64()]
+	}
+	return pw, nil
+}
+
+// hasPasswordComplexity reports whether pw contains at least one uppercase, lowercase,
+// digit, and special character.
+func hasPasswordComplexity(pw []byte) bool {
+	hasUpper, hasLower, hasDigit, hasSpecial := false, false, false, false
+	for _, c := range pw {
+		switch {
+		case strings.ContainsRune(passwordUpper, rune(c)):
+			hasUpper = true
+		case strings.ContainsRune(passwordLower, rune(c)):
+			hasLower = true
+		case strings.ContainsRune(passwordDigits, rune(c)):
+			hasDigit = true
+		case strings.ContainsRune(passwordSpecial, rune(c)):
+			hasSpecial = true
+		}
+	}
+	return hasUpper && hasLower && hasDigit && hasSpecial
+}
+
+func (b *bootstrapper) gitAdd(ctx context.Context, filePaths ...string) error {
 	args := append([]string{"add", "--"}, filePaths...)
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = b.repoRoot
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(output)), err)
@@ -833,14 +931,17 @@ func (b *bootstrapper) saveSopsConfig(doc *yaml.Node) error {
 	if err != nil {
 		return fmt.Errorf("create .sops.yaml: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	enc := yaml.NewEncoder(f)
 	enc.SetIndent(2)
 	if err := enc.Encode(doc); err != nil {
 		return fmt.Errorf("encode .sops.yaml: %w", err)
 	}
-	return enc.Close()
+	if err := enc.Close(); err != nil {
+		return fmt.Errorf("close .sops.yaml encoder: %w", err)
+	}
+	return nil
 }
 
 // findCommonKeys extracts the PGP and non-host age keys from the first existing
@@ -851,45 +952,55 @@ func (b *bootstrapper) findCommonKeys(root *yaml.Node) (pgpKeys []*yaml.Node, ag
 		return nil, nil, fmt.Errorf("no creation_rules in .sops.yaml")
 	}
 
+	firstGroup := findHostRuleFirstKeyGroup(rules)
+	if firstGroup == nil {
+		return nil, nil, fmt.Errorf("no existing host creation rule found in .sops.yaml to derive common keys from")
+	}
+
+	if pgp := findMapValue(firstGroup, "pgp"); pgp != nil {
+		pgpKeys = resolveAliasNodes(pgp.Content)
+	}
+
+	if age := findMapValue(firstGroup, "age"); age != nil {
+		for _, resolved := range resolveAliasNodes(age.Content) {
+			// Only include non-host keys (user/shared keys)
+			if !strings.HasPrefix(resolved.Anchor, "host_") {
+				ageKeys = append(ageKeys, resolved)
+			}
+		}
+	}
+
+	return pgpKeys, ageKeys, nil
+}
+
+// findHostRuleFirstKeyGroup returns the first key_group of the first nix/hosts/
+// creation rule that has one, or nil if no such rule exists.
+func findHostRuleFirstKeyGroup(rules *yaml.Node) *yaml.Node {
 	for _, rule := range rules.Content {
 		pr := findMapValue(rule, "path_regex")
 		if pr == nil || !strings.HasPrefix(pr.Value, "nix/hosts/") {
 			continue
 		}
-
 		kg := findMapValue(rule, "key_groups")
 		if kg == nil || len(kg.Content) == 0 {
 			continue
 		}
-		firstGroup := kg.Content[0]
-
-		if pgp := findMapValue(firstGroup, "pgp"); pgp != nil {
-			for _, k := range pgp.Content {
-				resolved := k
-				if k.Kind == yaml.AliasNode {
-					resolved = k.Alias
-				}
-				pgpKeys = append(pgpKeys, resolved)
-			}
-		}
-
-		if age := findMapValue(firstGroup, "age"); age != nil {
-			for _, k := range age.Content {
-				resolved := k
-				if k.Kind == yaml.AliasNode {
-					resolved = k.Alias
-				}
-				// Only include non-host keys (user/shared keys)
-				if !strings.HasPrefix(resolved.Anchor, "host_") {
-					ageKeys = append(ageKeys, resolved)
-				}
-			}
-		}
-
-		return pgpKeys, ageKeys, nil
+		return kg.Content[0]
 	}
+	return nil
+}
 
-	return nil, nil, fmt.Errorf("no existing host creation rule found in .sops.yaml to derive common keys from")
+// resolveAliasNodes returns nodes with each YAML alias resolved to the node it points to.
+func resolveAliasNodes(nodes []*yaml.Node) []*yaml.Node {
+	resolved := make([]*yaml.Node, len(nodes))
+	for i, k := range nodes {
+		if k.Kind == yaml.AliasNode {
+			resolved[i] = k.Alias
+		} else {
+			resolved[i] = k
+		}
+	}
+	return resolved
 }
 
 // findMapValue returns the value node for the given key in a YAML mapping node.

@@ -13,10 +13,9 @@ package main
 
 import (
 	"context"
+	"dagger/homelab/internal/dagger"
 	"fmt"
 	"strings"
-
-	"dagger/homelab/internal/dagger"
 )
 
 // Homelab is the main Dagger module for k8s-homelab CI/CD
@@ -117,7 +116,7 @@ func (m *Homelab) ValidateNix(ctx context.Context,
 	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"]
 	source *dagger.Directory,
 	// +optional
-	paths []string,
+	paths []string, //nolint:unparam // accepted for CI --changed uniformity (lab ci passes --paths to every +check); flake check always checks the whole tree
 ) (string, error) {
 	_, err := nixContainer().
 		WithMountedDirectory("/src", source).
@@ -141,18 +140,13 @@ func (m *Homelab) ValidateWoodpecker(ctx context.Context,
 	// +optional
 	paths []string,
 ) (string, error) {
-	targets := filterPaths(paths, validateWoodpeckerPatterns)
-	if len(paths) > 0 && len(targets) == 0 {
-		return "Woodpecker validation skipped (no matching files)", nil
-	}
-
 	container := dag.Container().
 		From(woodpeckerImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src")
 
-	if len(targets) > 0 {
-		for _, f := range targets {
+	if len(paths) > 0 {
+		for _, f := range paths {
 			container = container.WithExec([]string{"woodpecker-cli", "lint", "--strict", f})
 		}
 	} else {
@@ -175,7 +169,7 @@ func (m *Homelab) BuildCli(ctx context.Context,
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
 	// +optional
-	paths []string,
+	paths []string, //nolint:unparam // accepted for CI --changed uniformity (lab ci passes --paths to every +check); nix build always builds the whole CLI
 ) (string, error) {
 	_, err := nixContainer().
 		WithMountedDirectory("/src", source).
@@ -209,13 +203,13 @@ func (m *Homelab) BuildCliGo(ctx context.Context,
 }
 
 // Cli returns the built lab CLI binary (using Go for speed)
-func (m *Homelab) Cli(ctx context.Context,
+func (m *Homelab) Cli(ctx context.Context, //nolint:unparam // ctx is idiomatic for Dagger module functions even when the current lazy *dagger.File chain doesn't need it directly
 	// +defaultPath="/"
 	// +ignore=["*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum"]
 	source *dagger.Directory,
 	platform dagger.Platform,
 ) *dagger.File {
-	return dag.Container().
+	return dag.Container(dagger.ContainerOpts{Platform: platform}).
 		From(golangImage).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/cmd/lab").
@@ -225,7 +219,7 @@ func (m *Homelab) Cli(ctx context.Context,
 }
 
 // CliNix returns the built lab CLI binary using Nix
-func (m *Homelab) CliNix(ctx context.Context,
+func (m *Homelab) CliNix(ctx context.Context, //nolint:unparam // ctx is idiomatic for Dagger module functions even when the current lazy *dagger.File chain doesn't need it directly
 	// +defaultPath="/"
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
@@ -270,7 +264,8 @@ func (m *Homelab) DevenvContainer(
 		// Use the host daemon as a substituter. The "daemon" keyword connects
 		// to the socket at the default path (/nix/var/nix/daemon-socket/socket).
 		// This works on NixOS CI hosts where architecture matches the container.
-		devenvOpts = append(devenvOpts,
+		devenvOpts = append(
+			devenvOpts,
 			"--nix-option", "extra-substituters", "daemon",
 			"--nix-option", "require-sigs", "false",
 		)

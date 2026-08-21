@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -35,14 +37,14 @@ func getKubeconfigManager() *kubeconfig.Manager {
 	return kubeconfigMgr
 }
 
-func setupKubeconfig(envName string) (func(), error) {
+func setupKubeconfig(ctx context.Context, envName string) (func(), error) {
 	mgr := getKubeconfigManager()
 
 	if !mgr.Exists(envName) {
 		return nil, fmt.Errorf("no kubeconfig found for environment %q (expected at %s)", envName, mgr.GetEncryptedPath(envName))
 	}
 
-	cleanup, err := mgr.Setup(envName)
+	cleanup, err := mgr.Setup(ctx, envName)
 	if err != nil {
 		return nil, fmt.Errorf("setup kubeconfig: %w", err)
 	}
@@ -98,7 +100,7 @@ After bootstrap, ArgoCD will manage all applications.`,
 				return fmt.Errorf("load environment: %w", err)
 			}
 
-			cleanup, err := setupKubeconfig(envName)
+			cleanup, err := setupKubeconfig(cmd.Context(), envName)
 			if err != nil {
 				return err
 			}
@@ -111,92 +113,16 @@ After bootstrap, ArgoCD will manage all applications.`,
 				}
 			}
 
-			bootstrapOrder := []string{
-				"secret-system",
-				"cert-system",
-				"metallb",
-			}
-
-			if !skipArgo {
-				bootstrapOrder = append(bootstrapOrder, "argocd")
-			}
-
-			for _, app := range bootstrapOrder {
-				if !slices.Contains(env.Apps.Foundation, app) {
-					continue
-				}
-
-				appPath := filepath.Join("k8s/foundation", app)
-				if _, err := os.Stat(appPath); os.IsNotExist(err) {
-					continue
-				}
-
-				if !jsonOutput {
-					fmt.Printf("\nInstalling %s...\n", app)
-				}
-
-				chartPath := filepath.Join(appPath, "Chart.yaml")
-				if _, err := os.Stat(chartPath); os.IsNotExist(err) {
-					if err := applyKustomization(appPath, dryRun); err != nil {
-						return fmt.Errorf("install %s: %w", app, err)
-					}
-					continue
-				}
-
-				needs, err := helm.NeedsDependencyBuild(appPath)
-				if err != nil {
-					return fmt.Errorf("check deps for %s: %w", app, err)
-				}
-				if needs {
-					depCmd := exec.Command("helm", "dependency", "build", appPath)
-					depCmd.Stdout = os.Stdout
-					depCmd.Stderr = os.Stderr
-					if err := depCmd.Run(); err != nil {
-						return fmt.Errorf("build deps for %s: %w", app, err)
-					}
-				}
-
-				helmArgs := []string{
-					"upgrade", "--install", app, appPath,
-					"--namespace", app,
-					"--create-namespace",
-				}
-				if dryRun {
-					helmArgs = append(helmArgs, "--dry-run")
-				}
-
-				clusterValues := filepath.Join(getConfigDir(), "gen", "cluster-values.yaml")
-				if _, err := os.Stat(clusterValues); err == nil {
-					helmArgs = append(helmArgs, "--values", clusterValues)
-				}
-
-				helmCmd := exec.Command("helm", helmArgs...)
-				helmCmd.Stdout = os.Stdout
-				helmCmd.Stderr = os.Stderr
-				if err := helmCmd.Run(); err != nil {
-					return fmt.Errorf("install %s: %w", app, err)
-				}
+			if err := installFoundationApps(cmd.Context(), env, bootstrapOrder(skipArgo), dryRun); err != nil {
+				return err
 			}
 
 			if !skipArgo && !dryRun {
-				if !jsonOutput {
-					fmt.Println("\nApplying ArgoCD app-of-apps...")
-				}
-
-				kubectlCmd := exec.Command("kubectl", "apply", "-f", "k8s/foundation/application.yaml")
-				kubectlCmd.Stdout = os.Stdout
-				kubectlCmd.Stderr = os.Stderr
-				if err := kubectlCmd.Run(); err != nil {
-					fmt.Printf("Warning: failed to apply foundation app-of-apps: %v\n", err)
-				}
+				applyArgoAppOfApps(cmd.Context())
 			}
 
 			if !jsonOutput && !dryRun {
-				fmt.Println("\nBootstrap complete!")
-				fmt.Println("ArgoCD will now manage the remaining applications.")
-				fmt.Println("\nTo access ArgoCD UI:")
-				fmt.Println("  kubectl port-forward svc/argocd-server -n argocd 8080:443")
-				fmt.Println("  open https://localhost:8080")
+				printBootstrapComplete()
 			}
 
 			return nil
@@ -207,6 +133,113 @@ After bootstrap, ArgoCD will manage all applications.`,
 	cmd.Flags().Bool("skip-argocd", false, "Skip ArgoCD installation (for debugging)")
 
 	return cmd
+}
+
+// installFoundationApp installs a single foundation-tier app at appPath, either via
+// `kubectl apply -k` (if it has no Chart.yaml) or via Helm (building dependencies first
+// if needed).
+// bootstrapOrder returns the foundation apps in the order they must be installed,
+// omitting argocd if skipArgo is set.
+func bootstrapOrder(skipArgo bool) []string {
+	order := []string{"secret-system", "cert-system", "metallb"}
+	if !skipArgo {
+		order = append(order, "argocd")
+	}
+	return order
+}
+
+// installFoundationApps installs each app in order that is both enabled in env's
+// foundation tier and present on disk under k8s/foundation/.
+func installFoundationApps(ctx context.Context, env *config.Environment, order []string, dryRun bool) error {
+	for _, app := range order {
+		if !slices.Contains(env.Apps.Foundation, app) {
+			continue
+		}
+
+		appPath := filepath.Join("k8s/foundation", app)
+		if _, err := os.Stat(appPath); os.IsNotExist(err) {
+			continue
+		}
+
+		if !jsonOutput {
+			fmt.Printf("\nInstalling %s...\n", app)
+		}
+
+		if err := installFoundationApp(ctx, app, appPath, dryRun); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func installFoundationApp(ctx context.Context, app, appPath string, dryRun bool) error {
+	chartPath := filepath.Join(appPath, "Chart.yaml")
+	if _, err := os.Stat(chartPath); os.IsNotExist(err) {
+		if err := applyKustomization(ctx, appPath, dryRun); err != nil {
+			return fmt.Errorf("install %s: %w", app, err)
+		}
+		return nil
+	}
+
+	needs, err := helm.NeedsDependencyBuild(appPath)
+	if err != nil {
+		return fmt.Errorf("check deps for %s: %w", app, err)
+	}
+	if needs {
+		depCmd := exec.CommandContext(ctx, "helm", "dependency", "build", appPath)
+		depCmd.Stdout = os.Stdout
+		depCmd.Stderr = os.Stderr
+		if err := depCmd.Run(); err != nil {
+			return fmt.Errorf("build deps for %s: %w", app, err)
+		}
+	}
+
+	helmArgs := []string{
+		"upgrade", "--install", app, appPath,
+		"--namespace", app,
+		"--create-namespace",
+	}
+	if dryRun {
+		helmArgs = append(helmArgs, "--dry-run")
+	}
+
+	clusterValues := filepath.Join(getConfigDir(), "gen", "cluster-values.yaml")
+	if _, err := os.Stat(clusterValues); err == nil {
+		helmArgs = append(helmArgs, "--values", clusterValues)
+	}
+
+	helmCmd := exec.CommandContext(ctx, "helm", helmArgs...)
+	helmCmd.Stdout = os.Stdout
+	helmCmd.Stderr = os.Stderr
+	if err := helmCmd.Run(); err != nil {
+		return fmt.Errorf("install %s: %w", app, err)
+	}
+	return nil
+}
+
+// applyArgoAppOfApps applies the foundation tier's ArgoCD app-of-apps manifest.
+// Failures are logged as warnings rather than returned, since ArgoCD itself isn't
+// required for the rest of bootstrap to have succeeded.
+func applyArgoAppOfApps(ctx context.Context) {
+	if !jsonOutput {
+		fmt.Println("\nApplying ArgoCD app-of-apps...")
+	}
+
+	kubectlCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "k8s/foundation/application.yaml")
+	kubectlCmd.Stdout = os.Stdout
+	kubectlCmd.Stderr = os.Stderr
+	if err := kubectlCmd.Run(); err != nil {
+		fmt.Printf("Warning: failed to apply foundation app-of-apps: %v\n", err)
+	}
+}
+
+// printBootstrapComplete prints the post-bootstrap success message and next steps.
+func printBootstrapComplete() {
+	fmt.Println("\nBootstrap complete!")
+	fmt.Println("ArgoCD will now manage the remaining applications.")
+	fmt.Println("\nTo access ArgoCD UI:")
+	fmt.Println("  kubectl port-forward svc/argocd-server -n argocd 8080:443")
+	fmt.Println("  open https://localhost:8080")
 }
 
 func newK8sDiffCmd() *cobra.Command {
@@ -230,7 +263,7 @@ Examples:
 			watch, _ := cmd.Flags().GetBool("watch")
 			debounce, _ := cmd.Flags().GetDuration("debounce")
 
-			cleanup, err := setupKubeconfig(envName)
+			cleanup, err := setupKubeconfig(cmd.Context(), envName)
 			if err != nil {
 				return err
 			}
@@ -242,10 +275,10 @@ Examples:
 			}
 
 			if !watch {
-				return runDiff(target)
+				return runDiff(cmd.Context(), target)
 			}
 
-			return watchAndDiff(target, debounce)
+			return watchAndDiff(cmd.Context(), target, debounce)
 		},
 	}
 
@@ -269,7 +302,7 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			envName, _ := cmd.Flags().GetString("env")
 
-			cleanup, err := setupKubeconfig(envName)
+			cleanup, err := setupKubeconfig(cmd.Context(), envName)
 			if err != nil {
 				return err
 			}
@@ -286,7 +319,7 @@ Examples:
 			tier, app := parseK8sTarget(target)
 
 			if useArgo {
-				return syncViaArgoCD(tier, app, prune)
+				return syncViaArgoCD(cmd.Context(), tier, app, prune)
 			}
 
 			if tier == "" && app == "" {
@@ -294,10 +327,10 @@ Examples:
 			}
 
 			if app == "" {
-				return syncTier(tier)
+				return syncTier(cmd.Context(), tier)
 			}
 
-			return syncApp(tier, app)
+			return syncApp(cmd.Context(), tier, app)
 		},
 	}
 
@@ -336,59 +369,71 @@ Examples:
 			hasKubeconfig := mgr.Exists(envName)
 
 			if jsonOutput {
-				var output any
-				if tier == "" {
-					output = map[string]any{
-						"environment":   envName,
-						"hasKubeconfig": hasKubeconfig,
-						"apps":          env.Apps,
-					}
-				} else {
-					switch tier {
-					case "foundation":
-						output = env.Apps.Foundation
-					case "platform":
-						output = env.Apps.Platform
-					case "apps":
-						output = env.Apps.Apps
-					default:
-						return fmt.Errorf("unknown tier: %s", tier)
-					}
-				}
-				out, _ := json.MarshalIndent(output, "", "  ")
-				fmt.Println(string(out))
-				return nil
+				return printK8sListJSON(env, envName, tier, hasKubeconfig)
 			}
 
-			fmt.Printf("Applications for %s environment", envName)
-			if hasKubeconfig {
-				fmt.Println(" (kubeconfig available)")
-			} else {
-				fmt.Println(" (no kubeconfig)")
-			}
-
-			printTier := func(name string, apps []string) {
-				if tier != "" && tier != name {
-					return
-				}
-				fmt.Printf("\n%s:\n", cases.Title(language.English).String(name))
-				for _, app := range apps {
-					appPath := filepath.Join("k8s", name, app)
-					status := "✓"
-					if _, err := os.Stat(appPath); os.IsNotExist(err) {
-						status = "✗ (missing)"
-					}
-					fmt.Printf("  %s %s\n", status, app)
-				}
-			}
-
-			printTier("foundation", env.Apps.Foundation)
-			printTier("platform", env.Apps.Platform)
-			printTier("apps", env.Apps.Apps)
-
+			printK8sListText(env, envName, tier, hasKubeconfig)
 			return nil
 		},
 	}
+}
+
+// printK8sListJSON prints the app list for tier (or all tiers, if empty) as JSON.
+func printK8sListJSON(env *config.Environment, envName, tier string, hasKubeconfig bool) error {
+	var output any
+	if tier == "" {
+		output = map[string]any{
+			"environment":   envName,
+			"hasKubeconfig": hasKubeconfig,
+			"apps":          env.Apps,
+		}
+	} else {
+		switch tier {
+		case "foundation":
+			output = env.Apps.Foundation
+		case "platform":
+			output = env.Apps.Platform
+		case "apps":
+			output = env.Apps.Apps
+		default:
+			return fmt.Errorf("unknown tier: %s", tier)
+		}
+	}
+	out, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal app list: %w", err)
+	}
+	fmt.Println(string(out))
+	return nil
+}
+
+// printK8sListText prints the app list for tier (or all tiers, if empty) as human-readable text.
+func printK8sListText(env *config.Environment, envName, tier string, hasKubeconfig bool) {
+	fmt.Printf("Applications for %s environment", envName)
+	if hasKubeconfig {
+		fmt.Println(" (kubeconfig available)")
+	} else {
+		fmt.Println(" (no kubeconfig)")
+	}
+
+	printTier := func(name string, apps []string) {
+		if tier != "" && tier != name {
+			return
+		}
+		fmt.Printf("\n%s:\n", cases.Title(language.English).String(name))
+		for _, app := range apps {
+			appPath := filepath.Join("k8s", name, app)
+			status := "✓"
+			if _, err := os.Stat(appPath); os.IsNotExist(err) {
+				status = "✗ (missing)"
+			}
+			fmt.Printf("  %s %s\n", status, app)
+		}
+	}
+
+	printTier("foundation", env.Apps.Foundation)
+	printTier("platform", env.Apps.Platform)
+	printTier("apps", env.Apps.Apps)
 }
 
 func newK8sStatusCmd() *cobra.Command {
@@ -399,7 +444,7 @@ func newK8sStatusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			envName, _ := cmd.Flags().GetString("env")
 
-			cleanup, err := setupKubeconfig(envName)
+			cleanup, err := setupKubeconfig(cmd.Context(), envName)
 			if err != nil {
 				return err
 			}
@@ -412,7 +457,7 @@ func newK8sStatusCmd() *cobra.Command {
 			if !jsonOutput {
 				fmt.Println("\nNodes:")
 			}
-			kubectlCmd := exec.Command("kubectl", "get", "nodes", "-o", "wide")
+			kubectlCmd := exec.CommandContext(cmd.Context(), "kubectl", "get", "nodes", "-o", "wide")
 			kubectlCmd.Stdout = os.Stdout
 			kubectlCmd.Stderr = os.Stderr
 			if err := kubectlCmd.Run(); err != nil {
@@ -422,15 +467,15 @@ func newK8sStatusCmd() *cobra.Command {
 			if !jsonOutput {
 				fmt.Println("\nArgoCD Applications:")
 			}
-			argoCmd := exec.Command("argocd", "app", "list", "--grpc-web")
+			argoCmd := exec.CommandContext(cmd.Context(), "argocd", "app", "list", "--grpc-web")
 			argoCmd.Stdout = os.Stdout
 			argoCmd.Stderr = os.Stderr
 			if err := argoCmd.Run(); err != nil {
-				kubectlCmd := exec.Command("kubectl", "get", "applications", "-n", "argocd",
+				kubectlCmd := exec.CommandContext(cmd.Context(), "kubectl", "get", "applications", "-n", "argocd",
 					"-o", "custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status")
 				kubectlCmd.Stdout = os.Stdout
 				kubectlCmd.Stderr = os.Stderr
-				kubectlCmd.Run()
+				_ = kubectlCmd.Run()
 			}
 
 			return nil
@@ -459,7 +504,7 @@ This exports the environment configuration to formats usable by Helm charts.`,
 				outputDir = filepath.Join(configDir, "gen")
 			}
 
-			if outputDirErr := os.MkdirAll(outputDir, 0o755); outputDirErr != nil {
+			if outputDirErr := os.MkdirAll(outputDir, 0o750); outputDirErr != nil {
 				return fmt.Errorf("create output directory: %w", outputDirErr)
 			}
 
@@ -469,7 +514,7 @@ This exports the environment configuration to formats usable by Helm charts.`,
 			}
 
 			helmPath := filepath.Join(outputDir, "cluster-values.yaml")
-			if clusterValuesErr := os.WriteFile(helmPath, []byte(helmValues), 0o644); clusterValuesErr != nil {
+			if clusterValuesErr := os.WriteFile(helmPath, []byte(helmValues), 0o600); clusterValuesErr != nil {
 				return fmt.Errorf("write helm values: %w", clusterValuesErr)
 			}
 
@@ -479,7 +524,7 @@ This exports the environment configuration to formats usable by Helm charts.`,
 			}
 
 			tfPath := filepath.Join(outputDir, "cluster.tfvars")
-			if err := os.WriteFile(tfPath, []byte(tfValues), 0o644); err != nil {
+			if err := os.WriteFile(tfPath, []byte(tfValues), 0o600); err != nil {
 				return fmt.Errorf("write terraform values: %w", err)
 			}
 
@@ -537,8 +582,8 @@ The decrypted kubeconfig is stored in .lab/kubeconfig/<env>.yaml`,
 
 			mgr := getKubeconfigManager()
 
-			if err := mgr.SetupPersistent(envName); err != nil {
-				return err
+			if err := mgr.SetupPersistent(cmd.Context(), envName); err != nil {
+				return fmt.Errorf("setting up persistent kubeconfig: %w", err)
 			}
 
 			decPath := mgr.GetDecryptedPath(envName)
@@ -646,7 +691,7 @@ func parseK8sTarget(target string) (tier, app string) {
 	return "", parts[0]
 }
 
-func runDiff(target string) error {
+func runDiff(ctx context.Context, target string) error {
 	tier, app := parseK8sTarget(target)
 
 	if tier == "" && app == "" {
@@ -654,7 +699,7 @@ func runDiff(target string) error {
 			if !jsonOutput {
 				fmt.Printf("\n=== %s ===\n", strings.ToUpper(t))
 			}
-			if err := diffTier(t); err != nil {
+			if err := diffTier(ctx, t); err != nil {
 				fmt.Printf("Warning: %v\n", err)
 			}
 		}
@@ -662,28 +707,28 @@ func runDiff(target string) error {
 	}
 
 	if app == "" {
-		return diffTier(tier)
+		return diffTier(ctx, tier)
 	}
 
-	return diffApp(tier, app)
+	return diffApp(ctx, tier, app)
 }
 
-func diffTier(tier string) error {
+func diffTier(ctx context.Context, tier string) error {
 	tierPath := filepath.Join("k8s", tier)
 	charts, err := helm.DiscoverCharts(tierPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("discovering charts: %w", err)
 	}
 
 	for _, chart := range charts {
-		if err := diffApp(chart.Tier, chart.Name); err != nil {
+		if err := diffApp(ctx, chart.Tier, chart.Name); err != nil {
 			fmt.Printf("Warning: %s/%s: %v\n", chart.Tier, chart.Name, err)
 		}
 	}
 	return nil
 }
 
-func diffApp(tier, app string) error {
+func diffApp(ctx context.Context, tier, app string) error {
 	chartDir := filepath.Join("k8s", tier, app)
 
 	info, err := helm.ParseChartInfo(chartDir)
@@ -691,20 +736,8 @@ func diffApp(tier, app string) error {
 		return fmt.Errorf("parse chart info: %w", err)
 	}
 
-	needs, err := helm.NeedsDependencyBuild(chartDir)
-	if err != nil {
+	if err := buildChartDependenciesIfNeeded(ctx, tier, app, chartDir); err != nil {
 		return err
-	}
-	if needs {
-		if !jsonOutput {
-			fmt.Printf("Building dependencies for %s/%s...\n", tier, app)
-		}
-		depCmd := exec.Command("helm", "dependency", "build", chartDir)
-		depCmd.Stdout = os.Stdout
-		depCmd.Stderr = os.Stderr
-		if depErr := depCmd.Run(); depErr != nil {
-			return fmt.Errorf("helm dependency build: %w", depErr)
-		}
 	}
 
 	if !jsonOutput {
@@ -721,12 +754,49 @@ func diffApp(tier, app string) error {
 		templateArgs = append(templateArgs, "--values", clusterValues)
 	}
 
-	helmCmd := exec.Command("helm", templateArgs...)
-	kubectlCmd := exec.Command("kubectl", "diff", "-f", "-")
+	helmCmd := exec.CommandContext(ctx, "helm", templateArgs...)
+	kubectlCmd := exec.CommandContext(ctx, "kubectl", "diff", "-f", "-")
 
+	changed, err := runHelmDiffPipe(helmCmd, kubectlCmd)
+	if err != nil {
+		return err
+	}
+
+	if !jsonOutput && !changed {
+		fmt.Println("  (no changes)")
+	}
+	return nil
+}
+
+// buildChartDependenciesIfNeeded runs `helm dependency build` for chartDir if needed.
+func buildChartDependenciesIfNeeded(ctx context.Context, tier, app, chartDir string) error {
+	needs, err := helm.NeedsDependencyBuild(chartDir)
+	if err != nil {
+		return fmt.Errorf("checking dependency build: %w", err)
+	}
+	if !needs {
+		return nil
+	}
+
+	if !jsonOutput {
+		fmt.Printf("Building dependencies for %s/%s...\n", tier, app)
+	}
+	depCmd := exec.CommandContext(ctx, "helm", "dependency", "build", chartDir)
+	depCmd.Stdout = os.Stdout
+	depCmd.Stderr = os.Stderr
+	if err := depCmd.Run(); err != nil {
+		return fmt.Errorf("helm dependency build: %w", err)
+	}
+	return nil
+}
+
+// runHelmDiffPipe runs helmCmd piped into kubectlCmd (a `kubectl diff -f -`), returning
+// whether kubectl reported any changes. A kubectl exit code of 1 (changes found) is not
+// treated as an error.
+func runHelmDiffPipe(helmCmd, kubectlCmd *exec.Cmd) (changed bool, err error) {
 	pipe, err := helmCmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("create pipe: %w", err)
+		return false, fmt.Errorf("create pipe: %w", err)
 	}
 	kubectlCmd.Stdin = pipe
 	kubectlCmd.Stdout = os.Stdout
@@ -735,108 +805,148 @@ func diffApp(tier, app string) error {
 	if err := kubectlCmd.Start(); err != nil {
 		helmCmd.Stdout = os.Stdout
 		helmCmd.Stderr = os.Stderr
-		return helmCmd.Run()
+		if err := helmCmd.Run(); err != nil {
+			return false, fmt.Errorf("helm template: %w", err)
+		}
+		return false, nil
 	}
 
 	if err := helmCmd.Run(); err != nil {
-		kubectlCmd.Wait()
-		return fmt.Errorf("helm template: %w", err)
+		_ = kubectlCmd.Wait()
+		return false, fmt.Errorf("helm template: %w", err)
 	}
 
 	if err := kubectlCmd.Wait(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-			return nil
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return true, nil
 		}
-		return fmt.Errorf("kubectl diff: %w", err)
+		return false, fmt.Errorf("kubectl diff: %w", err)
 	}
 
-	if !jsonOutput {
-		fmt.Println("  (no changes)")
-	}
-	return nil
+	return false, nil
 }
 
-func watchAndDiff(target string, debounce time.Duration) error {
+func watchAndDiff(ctx context.Context, target string, debounce time.Duration) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("create watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
-	tier, app := parseK8sTarget(target)
-	var watchPaths []string
-	if tier != "" && app != "" {
-		watchPaths = []string{filepath.Join("k8s", tier, app)}
-	} else if tier != "" {
-		watchPaths = []string{filepath.Join("k8s", tier)}
-	} else {
-		watchPaths = []string{"k8s"}
-	}
-
-	for _, wp := range watchPaths {
-		filepath.WalkDir(wp, func(path string, d os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() {
-				name := d.Name()
-				if name == "charts" || name == ".venv" || name == "__pycache__" || name == ".pytest_cache" {
-					return filepath.SkipDir
-				}
-				watcher.Add(path)
-			}
-			return nil
-		})
+	if err := addWatchTargets(watcher, target); err != nil {
+		return err
 	}
 
 	fmt.Println("Watching for changes... (Ctrl+C to stop)")
-	runDiff(target)
+	if err := runDiff(ctx, target); err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
 
+	runWatchLoop(ctx, watcher, target, debounce)
+	return nil
+}
+
+// watchPathsForTarget returns the k8s/ subdirectories to watch for target: a single
+// app, a whole tier, or all of k8s if target names neither.
+func watchPathsForTarget(target string) []string {
+	tier, app := parseK8sTarget(target)
+	switch {
+	case tier != "" && app != "":
+		return []string{filepath.Join("k8s", tier, app)}
+	case tier != "":
+		return []string{filepath.Join("k8s", tier)}
+	default:
+		return []string{"k8s"}
+	}
+}
+
+// isWatchExcludedDir reports whether a directory should be skipped when adding watch paths.
+func isWatchExcludedDir(name string) bool {
+	return name == "charts" || name == ".venv" || name == "__pycache__" || name == ".pytest_cache"
+}
+
+// addWatchTargets registers every relevant directory under target's watch scope with watcher.
+func addWatchTargets(watcher *fsnotify.Watcher, target string) error {
+	for _, wp := range watchPathsForTarget(target) {
+		err := filepath.WalkDir(wp, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() {
+				return nil
+			}
+			if isWatchExcludedDir(d.Name()) {
+				return filepath.SkipDir
+			}
+			if err := watcher.Add(path); err != nil {
+				return fmt.Errorf("watch %s: %w", path, err)
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("walk %s: %w", wp, err)
+		}
+	}
+	return nil
+}
+
+// isRelevantWatchEvent reports whether event is a write/create of a chart-relevant file.
+func isRelevantWatchEvent(event fsnotify.Event) bool {
+	if !event.Has(fsnotify.Write) && !event.Has(fsnotify.Create) {
+		return false
+	}
+	ext := filepath.Ext(event.Name)
+	return ext == ".yaml" || ext == ".yml" || ext == ".tpl"
+}
+
+// handleWatchedChange re-diffs the app (or target) affected by a debounced file change.
+func handleWatchedChange(ctx context.Context, changedFile, target string) {
+	fmt.Printf("\n--- File changed: %s ---\n", changedFile)
+
+	chartDir := findChartDir(changedFile)
+	if chartDir == "" {
+		if err := runDiff(ctx, target); err != nil {
+			fmt.Printf("Error: %v\n", err)
+		}
+		return
+	}
+
+	info, err := helm.ParseChartInfo(chartDir)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	if err := diffApp(ctx, info.Tier, info.Name); err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+	fmt.Println("\nWatching for changes... (Ctrl+C to stop)")
+}
+
+// runWatchLoop processes fsnotify events for watcher until its channels close,
+// debouncing relevant changes into calls to handleWatchedChange.
+func runWatchLoop(ctx context.Context, watcher *fsnotify.Watcher, target string, debounce time.Duration) {
 	var timer *time.Timer
 
 	for {
 		select {
 		case event, ok := <-watcher.Events:
 			if !ok {
-				return nil
+				return
 			}
-
-			if !event.Has(fsnotify.Write) && !event.Has(fsnotify.Create) {
+			if !isRelevantWatchEvent(event) {
 				continue
 			}
-
-			ext := filepath.Ext(event.Name)
-			if ext != ".yaml" && ext != ".yml" && ext != ".tpl" {
-				continue
-			}
-
 			if timer != nil {
 				timer.Stop()
 			}
-
 			changedFile := event.Name
-			timer = time.AfterFunc(debounce, func() {
-				fmt.Printf("\n--- File changed: %s ---\n", changedFile)
-
-				chartDir := findChartDir(changedFile)
-				if chartDir == "" {
-					runDiff(target)
-					return
-				}
-
-				info, err := helm.ParseChartInfo(chartDir)
-				if err != nil {
-					fmt.Printf("Error: %v\n", err)
-					return
-				}
-
-				diffApp(info.Tier, info.Name)
-				fmt.Println("\nWatching for changes... (Ctrl+C to stop)")
-			})
+			timer = time.AfterFunc(debounce, func() { handleWatchedChange(ctx, changedFile, target) })
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
-				return nil
+				return
 			}
 			fmt.Printf("Watch error: %v\n", err)
 		}
@@ -854,22 +964,22 @@ func findChartDir(filePath string) string {
 	return ""
 }
 
-func syncTier(tier string) error {
+func syncTier(ctx context.Context, tier string) error {
 	tierPath := filepath.Join("k8s", tier)
 	charts, err := helm.DiscoverCharts(tierPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("discovering charts: %w", err)
 	}
 
 	for _, chart := range charts {
-		if err := syncApp(chart.Tier, chart.Name); err != nil {
+		if err := syncApp(ctx, chart.Tier, chart.Name); err != nil {
 			fmt.Printf("Warning: %s/%s: %v\n", chart.Tier, chart.Name, err)
 		}
 	}
 	return nil
 }
 
-func syncApp(tier, app string) error {
+func syncApp(ctx context.Context, tier, app string) error {
 	chartDir := filepath.Join("k8s", tier, app)
 
 	info, err := helm.ParseChartInfo(chartDir)
@@ -877,20 +987,8 @@ func syncApp(tier, app string) error {
 		return fmt.Errorf("parse chart info: %w", err)
 	}
 
-	needs, err := helm.NeedsDependencyBuild(chartDir)
-	if err != nil {
+	if err := buildChartDependenciesIfNeeded(ctx, tier, app, chartDir); err != nil {
 		return err
-	}
-	if needs {
-		if !jsonOutput {
-			fmt.Printf("Building dependencies for %s/%s...\n", tier, app)
-		}
-		depCmd := exec.Command("helm", "dependency", "build", chartDir)
-		depCmd.Stdout = os.Stdout
-		depCmd.Stderr = os.Stderr
-		if err := depCmd.Run(); err != nil {
-			return fmt.Errorf("helm dependency build: %w", err)
-		}
 	}
 
 	if !jsonOutput {
@@ -908,19 +1006,23 @@ func syncApp(tier, app string) error {
 		upgradeArgs = append(upgradeArgs, "--values", clusterValues)
 	}
 
-	helmCmd := exec.Command("helm", upgradeArgs...)
+	helmCmd := exec.CommandContext(ctx, "helm", upgradeArgs...)
 	helmCmd.Stdout = os.Stdout
 	helmCmd.Stderr = os.Stderr
-	return helmCmd.Run()
+	if err := helmCmd.Run(); err != nil {
+		return fmt.Errorf("helm upgrade: %w", err)
+	}
+	return nil
 }
 
-func syncViaArgoCD(tier, app string, prune bool) error {
+func syncViaArgoCD(ctx context.Context, tier, app string, prune bool) error {
 	var appName string
-	if app != "" {
+	switch {
+	case app != "":
 		appName = app
-	} else if tier != "" {
+	case tier != "":
 		appName = tier
-	} else {
+	default:
 		return fmt.Errorf("please specify an app or tier to sync")
 	}
 
@@ -933,23 +1035,29 @@ func syncViaArgoCD(tier, app string, prune bool) error {
 		args = append(args, "--prune")
 	}
 
-	argoCmd := exec.Command("argocd", args...)
+	argoCmd := exec.CommandContext(ctx, "argocd", args...)
 	argoCmd.Stdout = os.Stdout
 	argoCmd.Stderr = os.Stderr
-	return argoCmd.Run()
+	if err := argoCmd.Run(); err != nil {
+		return fmt.Errorf("argocd sync: %w", err)
+	}
+	return nil
 }
 
-func applyKustomization(path string, dryRun bool) error {
+func applyKustomization(ctx context.Context, path string, dryRun bool) error {
 	kustomizePath := filepath.Join(path, "kustomization.yaml")
 	if _, err := os.Stat(kustomizePath); err == nil {
 		args := []string{"apply", "-k", path}
 		if dryRun {
 			args = append(args, "--dry-run=client")
 		}
-		kubectlCmd := exec.Command("kubectl", args...)
+		kubectlCmd := exec.CommandContext(ctx, "kubectl", args...)
 		kubectlCmd.Stdout = os.Stdout
 		kubectlCmd.Stderr = os.Stderr
-		return kubectlCmd.Run()
+		if err := kubectlCmd.Run(); err != nil {
+			return fmt.Errorf("kubectl apply: %w", err)
+		}
+		return nil
 	}
 	return nil
 }

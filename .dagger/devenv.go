@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
+	"dagger/homelab/internal/dagger"
 	"fmt"
 	"path/filepath"
 	"sort"
-
-	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -139,7 +138,7 @@ func (m *Homelab) UpdateDevenv(
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("updating devenv: %w", err)
 	}
 
 	result := source

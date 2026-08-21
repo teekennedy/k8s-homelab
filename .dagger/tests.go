@@ -2,9 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
-
 	"dagger/homelab/internal/dagger"
+	"fmt"
 )
 
 // testChartSource returns a minimal Helm chart source directory for testing.

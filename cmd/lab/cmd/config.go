@@ -92,38 +92,44 @@ If no environment is specified, validates all environments.`,
 				return nil
 			}
 
-			entries, err := os.ReadDir(configDir)
-			if err != nil {
-				return fmt.Errorf("read config directory: %w", err)
-			}
-
-			excludeFiles := map[string]bool{
-				"schema.cue": true,
-				"base.cue":   true,
-			}
-
-			var errors []error
-			for _, entry := range entries {
-				if !entry.IsDir() && filepath.Ext(entry.Name()) == ".cue" && !excludeFiles[entry.Name()] {
-					env := entry.Name()[:len(entry.Name())-4]
-					if err := config.ValidateEnvironment(configDir, env); err != nil {
-						errors = append(errors, fmt.Errorf("%s: %w", env, err))
-					} else {
-						fmt.Printf("Environment %q is valid\n", env)
-					}
-				}
-			}
-
-			if len(errors) > 0 {
-				fmt.Fprintf(os.Stderr, "\nValidation errors:\n")
-				for _, err := range errors {
-					fmt.Fprintf(os.Stderr, "  - %v\n", err)
-				}
-				return fmt.Errorf("%d environment(s) failed validation", len(errors))
-			}
-			return nil
+			return validateAllEnvironments(configDir)
 		},
 	}
+}
+
+// validateAllEnvironments validates every environment config file found in configDir,
+// printing a result per environment and returning an error summarizing any failures.
+func validateAllEnvironments(configDir string) error {
+	entries, err := os.ReadDir(configDir)
+	if err != nil {
+		return fmt.Errorf("read config directory: %w", err)
+	}
+
+	excludeFiles := map[string]bool{
+		"schema.cue": true,
+		"base.cue":   true,
+	}
+
+	var errors []error
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".cue" && !excludeFiles[entry.Name()] {
+			env := entry.Name()[:len(entry.Name())-4]
+			if err := config.ValidateEnvironment(configDir, env); err != nil {
+				errors = append(errors, fmt.Errorf("%s: %w", env, err))
+			} else {
+				fmt.Printf("Environment %q is valid\n", env)
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		fmt.Fprintf(os.Stderr, "\nValidation errors:\n")
+		for _, err := range errors {
+			fmt.Fprintf(os.Stderr, "  - %v\n", err)
+		}
+		return fmt.Errorf("%d environment(s) failed validation", len(errors))
+	}
+	return nil
 }
 
 func newConfigExportCmd() *cobra.Command {
@@ -161,29 +167,38 @@ func newConfigListCmd() *cobra.Command {
 				return fmt.Errorf("read config directory: %w", err)
 			}
 
-			excludeFiles := map[string]bool{
-				"schema.cue": true,
-				"base.cue":   true,
-			}
+			envs := listEnvironmentNames(entries)
 
 			if jsonOutput {
-				var envs []string
-				for _, entry := range entries {
-					if !entry.IsDir() && filepath.Ext(entry.Name()) == ".cue" && !excludeFiles[entry.Name()] {
-						envs = append(envs, entry.Name()[:len(entry.Name())-4])
-					}
+				out, err := json.Marshal(envs)
+				if err != nil {
+					return fmt.Errorf("marshal environments: %w", err)
 				}
-				out, _ := json.Marshal(envs)
 				fmt.Println(string(out))
 			} else {
 				fmt.Println("Available environments:")
-				for _, entry := range entries {
-					if !entry.IsDir() && filepath.Ext(entry.Name()) == ".cue" && !excludeFiles[entry.Name()] {
-						fmt.Printf("  - %s\n", entry.Name()[:len(entry.Name())-4])
-					}
+				for _, env := range envs {
+					fmt.Printf("  - %s\n", env)
 				}
 			}
 			return nil
 		},
 	}
+}
+
+// listEnvironmentNames returns the environment names (config file basenames,
+// minus ".cue") for every non-excluded *.cue file among entries.
+func listEnvironmentNames(entries []os.DirEntry) []string {
+	excludeFiles := map[string]bool{
+		"schema.cue": true,
+		"base.cue":   true,
+	}
+
+	var envs []string
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".cue" && !excludeFiles[entry.Name()] {
+			envs = append(envs, entry.Name()[:len(entry.Name())-4])
+		}
+	}
+	return envs
 }
