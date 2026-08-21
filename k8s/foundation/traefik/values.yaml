@@ -6,7 +6,7 @@ standby:
   replicas: 2
   image:
     repository: nginxinc/nginx-unprivileged
-    tag: 1.31.3-alpine
+    tag: 1.31.4-alpine
   resources:
     requests:
       cpu: 5m
