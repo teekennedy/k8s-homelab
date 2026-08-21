@@ -3,7 +3,7 @@ homepage:
   image:
     registry: ghcr.io
     repository: gethomepage/homepage
-    tag: "v2.0.0"
+    tag: "v2.1.0"
   # Homepage owns the apex msng.to Ingress and gates it with OIDC login.
   ingress:
     enabled: true
