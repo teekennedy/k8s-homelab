@@ -1,7 +1,6 @@
 exemptions:
-  # POSTGRES_PASSWORD/POSTGRES_USER are sourced from a CNPG-generated
-  # secretKeyRef, not a literal value, but polaris flags the env var name
-  # regardless of value source — same false positive forgejo exempts.
+  # POSTGRES_PASSWORD/POSTGRES_USER come from a secretKeyRef, not a literal
+  # value, but polaris flags the env var name regardless of source.
   - controllerNames:
       - joplin-server
     rules:

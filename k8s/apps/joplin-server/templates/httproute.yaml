@@ -1,8 +1,7 @@
 ---
 # The whole host goes to Joplin Server as one rule: it does its own auth for
-# both the web admin UI and the sync API (the desktop/mobile apps
-# authenticate directly against the API with email+password), so there's no
-# OIDC gate to carve exceptions around the way freshrss's route has.
+# both the web UI and the sync API, so there's no OIDC gate to carve
+# exceptions around.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

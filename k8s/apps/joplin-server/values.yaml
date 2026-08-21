@@ -1,11 +1,4 @@
 # Default values for joplin-server.
-#
-# Joplin Server is the same open-source project that powers Joplin Cloud.
-# Self-hosting it here replaces the Joplin Cloud subscription while keeping
-# native notebook sharing between accounts and native mobile sync — unlike a
-# Syncthing-synced-folder approach, which Joplin's mobile apps can't use at
-# all (no "File System" sync target on iOS/Android, only server-based
-# targets).
 
 replicaCount: 1
 
@@ -35,25 +28,22 @@ serviceAccount:
   name: ""
 
 # --- Postgres (CNPG) --------------------------------------------------------
-# Single instance on purpose: this is a 2-person personal app, not shared
-# infra like forgejo's 3-instance HA cluster. barman-cloud WAL archiving is
-# kept even at 1 instance so there's still point-in-time recovery.
+# Single instance: a 2-person app doesn't need forgejo's 3-instance HA
+# cluster. barman-cloud WAL archiving still gives point-in-time recovery.
 psql:
   clusterName: joplin-psql
   image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
 
 # --- App config --------------------------------------------------------
-# joplin/server env reference: https://joplinapp.org/help/apps/sync/
 appBaseUrl: https://joplin.msng.to
-# Filesystem-driver attachment storage, kept off Postgres on purpose (see
-# persistence.data below). Must match the PVC mount path in deployment.yaml.
+# Filesystem-driver attachment storage. Path must match the PVC mount in
+# deployment.yaml.
 storageDriver: "Type=Filesystem; Path=/data"
 
 podSecurityContext:
   runAsNonRoot: true
-  # Confirmed by inspecting the joplin/server:3.7.1 image directly
-  # (`id joplin` -> uid=1001 gid=1001) — the image doesn't pin a UID in its
-  # Dockerfile, so this must be re-checked on any future major image bump.
+  # The image doesn't pin a UID in its Dockerfile; confirmed by inspection
+  # (`id joplin` -> uid=1001 gid=1001). Re-check on any major image bump.
   runAsUser: 1001
   runAsGroup: 1001
   fsGroup: 1001
@@ -62,11 +52,7 @@ podSecurityContext:
     type: RuntimeDefault
 
 securityContext:
-  # Deliberately NOT readOnlyRootFilesystem: pm2 (the image's process
-  # manager) keeps live state under PM2_HOME=/opt/pm2 (module registry, pid
-  # files, logs) that ships pre-seeded at image build time. Reproducing that
-  # read-only via an emptyDir overlay — the way freshrss's chart does for
-  # Apache/PHP — would need auditing pm2's module resolution first.
+  readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
   capabilities:
     drop:
@@ -81,10 +67,9 @@ resources:
     memory: 1Gi
 
 persistence:
-  # Note attachments only (images, PDFs, files pasted into notes) — the notes
-  # themselves live in Postgres. Longhorn + the recurring backup-to-NAS job
-  # (same group every other app's data volume uses) is the actual backup
-  # story that replaces what the Joplin Cloud subscription provided.
+  # Note attachments (images, PDFs, files pasted into notes). Notes
+  # themselves live in Postgres. Longhorn's recurring backup-to-NAS job
+  # (same group every other app's data volume uses) covers this PVC too.
   data:
     size: 20Gi
     storageClass: longhorn

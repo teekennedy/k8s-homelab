@@ -6,9 +6,8 @@ metadata:
   name: {{ .Values.psql.clusterName }}
   namespace: {{ .Release.Namespace }}
 spec:
-  # Single instance: this is a 2-person personal app, not shared infra like
-  # forgejo's 3-instance HA cluster. A node failure means a few minutes of
-  # sync downtime, not data loss — barman-cloud below still gives WAL-archived
+  # Single instance: a node failure means a few minutes of sync downtime,
+  # not data loss — barman-cloud below still gives WAL-archived
   # point-in-time recovery.
   instances: 1
   imageName: {{ .Values.psql.image }}
