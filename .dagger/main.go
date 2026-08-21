@@ -259,21 +259,7 @@ func (m *Homelab) DevenvContainer(
 		Include:   []string{"devenv.*", "cmd/lab/**"},
 	})
 
-	// Cache the nix store across runs. The cache volume name includes the image
-	// tag so it auto-invalidates when the devenv image is updated (e.g. by Renovate).
-	nixCacheKey := "devenv-nix-" + devenvImage
-	baseNix := dag.Container().From(devenvImage).WithUser("root").Directory("/nix")
-
-	builder := dag.Container().
-		From(devenvImage).
-		WithUser("root").
-		// Persist the nix store so packages are only built once.
-		// Initialized from the base image on first use; reused on subsequent runs.
-		WithMountedCache("/nix", dag.CacheVolume(nixCacheKey), dagger.ContainerWithMountedCacheOpts{
-			Source: baseNix,
-		}).
-		// Suppress zsh-specific setup (compdef errors) and version nag in container context
-		WithEnvVariable("DEVENV_ZSH_DISABLE", "1").
+	builder := devenvContainer().
 		WithDirectory("/devenv", source).
 		WithWorkdir("/devenv")
 

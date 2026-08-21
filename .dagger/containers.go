@@ -41,3 +41,21 @@ func golangContainer() *dagger.Container {
 		WithEnvVariable("GOMODCACHE", gomodcache).
 		WithMountedCache(gomodcache, dag.CacheVolume("GOMODCACHE-"+golangImage))
 }
+
+// devenvContainer returns a devenv container with a persistent nix store cache
+// mounted, so nix/devenv operations only build or fetch what changed. The
+// cache volume name includes the image tag so it auto-invalidates when the
+// devenv image is updated (e.g. by Renovate).
+func devenvContainer() *dagger.Container {
+	nixCacheKey := "devenv-nix-" + devenvImage
+	baseNix := dag.Container().From(devenvImage).WithUser("root").Directory("/nix")
+
+	return dag.Container().
+		From(devenvImage).
+		WithUser("root").
+		WithMountedCache("/nix", dag.CacheVolume(nixCacheKey), dagger.ContainerWithMountedCacheOpts{
+			Source: baseNix,
+		}).
+		// Suppress zsh-specific setup (compdef errors) and version nag in container context
+		WithEnvVariable("DEVENV_ZSH_DISABLE", "1")
+}
