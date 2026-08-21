@@ -197,7 +197,7 @@
   },
   "packageRules": [
     {
-      "description": "Skip FlakeHub transitive flake inputs that Renovate cannot resolve reliably",
+      "description": "Skip FlakeHub inputs: Renovate's nix manager only supports the git-refs datasource (git ls-remote), and flakehub.com is HTTP-only (tarball + REST API), so it can never resolve. Transitive deps that point to FlakeHub will still update.",
       "matchManagers": [
         "nix"
       ],
@@ -231,15 +231,6 @@
         "ghcr.io/jellyfin/jellyfin",
         "jellyfin/jellyfin"
       ]
-    },
-    {
-      "matchDatasources": [
-        "docker"
-      ],
-      "matchPackageNames": [
-        "lissy93/dashy"
-      ],
-      "versioning": "regex:^release-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
     },
     {
       "matchDatasources": [
