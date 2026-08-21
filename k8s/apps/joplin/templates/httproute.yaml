@@ -5,13 +5,13 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ include "joplin-server.fullname" . }}
+  name: {{ include "joplin.fullname" . }}
   namespace: {{ .Release.Namespace }}
   annotations:
     # external-dns selector; not read by the router.
     traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.route.entrypoint }}
   labels:
-    {{- include "joplin-server.labels" . | nindent 4 }}
+    {{- include "joplin.labels" . | nindent 4 }}
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
@@ -23,5 +23,5 @@ spec:
     - {{ .Values.route.host | quote }}
   rules:
     - backendRefs:
-        - name: {{ include "joplin-server.fullname" . }}
+        - name: {{ include "joplin.fullname" . }}
           port: {{ .Values.service.port }}

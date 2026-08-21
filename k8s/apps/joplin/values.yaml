@@ -1,4 +1,4 @@
-# Default values for joplin-server.
+# Default values for joplin.
 
 replicaCount: 1
 

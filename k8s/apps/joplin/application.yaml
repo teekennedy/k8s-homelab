@@ -3,12 +3,12 @@ kind: Application
 metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
-  name: joplin-server
+  name: joplin
   namespace: argocd
 spec:
   destination:
     name: in-cluster
-    namespace: joplin-server
+    namespace: joplin
   ignoreDifferences:
     - jsonPointers:
         - /spec/volumeName
@@ -24,13 +24,18 @@ spec:
         - /data
       kind: Secret
       name: cnpg-s3-credentials
-      namespace: joplin-server
+      namespace: joplin
   project: default
   source:
-    path: k8s/apps/joplin-server
+    path: k8s/apps/joplin
     repoURL: https://git.msng.to/ops/k8s-homelab
     targetRevision: main
   syncPolicy:
+    # Opts the namespace into public exposure; without it the HTTPRoute is not
+    # admitted by the gateway.
+    managedNamespaceMetadata:
+      labels:
+        external-gateway-access: "true"
     automated:
       prune: true
     retry:

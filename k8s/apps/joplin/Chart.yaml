@@ -1,5 +1,5 @@
 apiVersion: v2
-name: joplin-server
+name: joplin
 description: Self-hosted Joplin Server, replacing the Joplin Cloud subscription.
 type: application
 # Bump on any change to the chart templates/values.

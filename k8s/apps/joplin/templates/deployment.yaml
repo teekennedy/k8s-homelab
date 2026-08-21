@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "joplin-server.fullname" . }}
+  name: {{ include "joplin.fullname" . }}
   labels:
-    {{- include "joplin-server.labels" . | nindent 4 }}
+    {{- include "joplin.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   # Single writer: the attachment PVC is RWO, and nothing here supports
@@ -12,13 +12,13 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "joplin-server.selectorLabels" . | nindent 6 }}
+      {{- include "joplin.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "joplin-server.labels" . | nindent 8 }}
+        {{- include "joplin.labels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "joplin-server.serviceAccountName" . }}
+      serviceAccountName: {{ include "joplin.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -98,7 +98,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: {{ include "joplin-server.fullname" . }}-data
+            claimName: {{ include "joplin.fullname" . }}-data
         - name: pm2-home
           emptyDir: {}
         - name: tmp
