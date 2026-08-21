@@ -191,6 +191,10 @@
   "nix": {
     "enabled": true
   },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on tuesday"]
+  },
   "packageRules": [
     {
       "description": "Skip FlakeHub transitive flake inputs that Renovate cannot resolve reliably",
@@ -206,20 +210,17 @@
       "enabled": false
     },
     {
-      "description": "Group every update by the directory its package file lives in, so each project folder (helm chart, Go module, Python project, nix flake, etc.) gets a single PR. A folder holding multiple ecosystems (e.g. cmd/lab has go.mod + flake.nix + devenv.nix) is grouped together because they share the same packageFileDir. separateMajorMinor (default) still splits majors into their own PR.",
+      "description": "Group every update by the directory its package file lives in, so each project folder (helm chart, Go module, Python project, nix flake, etc.) gets a single PR. A folder holding multiple ecosystems (e.g. cmd/lab has go.mod + flake.nix) is grouped together because they share the same packageFileDir. separateMajorMinor (default) still splits majors into their own PR.",
       "matchFileNames": [
         "**"
       ],
       "groupName": "{{packageFileDir}}"
     },
     {
-      "description": "Root-level nix flake / devenv inputs have an empty packageFileDir; give them an explicit group name.",
+      "description": "Root-level nix flake inputs have an empty packageFileDir; give them an explicit group name.",
       "matchFileNames": [
         "flake.nix",
-        "flake.lock",
-        "devenv.nix",
-        "devenv.yaml",
-        "devenv.lock"
+        "flake.lock"
       ],
       "groupName": "root"
     },
