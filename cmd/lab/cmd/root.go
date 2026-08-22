@@ -33,7 +33,6 @@ It provides commands for:
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
 	cmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 
-	cmd.AddCommand(newCICmd())
 	cmd.AddCommand(newConfigCmd())
 	cmd.AddCommand(newEnvCmd())
 	cmd.AddCommand(newK8sCmd())

@@ -122,12 +122,12 @@ func (m *Homelab) goFormat(ctx context.Context, source *dagger.Directory) *dagge
 	return container.Directory("/src")
 }
 
-// FixGo tidies go.mod/go.sum and applies golangci-lint's autofixes (including
+// LintGo tidies go.mod/go.sum and applies golangci-lint's autofixes (including
 // formatting) across all discovered Go modules.
 // Fails if issues remain that --fix cannot resolve (e.g. cyclop, gosec).
-// Returns a changeset. Use `dagger call fix-go --auto-apply` to apply.
+// Returns a changeset. Use `dagger call lint-go --auto-apply` to apply.
 // +generate
-func (m *Homelab) FixGo(
+func (m *Homelab) LintGo(
 	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.golangci.yaml"]
@@ -143,7 +143,7 @@ func (m *Homelab) FixGo(
 // goFix runs `go mod tidy` followed by `golangci-lint run --fix` on all Go modules,
 // returning the fixed directory. Errors from either step (including unfixable
 // lint issues that --fix leaves behind) are returned rather than swallowed, so
-// FixGo fails when there's more to fix than autofixing can handle.
+// LintGo fails when there's more to fix than autofixing can handle.
 func (m *Homelab) goFix(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 	goModulePaths := discoverGoModulePaths(ctx, source)
 	if len(goModulePaths) == 0 {

@@ -34,13 +34,11 @@
 - `lab k8s --env <env> <command>` manages Kubernetes with environment-specific kubeconfig.
 - `lab k8s kubeconfig decrypt <env>` decrypts kubeconfig; `lab k8s kubeconfig cleanup` removes decrypted files.
 - `lab k8s diff/sync <app>` manages Kubernetes applications; `lab tf plan/apply <module>` wraps OpenTofu.
-- `lab ci` runs all CI checks; `lab ci lint/build/test/validate` runs checks by category.
-- `dagger check` runs all CI checks directly (works even if lab is broken).
+- `dagger check` runs all CI checks; `dagger check 'lint*'/'build*'/'test*'/'validate*'` runs checks by category.
 - `nix flake check` runs deploy-rs checks to validate host expressions.
 - `nix build .#nixosConfigurations.<host>.config.system.build.toplevel` ensures a host builds successfully; swap `<host>` for `borg-0`, etc.
 - `deploy -- .#<host>` applies a configuration via deploy-rs once builds pass.
 - `tofu -chdir=terraform plan` reviews infra changes; pair with `tofu apply` only after plan review.
-- `dagger check` runs the full CI pipeline (lint, validate, build, test) via Dagger.
 
 ## Coding Style & Naming Conventions
 Use two-space indentation in Nix files and rely on `alejandra` plus `deadnix` (via pre-commit) to format and prune unused definitions. YAML should stay lowercase-kebab keys, validated with `yamllint --strict`. Terraform modules are formatted with `tofu fmt`. CUE files use tabs for indentation and follow the schema definitions in `config/schema.cue`; validate with `lab config validate` or `cue vet`. Go code in `cmd/lab/` follows standard `go fmt` and `go vet`. Follow existing naming patterns (`borg-*` hosts, `*-system` namespaces, Helm release dirs matching namespaces). Favor explicit attribute sets and keep secrets references under `sops` blocks.

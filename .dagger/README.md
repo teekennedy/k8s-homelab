@@ -36,7 +36,7 @@ The combination means:
 | File | Contents |
 |---|---|
 | `main.go` | Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions |
-| `golang.go` | GoModule struct, per-module Test, aggregate TestGo/FormatGo/FixGo |
+| `golang.go` | GoModule struct, per-module Test, aggregate TestGo/FormatGo/LintGo |
 | `python.go` | PythonProject struct, per-project Test/Lint, aggregate LintPython/TestPython/FormatPython |
 | `helm.go` | HelmChart struct, per-chart Validate/Build, aggregate ValidateHelm/BuildHelm |
 | `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
@@ -113,7 +113,7 @@ dagger call terraform-modules         # Show all Terraform modules
 # Auto-apply formatting fixes (use format-*/fix-* functions, not check)
 dagger call format-nix --auto-apply
 dagger call format-go --auto-apply
-dagger call fix-go --auto-apply       # go mod tidy + golangci-lint run --fix
+dagger call lint-go --auto-apply      # go mod tidy + golangci-lint run --fix
 dagger call format-python --auto-apply
 
 # Regenerate the nix vendorHash for cmd/lab after a Go dependency changes
@@ -125,17 +125,6 @@ dagger call build-cli-go --source=.     # Using Go (faster)
 
 # Get built binary
 dagger call cli-nix --source=. export --path=./lab
-```
-
-### Via lab CLI
-
-```bash
-lab ci               # Run all checks
-lab ci lint          # Run all lint* checks
-lab ci lint --fix    # Run lint checks, auto-apply formatting fixes
-lab ci build         # Run all build* checks
-lab ci test          # Run all test* checks
-lab ci validate      # Run all validate* checks
 ```
 
 ## Available Functions
@@ -209,9 +198,9 @@ doesn't (e.g. `LintCue` also runs `cue vet`).
 These also run as part of `dagger check` (a non-empty changeset fails the check).
 - `FormatNix(source, paths)` - Format Nix files (`dagger call format-nix --auto-apply`)
 - `FormatGo(source)` - Format Go files (`dagger call format-go --auto-apply`)
-- `FixGo(source)` - `go mod tidy` + `golangci-lint run --fix` for each Go module;
+- `LintGo(source)` - `go mod tidy` + `golangci-lint run --fix` for each Go module;
   fails if issues remain that `--fix` can't resolve (e.g. cyclop, gosec)
-  (`dagger call fix-go --auto-apply`)
+  (`dagger call lint-go --auto-apply`)
 - `FormatPython(source, paths)` - Format Python files (`dagger call format-python --auto-apply`)
 - `FormatCue(source)` / `FixCue(source)` / `ExportCue(source)` - CUE formatting,
   syntax upgrades, and `config/gen/<env>/env.json` export
@@ -310,7 +299,7 @@ dagger check  # Only FormatNix + ValidateNix re-run
 
 # Change Go code in one module - only that module re-tests
 echo "// comment" >> cmd/lab/main.go
-dagger check  # FormatGo/FixGo + TestGo re-run, but only cmd/lab module actually re-executes in TestGo
+dagger check  # FormatGo/LintGo + TestGo re-run, but only cmd/lab module actually re-executes in TestGo
 
 # Change a Python file in one project
 echo "# comment" >> k8s/foundation/kured/files/kured-webhook/server.py

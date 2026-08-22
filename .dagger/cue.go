@@ -117,7 +117,7 @@ func (m *Homelab) LintCue(
 	// +ignore=["*", "!config/**/*.cue"]
 	source *dagger.Directory,
 	// +optional
-	paths []string, //nolint:unparam // accepted for CI --changed uniformity (lab ci passes --paths to every +check); CUE lint always checks the whole tree
+	paths []string, //nolint:unparam // accepted for --paths uniformity across +check functions; CUE lint always checks the whole tree
 ) (string, error) {
 	// Check formatting via changeset.
 	formatted := cueContainer(source).

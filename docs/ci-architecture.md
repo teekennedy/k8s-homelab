@@ -66,14 +66,10 @@ lab host deploy borg-0
 # CI runs in containers.ci environment (no lab pre-installed)
 # Dagger pipeline builds lab as first step
 
-# Option 1: Direct dagger check
 dagger check 'build*'
-
-# Option 2: Using lab ci (if lab is already working)
-lab ci build
-lab ci lint
-lab ci test
-lab ci
+dagger check 'lint*'
+dagger check 'test*'
+dagger check
 ```
 
 ### Fixing a Broken Lab Build
@@ -139,23 +135,6 @@ dagger call build-cli --source=.
 
 ## Command Reference
 
-### lab ci Commands
-```bash
-# Run all checks
-lab ci
-
-# Run checks by category
-lab ci lint           # Run all lint* checks
-lab ci validate       # Run all validate* checks
-lab ci build          # Run all build* checks
-lab ci test           # Run all test* checks
-
-# With options
-lab ci --fix          # Auto-apply formatting fixes
-lab ci lint --fix     # Auto-apply lint formatting fixes
-lab ci --changed      # Run checks only on changed files
-```
-
 ### Dagger Checks
 ```bash
 # Run all checks
@@ -189,26 +168,8 @@ dagger call cli-nix --source=. export --path=./lab
 4. **Developer Convenience**: Dev shell still has lab pre-installed
 5. **Self-Healing**: CI can fix and rebuild lab automatically
 
-## Future Enhancements
-
-### CI Container Entry
-Make `lab ci` commands actually enter the CI container:
-
-```go
-func runDaggerInCI(args ...string) error {
-    if os.Getenv("HOMELAB_CI_CONTAINER") == "true" {
-        return runDagger(args...)
-    }
-
-    // Enter CI container
-    cmd := exec.Command("devenv", "container", "run", "ci", "--", "dagger", args...)
-    return cmd.Run()
-}
-```
-
 ## Related Files
 
 - `devenv.nix` - Defines both dev shell and CI container
-- `cmd/lab/cmd/ci.go` - lab CI command implementations
 - `.dagger/main.go` - Dagger pipeline definitions
 - `cmd/lab/flake.nix` - Lab's Nix build configuration

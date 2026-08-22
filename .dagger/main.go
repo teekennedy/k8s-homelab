@@ -89,7 +89,7 @@ func (m *Homelab) ValidateNix(ctx context.Context,
 	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"]
 	source *dagger.Directory,
 	// +optional
-	paths []string, //nolint:unparam // accepted for CI --changed uniformity (lab ci passes --paths to every +check); flake check always checks the whole tree
+	paths []string, //nolint:unparam // accepted for --paths uniformity across +check functions; flake check always checks the whole tree
 ) (string, error) {
 	_, err := nixContainer().
 		WithMountedDirectory("/src", source).
@@ -142,7 +142,7 @@ func (m *Homelab) BuildCli(ctx context.Context,
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
 	// +optional
-	paths []string, //nolint:unparam // accepted for CI --changed uniformity (lab ci passes --paths to every +check); nix build always builds the whole CLI
+	paths []string, //nolint:unparam // accepted for --paths uniformity across +check functions; nix build always builds the whole CLI
 ) (string, error) {
 	_, err := nixContainer().
 		WithMountedDirectory("/src", source).

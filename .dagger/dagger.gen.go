@@ -549,20 +549,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).FixCue(&parent, source), nil
-		case "FixGo":
-			var parent Homelab
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			return (*Homelab).FixGo(&parent, ctx, source)
 		case "FormatCue":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -682,6 +668,20 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).LintCue(&parent, ctx, source, paths)
+		case "LintGo":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var source *dagger.Directory
+			if inputArgs["source"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
+				}
+			}
+			return (*Homelab).LintGo(&parent, ctx, source)
 		case "LintPython":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
