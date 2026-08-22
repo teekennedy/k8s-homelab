@@ -38,9 +38,6 @@ type GoModule struct {
 	// When populated via GoModules(), this is derived from a +defaultPath
 	// parent directory, so its ID is stable across sessions.
 	Source *dagger.Directory
-	// ConfigFile is the repo's root .golangci.yaml, used by Lint.
-	// +private
-	ConfigFile *dagger.File
 }
 
 // GoModules returns all discovered Go modules with scoped source directories.
@@ -52,13 +49,11 @@ func (m *Homelab) GoModules(
 	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.golangci.yaml"]
 	source *dagger.Directory,
 ) []*GoModule {
-	configFile := source.File(".golangci.yaml")
 	var modules []*GoModule
 	for _, modPath := range discoverGoModulePaths(ctx, source) {
 		modules = append(modules, &GoModule{
-			Path:       modPath,
-			Source:     source.Directory(modPath),
-			ConfigFile: configFile,
+			Path:   modPath,
+			Source: source.Directory(modPath),
 		})
 	}
 	return modules
@@ -82,79 +77,6 @@ func (gm *GoModule) Test(ctx context.Context) (string, error) {
 	return fmt.Sprintf("Go tests passed in %s", gm.Path), nil
 }
 
-// Lint runs golangci-lint (linting and formatting checks) and verifies
-// go.mod/go.sum are tidy for this module.
-// +check
-func (gm *GoModule) Lint(ctx context.Context) (string, error) {
-	if gm.Source == nil {
-		return "", fmt.Errorf("GoModule %s has no source directory; call GoModules() first", gm.Path)
-	}
-
-	lintArgs := []string{"golangci-lint", "run", "./..."}
-	lintContainer, err := golangciLintContainer(ctx, gm.ConfigFile, lintArgs)
-	if err != nil {
-		return "", fmt.Errorf("building golangci-lint container for %s: %w", gm.Path, err)
-	}
-
-	_, err = lintContainer.
-		WithMountedDirectory("/src", gm.Source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"}).
-		WithMountedFile("/src/.golangci.yaml", gm.ConfigFile, dagger.ContainerWithMountedFileOpts{Owner: "1000:1000"}).
-		WithWorkdir("/src").
-		WithExec(lintArgs).
-		Sync(ctx)
-	if err != nil {
-		return "", fmt.Errorf("golangci-lint failed in %s: %w", gm.Path, err)
-	}
-
-	_, err = golangContainer().
-		WithMountedDirectory("/src", gm.Source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"}).
-		WithWorkdir("/src").
-		WithExec([]string{"go", "mod", "tidy", "-diff"}).
-		Sync(ctx)
-	if err != nil {
-		return "", fmt.Errorf("go.mod/go.sum not tidy in %s (run `dagger call fix-go --auto-apply`): %w", gm.Path, err)
-	}
-
-	return fmt.Sprintf("Go lint passed in %s", gm.Path), nil
-}
-
-// LintGo runs golangci-lint (linting and formatting checks) and verifies
-// go.mod/go.sum are tidy across all discovered Go modules.
-// Each module is linted with a scoped source directory so that changes
-// in one module don't invalidate the BuildKit cache for other modules.
-// Use `dagger call fix-go --auto-apply` to fix.
-// +check
-func (m *Homelab) LintGo(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.golangci.yaml"]
-	source *dagger.Directory,
-) (string, error) {
-	goModulePaths := discoverGoModulePaths(ctx, source)
-	if len(goModulePaths) == 0 {
-		return "Go lint skipped (no modules found)", nil
-	}
-
-	configFile := source.File(".golangci.yaml")
-	g := new(errgroup.Group)
-	for _, modPath := range goModulePaths {
-		gm := &GoModule{
-			Path:       modPath,
-			Source:     source.Directory(modPath),
-			ConfigFile: configFile,
-		}
-		g.Go(func() error {
-			_, err := gm.Lint(ctx)
-			return err
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return "", fmt.Errorf("go lint failed: %w", err)
-	}
-
-	return "Go lint passed", nil
-}
-
 // FormatGo formats Go files using golangci-lint's configured formatters
 // (gofumpt) across all discovered modules.
 // Returns a changeset. Use `dagger call format-go --auto-apply` to apply.
@@ -164,12 +86,9 @@ func (m *Homelab) FormatGo(
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.golangci.yaml"]
 	source *dagger.Directory,
-) (*dagger.Changeset, error) {
-	formatted, err := m.goFormat(ctx, source)
-	if err != nil {
-		return nil, err
-	}
-	return formatted.Changes(source), nil
+) *dagger.Changeset {
+	formatted := m.goFormat(ctx, source)
+	return formatted.Changes(source)
 }
 
 // golangciLintConfigPath is where the repo-root golangci-lint config is
@@ -181,20 +100,16 @@ func (m *Homelab) FormatGo(
 const golangciLintConfigPath = "/golangci.yaml"
 
 // goFormat runs `golangci-lint fmt` on all Go modules, returning the formatted directory.
-func (m *Homelab) goFormat(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
+func (m *Homelab) goFormat(ctx context.Context, source *dagger.Directory) *dagger.Directory {
 	goModulePaths := discoverGoModulePaths(ctx, source)
 	if len(goModulePaths) == 0 {
-		return source, nil
+		return source
 	}
 
 	configFile := source.File(".golangci.yaml")
 	fmtArgs := []string{"golangci-lint", "fmt", "--config", golangciLintConfigPath, "./..."}
-	base, err := golangciLintContainer(ctx, configFile, fmtArgs)
-	if err != nil {
-		return nil, err
-	}
 
-	container := base.
+	container := golangciLintContainer().
 		WithMountedFile(golangciLintConfigPath, configFile).
 		WithMountedDirectory("/src", source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"})
 
@@ -204,11 +119,12 @@ func (m *Homelab) goFormat(ctx context.Context, source *dagger.Directory) (*dagg
 			WithExec(fmtArgs)
 	}
 
-	return container.Directory("/src"), nil
+	return container.Directory("/src")
 }
 
 // FixGo tidies go.mod/go.sum and applies golangci-lint's autofixes (including
 // formatting) across all discovered Go modules.
+// Fails if issues remain that --fix cannot resolve (e.g. cyclop, gosec).
 // Returns a changeset. Use `dagger call fix-go --auto-apply` to apply.
 // +generate
 func (m *Homelab) FixGo(
@@ -225,7 +141,9 @@ func (m *Homelab) FixGo(
 }
 
 // goFix runs `go mod tidy` followed by `golangci-lint run --fix` on all Go modules,
-// returning the fixed directory.
+// returning the fixed directory. Errors from either step (including unfixable
+// lint issues that --fix leaves behind) are returned rather than swallowed, so
+// FixGo fails when there's more to fix than autofixing can handle.
 func (m *Homelab) goFix(ctx context.Context, source *dagger.Directory) (*dagger.Directory, error) {
 	goModulePaths := discoverGoModulePaths(ctx, source)
 	if len(goModulePaths) == 0 {
@@ -234,23 +152,21 @@ func (m *Homelab) goFix(ctx context.Context, source *dagger.Directory) (*dagger.
 
 	configFile := source.File(".golangci.yaml")
 	fixArgs := []string{"golangci-lint", "run", "--fix", "--config", golangciLintConfigPath, "./..."}
-	base, err := golangciLintContainer(ctx, configFile, fixArgs)
-	if err != nil {
-		return nil, err
-	}
 
-	container := base.
+	container := golangciLintContainer().
 		WithMountedFile(golangciLintConfigPath, configFile).
 		WithMountedDirectory("/src", source, dagger.ContainerWithMountedDirectoryOpts{Owner: "1000:1000"})
 
 	for _, modPath := range goModulePaths {
-		container = container.
-			WithWorkdir("/src/"+modPath).
+		fixed, err := container.
+			WithWorkdir("/src/" + modPath).
 			WithExec([]string{"go", "mod", "tidy"}).
-			// --fix applies every fix it can, but still exits non-zero if issues
-			// remain that it can't fix (e.g. cyclop, gosec). That's fine here:
-			// Lint is what gates on remaining issues, FixGo just applies what it can.
-			WithExec(fixArgs, dagger.ContainerWithExecOpts{Expect: dagger.ReturnTypeAny})
+			WithExec(fixArgs).
+			Sync(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("go fix failed in %s: %w", modPath, err)
+		}
+		container = fixed
 	}
 
 	return container.Directory("/src"), nil

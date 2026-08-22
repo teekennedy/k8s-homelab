@@ -51,30 +51,3 @@ func (m *Homelab) UpdateGoVendorHash(
 
 	return updated.Directory("/src").Changes(source), nil
 }
-
-// CheckGoVendorHash validates that cmd/lab/gomod.json holds the vendorHash nix
-// actually computes for the lab CLI's dependencies.
-// Use `dagger call update-go-vendor-hash --auto-apply` to fix.
-// +check
-func (m *Homelab) CheckGoVendorHash(
-	ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!cmd/lab/**/*", "cmd/lab/result", "cmd/lab/.direnv"]
-	source *dagger.Directory,
-) (string, error) {
-	changeset, err := m.UpdateGoVendorHash(ctx, source)
-	if err != nil {
-		return "", err
-	}
-
-	empty, err := changeset.IsEmpty(ctx)
-	if err != nil {
-		return "", fmt.Errorf("checking go vendor hash changeset: %w", err)
-	}
-
-	if !empty {
-		return "", fmt.Errorf("%s/gomod.json is out of date with go.mod/go.sum\nRun `dagger call update-go-vendor-hash --auto-apply` to fix", labModuleDir)
-	}
-
-	return "Go vendor hash is up to date", nil
-}

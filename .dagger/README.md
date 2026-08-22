@@ -36,7 +36,7 @@ The combination means:
 | File | Contents |
 |---|---|
 | `main.go` | Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions |
-| `golang.go` | GoModule struct, per-module Test/Lint, aggregate LintGo/TestGo/FormatGo |
+| `golang.go` | GoModule struct, per-module Test, aggregate TestGo/FormatGo/FixGo |
 | `python.go` | PythonProject struct, per-project Test/Lint, aggregate LintPython/TestPython/FormatPython |
 | `helm.go` | HelmChart struct, per-chart Validate/Build, aggregate ValidateHelm/BuildHelm |
 | `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
@@ -93,12 +93,11 @@ dagger check 'test*'
 dagger check 'validate*'
 
 # Run a specific check
-dagger check lint-nix
+dagger check lint-cue
 dagger check build-helm
 
 # Per-project operations (maximum cache granularity)
 dagger call go-modules test           # Test each Go module independently
-dagger call go-modules lint           # Lint each Go module independently
 dagger call python-projects test      # Test each Python project independently
 dagger call python-projects lint      # Lint each Python project independently
 dagger call helm-charts validate      # Validate each Helm chart independently
@@ -111,9 +110,10 @@ dagger call python-projects           # Show all Python projects
 dagger call helm-charts               # Show all Helm charts
 dagger call terraform-modules         # Show all Terraform modules
 
-# Auto-apply formatting fixes (use format-* functions, not check)
+# Auto-apply formatting fixes (use format-*/fix-* functions, not check)
 dagger call format-nix --auto-apply
 dagger call format-go --auto-apply
+dagger call fix-go --auto-apply       # go mod tidy + golangci-lint run --fix
 dagger call format-python --auto-apply
 
 # Regenerate the nix vendorHash for cmd/lab after a Go dependency changes
@@ -148,7 +148,6 @@ Functions annotated with `// +check` can be run via `dagger check`.
 #### GoModule
 Discovered automatically from `go.mod` files. Each module gets a scoped source directory.
 - `Test()` - Run `go test` for this module (`+check`)
-- `Lint()` - Run `go vet` and `go fmt` for this module (`+check`)
 
 #### PythonProject
 Discovered automatically from `pyproject.toml` files.
@@ -169,16 +168,17 @@ siblings via relative paths (e.g., `../k8s-secret`).
 
 ### Top-Level Checks
 
+Nix, Go, and cmd/lab-vendorHash formatting checks are no longer separate
+`Lint*`/`Check*` functions — the `dagger` CLI now includes `+generate`
+functions (see Format Functions below) directly in `dagger check`, failing
+the check if the generator would produce a non-empty changeset. A dedicated
+`Lint*` wrapper is only worth keeping when it does something a generator
+doesn't (e.g. `LintCue` also runs `cue vet`).
+
 #### Lint Checks
-- `LintNix(source, paths)` - Nix formatting and dead code validation
-  - Filters: `**/*.nix`
-  - Tools: `deadnix`, `alejandra`
-  - Fix: `dagger call format-nix --auto-apply`
-- `LintGo(source)` - Go linting and formatting validation (delegates to GoModule.Lint)
-  - Tools: `go vet`, `go fmt`
-  - Fix: `dagger call format-go --auto-apply`
-- `LintCue(source, paths)` - CUE validation
+- `LintCue(source, paths)` - CUE formatting and constraint validation (`cue fmt` + `cue vet`)
   - Filters: `config/**/*.cue`
+  - Fix: `dagger call format-cue --auto-apply`
 - `LintPython(source, paths)` - Python formatting validation (delegates to PythonProject.Lint)
   - Tools: `black`
   - Fix: `dagger call format-python --auto-apply`
@@ -194,10 +194,6 @@ siblings via relative paths (e.g., `../k8s-secret`).
   - Filters: `terraform/**/*`
 - `ValidateWoodpecker(source, paths)` - Woodpecker CI pipeline validation
   - Filters: `.woodpecker/*.yaml`
-- `CheckGoVendorHash(source)` - Validates `cmd/lab/gomod.json` against the vendorHash
-  nix computes for the lab CLI's Go dependencies
-  - Filters: `cmd/lab/**/*`
-  - Fix: `dagger call update-go-vendor-hash --auto-apply`
 
 #### Build Checks
 - `BuildCli(source)` - Build lab CLI (using Nix)
@@ -209,10 +205,16 @@ siblings via relative paths (e.g., `../k8s-secret`).
 - `TestGo(source, paths)` - Run Go tests (delegates to GoModule.Test)
 - `TestPython(source, paths)` - Run Python tests (delegates to PythonProject.Test)
 
-### Format Functions (auto-apply)
+### Format Functions (`+generate`, auto-apply)
+These also run as part of `dagger check` (a non-empty changeset fails the check).
 - `FormatNix(source, paths)` - Format Nix files (`dagger call format-nix --auto-apply`)
 - `FormatGo(source)` - Format Go files (`dagger call format-go --auto-apply`)
+- `FixGo(source)` - `go mod tidy` + `golangci-lint run --fix` for each Go module;
+  fails if issues remain that `--fix` can't resolve (e.g. cyclop, gosec)
+  (`dagger call fix-go --auto-apply`)
 - `FormatPython(source, paths)` - Format Python files (`dagger call format-python --auto-apply`)
+- `FormatCue(source)` / `FixCue(source)` / `ExportCue(source)` - CUE formatting,
+  syntax upgrades, and `config/gen/<env>/env.json` export
 - `UpdateGoVendorHash(source)` - Recompute the nix buildGoModule vendorHash for `cmd/lab`
   into `cmd/lab/gomod.json` (`dagger call update-go-vendor-hash --auto-apply`).
   Renovate runs this as a post-upgrade task whenever it bumps a `cmd/lab` Go dependency.
@@ -279,11 +281,11 @@ source *dagger.Directory,
 an unrelated file and verifying the check uses its cache.
 
 **Example**: When you change a `.go` file in `cmd/lab/`:
-- ✅ `LintGo()` cache invalidates (includes `**/*.go`)
+- ✅ `TestGo()` cache invalidates (includes `**/*.go`)
 - ✅ `BuildCli()` cache invalidates (includes `cmd/lab/**/*`)
-- ❌ `LintNix()` cache remains valid (only includes `**/*.nix`)
+- ❌ `ValidateNix()` cache remains valid (only includes `**/*.nix`)
 - ❌ `LintYaml()` cache remains valid (only includes `**/*.yaml`)
-- And within LintGo(), only the `cmd/lab` GoModule re-lints (Layer 1)
+- And within TestGo(), only the `cmd/lab` GoModule re-tests (Layer 1)
 
 ### Per-Project Source Scoping
 
@@ -302,13 +304,13 @@ Each module type scopes its source differently based on project characteristics:
 # First run - runs all checks
 dagger check
 
-# Change a .nix file - only Nix checks re-run
+# Change a .nix file - only Nix checks/generators re-run
 echo "# comment" >> nix/hosts/common/default.nix
-dagger check  # Only LintNix + ValidateNix re-run
+dagger check  # Only FormatNix + ValidateNix re-run
 
 # Change Go code in one module - only that module re-tests
 echo "// comment" >> cmd/lab/main.go
-dagger check  # LintGo + TestGo re-run, but only cmd/lab module actually re-executes
+dagger check  # FormatGo/FixGo + TestGo re-run, but only cmd/lab module actually re-executes in TestGo
 
 # Change a Python file in one project
 echo "# comment" >> k8s/foundation/kured/files/kured-webhook/server.py

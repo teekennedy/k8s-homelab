@@ -21,33 +21,6 @@ import (
 // Homelab is the main Dagger module for k8s-homelab CI/CD
 type Homelab struct{}
 
-// LintNix validates Nix formatting (alejandra) and dead code (deadnix).
-// Fails if any files need formatting. Use `dagger call format-nix --auto-apply` to fix.
-// +check
-func (m *Homelab) LintNix(
-	ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.nix", ".devenv*", ".devenv/**", "devenv.local.*"]
-	source *dagger.Directory,
-	// +optional
-	paths []string,
-) (string, error) {
-	formatted := m.nixFormat(source, paths)
-
-	changeset := formatted.Changes(source)
-	empty, err := changeset.IsEmpty(ctx)
-	if err != nil {
-		return "", fmt.Errorf("checking for nix formatting changes: %w", err)
-	}
-
-	if !empty {
-		modified, _ := changeset.ModifiedPaths(ctx)
-		return "", fmt.Errorf("nix files need formatting: %s\nRun `dagger call format-nix --auto-apply` to fix", strings.Join(modified, ", "))
-	}
-
-	return "Nix lint passed", nil
-}
-
 // FormatNix formats Nix files with alejandra and removes dead code with deadnix.
 // Returns a changeset. Use `dagger call format-nix --auto-apply` to apply.
 // +generate

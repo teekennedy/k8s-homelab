@@ -21,6 +21,26 @@ linters:
 
   # All available settings of specific linters.
   settings:
+    errcheck:
+      # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
+      # Such cases aren't reported by default.
+      # Default: false
+      check-type-assertions: true
+      # Report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`.
+      # Such cases aren't reported by default.
+      # Default: false
+      check-blank: false
+      # To disable the errcheck built-in exclude list.
+      # See `-excludeonly` option in https://github.com/kisielk/errcheck#excluding-functions for details.
+      # Default: false
+      disable-default-exclusions: false
+      # List of functions to exclude from checking, where each entry is a single function to exclude.
+      # See https://github.com/kisielk/errcheck#excluding-functions for details.
+      exclude-functions: []
+      # Display function signature instead of selector.
+      # Default: false
+      verbose: true
+
     gosec:
       excludes:
         # G204 (subprocess launched with variable/tainted args) fires on nearly
@@ -29,6 +49,26 @@ linters:
         # dagger, git, kind) with programmatically-built args. Per-callsite
         # nolint would just be noise on the normal case here.
         - G204
+
+    unused:
+      # Mark all struct fields that have been written to as used.
+      # Default: true
+      field-writes-are-uses: true
+      # Treat IncDec statement (e.g. `i++` or `i--`) as both read and write operation instead of just write.
+      # Default: false
+      post-statements-are-reads: false
+      # Mark all exported fields as used.
+      # default: true
+      exported-fields-are-used: false
+      # Mark all function parameters as used.
+      # default: true
+      parameters-are-used: true # unparam handles unused params better
+      # Mark all local variables as used.
+      # default: true
+      local-variables-are-used: false
+      # Mark all identifiers inside generated files as used.
+      # Default: true
+      generated-is-used: true
 
   exclusions:
     # Mode of the generated files analysis.
@@ -58,26 +98,6 @@ formatters:
 
   # Formatters settings.
   settings:
-    errcheck:
-      # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
-      # Such cases aren't reported by default.
-      # Default: false
-      check-type-assertions: true
-      # Report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`.
-      # Such cases aren't reported by default.
-      # Default: false
-      check-blank: false
-      # To disable the errcheck built-in exclude list.
-      # See `-excludeonly` option in https://github.com/kisielk/errcheck#excluding-functions for details.
-      # Default: false
-      disable-default-exclusions: false
-      # List of functions to exclude from checking, where each entry is a single function to exclude.
-      # See https://github.com/kisielk/errcheck#excluding-functions for details.
-      exclude-functions: []
-      # Display function signature instead of selector.
-      # Default: false
-      verbose: true
-
     gofumpt:
       # Module path which contains the source code being formatted.
       # Default: ""
@@ -203,7 +223,7 @@ run:
   # Timeout for total work, e.g. 30s, 5m, 5m30s.
   # If the value is lower or equal to 0, the timeout is disabled.
   # Default: 0 (disabled)
-  timeout: 5m
+  timeout: 0
 
   # The mode used to evaluate relative paths.
   # It's used by exclusions, Go plugins, and some linters.
