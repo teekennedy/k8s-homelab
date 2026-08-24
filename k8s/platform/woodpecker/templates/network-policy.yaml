@@ -1,0 +1,157 @@
+# Network policy for the woodpecker namespace.
+#
+# Pipeline step pods run in this namespace and are created on the fly by the
+# agent, with labels this chart does not control, so the common rules select
+# every pod (podSelector: {}) rather than trying to name them. The server and
+# agent get their own narrower ingress rules on top.
+#
+# Step pods do reliably carry a `woodpecker-ci.org/step` label (confirmed by
+# inspecting a running step pod) even though its value is pipeline-defined,
+# so rules that should apply to step pods only -- and not the server/agent --
+# select on that label key existing, rather than folding into the common
+# podSelector: {} rules.
+#
+# Modelled on k8s/platform/renovate/templates/network-policy.yaml, which has
+# the same shape of problem.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: woodpecker-default-deny
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: woodpecker-common-egress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # git.msng.to (Forgejo) for the implicit clone step and the server's forge
+    # API calls. The load balancer DNATs node-IP:443 to Traefik pod IPs, so this
+    # has to target the pods rather than the pre-DNAT node addresses.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+    # Kubernetes apiserver. Dagger's kube-pod:// transport is `kubectl exec`
+    # through the apiserver rather than a pod-to-pod connection, and the
+    # apiserver is host-networked, so this must be an ipBlock on the node/VIP
+    # addresses -- a podSelector cannot match it. The nixos-deploy step also
+    # reads its SSH credential and creates the rollout Job through here.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.nixosRollout.nodeCidr }}
+      ports:
+        - protocol: TCP
+          port: 6443
+    # The agent's gRPC connection to the server, plus anything in-namespace
+    # talking to the server's HTTP API.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: server
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 8000
+    # Public internet: apk mirrors, dl.dagger.io, and container registries.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: woodpecker-step-ssh-egress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: woodpecker-ci.org/step
+        operator: Exists
+  policyTypes:
+    - Egress
+  egress:
+    # sshd on the borg hosts, for the NixOS deploy step and the rollout job.
+    # Scoped to step pods only (not the server/agent) via the label above.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.nixosRollout.nodeCidr }}
+      ports:
+        - protocol: TCP
+          port: 22
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: woodpecker-server-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: server
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # ci.msng.to through Traefik.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8000
+    # The agent's gRPC connection, and pipeline steps reporting back.
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 8000
+    # Prometheus scraping the server's metrics endpoint.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring-system
+      ports:
+        - protocol: TCP
+          port: 8000

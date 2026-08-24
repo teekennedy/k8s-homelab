@@ -180,7 +180,7 @@ func buildDeployArgs(hostname string, skipChecks, dryRun, boot bool) []string {
 
 // createKuredRebootSentinel touches the kured reboot-required sentinel file on hostname.
 func createKuredRebootSentinel(ctx context.Context, hostname, repoRoot string) error {
-	rebootCmd := exec.CommandContext(ctx, "ssh", hostname, "sudo", "touch", "/var/run/reboot-required")
+	rebootCmd := exec.CommandContext(ctx, "ssh", hostname, "sudo", "touch", "/run/reboot-required")
 	rebootCmd.Stdout = os.Stdout
 	rebootCmd.Stderr = os.Stderr
 	rebootCmd.Stdin = os.Stdin
@@ -455,7 +455,7 @@ Use --now to reboot immediately instead of waiting for kured.`,
 				return err
 			}
 
-			rebootCmd, action := "sudo touch /var/run/reboot-required", "Scheduling reboot for"
+			rebootCmd, action := "sudo touch /run/reboot-required", "Scheduling reboot for"
 			if now {
 				rebootCmd, action = "sudo reboot", "Rebooting"
 			}

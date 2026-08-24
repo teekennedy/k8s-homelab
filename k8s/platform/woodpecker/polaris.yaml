@@ -10,3 +10,15 @@ exemptions:
       - dagger-pipeline-exec-binding
     rules:
       - rolebindingRolePodExecAttach
+  # nixos-rollout apk-installs openssh-client at runtime, which needs root and a
+  # writable root filesystem (see the identical pattern in
+  # foundation/cert-system/polaris.yaml for the SSH CA workloads). It also polls
+  # node readiness via `kubectl get node`, which needs the ServiceAccount token
+  # automounted. No PriorityClass resources are defined anywhere in this cluster.
+  - controllerNames:
+      - nixos-rollout
+    rules:
+      - runAsRootAllowed
+      - notReadOnlyRootFilesystem
+      - automountServiceAccountToken
+      - priorityClassNotSet

@@ -59,3 +59,13 @@ webhook:
     - KubePodNotReady
     - KubeDaemonSetRolloutStuck
     - LonghornNodeDown
+
+# Maintenance gate that blocks reboots while a CI pipeline is running.
+# See templates/prometheus-rule-woodpecker.yaml.
+woodpeckerGate:
+  namespace: woodpecker
+  # Woodpecker names pipeline step pods wp-<id>. Anchored so it cannot also
+  # match woodpecker-server-0 / woodpecker-agent-0 or the nixos-rollout job.
+  # Verify against `kubectl get pods -n woodpecker` during a run before relying
+  # on this: an over-narrow pattern silently disables the gate.
+  podPattern: "wp-.*"

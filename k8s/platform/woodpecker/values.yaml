@@ -11,6 +11,16 @@ woodpecker:
       WOODPECKER_FORGEJO: "true"
       WOODPECKER_FORGEJO_URL: "https://git.msng.to"
       WOODPECKER_ADMIN: "tkennedy"
+      # A running pipeline pod blocks kured (see the WoodpeckerPipelineRunning
+      # gate in k8s/foundation/kured), so a wedged pipeline would hold node
+      # reboots off indefinitely. These bound that.
+      #
+      # DEFAULT only applies to repos activated from here on; an already
+      # activated repo keeps whatever it was given, so set it once per repo in
+      # the UI or with `woodpecker-cli repo update --timeout`. MAX is the ceiling
+      # a repo setting may be raised to and does apply retroactively.
+      WOODPECKER_DEFAULT_PIPELINE_TIMEOUT: "30"
+      WOODPECKER_MAX_PIPELINE_TIMEOUT: "60"
     extraSecretNamesForEnvFrom:
       - woodpecker-default-agent-secret
       # WOODPECKER_FORGEJO_CLIENT / _SECRET, written by the forgejo-resources
@@ -51,3 +61,35 @@ woodpecker:
       # TODO get a base image with dagger CLI preinstalled and use that with a non-root user
       # WOODPECKER_BACKEND_K8S_SECCTX_NONROOT: "true"
       WOODPECKER_BACKEND_K8S_VOLUME_SIZE: "1G"
+
+# Ordered reboot rollout for the borg hosts. See
+# templates/nixos-rollout-cronjob.yaml and nix/modules/selfupdate.
+nixosRollout:
+  # alpine/k8s ships kubectl; openssh-client is apk-installed at runtime.
+  # renovate: datasource=docker depName=alpine/k8s
+  image: alpine/k8s:1.36.2
+  # Written by the deploybot-ssh-cert-issuer CronJob in cert-system, which
+  # reissues it every 6h with a 12h validity.
+  certSecretName: deploybot-ssh-cert
+  issuerNamespace: cert-system
+  # The borg node VLAN. Used by templates/network-policy.yaml for both the
+  # apiserver (6443) and sshd (22); the apiserver is host-networked so a
+  # podSelector cannot reach it.
+  nodeCidr: 10.69.80.0/25
+  # Must match services.nixos-selfupdate.user in nix/modules/selfupdate.
+  user: deploybot
+  # k3s upgrade order: clusterInit server, other servers, and finally agents.
+  hostOrder:
+    - borg-2=10.69.80.12 # clusterInit server
+    - borg-0=10.69.80.10 # server
+    - borg-1=10.69.80.11 # server
+    - borg-3=10.69.80.13 # agent
+  # Safety net for generations staged by the hosts' own fallback timer without
+  # a pipeline ever running. A no-op when every host is already up to date.
+  schedule: "0 5 * * *"
+  # Per host. kured's drainTimeout is 30m and lockReleaseDelay 5m, and an
+  # unrelated pipeline can re-arm the kured gate mid-rollout, so leave room.
+  rebootTimeoutSeconds: 3600
+  pollIntervalSeconds: 30
+  # Four hosts at the per-host worst case, plus slack.
+  activeDeadlineSeconds: 16200

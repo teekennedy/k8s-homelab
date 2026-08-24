@@ -1,6 +1,6 @@
 apiVersion: v2
 name: woodpecker
-version: 0.0.6
+version: 0.0.7
 appVersion: 3.13.0
 dependencies:
   - name: woodpecker

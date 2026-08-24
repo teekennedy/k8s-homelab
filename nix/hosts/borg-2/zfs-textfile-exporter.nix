@@ -1,5 +1,11 @@
-{pkgs, ...}: let
-  textfileDir = "/var/lib/prometheus/node-exporter-textfiles";
+{
+  config,
+  pkgs,
+  ...
+}: let
+  # Owned by nix/modules/common/textfile-collector.nix, which also creates the
+  # directory. This host is one of two writers.
+  textfileDir = config.services.textfileCollector.directory;
 
   # The script lives in its own directory with a pyproject.toml so that Dagger's
   # Python checks (black + pytest) discover it like the k8s-side projects.
@@ -18,10 +24,6 @@
     flakeIgnore = ["E203" "E501" "W503" "W504"];
   } (builtins.readFile ./zfs-exporter/zfs_exporter.py);
 in {
-  systemd.tmpfiles.rules = [
-    "d ${textfileDir} 0755 root root -"
-  ];
-
   systemd.services.zfs-textfile-exporter = {
     description = "Export ZFS pool metrics for Prometheus textfile collector";
     serviceConfig = {

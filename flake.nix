@@ -220,12 +220,16 @@
                     ./nix/modules/restic
                     ./nix/modules/k3s
                     ./nix/modules/nfs-mtls
+                    ./nix/modules/selfupdate
                     ./nix/modules/users/defaultUser.nix
                     inputs.determinate.nixosModules.default
                     inputs.nixos-facter-modules.nixosModules.facter
                     {
                       defaultUsername = "tkennedy";
                       networking.hostName = host.hostname;
+                      # Pull-based CD. The remote-trigger half stays inert until
+                      # nix/modules/selfupdate/deploybot_user_ca.pub exists.
+                      services.nixos-selfupdate.enable = true;
                       # Pin nixpkgs to flake input
                       nix.registry.nixpkgs.flake = inputs.nixpkgs;
                       facter.reportPath = let

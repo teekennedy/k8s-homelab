@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Maintenance gate: don't reboot a node out from under a running CI pipeline.
+#
+# Woodpecker pipelines run as pods scheduled anywhere in the cluster, and a
+# pipeline whose pod is evicted by a kured drain fails outright -- Woodpecker
+# does not retry it, so someone has to notice and hit Restart by hand.
+#
+# kured reads firing alerts straight off the Prometheus API and refuses to
+# reboot while any alert outside its alertFilterRegexp is firing, so simply
+# existing here is the whole mechanism. Deliberately not added to
+# kured.configuration.alertFilterRegexp in values.yaml: that list is the alerts
+# kured *ignores*. It is routed to the null receiver in
+# k8s/platform/monitoring-system/values.yaml instead, so it gates without
+# sending anyone a Discord message.
+#
+# The companion to this is the pipeline timeout: this alert can hold reboots off
+# for as long as a pipeline runs, so WOODPECKER_MAX_PIPELINE_TIMEOUT bounds how
+# long that can be.
+#
+# The main group lives in
+# k8s/platform/monitoring-system/templates/prometheus-rule-maintenance-gates.yaml;
+# this one ships with kured because it exists purely for kured, the same way
+# Jellyfin's gate ships with the jellyfin chart. Reusing the group name across
+# separate PrometheusRule objects is fine -- the operator writes one rule file
+# per object.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: woodpecker-maintenance-gate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: maintenance-gates
+      interval: 30s
+      rules:
+        # No `for:` -- a gate that takes minutes to arm is not a gate. The pod
+        # name prefix is how Woodpecker names step pods; it does not match the
+        # server or agent StatefulSet pods (woodpecker-server-0, woodpecker-agent-0)
+        # or the rollout job (nixos-rollout-*), which must not gate reboots since
+        # waiting for reboots is its entire job.
+        - alert: WoodpeckerPipelineRunning
+          expr: |
+            count(kube_pod_status_phase{namespace="{{ .Values.woodpeckerGate.namespace }}", pod=~"{{ .Values.woodpeckerGate.podPattern }}", phase="Running"}) > 0
+          labels:
+            severity: info
+            component: ci
+          annotations:
+            summary: {{ "{{ $value }} Woodpecker pipeline pod(s) running" | quote }}
+            description: {{ "A CI pipeline is running. Automated node reboots are blocked until it finishes, so that a kured drain does not kill the pipeline." | quote }}

@@ -1,0 +1,21 @@
+# SSH host keys for the borg nodes, used by CI to verify hosts it deploys to
+# (.woodpecker/deploy-hosts.yaml and the nixos-rollout job). This lives in the
+# woodpecker chart rather than under nix/ so that one copy serves both readers:
+# Helm's .Files.Get cannot reach outside the chart directory, and the pipeline
+# reads the same path out of its checked-out workspace.
+#
+# Host public keys are not secret. These are the same keys .sops.yaml records
+# as each host's age recipient, so they can be re-verified without trusting
+# this file:
+#
+#   ssh-keyscan -t ed25519 10.69.80.10 | grep ssh-ed25519 | ssh-to-age
+#
+# must reproduce the matching host_borg-N age key in .sops.yaml.
+#
+# Regenerate with scripts/update-known-hosts.sh after rebuilding a host, which
+# is the only thing that changes a host key (impermanence persists
+# /etc/ssh/ssh_host_ed25519_key across reboots).
+borg-0,borg-0.msng.to,10.69.80.10 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICJQRqBGMXLfQoZqBCHZHC5HBRE+yO9/mimTwiQ5NIcH
+borg-1,borg-1.msng.to,10.69.80.11 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTLislLa9iVm6UXRGtrWoOrPXxcxpc89GBHPnHAtdJn
+borg-2,borg-2.msng.to,10.69.80.12 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIILgmviYKe+aSetP4R/UR9OjvaU2mHtT9cXyu8qF4u5q
+borg-3,borg-3.msng.to,10.69.80.13 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP5lrKIDPYLNaxDpeI/4gN6iOt7Fmx/Ky+Nt53Ogl0c1

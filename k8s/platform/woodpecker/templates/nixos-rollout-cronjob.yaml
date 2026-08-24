@@ -1,0 +1,117 @@
+{{- $rollout := .Values.nixosRollout }}
+# Ordered reboot rollout for the borg hosts.
+#
+# Two ways in:
+#   * .woodpecker/deploy-hosts.yaml instantiates it right after staging every
+#     host: `kubectl create job --from=cronjob/nixos-rollout ...`
+#   * the schedule below, which is the safety net for anything the hosts' own
+#     7.5-day fallback timer staged without a pipeline ever running
+#
+# On the scheduled path every host normally answers UP_TO_DATE within seconds
+# and the job exits -- a few seconds of pod time, most of it the openssh-client
+# apk install.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nixos-rollout-script
+  namespace: {{ .Release.Namespace }}
+data:
+  nixos-rollout.sh: |
+{{ .Files.Get "files/nixos-rollout.sh" | indent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nixos-rollout-known-hosts
+  namespace: {{ .Release.Namespace }}
+data:
+  known_hosts: |
+{{ .Files.Get "files/known_hosts" | indent 4 }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nixos-rollout
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: nixos-rollout
+    app.kubernetes.io/instance: nixos-rollout
+spec:
+  schedule: {{ $rollout.schedule | quote }}
+  # A scheduled run must never collide with one the pipeline just started.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  # A rollout is minutes-to-hours of mostly waiting; missing a scheduled run
+  # because one was already going is fine, the next one picks up the slack.
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    # `kubectl create job --from=cronjob/nixos-rollout` copies these onto the
+    # Job it creates, which is how the pipeline finds and cancels an in-flight
+    # rollout before starting a new one.
+    metadata:
+      labels:
+        app.kubernetes.io/name: nixos-rollout
+    spec:
+      # Worst case is four nodes each taking a 30m drain plus a reboot.
+      activeDeadlineSeconds: {{ $rollout.activeDeadlineSeconds }}
+      backoffLimit: 6
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: nixos-rollout
+            app.kubernetes.io/instance: nixos-rollout
+        spec:
+          serviceAccountName: nixos-rollout
+          restartPolicy: OnFailure
+          volumes:
+            - name: script
+              configMap:
+                name: nixos-rollout-script
+                defaultMode: 0755
+            - name: known-hosts
+              configMap:
+                name: nixos-rollout-known-hosts
+            - name: creds
+              secret:
+                secretName: {{ $rollout.certSecretName }}
+                defaultMode: 0400
+          containers:
+            - name: rollout
+              image: {{ $rollout.image }}
+              imagePullPolicy: Always
+              command: ["/scripts/nixos-rollout.sh"]
+              env:
+                - name: SSH_USER
+                  value: {{ $rollout.user | quote }}
+                # name=ip pairs; see nixosRollout.hostOrder in values.yaml.
+                # The stage step of .woodpecker/deploy-hosts.yaml reads this
+                # back off the CronJob so the fleet list has one source.
+                - name: HOST_ORDER
+                  value: {{ $rollout.hostOrder | join " " | quote }}
+                - name: REBOOT_TIMEOUT
+                  value: {{ $rollout.rebootTimeoutSeconds | quote }}
+                - name: POLL_INTERVAL
+                  value: {{ $rollout.pollIntervalSeconds | quote }}
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                - name: known-hosts
+                  mountPath: /known-hosts
+                  readOnly: true
+                - name: creds
+                  mountPath: /creds
+                  readOnly: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 250m
+                  memory: 128Mi

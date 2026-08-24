@@ -1,0 +1,184 @@
+{{- $ca := .Values.deploybotSshCa }}
+# OpenSSH user CA for the deploybot login on the borg hosts.
+#
+# cert-manager cannot help here: it issues X.509, and upstream sshd only honours
+# OpenSSH certificates signed with `ssh-keygen -s` via TrustedUserCAKeys. So this
+# is the SSH equivalent of the internal-ca in internal-ca.yaml -- a
+# long-lived CA whose private key never leaves the cluster, a short-lived leaf
+# that is reissued on a schedule, and a trust anchor distributed exactly once.
+#
+# The trust anchor is the CA *public* key, committed to the repo at
+# nix/modules/selfupdate/deploybot_user_ca.pub by scripts/setup-ssh-ca.sh. It
+# never rotates, so rotating the leaf costs the hosts nothing -- no sync
+# DaemonSet, and no window where a host trusts the wrong key.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deploybot-ssh-ca-bootstrap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deploybot-ssh-ca-bootstrap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deploybot-ssh-ca-bootstrap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+subjects:
+  - kind: ServiceAccount
+    name: deploybot-ssh-ca-bootstrap
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: deploybot-ssh-ca-bootstrap
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: deploybot-ssh-ca-bootstrap
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: deploybot-ssh-ca-bootstrap
+      restartPolicy: Never
+      containers:
+        - name: bootstrap
+          image: {{ $ca.image }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+
+              # Idempotent by design: the CA is generated once and then left
+              # alone forever. Regenerating it would invalidate the public key
+              # the hosts have committed, locking CI out of every host at once.
+              if kubectl -n "$NAMESPACE" get secret "$SECRET_NAME" >/dev/null 2>&1; then
+                echo "$SECRET_NAME already exists; leaving the CA alone"
+                exit 0
+              fi
+
+              apk add --no-cache openssh-keygen >/dev/null 2>&1
+
+              echo "generating the deploybot SSH user CA"
+              ssh-keygen -q -t ed25519 -N '' -C "deploybot-user-ca" -f /tmp/ca
+
+              kubectl -n "$NAMESPACE" create secret generic "$SECRET_NAME" \
+                --from-file=ca=/tmp/ca \
+                --from-file=ca.pub=/tmp/ca.pub
+
+              echo "CA created. Publish the public half to the hosts with scripts/setup-ssh-ca.sh:"
+              cat /tmp/ca.pub
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SECRET_NAME
+              value: {{ $ca.caSecretName | quote }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deploybot-ssh-cert-issuer
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: deploybot-ssh-cert-issuer
+  namespace: {{ .Release.Namespace }}
+spec:
+  schedule: {{ $ca.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        spec:
+          serviceAccountName: deploybot-ssh-cert-issuer
+          restartPolicy: OnFailure
+          volumes:
+            - name: ca
+              secret:
+                secretName: {{ $ca.caSecretName }}
+                defaultMode: 0400
+          containers:
+            - name: issue
+              image: {{ $ca.image }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  apk add --no-cache openssh-keygen >/dev/null 2>&1
+
+                  # A fresh keypair every run, so the private key rotates rather
+                  # than just the certificate over it.
+                  ssh-keygen -q -t ed25519 -N '' -C "woodpecker-deploybot" -f /tmp/id
+
+                  # Validity deliberately outruns the schedule so there is always
+                  # an overlap window; a pipeline that started just before a
+                  # reissue keeps working with the credential it already read.
+                  ssh-keygen -q -s /ca/ca \
+                    -I "woodpecker-$(date -u +%Y%m%dT%H%M%SZ)" \
+                    -n "$PRINCIPAL" \
+                    -V "-5m:+$VALIDITY" \
+                    -z "$(date +%s)" \
+                    /tmp/id.pub
+
+                  kubectl -n "$TARGET_NAMESPACE" create secret generic "$SECRET_NAME" \
+                    --from-file=id_ed25519=/tmp/id \
+                    --from-file=id_ed25519-cert.pub=/tmp/id-cert.pub \
+                    --dry-run=client -o yaml | kubectl apply -f -
+
+                  ssh-keygen -L -f /tmp/id-cert.pub
+              env:
+                - name: TARGET_NAMESPACE
+                  value: {{ $ca.targetNamespace | quote }}
+                - name: SECRET_NAME
+                  value: {{ $ca.certSecretName | quote }}
+                - name: PRINCIPAL
+                  value: {{ $ca.principal | quote }}
+                - name: VALIDITY
+                  value: {{ $ca.validity | quote }}
+              volumeMounts:
+                - name: ca
+                  mountPath: /ca
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi

@@ -69,7 +69,7 @@ kubectl -n kured run -it --rm debug --image=curlimages/curl --restart=Never -- \
   curl -v http://kured-webhook.kured.svc.cluster.local:8080/health
 
 # Trigger a reboot and watch it work
-ssh <node> sudo touch /var/run/reboot-required
+ssh <node> sudo touch /run/reboot-required
 
 # Watch the logs
 kubectl -n kured logs -f deployment/kured-webhook
@@ -84,4 +84,4 @@ kubectl -n kured logs -f deployment/kured-webhook
 
 **After**:
 - No TLS errors (clean logs)
-- Fully automated: `touch /var/run/reboot-required` → webhook evicts Longhorn → kured drains → node reboots → Longhorn scheduling restored
+- Fully automated: `touch /run/reboot-required` → webhook evicts Longhorn → kured drains → node reboots → Longhorn scheduling restored

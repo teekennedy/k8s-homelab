@@ -10,3 +10,22 @@ exemptions:
       - runAsRootAllowed
       - runAsPrivileged
       - hostPIDSet
+  # Both SSH CA workloads apk-install openssh-keygen at runtime, which needs
+  # root and a writable root filesystem. The bootstrap Job is a one-shot ArgoCD
+  # sync hook (deleted on HookSucceeded) and the issuer runs for a few seconds
+  # every six hours, so neither is a standing surface.
+  - controllerNames:
+      - deploybot-ssh-ca-bootstrap
+      - deploybot-ssh-cert-issuer
+    rules:
+      - runAsRootAllowed
+      - privilegeEscalationAllowed
+      - readOnlyRootFilesystem
+  # SECRET_NAME's value is the *name* of the Kubernetes Secret object the script
+  # writes to, not a credential -- Polaris's sensitiveContainerEnvVar check
+  # matches on the env var name pattern, not its content.
+  - controllerNames:
+      - deploybot-ssh-ca-bootstrap
+      - deploybot-ssh-cert-issuer
+    rules:
+      - sensitiveContainerEnvVar

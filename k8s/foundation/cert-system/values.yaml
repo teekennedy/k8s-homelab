@@ -9,3 +9,21 @@ trust-manager:
   app:
     trust:
       namespace: cert-system
+
+# OpenSSH user CA backing the deploybot login on the borg hosts.
+# See templates/deploybot-ssh-ca.yaml for why this is not a cert-manager issuer.
+deploybotSshCa:
+  # alpine/k8s ships kubectl; openssh-keygen is apk-installed at runtime.
+  # renovate: datasource=docker depName=alpine/k8s
+  image: alpine/k8s:1.36.2
+  caSecretName: deploybot-ssh-ca
+  certSecretName: deploybot-ssh-cert
+  # Namespace the short-lived credential is published into. The RBAC allowing
+  # that write lives with the consumer, in k8s/platform/woodpecker.
+  targetNamespace: woodpecker
+  # Must match services.nixos-selfupdate.user in nix/modules/selfupdate, which
+  # is what sshd matches the certificate's principal against.
+  principal: deploybot
+  # Reissued twice as often as it expires, so there is always an overlap window.
+  schedule: "0 */6 * * *"
+  validity: 12h

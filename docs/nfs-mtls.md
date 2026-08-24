@@ -92,15 +92,14 @@ ssh borg-0 ls -la /var/lib/nfs-mtls/
 Deploy borg-2 first — it's the NFS server and must be ready before clients try mTLS mounts:
 
 ```sh
-lab host deploy borg-2 --boot
-ssh borg-2 sudo touch /var/run/reboot-required
+lab host deploy borg-2 --kured-reboot
 # Wait for kured to orchestrate the borg-2 reboot, then:
-lab host deploy borg-0 --boot && ssh borg-0 sudo touch /var/run/reboot-required
-lab host deploy borg-1 --boot && ssh borg-1 sudo touch /var/run/reboot-required
-lab host deploy borg-3 --boot && ssh borg-3 sudo touch /var/run/reboot-required
+lab host deploy borg-0 --kured-reboot
+lab host deploy borg-1 --kured-reboot
+lab host deploy borg-3 --kured-reboot
 ```
 
-`--boot` activates the profile on next boot. `touch /var/run/reboot-required` signals kured to schedule the reboot with proper cordoning.
+`--kured-reboot` activates the profile on next boot, and creates the sentinel file kured looks for to schedule the reboot with proper cordoning.
 
 ### 3. Verify
 

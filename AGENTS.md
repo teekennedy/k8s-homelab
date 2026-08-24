@@ -20,6 +20,7 @@
   - Decrypted kubeconfigs: `(XDG_CACHE)/lab/k8s/kubeconfig/`
   - Environment state: `(XDG_STATE)/lab/env/`
 - `nix/hosts/<hostname>/` holds host-specific NixOS modules, `secrets.yaml`, and facter reports; keep new nodes under `nix/hosts/common` for shared bits.
+- **NixOS CD**: pushes to `main` touching `flake.nix`, `flake.lock`, or `nix/**` deploy automatically; hosts build themselves and an in-cluster job reboots them in k3s order. See `docs/nixos-cd.md`. `lab host deploy` remains the manual path.
 - `nix/modules/` provides reusable Nix modules (e.g. `nix/modules/k3s`, `nix/modules/users/defaultUser.nix`) that get imported by each host; extend here before duplicating config.
 - `k8s/foundation/`, `k8s/platform/`, and `k8s/apps/` hold Argo CD application definitions (tier app-of-apps live at `k8s/<tier>/application.yaml`).
 - `terraform/` contains infrastructure state (OpenTofu) for network storage; `scripts/` includes bootstrap helpers such as `scripts/bootstrap-host.sh`.
@@ -38,6 +39,7 @@
 - `nix flake check` runs deploy-rs checks to validate host expressions.
 - `nix build .#nixosConfigurations.<host>.config.system.build.toplevel` ensures a host builds successfully; swap `<host>` for `borg-0`, etc.
 - `deploy -- .#<host>` applies a configuration via deploy-rs once builds pass.
+- `./scripts/setup-ssh-ca.sh` publishes the cluster's deploybot SSH CA public key to `nix/modules/selfupdate/` (one-time); `./scripts/update-known-hosts.sh` refreshes the host keys CI verifies against.
 - `tofu -chdir=terraform plan` reviews infra changes; pair with `tofu apply` only after plan review.
 
 ## Coding Style & Naming Conventions

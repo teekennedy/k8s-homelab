@@ -1,0 +1,76 @@
+# https://woodpecker-ci.org/docs/usage/workflow-syntax
+#
+# NixOS continuous deployment.
+#
+# This stages a new NixOS generation on every borg host and then kicks off a
+# job to perform the rollout. It deliberately does not wait for any reboot:
+# while this pipeline runs, the WoodpeckerPipelineRunning gate
+# (k8s/foundation/kured) blocks kured, so waiting here would deadlock.
+#
+# SSH access is designed for least privilege. All the pipeline can do is name a
+# commit that is already an ancestor of main; the host fetches and builds it
+# itself. See nix/modules/selfupdate.
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - flake.nix
+        - flake.lock
+        - "nix/**"
+
+steps:
+  - name: stage
+    image: alpine/k8s:1.36.2
+    backend_options:
+      kubernetes:
+        serviceAccountName: nixos-deploy
+    environment:
+      SSH_USER: deploybot
+      CERT_SECRET: deploybot-ssh-cert
+      KNOWN_HOSTS: k8s/platform/woodpecker/files/known_hosts
+    commands:
+      - apk add --no-cache openssh-client
+      # The credential is an SSH certificate that is regularly reissued by the
+      # deploybot-ssh-cert-issuer CronJob in cert-system. Reading it here at
+      # runtime keeps it out of Woodpecker's own secret store entirely.
+      - install -d -m 700 "$HOME/.ssh"
+      - |
+        set -e
+        kubectl get secret "$CERT_SECRET" -o json > /tmp/cert.json
+        jq -r '.data.id_ed25519 | @base64d' /tmp/cert.json > "$HOME/.ssh/id_ed25519"
+        jq -r '.data["id_ed25519-cert.pub"] | @base64d' /tmp/cert.json > "$HOME/.ssh/id_ed25519-cert.pub"
+        rm -f /tmp/cert.json
+        chmod 600 "$HOME/.ssh/id_ed25519"
+      - cp "$KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
+      # Stage each new generation sequentially, exiting early if any build
+      # fails. The host list is read from the rollout CronJob so it can act as
+      # the single source of truth.
+      - |
+        set -e
+        HOST_ORDER=$(kubectl get cronjob nixos-rollout \
+          -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].env[?(@.name=="HOST_ORDER")].value}')
+        test -n "$HOST_ORDER"
+        for entry in $HOST_ORDER; do
+          ip=$${entry##*=}
+          echo "=== staging $CI_COMMIT_SHA on $ip"
+          timeout 40m ssh -n -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
+            -i "$HOME/.ssh/id_ed25519" \
+            -o CertificateFile="$HOME/.ssh/id_ed25519-cert.pub" \
+            "$SSH_USER@$ip" "deploy $CI_COMMIT_SHA"
+        done
+
+  - name: rollout
+    image: alpine/k8s:1.36.2
+    depends_on: [stage]
+    backend_options:
+      kubernetes:
+        serviceAccountName: nixos-deploy
+    commands:
+      # Drop any rollout still in flight from an earlier push so the newest
+      # revision wins, rather than two rollouts racing across the fleet.
+      - kubectl delete job -l app.kubernetes.io/name=nixos-rollout --ignore-not-found --wait
+      - kubectl create job --from=cronjob/nixos-rollout "nixos-rollout-$(date +%s)"
+      # Reboots start once this pipeline exits and the kured gate clears.
+      - echo "rollout job created; kured reboots begin once this pipeline finishes"

@@ -165,7 +165,7 @@ kube-prometheus-stack:
           # session stuck for twelve hours is a real problem worth a ping.
           - receiver: "null"
             matchers:
-              - alertname =~ "ResticBackupRunning|JellyfinStreamActive"
+              - alertname =~ "ResticBackupRunning|JellyfinStreamActive|WoodpeckerPipelineRunning"
 
       receivers:
         - name: "null"

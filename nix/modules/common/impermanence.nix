@@ -91,6 +91,10 @@ in {
       "/var/log"
       # core dumps
       "/var/lib/systemd/coredump"
+      # systemd timer stamp files.
+      # Allows systemd to detect when a Persistent=true OnCalendar timer misses
+      # a run while the host was down.
+      "/var/lib/systemd/timers"
     ];
     files = [];
   };

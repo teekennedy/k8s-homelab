@@ -6,5 +6,6 @@
     ./sops-nix.nix
     ./nix.nix
     ./io-tuning.nix
+    ./textfile-collector.nix
   ];
 }
