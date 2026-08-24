@@ -150,7 +150,7 @@ kube-prometheus-stack:
         resolve_timeout: 5m
       route:
         receiver: discord
-        group_by: ['alertname', 'severity', 'namespace']
+        group_by: ['alertname', 'severity', 'namespace', 'node']
         group_wait: 30s
         group_interval: 5m
         repeat_interval: 12h
