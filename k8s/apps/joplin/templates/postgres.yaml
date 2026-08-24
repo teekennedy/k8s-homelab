@@ -10,6 +10,7 @@ spec:
   # not data loss — barman-cloud below still gives WAL-archived
   # point-in-time recovery.
   instances: 1
+  enablePDB: false
   imageName: {{ .Values.psql.image }}
   primaryUpdateStrategy: unsupervised
   storage:
