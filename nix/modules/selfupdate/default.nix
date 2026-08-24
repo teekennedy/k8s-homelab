@@ -190,13 +190,26 @@ in {
         };
       };
 
+      # Group is created unconditionally (and used to own rundir below) even
+      # though only the CI trigger account below ever joins it: an unused
+      # group is inert, but the group name has to resolve at boot regardless
+      # of whether the CA key -- and thus the deploybot user -- exists yet.
+      users.groups.${user} = {};
+
       # Unconditionally create rundir: nixos-selfupdate.service writes RUN_LOG
       # here on every run (timer fallback included), not just when the CI
       # trigger account below is enabled. Making the directory conditional on
       # userCaKeyFile means that `tee` will write to a directory that doesn't
       # exist when userCaKeyFile is null, which causes the unit to fail.
+      #
+      # The runDir has two files: TARGET_REV_FILE and RUN_LOG. TARGET_REV_FILE
+      # is written by the deploybot user and read by nixos-selfupdate.service
+      # running as root. RUN_LOG is written by nixos-selfupdate.service and
+      # read by deploybot. The permissions are setup so that deploybot can
+      # write TARGET_REV_FILE and read RUN_LOG, while the sticky bit prevents
+      # deploybot from deleting or renaming RUN_LOG.
       systemd.tmpfiles.rules = [
-        "d ${runDir} 0755 root root -"
+        "d ${runDir} 1770 root ${user} -"
       ];
     }
 
@@ -216,7 +229,6 @@ in {
         # the certificate against; there is no authorized_keys file at all.
         openssh.authorizedPrincipals = [user];
       };
-      users.groups.${user} = {};
 
       security.sudo.extraRules = [
         {
