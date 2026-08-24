@@ -189,6 +189,15 @@ in {
           OnUnitActiveSec = "5min";
         };
       };
+
+      # Unconditionally create rundir: nixos-selfupdate.service writes RUN_LOG
+      # here on every run (timer fallback included), not just when the CI
+      # trigger account below is enabled. Making the directory conditional on
+      # userCaKeyFile means that `tee` will write to a directory that doesn't
+      # exist when userCaKeyFile is null, which causes the unit to fail.
+      systemd.tmpfiles.rules = [
+        "d ${runDir} 0755 root root -"
+      ];
     }
 
     # Remote trigger. Off until the cluster-side SSH CA exists.
@@ -208,12 +217,6 @@ in {
         openssh.authorizedPrincipals = [user];
       };
       users.groups.${user} = {};
-
-      # /run, so it is tmpfs and clears on reboot. 0750 lets the account read
-      # back the run log root writes there without granting it the journal.
-      systemd.tmpfiles.rules = [
-        "d ${runDir} 0750 ${user} ${user} -"
-      ];
 
       security.sudo.extraRules = [
         {
