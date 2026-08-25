@@ -5,6 +5,7 @@
     "security:openssf-scorecard"
   ],
   "bumpVersion": "patch",
+  "timezone": "America/Denver",
   "minimumReleaseAge": "7 days",
   "minimumReleaseAgeBehaviour": "timestamp-optional",
   "rebaseWhen": "behind-base-branch",
