@@ -90,7 +90,7 @@ secret-sync:
   enabled: true
   image:
     repository: golang
-    tag: 1.26.5-alpine
+    tag: 1.26.6-alpine
   rollout:
     enabled: true
     namespace: homepage
