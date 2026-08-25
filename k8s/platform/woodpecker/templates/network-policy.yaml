@@ -106,8 +106,28 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # sshd on the borg hosts, for the NixOS deploy step and the rollout job.
+    # sshd on the borg hosts, for the NixOS deploy step.
     # Scoped to step pods only (not the server/agent) via the label above.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.nixosRollout.nodeCidr }}
+      ports:
+        - protocol: TCP
+          port: 22
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rollout-job-ssh-egress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      name: nixos-rollout
+  policyTypes:
+    - Egress
+  egress:
+    # sshd on the borg hosts, for the NixOS rollout job.
     - to:
         - ipBlock:
             cidr: {{ .Values.nixosRollout.nodeCidr }}
