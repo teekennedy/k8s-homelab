@@ -67,7 +67,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: rollout
-          image: alpine/kubectl:1.36.0
+          image: "{{ .Values.configRollout.kubectlImage }}"
           command: ["kubectl"]
           args:
             - rollout

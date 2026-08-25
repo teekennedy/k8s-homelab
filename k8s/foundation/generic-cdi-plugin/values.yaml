@@ -1,0 +1,5 @@
+# Deliberately in values.yaml (not templates/daemonset.yaml) so that
+# renovate can pick it up. Note: upstream only publishes a floating `main`
+# tag (no versioned releases), so renovate can track digest updates here
+# but won't have a version to bump.
+image: ghcr.io/olfillasodikno/generic-cdi-plugin:main

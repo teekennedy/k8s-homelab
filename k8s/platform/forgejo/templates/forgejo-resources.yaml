@@ -15,7 +15,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: apply
-          image: golang:1.26-alpine
+          image: "{{ .Values.forgejoResources.golangImage }}"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

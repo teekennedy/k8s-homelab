@@ -16,7 +16,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: setup
-          image: alpine/kubectl:1.35.0
+          image: "{{ .Values.basicAuthPresync.kubectlImage }}"
           command: ["/bin/sh", "-c"]
           args:
             - |

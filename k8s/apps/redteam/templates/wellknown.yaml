@@ -41,7 +41,7 @@ spec:
       initContainers:
         # Substitute sha256(NONCE) into the served security.txt.
         - name: render-hash
-          image: busybox:stable
+          image: "{{ .Values.wellknown.busyboxImage }}"
           securityContext:
             runAsUser: 65534
             allowPrivilegeEscalation: false
@@ -69,7 +69,7 @@ spec:
               mountPath: /out
       containers:
         - name: nginx
-          image: nginxinc/nginx-unprivileged:stable
+          image: "{{ .Values.wellknown.nginxImage }}"
           securityContext:
             runAsUser: 101
             allowPrivilegeEscalation: false

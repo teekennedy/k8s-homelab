@@ -2,6 +2,12 @@ psql:
   # Deliberately in values.yaml so that renovate can pick it up.
   image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
 
+oidcJwks:
+  # Images used by templates/authelia-oidc-jwks.yaml. Deliberately in
+  # values.yaml (not the template) so that renovate can pick them up.
+  stepCliImage: smallstep/step-cli:0.28.6
+  kubectlImage: alpine/k8s:1.32.4
+
 # Maps each Authelia OIDC client to the Secret holding its plaintext client
 # secret, so the PreSync sync job can bcrypt-hash it into the aggregate Secret
 # Authelia mounts (see templates/authelia-oidc-client-secrets.yaml and

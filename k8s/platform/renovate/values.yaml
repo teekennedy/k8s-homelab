@@ -1,3 +1,8 @@
+gpgBootstrap:
+  # Deliberately in values.yaml (not templates/gpg-bootstrap-job.yaml) so that
+  # renovate can pick it up.
+  image: alpine/k8s:1.32.3
+
 renovate:
   cronjob:
     # Runs at 5am every day, but with static random offset (22m)

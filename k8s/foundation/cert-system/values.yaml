@@ -1,3 +1,8 @@
+nfsMtlsCertSync:
+  # Deliberately in values.yaml (not templates/nfs-mtls-cert-sync.yaml) so
+  # that renovate can pick it up.
+  alpineImage: alpine:3
+
 cert-manager:
   installCRDs: true
   prometheus:

@@ -60,7 +60,7 @@ spec:
       initContainers:
         - name: generate-key
           # step-cli runs as uid 1000 (non-root) and generates PKCS#8 RSA private keys
-          image: smallstep/step-cli:0.28.6
+          image: "{{ .Values.oidcJwks.stepCliImage }}"
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
@@ -91,7 +91,7 @@ spec:
         - name: generate
           # alpine/k8s has kubectl pre-installed; runs as uid 1000 to match step-cli's
           # key file ownership (mode 600, uid 1000) so the file is readable
-          image: alpine/k8s:1.32.4
+          image: "{{ .Values.oidcJwks.kubectlImage }}"
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000

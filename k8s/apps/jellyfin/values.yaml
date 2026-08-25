@@ -1,6 +1,12 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/common-3.2.0/charts/library/common/values.schema.json
 # Docs: https://bjw-s-labs.github.io/helm-charts/docs/app-template/
 
+qbittorrentPasswordHash:
+  # Deliberately in values.yaml (not templates/qbittorrent-password-hash-job.yaml)
+  # so that renovate can pick them up.
+  pythonImage: python:3.12-alpine
+  kubectlImage: bitnami/kubectl:latest
+
 # Prometheus resources this chart owns. They live here rather than in
 # monitoring-system so that a jellyfin deployment carries its own scrape
 # targets and alerts.

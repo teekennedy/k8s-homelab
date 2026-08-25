@@ -53,7 +53,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: gpg-bootstrap
-          image: alpine/k8s:1.32.3
+          image: "{{ .Values.gpgBootstrap.image }}"
           command: ["/bin/sh", "-c"]
           args:
             - |

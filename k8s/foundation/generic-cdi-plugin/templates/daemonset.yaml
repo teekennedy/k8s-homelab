@@ -15,7 +15,7 @@ spec:
         app.kubernetes.io/name: generic-cdi-plugin
     spec:
       containers:
-      - image: ghcr.io/olfillasodikno/generic-cdi-plugin:main
+      - image: "{{ .Values.image }}"
         name: generic-cdi-plugin
         command: 
           - /generic-cdi-plugin

@@ -102,7 +102,7 @@ spec:
             defaultMode: 0755
       containers:
         - name: sync
-          image: alpine:3
+          image: "{{ .Values.nfsMtlsCertSync.alpineImage }}"
           command: ["/scripts/sync.sh"]
           securityContext:
             privileged: true
