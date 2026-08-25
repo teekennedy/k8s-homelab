@@ -194,7 +194,9 @@
   },
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 6am on tuesday"]
+    "schedule": ["before 6am on tuesday"],
+    "automerge": true,
+    "automergeType": "pr"
   },
   "packageRules": [
     {
@@ -224,6 +226,44 @@
         "flake.lock"
       ],
       "groupName": "root"
+    },
+    {
+      "description": "Give lock file maintenance PRs a title that identifies the lock file type and directory, instead of the generic default 'chore(deps): lock file maintenance' that's identical across every PR.",
+      "matchManagers": [
+        "nix"
+      ],
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "commitMessageAction": "{{packageFileDir}} flake lock file maintenance"
+    },
+    {
+      "matchManagers": [
+        "terraform"
+      ],
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "commitMessageAction": "{{packageFileDir}} terraform lock file maintenance"
+    },
+    {
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "commitMessageAction": "{{packageFileDir}} uv lock file maintenance"
+    },
+    {
+      "description": "Root flake.lock has an empty packageFileDir, so give it an explicit title instead of a leading space.",
+      "matchFileNames": [
+        "flake.lock"
+      ],
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "commitMessageAction": "root flake lock file maintenance"
     },
     {
       "description": "Don't apply minimumReleaseAge to jellyfin image+appVersion so they stay grouped",
