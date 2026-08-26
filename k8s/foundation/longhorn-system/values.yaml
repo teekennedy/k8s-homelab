@@ -1,7 +1,7 @@
 basicAuthPresync:
   # Deliberately in values.yaml (not templates/basic-auth-presync-job.yaml)
   # so that renovate can pick it up.
-  kubectlImage: alpine/kubectl:1.35.0
+  kubectlImage: alpine/kubectl:1.36.3
 
 # https://github.com/longhorn/charts/blob/v1.8.x/charts/longhorn/values.yaml
 longhorn:
