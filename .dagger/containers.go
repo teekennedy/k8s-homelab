@@ -16,7 +16,7 @@ const (
 	// renovate: datasource=docker depName=golangci/golangci-lint
 	golangciLintImage = "golangci/golangci-lint:v2.12.2-alpine"
 	// renovate: datasource=docker depName=ghcr.io/astral-sh/uv
-	uvImage = "ghcr.io/astral-sh/uv:0.12.5-alpine"
+	uvImage = "ghcr.io/astral-sh/uv:0.12.6-alpine"
 	// renovate: datasource=docker depName=cuelang/cue
 	cueImage = "cuelang/cue:0.17.1"
 	// renovate: datasource=docker depName=cytopia/yamllint
