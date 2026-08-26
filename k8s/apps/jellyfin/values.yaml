@@ -4,7 +4,7 @@
 qbittorrentPasswordHash:
   # Deliberately in values.yaml (not templates/qbittorrent-password-hash-job.yaml)
   # so that renovate can pick them up.
-  pythonImage: python:3.12-alpine
+  pythonImage: python:3.14-alpine
   kubectlImage: bitnami/kubectl:latest
 
 # Prometheus resources this chart owns. They live here rather than in
