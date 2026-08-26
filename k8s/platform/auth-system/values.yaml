@@ -5,8 +5,8 @@ psql:
 oidcJwks:
   # Images used by templates/authelia-oidc-jwks.yaml. Deliberately in
   # values.yaml (not the template) so that renovate can pick them up.
-  stepCliImage: smallstep/step-cli:0.28.6
-  kubectlImage: alpine/k8s:1.32.4
+  stepCliImage: smallstep/step-cli:0.30.6
+  kubectlImage: alpine/k8s:1.36.2
 
 # Maps each Authelia OIDC client to the Secret holding its plaintext client
 # secret, so the PreSync sync job can bcrypt-hash it into the aggregate Secret
