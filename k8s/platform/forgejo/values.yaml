@@ -5,7 +5,7 @@ psql:
 forgejoResources:
   # Deliberately in values.yaml (not templates/forgejo-resources.yaml) so
   # that renovate can pick it up.
-  golangImage: golang:1.26-alpine
+  golangImage: golang:1.27-alpine
 
 # Valkey replication set + Sentinel, ported from k8s/platform/auth-system.
 # Deliberately a *separate* instance from Authelia's rather than one shared
@@ -32,7 +32,7 @@ forgejo:
     runAsNonRoot: true
     runAsUser: 1000
   image:
-    tag: "16.0.2"
+    tag: "16.0.3"
     rootless: true
   ingress:
     enabled: true
