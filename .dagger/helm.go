@@ -295,7 +295,7 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 
 // matchChartPaths returns chart paths that contain any of the given file paths.
 // CUE config changes cause all charts to be returned.
-func matchChartPaths(filePaths []string, chartPaths []string) []string {
+func matchChartPaths(filePaths, chartPaths []string) []string {
 	// CUE changes affect all charts
 	for _, p := range filePaths {
 		if strings.HasPrefix(p, "config/") && strings.HasSuffix(p, ".cue") {

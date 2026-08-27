@@ -464,7 +464,7 @@ func buildHostCreationRule(expectedRegex string, commonPGP, commonAge []*yaml.No
 
 // insertHostRule inserts newRule into rules immediately after the last existing
 // nix/hosts/ rule (keeping host rules grouped ahead of modules/terraform rules).
-func insertHostRule(rules *yaml.Node, newRule *yaml.Node) {
+func insertHostRule(rules, newRule *yaml.Node) {
 	insertIdx := 0
 	for i, rule := range rules.Content {
 		pr := findMapValue(rule, "path_regex")
@@ -946,7 +946,7 @@ func (b *bootstrapper) saveSopsConfig(doc *yaml.Node) error {
 
 // findCommonKeys extracts the PGP and non-host age keys from the first existing
 // host creation rule. These are the "common" keys used for all host secrets.
-func (b *bootstrapper) findCommonKeys(root *yaml.Node) (pgpKeys []*yaml.Node, ageKeys []*yaml.Node, err error) {
+func (b *bootstrapper) findCommonKeys(root *yaml.Node) (pgpKeys, ageKeys []*yaml.Node, err error) {
 	rules := findMapValue(root, "creation_rules")
 	if rules == nil {
 		return nil, nil, fmt.Errorf("no creation_rules in .sops.yaml")

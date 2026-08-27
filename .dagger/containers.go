@@ -12,9 +12,9 @@ const (
 	// renovate: datasource=docker depName=nixos/nix
 	nixImage = "nixos/nix:2.35.2"
 	// renovate: datasource=docker depName=golang
-	golangImage = "golang:1.26-alpine"
+	golangImage = "golang:1.27-alpine"
 	// renovate: datasource=docker depName=golangci/golangci-lint
-	golangciLintImage = "golangci/golangci-lint:v2.12.2-alpine"
+	golangciLintImage = "golangci/golangci-lint:v2.13.0-alpine"
 	// renovate: datasource=docker depName=ghcr.io/astral-sh/uv
 	uvImage = "ghcr.io/astral-sh/uv:0.12.6-alpine"
 	// renovate: datasource=docker depName=cuelang/cue

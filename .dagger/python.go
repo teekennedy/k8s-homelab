@@ -244,7 +244,7 @@ func (m *Homelab) TestPython(ctx context.Context,
 }
 
 // matchProjectPaths returns project paths that contain any of the given file paths.
-func matchProjectPaths(filePaths []string, projectPaths []string) []string {
+func matchProjectPaths(filePaths, projectPaths []string) []string {
 	matched := map[string]bool{}
 	for _, p := range filePaths {
 		for _, dir := range projectPaths {
