@@ -25,6 +25,11 @@ spec:
       kind: Secret
       name: cnpg-s3-credentials
       namespace: joplin
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: smtp-creds
+      namespace: joplin
   project: default
   source:
     path: k8s/apps/joplin
