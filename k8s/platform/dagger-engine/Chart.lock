@@ -1,6 +1,6 @@
 dependencies:
 - name: dagger-helm
   repository: oci://registry.dagger.io
-  version: 0.21.8
-digest: sha256:c6496b7537477db75313397f96e902bca7f072fea5b5fb7239aae695c4cacba5
-generated: "2026-07-30T11:23:36.564023878Z"
+  version: 0.21.9
+digest: sha256:cfc225c810b56fff5677c2bf99a3ef24fa3fd4d771c8bc6b3015ab696721bbb7
+generated: "2026-08-27T11:24:44.921618588Z"
