@@ -1,7 +1,7 @@
 configRollout:
   # Deliberately in values.yaml (not templates/config-rollout.yaml) so that
   # renovate can pick it up.
-  kubectlImage: alpine/kubectl:1.36.3
+  kubectlImage: alpine/kubectl:1.36.4
 
 # https://github.com/M0NsTeRRR/helm-charts/tree/main/charts/homepage
 homepage:
