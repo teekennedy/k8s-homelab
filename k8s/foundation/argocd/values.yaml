@@ -80,6 +80,23 @@ argo-cd:
         g, full-admin, role:admin
         g, argocd-user, role:readonly
         g, readonly, role:readonly
+    # ConfigMap for the helmfile Config Management Plugin (paired with the
+    # repoServer.extraContainers sidecar below).
+    # Ref: https://argo-cd.readthedocs.io/en/stable/operator-manual/config-management-plugins/
+    cmp:
+      create: true
+      plugins:
+        helmfile:
+          generate:
+            command: [sh, -c]
+            args:
+              # Every release chart lives at k8s/<tier>/<name>, so the plugin's
+              # cwd (the Application's source path) is always 3 levels below
+              # the repo root where helmfile.yaml.gotmpl lives.
+              - |
+                set -euo pipefail
+                cd ../../..
+                exec helmfile --environment "${ARGOCD_ENV_HELMFILE_ENVIRONMENT:-production}" --selector "name=$ARGOCD_APP_NAME" template
   server:
     ingress:
       enabled: false
@@ -94,6 +111,39 @@ argo-cd:
     metrics: *metrics
   repoServer:
     metrics: *metrics
+    # helmfile CMP sidecar: renders k8s/<tier>/<name> charts via `helmfile template`
+    # instead of ArgoCD's native Helm autodetection. Each application.yaml opts in
+    # via `source.plugin.name: helmfile`.
+    extraContainers:
+      - name: cmp-helmfile
+        image: ghcr.io/helmfile/helmfile:v1.7.3
+        imagePullPolicy: IfNotPresent
+        command:
+          - /var/run/argocd/argocd-cmp-server
+        env:
+          - name: HELM_CACHE_HOME
+            value: /tmp/helm/cache
+          - name: HELM_CONFIG_HOME
+            value: /tmp/helm/config
+          - name: HELM_DATA_HOME
+            value: /tmp/helm/data
+        volumeMounts:
+          - mountPath: /var/run/argocd
+            name: var-files
+          - mountPath: /home/argocd/cmp-server/plugins
+            name: plugins
+          - mountPath: /home/argocd/cmp-server/config/plugin.yaml
+            subPath: helmfile.yaml
+            name: argocd-cmp-cm
+          # Filesystem separation from the repo-server's own /tmp, per the CMP docs.
+          - mountPath: /tmp
+            name: cmp-tmp
+    volumes:
+      - name: argocd-cmp-cm
+        configMap:
+          name: argocd-cmp-cm
+      - name: cmp-tmp
+        emptyDir: {}
   redis:
     metrics:
       enabled: false
