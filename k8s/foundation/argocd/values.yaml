@@ -90,12 +90,29 @@ argo-cd:
           generate:
             command: [sh, -c]
             args:
-              # Every release chart lives at k8s/<tier>/<name>, so the plugin's
-              # cwd (the Application's source path) is always 3 levels below
-              # the repo root where helmfile.yaml.gotmpl lives.
+              # The plugin's cwd is the Application's source path (e.g.
+              # k8s/foundation/argocd), and ARGOCD_APP_SOURCE_PATH gives us
+              # that same path relative to the repo root where
+              # helmfile.yaml.gotmpl lives. Count its segments and cd up that
+              # many levels, rather than hardcoding a fixed chart depth.
               - |
                 set -euo pipefail
-                cd ../../..
+                rest="$ARGOCD_APP_SOURCE_PATH"
+                segments=0
+                while [ -n "$rest" ]; do
+                  segments=$((segments + 1))
+                  case "$rest" in
+                    */*) rest="${rest#*/}" ;;
+                    *) rest="" ;;
+                  esac
+                done
+                up=""
+                i=0
+                while [ "$i" -lt "$segments" ]; do
+                  up="../$up"
+                  i=$((i + 1))
+                done
+                cd "${up:-.}"
                 exec helmfile --environment "${ARGOCD_ENV_HELMFILE_ENVIRONMENT:-production}" --selector "name=$ARGOCD_APP_NAME" template
   server:
     ingress:
