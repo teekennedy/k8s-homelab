@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"dagger/homelab/internal/dagger"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -34,6 +35,10 @@ func (hc *HelmChart) Polaris(ctx context.Context) (string, error) {
 
 	out, err := container.WithExec(args).Stdout(ctx)
 	if err != nil {
+		var execErr *dagger.ExecError
+		if errors.As(err, &execErr) {
+			return "", fmt.Errorf("polaris failed for %s: %w\n%s%s", hc.Path, err, execErr.Stdout, execErr.Stderr)
+		}
 		return "", fmt.Errorf("polaris failed for %s: %w\n%s", hc.Path, err, out)
 	}
 
@@ -96,6 +101,10 @@ func (hc *HelmChart) Kubeconform(ctx context.Context) (string, error) {
 		WithExec(args).
 		Stdout(ctx)
 	if err != nil {
+		var execErr *dagger.ExecError
+		if errors.As(err, &execErr) {
+			return "", fmt.Errorf("kubeconform failed for %s: %w\n%s%s", hc.Path, err, execErr.Stdout, execErr.Stderr)
+		}
 		return "", fmt.Errorf("kubeconform failed for %s: %w\n%s", hc.Path, err, out)
 	}
 

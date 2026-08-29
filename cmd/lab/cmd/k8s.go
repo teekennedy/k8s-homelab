@@ -502,70 +502,23 @@ This exports the environment configuration to formats usable by Helm charts.`,
 			outputDir, _ := cmd.Flags().GetString("output")
 			configDir := getConfigDir()
 
-			env, err := config.LoadEnvironment(configDir, envName)
-			if err != nil {
+			if _, err := config.LoadEnvironment(configDir, envName); err != nil {
 				return fmt.Errorf("load environment: %w", err)
 			}
 
 			if outputDir == "" {
 				outputDir = filepath.Join(configDir, "gen")
 			}
-
-			if outputDirErr := os.MkdirAll(outputDir, 0o750); outputDirErr != nil {
-				return fmt.Errorf("create output directory: %w", outputDirErr)
+			if err := os.MkdirAll(outputDir, 0o750); err != nil {
+				return fmt.Errorf("create output directory: %w", err)
 			}
 
-			helmValues, err := config.ExportEnvironment(configDir, envName, "helm")
+			paths, err := generateClusterFiles(configDir, envName, outputDir)
 			if err != nil {
-				return fmt.Errorf("export helm values: %w", err)
+				return err
 			}
 
-			helmPath := filepath.Join(outputDir, "cluster-values.yaml")
-			if clusterValuesErr := os.WriteFile(helmPath, []byte(helmValues), 0o600); clusterValuesErr != nil {
-				return fmt.Errorf("write helm values: %w", clusterValuesErr)
-			}
-
-			tfValues, err := config.ExportEnvironment(configDir, envName, "terraform")
-			if err != nil {
-				return fmt.Errorf("export terraform values: %w", err)
-			}
-
-			tfPath := filepath.Join(outputDir, "cluster.tfvars")
-			if err := os.WriteFile(tfPath, []byte(tfValues), 0o600); err != nil {
-				return fmt.Errorf("write terraform values: %w", err)
-			}
-
-			// Write env.json for Helmfile environment values consumption.
-			envJSON, err := config.ExportEnvironment(configDir, envName, "json")
-			if err != nil {
-				return fmt.Errorf("export env json: %w", err)
-			}
-			envJSONDir := filepath.Join(outputDir, envName)
-			if err := os.MkdirAll(envJSONDir, 0o750); err != nil {
-				return fmt.Errorf("create env json directory: %w", err)
-			}
-			envJSONPath := filepath.Join(envJSONDir, "env.json")
-			if err := os.WriteFile(envJSONPath, []byte(envJSON), 0o600); err != nil {
-				return fmt.Errorf("write env json: %w", err)
-			}
-
-			if !jsonOutput {
-				fmt.Printf("Generated configuration for %s environment:\n", envName)
-				fmt.Printf("  Helm values: %s\n", helmPath)
-				fmt.Printf("  Terraform vars: %s\n", tfPath)
-				fmt.Printf("  Helmfile env: %s\n", envJSONPath)
-			} else {
-				result := map[string]string{
-					"environment": envName,
-					"helmValues":  helmPath,
-					"tfVars":      tfPath,
-					"envJSON":     envJSONPath,
-				}
-				out, _ := json.Marshal(result)
-				fmt.Println(string(out))
-			}
-
-			_ = env
+			printGenerateResult(envName, paths)
 			return nil
 		},
 	}
@@ -573,6 +526,70 @@ This exports the environment configuration to formats usable by Helm charts.`,
 	cmd.Flags().String("output", "", "Output directory (default: config/gen)")
 
 	return cmd
+}
+
+// generatedPaths holds the output file paths written by generateClusterFiles.
+type generatedPaths struct {
+	helmPath    string
+	tfPath      string
+	envJSONPath string
+}
+
+// generateClusterFiles exports envName's Helm values, Terraform vars, and
+// Helmfile env.json into outputDir.
+func generateClusterFiles(configDir, envName, outputDir string) (generatedPaths, error) {
+	helmValues, err := config.ExportEnvironment(configDir, envName, "helm")
+	if err != nil {
+		return generatedPaths{}, fmt.Errorf("export helm values: %w", err)
+	}
+	helmPath := filepath.Join(outputDir, "cluster-values.yaml")
+	if err := os.WriteFile(helmPath, []byte(helmValues), 0o600); err != nil {
+		return generatedPaths{}, fmt.Errorf("write helm values: %w", err)
+	}
+
+	tfValues, err := config.ExportEnvironment(configDir, envName, "terraform")
+	if err != nil {
+		return generatedPaths{}, fmt.Errorf("export terraform values: %w", err)
+	}
+	tfPath := filepath.Join(outputDir, "cluster.tfvars")
+	if err := os.WriteFile(tfPath, []byte(tfValues), 0o600); err != nil {
+		return generatedPaths{}, fmt.Errorf("write terraform values: %w", err)
+	}
+
+	// Write env.json for Helmfile environment values consumption.
+	envJSON, err := config.ExportEnvironment(configDir, envName, "json")
+	if err != nil {
+		return generatedPaths{}, fmt.Errorf("export env json: %w", err)
+	}
+	envJSONDir := filepath.Join(outputDir, envName)
+	if err := os.MkdirAll(envJSONDir, 0o750); err != nil {
+		return generatedPaths{}, fmt.Errorf("create env json directory: %w", err)
+	}
+	envJSONPath := filepath.Join(envJSONDir, "env.json")
+	if err := os.WriteFile(envJSONPath, []byte(envJSON), 0o600); err != nil {
+		return generatedPaths{}, fmt.Errorf("write env json: %w", err)
+	}
+
+	return generatedPaths{helmPath: helmPath, tfPath: tfPath, envJSONPath: envJSONPath}, nil
+}
+
+// printGenerateResult prints the generated file paths as text or JSON depending on jsonOutput.
+func printGenerateResult(envName string, paths generatedPaths) {
+	if !jsonOutput {
+		fmt.Printf("Generated configuration for %s environment:\n", envName)
+		fmt.Printf("  Helm values: %s\n", paths.helmPath)
+		fmt.Printf("  Terraform vars: %s\n", paths.tfPath)
+		fmt.Printf("  Helmfile env: %s\n", paths.envJSONPath)
+		return
+	}
+	result := map[string]string{
+		"environment": envName,
+		"helmValues":  paths.helmPath,
+		"tfVars":      paths.tfPath,
+		"envJSON":     paths.envJSONPath,
+	}
+	out, _ := json.Marshal(result)
+	fmt.Println(string(out))
 }
 
 func newK8sKubeconfigCmd() *cobra.Command {

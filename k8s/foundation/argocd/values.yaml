@@ -137,7 +137,21 @@ argo-cd:
         imagePullPolicy: IfNotPresent
         command:
           - /var/run/argocd/argocd-cmp-server
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
         env:
+          # The image defaults HOME to /helm, which is only writable by root;
+          # redirect it (and Helm's own cache/config/data dirs) to the
+          # writable cmp-tmp emptyDir now that the container runs non-root.
+          - name: HOME
+            value: /tmp
           - name: HELM_CACHE_HOME
             value: /tmp/helm/cache
           - name: HELM_CONFIG_HOME
