@@ -187,6 +187,20 @@ releases:
       - secret-system/secret-system
 
   # --- apps tier ---
+  - name: copyparty
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: freshrss
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
   - name: homepage
     inherit:
       - template: apps
@@ -200,7 +214,31 @@ releases:
       - cert-system/cert-system
       - secret-system/secret-system
 
+  - name: joplin
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - reflector/reflector
+      - cnpg-system/cnpg-system
+      - s3-proxy/s3-proxy
+      - auth-system/auth-system
+
+  - name: redteam
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
   - name: spoolman
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+
+  - name: syncthing
     inherit:
       - template: apps
     needs:

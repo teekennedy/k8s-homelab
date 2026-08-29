@@ -46,10 +46,15 @@ _productionApps: {
 			"woodpecker":        true
 		}
 		apps: {
-			"homepage": true
-			"jellyfin": true
-			"spoolman": true
-			"terraria": true
+			"copyparty": true
+			"freshrss":  true
+			"homepage":  true
+			"jellyfin":  true
+			"joplin":    true
+			"redteam":   true
+			"spoolman":  true
+			"syncthing": true
+			"terraria":  true
 		}
 	}
 }
@@ -91,10 +96,15 @@ _stagingApps: {
 			"woodpecker":        false
 		}
 		apps: {
-			"homepage": true
-			"jellyfin": false
-			"spoolman": false
-			"terraria": false
+			"copyparty": false
+			"freshrss":  false
+			"homepage":  true
+			"jellyfin":  false
+			"joplin":    false
+			"redteam":   false
+			"spoolman":  false
+			"syncthing": false
+			"terraria":  false
 		}
 	}
 }
