@@ -443,11 +443,11 @@ app-template:
             PGID: "1200"
           resources:
             requests:
-              cpu: 500m
+              cpu: 750m
               memory: 1Gi
             limits:
-              cpu: 1000m
-              memory: 4Gi
+              cpu: 2000m
+              memory: 6Gi
         gluetun:
           image:
             repository: docker.io/qmcgaw/gluetun
