@@ -89,8 +89,12 @@ in {
         "/var/lib/rancher/k3s"
         "/var/lib/cni"
         "/var/lib/kubelet"
-        # logs
+        # logs, including systemd journal logs.
         "/var/log"
+        # promtail's journal cursor, hostPath-mounted by the promtail
+        # DaemonSet. Persisting the cursor across reboots prevents promtail
+        # from re-processing existing logs.
+        "/var/lib/promtail"
         # core dumps
         "/var/lib/systemd/coredump"
         # Crash records the firmware kept across a reset. systemd-pstore drains

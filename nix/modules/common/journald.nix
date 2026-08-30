@@ -1,18 +1,23 @@
 {...}: {
-  # Store journal logs in RAM (/run/log/journal) instead of disk (/var/log/journal)
-  # This reduces disk I/O which is beneficial for etcd performance.
-  # Logs are ephemeral and lost on reboot, but they're collected by Loki for persistence.
-  services.journald.storage = "volatile";
+  # Store journal logs on disk (/var/log/journal).
+  # /var/log is persisted by nix-impermanence.
+  services.journald.storage = "persistent";
 
-  # Configure retention limits to prevent excessive RAM usage
   services.journald.extraConfig = ''
-    # Limit volatile storage (RAM) to 1GB
+    # On-disk limits. Journal volume was measured at ~3MB/day/host as of 2026-08-30.
+    SystemMaxUse=1G
+    SystemMaxFileSize=100M
+    # The default is 15% of the filesystem, which on a 1TB disk disk is a ~150G
+    # reservation that would silently stop logging if it were filled that far.
+    SystemKeepFree=2G
+
+    # journald still writes to /run/log/journal early in boot and flushes to
+    # disk once /var is mounted, so these still bound that window.
     RuntimeMaxUse=1G
-    # Keep max 100MB per journal file
     RuntimeMaxFileSize=100M
-    # Start removing old logs when space gets below 200MB
     RuntimeKeepFree=200M
-    # Forward to syslog socket for collection by Promtail/Loki
+
+    # Collection is via promtail reading the journal directly, not syslog.
     ForwardToSyslog=no
     # Max retention time (older logs are rotated out)
     MaxRetentionSec=1week

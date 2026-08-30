@@ -436,11 +436,18 @@ promtail:
   config:
     clients:
       - url: http://monitoring-system-loki:3100/loki/api/v1/push
+    # The chart default positions filename is /run/promtail/positions.yaml,
+    # which is tmpfs and so is destroyed on reboot. Promtail seeks to `now -
+    # max_age` when it has no saved cursor, resulting in logs getting
+    # re-processed after reboot. Nix-impermanence is configured to persist the
+    # /var/lib/promtail folder.
+    positions:
+      filename: /var/lib/promtail/positions.yaml
     snippets:
       extraScrapeConfigs: |
         - job_name: systemd-journal
           journal:
-            path: /run/log/journal
+            path: /var/log/journal
             max_age: 24h
             labels:
               job: systemd-journal
@@ -451,7 +458,7 @@ promtail:
               target_label: 'host'
         - job_name: dmesg
           journal:
-            path: /run/log/journal
+            path: /var/log/journal
             max_age: 24h
             matches: _TRANSPORT=kernel
             labels:
@@ -459,19 +466,32 @@ promtail:
           relabel_configs:
             - source_labels: ['__journal__hostname']
               target_label: 'host'
+  # These paths are coupled to services.journald.storage in
+  # nix/modules/common/journald.nix: journald writes to /var/log/journal only
+  # while storage is "persistent". If that ever goes back to "volatile" the
+  # journal moves to /run/log/journal and promtail collects nothing at all,
+  # silently — there is no error for an empty journal directory.
   extraVolumes:
     - name: journal
       hostPath:
-        path: /run/log/journal
+        path: /var/log/journal
         type: DirectoryOrCreate
     - name: machine-id
       hostPath:
         path: /etc/machine-id
         type: File
+    - name: positions
+      hostPath:
+        path: /var/lib/promtail
+        type: DirectoryOrCreate
   extraVolumeMounts:
     - name: journal
-      mountPath: /run/log/journal
+      mountPath: /var/log/journal
       readOnly: true
     - name: machine-id
       mountPath: /etc/machine-id
       readOnly: true
+    # Writable: this is the one thing promtail persists. The container has
+    # readOnlyRootFilesystem, so the positions file has to live on a mount.
+    - name: positions
+      mountPath: /var/lib/promtail
