@@ -48,7 +48,7 @@ spec:
             topologyKey: kubernetes.io/hostname
       containers:
       - name: valkey
-        image: valkey/valkey:9-alpine
+        image: "{{ .Values.valkey.image }}"
         securityContext:
           allowPrivilegeEscalation: false
         ports:
@@ -115,7 +115,7 @@ spec:
             memory: "512Mi"
             cpu: "500m"
       - name: sentinel
-        image: valkey/valkey:9-alpine
+        image: "{{ .Values.valkey.image }}"
         securityContext:
           allowPrivilegeEscalation: false
         ports:

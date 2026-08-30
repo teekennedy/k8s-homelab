@@ -23,9 +23,10 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: lldap-bootstrap
-          # TODO make sure renovatebot can update this
-          # Root is needed to install kubectl
-          image: ghcr.io/lldap/lldap:2025-05-19-alpine
+          # Root is needed to install kubectl. Same image as the lldap
+          # deployment (see app-template.controllers.lldap in values.yaml)
+          # so renovate updates both together and they never drift.
+          image: "{{ (index .Values "app-template" "controllers" "lldap" "containers" "lldap" "image" "repository") }}:{{ (index .Values "app-template" "controllers" "lldap" "containers" "lldap" "image" "tag") }}"
           securityContext:
             allowPrivilegeEscalation: false
 

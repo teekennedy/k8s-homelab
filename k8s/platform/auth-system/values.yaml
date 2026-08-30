@@ -2,6 +2,11 @@ psql:
   # Deliberately in values.yaml so that renovate can pick it up.
   image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
 
+# Used by templates/valkey-statefulset.yaml. Deliberately in values.yaml (not
+# the template) so that renovate can pick it up.
+valkey:
+  image: valkey/valkey:9-alpine
+
 oidcJwks:
   # Images used by templates/authelia-oidc-jwks.yaml. Deliberately in
   # values.yaml (not the template) so that renovate can pick them up.
