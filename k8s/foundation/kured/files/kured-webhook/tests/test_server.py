@@ -1,4 +1,5 @@
 import json
+import socket
 import sys
 import urllib.error
 from datetime import datetime, timedelta, timezone
@@ -121,3 +122,57 @@ def test_k8s_request_handles_http_error(mock_urlopen, mock_auth):
 
     with pytest.raises(RuntimeError, match="K8s API error: 404"):
         server.k8s_request("GET", "/api/v1/nodes/missing")
+
+
+@patch("socket.getaddrinfo")
+def test_resolve_alertmanager_bases_dedupes_and_sorts(mock_getaddrinfo):
+    mock_getaddrinfo.return_value = [
+        (None, None, None, None, ("10.0.0.2", 9093)),
+        (None, None, None, None, ("10.0.0.1", 9093)),
+        (None, None, None, None, ("10.0.0.1", 9093)),
+    ]
+
+    bases = server.resolve_alertmanager_bases("http://alertmanager-operated:9093")
+
+    assert bases == ["http://10.0.0.1:9093", "http://10.0.0.2:9093"]
+    mock_getaddrinfo.assert_called_once_with(
+        "alertmanager-operated", 9093, type=socket.SOCK_STREAM
+    )
+
+
+@patch("urllib.request.urlopen")
+def test_broadcast_json_posts_to_every_replica(mock_urlopen):
+    mock_urlopen.return_value.__enter__.return_value = Mock(read=lambda: b"")
+    bases = ["http://10.0.0.1:9093", "http://10.0.0.2:9093", "http://10.0.0.3:9093"]
+
+    server.broadcast_json("/api/v2/alerts", [{"labels": {"alertname": "x"}}], bases)
+
+    posted_urls = [call.args[0].full_url for call in mock_urlopen.call_args_list]
+    assert posted_urls == [
+        "http://10.0.0.1:9093/api/v2/alerts",
+        "http://10.0.0.2:9093/api/v2/alerts",
+        "http://10.0.0.3:9093/api/v2/alerts",
+    ]
+
+
+@patch("urllib.request.urlopen")
+def test_broadcast_json_raises_on_partial_failure(mock_urlopen):
+    ok_response = MagicMock()
+    ok_response.__enter__.return_value = Mock(read=lambda: b"")
+    mock_urlopen.side_effect = [OSError("unreachable"), ok_response]
+    bases = ["http://10.0.0.1:9093", "http://10.0.0.2:9093"]
+
+    with pytest.raises(OSError, match="unreachable"):
+        server.broadcast_json("/api/v2/alerts", [{"labels": {"alertname": "x"}}], bases)
+
+    # Every replica is still attempted, even after an earlier one fails.
+    assert mock_urlopen.call_count == 2
+
+
+@patch("urllib.request.urlopen")
+def test_broadcast_json_raises_if_all_replicas_fail(mock_urlopen):
+    mock_urlopen.side_effect = OSError("unreachable")
+    bases = ["http://10.0.0.1:9093", "http://10.0.0.2:9093"]
+
+    with pytest.raises(OSError, match="unreachable"):
+        server.broadcast_json("/api/v2/alerts", [{"labels": {"alertname": "x"}}], bases)

@@ -34,7 +34,12 @@ webhook:
   image:
     repository: python
     tag: 3.14-alpine
-  alertmanagerUrl: http://monitoring-system-kube-pro-alertmanager.monitoring-system.svc.cluster.local:9093
+  # Headless service (one DNS A record per Alertmanager pod), not the
+  # load-balanced ClusterIP Service. Alertmanager's gossip cluster only
+  # replicates silences and the notification log, not the alert set itself,
+  # so alert POSTs need to reach every replica directly -- the webhook
+  # resolves this hostname to all pod IPs and fans out to each one.
+  alertmanagerUrl: http://alertmanager-operated.monitoring-system.svc.cluster.local:9093
   drainSilenceDuration: 1h
   drainSilenceAlerts:
     - CNPGInstanceNotReady

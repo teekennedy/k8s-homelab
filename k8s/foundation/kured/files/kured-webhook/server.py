@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import socket
 import ssl
 import sys
 import urllib.error
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Iterable, Optional, Tuple
+from urllib.parse import urlsplit
 
 
 @dataclass(frozen=True)
@@ -99,16 +101,55 @@ def build_reboot_alert_payload(
     ]
 
 
-def post_json(path: str, payload: dict | list) -> None:
+def resolve_alertmanager_bases(url: str) -> list[str]:
+    """Resolve every Alertmanager replica address behind `url`.
+
+    Alertmanager's gossip cluster only replicates silences and the
+    notification log -- not the alert set itself. An alert POSTed to a
+    single replica (e.g. via a load-balanced Service, which is what `url`
+    normally is) is invisible to the other replicas, so each one ends up
+    with a different, incomplete view of an alert's lifecycle and fires its
+    own inconsistent notifications. Alerts must be fanned out to every
+    replica individually; silences don't need this.
+    """
+    parts = urlsplit(url)
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    addrs = {
+        info[4][0]
+        for info in socket.getaddrinfo(parts.hostname, port, type=socket.SOCK_STREAM)
+    }
+    return [f"{parts.scheme}://{addr}:{port}" for addr in sorted(addrs)]
+
+
+def post_json(path: str, payload: dict | list, base: Optional[str] = None) -> None:
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        f"{config().alertmanager_url}{path}",
+        f"{base or config().alertmanager_url}{path}",
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=5) as resp:
         resp.read()
+
+
+def broadcast_json(path: str, payload: dict | list, bases: list[str]) -> None:
+    """POST payload to every base, raising if any of them failed.
+
+    Alertmanager's alert set isn't gossiped between replicas the way
+    silences are, so a partial write leaves replicas out of sync -- exactly
+    the inconsistency this exists to avoid. Every base is still attempted
+    (so reachable replicas stay up to date) before any failure is raised.
+    """
+    last_exc = None
+    for base in bases:
+        try:
+            post_json(path, payload, base=base)
+        except Exception as exc:
+            print(f"Failed posting {path} to {base}: {exc}", file=sys.stderr)
+            last_exc = exc
+    if last_exc:
+        raise last_exc
 
 
 def create_silence(alertname: str, duration: timedelta, node: str, reason: str) -> None:
@@ -124,7 +165,9 @@ def set_reboot_alert(node: str, resolved: bool) -> None:
         f"{'Resolving' if resolved else 'Creating'} reboot alert for {node}",
         file=sys.stderr,
     )
-    post_json("/api/v2/alerts", build_reboot_alert_payload(node, resolved))
+    payload = build_reboot_alert_payload(node, resolved)
+    bases = resolve_alertmanager_bases(config().alertmanager_url)
+    broadcast_json("/api/v2/alerts", payload, bases)
 
 
 def get_k8s_auth() -> Tuple[str, str, ssl.SSLContext]:
