@@ -489,7 +489,7 @@ app-template:
         qbittorrent-metrics:
           image:
             repository: ghcr.io/martabal/qbittorrent-exporter
-            tag: v2.0.2
+            tag: v2.0.3
           env:
             QBITTORRENT_USERNAME:
               valueFrom:
