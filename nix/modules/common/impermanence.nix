@@ -1,6 +1,7 @@
 {
   inputs,
   config,
+  lib,
   pkgs,
   ...
 }: let
@@ -78,24 +79,30 @@ in {
   fileSystems."/cache".neededForBoot = true;
   environment.persistence."/cache" = {
     hideMounts = true;
-    directories = [
-      # application cache directory (according to FHS)
-      "/var/cache"
-      # containerd default metadata dir
-      "/var/lib/containerd"
-      # k3s data dirs
-      "/var/lib/rancher/k3s"
-      "/var/lib/cni"
-      "/var/lib/kubelet"
-      # logs
-      "/var/log"
-      # core dumps
-      "/var/lib/systemd/coredump"
-      # systemd timer stamp files.
-      # Allows systemd to detect when a Persistent=true OnCalendar timer misses
-      # a run while the host was down.
-      "/var/lib/systemd/timers"
-    ];
+    directories =
+      [
+        # application cache directory (according to FHS)
+        "/var/cache"
+        # containerd default metadata dir
+        "/var/lib/containerd"
+        # k3s data dirs
+        "/var/lib/rancher/k3s"
+        "/var/lib/cni"
+        "/var/lib/kubelet"
+        # logs
+        "/var/log"
+        # core dumps
+        "/var/lib/systemd/coredump"
+        # Crash records the firmware kept across a reset. systemd-pstore drains
+        # /sys/fs/pstore into here on boot.
+        "/var/lib/systemd/pstore"
+        # systemd timer stamp files.
+        # Allows systemd to detect when a Persistent=true OnCalendar timer misses
+        # a run while the host was down.
+        "/var/lib/systemd/timers"
+      ]
+      # rasdaemon's machine-check database, a history of hardware faults.
+      ++ lib.optional config.hardware.rasdaemon.enable "/var/lib/rasdaemon";
     files = [];
   };
 }
