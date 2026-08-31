@@ -354,7 +354,7 @@ app-template:
           # https://github.com/Unpackerr/unpackerr/pkgs/container/unpackerr
           image:
             repository: ghcr.io/unpackerr/unpackerr
-            tag: 0.15.2
+            tag: v0.16.1
           env:
             TZ: America/Denver
             UN_SONARR_0_API_KEY:
