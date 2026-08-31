@@ -96,6 +96,7 @@ renovate:
         "autodiscover": true,
         "httpCacheTtlDays": 7,
         "allowedCommands": ["^dagger (develop|generate)( [^;&|]*)?$"],
+        "detectHostRulesFromEnv": true,
         "customEnvVariables": {
           "_EXPERIMENTAL_DAGGER_RUNNER_HOST": "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine",
           "DAGGER_NO_NAG": "1",
@@ -131,6 +132,20 @@ renovate:
         secretKeyRef:
           name: renovate-secret
           key: RENOVATE_GITHUB_COM_TOKEN
+    # Docker Hub credentials, picked up via detectHostRulesFromEnv above.
+    # matchHost is docker.io, encoded per Renovate's env var naming convention
+    # (periods -> single underscore). Secret is terraform-managed, see
+    # terraform/tfvars.sops.yaml's extra_secrets.renovate-dockerhub-creds.
+    - name: RENOVATE_DOCKER_DOCKER_IO_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: renovate-dockerhub-creds
+          key: username
+    - name: RENOVATE_DOCKER_DOCKER_IO_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: renovate-dockerhub-creds
+          key: password
     - name: RENOVATE_TOKEN
       valueFrom:
         secretKeyRef:

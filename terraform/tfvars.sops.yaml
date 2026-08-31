@@ -15,10 +15,14 @@ extra_secrets:
         data:
             api-key: ENC[AES256_GCM,data:w7/HOUvxcvYtT7I174k1xxHAC1ZFOFyJOma5GyO/IGs=,iv:+5Y8HDJlqvY4p+56VgHNfCVN0bylwnFRc72CC6DGUJ4=,tag:oNtJNIty6/6U8MPFtji89Q==,type:str]
         namespace: ENC[AES256_GCM,data:oWwC/vfPSWcENqFM,iv:4T6kiuU1pCg0UtCfaGysRdqnZnSwhE5zGAo0Xn2nByc=,tag:soUVEEx606ExjJmTnUSzWg==,type:str]
+    docker-dockerhub-creds:
+        namespace: ENC[AES256_GCM,data:QLPydf/bBMQ=,iv:WgTPh+0Da8qbHho1CRpDR+8v2THmsOiZ5iliO2VYAjo=,tag:H2OO5T/y+fXS6MzupCVtKg==,type:str]
+        data:
+            username: ENC[AES256_GCM,data:CXs0JvGu,iv:aCZvTcNh4dGIPyupVqZFUyGXq2TsFAVJ3ylrQ6ZmUhg=,tag:AAXSYnrcmKLAUGybYAxXlQ==,type:str]
+            password: ENC[AES256_GCM,data:E6dAL0gS01RmtF/lPlj5FSwES2moWsvSFNKYdYVYQuUqc6tT,iv:chMqOkBBmPcr/7KMYjJ9A+gCjsgV0+EBvckxD3SZYpw=,tag:j9nxzVTlU1N+pMJtX1sljw==,type:str]
 sops:
     age:
-        - recipient: age1ux6jahdtqlrcf3q5n0050vm2sr5qh66m388nfaamct6s643cspdqz8c40f
-          enc: |
+        - enc: |
             -----BEGIN AGE ENCRYPTED FILE-----
             YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFRFJza1M1TVZCLzgxcjht
             L0svYS8zT2tZcGV2QjJWeTI0VnpIaXQydGo4CjdFV3k1dWlzU0FPSmxrTFVYQXhT
@@ -26,8 +30,9 @@ sops:
             cTNoWVM3ZEJBWEE4R01GcGxIQlR5WlkKuCetV8JZ9kk2heP504+m3V+xmqqgU65C
             X8lRgHS/BeTOWxMEcqQDfWlc8Gzm2+hqPSh0EaIuSzhdWGG8XXCh0w==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2026-04-14T03:17:22Z"
-    mac: ENC[AES256_GCM,data:u9NHzlozVVM4Aop5iGWtdYTxfrYicy3W2tMU4UuVz7B8O+oMt2vnIGKWod7pivQ/Fjbo9DwcxnBwYXIgdSR9xomPJMazgG0ROFjFuN7mrtpcMmfwRin0khYl6xx1ryRORI+QaNFqFTw7pUWLTEg/2uo+YE3cceY2LZ76j8g8010=,iv:5SFMoH7oAm8tGI7EPkHUsl/r+P6MWLD3XVr47F+ZPGQ=,tag:4KOvw1UU0ThhfvomUv8nRA==,type:str]
+          recipient: age1ux6jahdtqlrcf3q5n0050vm2sr5qh66m388nfaamct6s643cspdqz8c40f
+    lastmodified: "2026-08-31T19:33:31Z"
+    mac: ENC[AES256_GCM,data:6g7Vq9qXRJqOTj5Eepy00uIIB4wdGNtyE6vz3MrFIPvfVVOKbHPiIaeKRXktIFi8MOcWoHUvwJe9rKbOIdaj1x5ok6Ot6a1B2cK/OGNSbB7JVErDMPtAei56YnSkdzz9z0yJlBmRgeXguxdviqF+FKxrVgtNWA57bQSHDEGEi2M=,iv:FqlOJcV8shKTJsdZmh1QvUFa6kMQqECnd5tq9rRn4NQ=,tag:FnZfxQ9ozUqQ+IE70FFHIw==,type:str]
     pgp:
         - created_at: "2024-12-02T02:33:51Z"
           enc: |-
@@ -41,4 +46,4 @@ sops:
             -----END PGP MESSAGE-----
           fp: FD5B1635F2218760E010601F4A6E1024D7BBE968
     unencrypted_suffix: _unencrypted
-    version: 3.12.2
+    version: 3.13.3
