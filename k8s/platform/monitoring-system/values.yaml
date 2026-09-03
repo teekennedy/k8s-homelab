@@ -81,7 +81,7 @@ kube-prometheus-stack:
         # the stale frontend stops loading ("App not found"). Pinning via
         # preinstall overwrites a mismatched on-disk version on boot. Versions
         # are kept current by Renovate (custom.grafana-plugins datasource).
-        preinstall: grafana-lokiexplore-app@2.5.1,grafana-metricsdrilldown-app@2.5.1
+        preinstall: grafana-lokiexplore-app@2.5.2,grafana-metricsdrilldown-app@2.5.1
       auth.generic_oauth:
         enabled: true
         # Auto-provision Grafana accounts for anyone Authelia lets through,
