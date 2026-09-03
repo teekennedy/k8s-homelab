@@ -20,7 +20,7 @@ trust-manager:
 deploybotSshCa:
   # alpine/k8s ships kubectl; openssh-keygen is apk-installed at runtime.
   # renovate: datasource=docker depName=alpine/k8s
-  image: alpine/k8s:1.36.2
+  image: alpine/k8s:1.37.0
   caSecretName: deploybot-ssh-ca
   certSecretName: deploybot-ssh-cert
   # Namespace the short-lived credential is published into. The RBAC allowing
