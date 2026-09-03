@@ -21,7 +21,7 @@ when:
 
 steps:
   - name: stage
-    image: alpine/k8s:1.36.2
+    image: alpine/k8s:1.37.0
     backend_options:
       kubernetes:
         serviceAccountName: nixos-deploy
@@ -62,7 +62,7 @@ steps:
         done
 
   - name: rollout
-    image: alpine/k8s:1.36.2
+    image: alpine/k8s:1.37.0
     depends_on: [stage]
     backend_options:
       kubernetes:
