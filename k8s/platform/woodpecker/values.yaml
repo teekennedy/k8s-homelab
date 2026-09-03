@@ -67,7 +67,7 @@ woodpecker:
 nixosRollout:
   # alpine/k8s ships kubectl; openssh-client is apk-installed at runtime.
   # renovate: datasource=docker depName=alpine/k8s
-  image: alpine/k8s:1.36.2
+  image: alpine/k8s:1.37.0
   # Written by the deploybot-ssh-cert-issuer CronJob in cert-system, which
   # reissues it every 6h with a 12h validity.
   certSecretName: deploybot-ssh-cert
