@@ -1,7 +1,7 @@
 gpgBootstrap:
   # Deliberately in values.yaml (not templates/gpg-bootstrap-job.yaml) so that
   # renovate can pick it up.
-  image: alpine/k8s:1.36.2
+  image: alpine/k8s:1.37.0
 
 renovate:
   cronjob:
