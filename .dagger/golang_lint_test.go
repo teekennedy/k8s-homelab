@@ -36,7 +36,7 @@ import (
 // tolerable is asserting on exact diagnostic wording, so don't.
 //
 // renovate: datasource=docker depName=golangci/golangci-lint
-const lintImage = "golangci/golangci-lint:v2.12.2"
+const lintImage = "golangci/golangci-lint:v2.13.2"
 
 // lintModPath is where the fixture module lives. It is deliberately nested:
 // LintGo scopes each module to its own mount, so the changeset it returns has
