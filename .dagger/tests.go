@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"dagger/homelab/internal/dagger"
 	"fmt"
+
+	"dagger/homelab/internal/dagger"
 )
 
 // testChartSource returns a minimal Helm chart source directory for testing.
@@ -58,7 +59,7 @@ dependencies:
 func (m *Homelab) TestBuildHelm(ctx context.Context) (string, error) {
 	source := testChartSource()
 
-	result, err := m.BuildHelm(ctx, source, nil)
+	result, err := m.BuildHelm(ctx, source, nil, nil)
 	if err != nil {
 		return "", fmt.Errorf("BuildHelm integration test failed: %w", err)
 	}
@@ -70,7 +71,7 @@ func (m *Homelab) TestBuildHelm(ctx context.Context) (string, error) {
 func (m *Homelab) TestValidateHelm(ctx context.Context) (string, error) {
 	source := testChartSource()
 
-	result, err := m.ValidateHelm(ctx, source, nil)
+	result, err := m.ValidateHelm(ctx, source, nil, nil)
 	if err != nil {
 		return "", fmt.Errorf("ValidateHelm integration test failed: %w", err)
 	}
@@ -83,7 +84,7 @@ func (m *Homelab) TestValidateHelm(ctx context.Context) (string, error) {
 func (m *Homelab) TestBuildHelmWithDeps(ctx context.Context) (string, error) {
 	source := testChartWithDepsSource()
 
-	result, err := m.BuildHelm(ctx, source, nil)
+	result, err := m.BuildHelm(ctx, source, nil, nil)
 	if err != nil {
 		return "", fmt.Errorf("BuildHelmWithDeps integration test failed: %w", err)
 	}
@@ -100,7 +101,7 @@ func (m *Homelab) TestHelmChartValidate(ctx context.Context) (string, error) {
 		Source: source.Directory("k8s/apps/test-app"),
 	}
 
-	result, err := hc.Validate(ctx)
+	result, err := hc.Validate(ctx, m.ciContainer())
 	if err != nil {
 		return "", fmt.Errorf("HelmChart.Validate test failed: %w", err)
 	}
@@ -117,7 +118,7 @@ func (m *Homelab) TestHelmChartBuild(ctx context.Context) (string, error) {
 		Source: source.Directory("k8s/apps/test-app"),
 	}
 
-	result, err := hc.Build(ctx)
+	result, err := hc.Build(ctx, m.ciContainer())
 	if err != nil {
 		return "", fmt.Errorf("HelmChart.Build test failed: %w", err)
 	}

@@ -2,27 +2,33 @@ package main
 
 import (
 	"context"
-	"dagger/homelab/internal/dagger"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
 
 // blackCmd is the single definition of how black is invoked. Every call site
 // uses it: lint, per-project format, and the aggregate format all have to agree
-// with each other and with the black pre-commit hook in devenv.nix. Three
-// hand-maintained copies of this argument list previously drifted apart, so the
-// `dagger check` gate and `dagger call format-python` disagreed on line length.
+// with each other. Three hand-maintained copies of this argument list previously
+// drifted apart, so the `dagger check` gate and `dagger call format-python`
+// disagreed on line length.
 //
-// No --line-length is passed on purpose. devenv.nix's hook doesn't pass one
-// either, so black's default governs both and there is no setting to keep in
-// sync. Adding a width here means adding the identical width there in the same
-// commit, or the two tools reformat each other's output forever.
+// black comes from the ci profile, so its version is pinned by devenv.lock.
+// This used to be `uv tool run black`, which resolves the newest release on
+// PyPI at run time: the old black pre-commit hook in devenv.nix ran a
+// Nix-pinned black while CI ran whatever had just been published, and nothing
+// held the two to the same version. (The `black>=24.0.0` in the various
+// pyproject.toml files is a dev dependency; `uv tool run` never read it.)
+//
+// No --line-length is passed on purpose — black's default is the one width that
+// needs no agreement between call sites.
 func blackCmd() []string {
-	return []string{"uv", "tool", "run", "--link-mode", "copy", "black", "."}
+	return []string{"black", "."}
 }
 
 // discoverPythonProjectPaths finds all Python project directories in source.
@@ -51,6 +57,19 @@ type PythonProject struct {
 	Source *dagger.Directory
 }
 
+// usable reports why this project cannot be worked on, if it cannot. Source is
+// populated by PythonProjects(); a zero PythonProject reaching here means
+// someone built one by hand or called a project function without a toolchain.
+func (pp *PythonProject) usable(container *dagger.Container) error {
+	if pp.Source == nil {
+		return fmt.Errorf("PythonProject %s has no source directory; call PythonProjects() first", pp.Path)
+	}
+	if container == nil {
+		return fmt.Errorf("PythonProject %s: no toolchain container given", pp.Path)
+	}
+	return nil
+}
+
 // PythonProjects returns all discovered Python projects with scoped source directories.
 // Each project's Source is a subdirectory of the +defaultPath source, so
 // Directory IDs are stable across sessions and cache independently.
@@ -70,15 +89,13 @@ func (m *Homelab) PythonProjects(
 	return projects
 }
 
-// Test runs pytest for this Python project.
-// +check
-func (pp *PythonProject) Test(ctx context.Context) (string, error) {
-	if pp.Source == nil {
-		return "", fmt.Errorf("PythonProject %s has no source directory; call PythonProjects() first", pp.Path)
+// Test runs pytest for this Python project, in the given toolchain container.
+func (pp *PythonProject) Test(ctx context.Context, container *dagger.Container) (string, error) {
+	if err := pp.usable(container); err != nil {
+		return "", err
 	}
 
-	_, err := dag.Container().
-		From(uvImage).
+	_, err := container.
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
 		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest", "-v"}).
@@ -90,14 +107,12 @@ func (pp *PythonProject) Test(ctx context.Context) (string, error) {
 }
 
 // Lint runs black formatting check for this Python project.
-// +check
-func (pp *PythonProject) Lint(ctx context.Context) (string, error) {
-	if pp.Source == nil {
-		return "", fmt.Errorf("PythonProject %s has no source directory; call PythonProjects() first", pp.Path)
+func (pp *PythonProject) Lint(ctx context.Context, container *dagger.Container) (string, error) {
+	if err := pp.usable(container); err != nil {
+		return "", err
 	}
 
-	formatted := dag.Container().
-		From(uvImage).
+	formatted := container.
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
 		WithExec(blackCmd()).
@@ -119,9 +134,8 @@ func (pp *PythonProject) Lint(ctx context.Context) (string, error) {
 }
 
 // Format formats Python files with black for this project, returning the formatted directory.
-func (pp *PythonProject) Format() *dagger.Directory {
-	return dag.Container().
-		From(uvImage).
+func (pp *PythonProject) Format(container *dagger.Container) *dagger.Directory {
+	return container.
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
 		WithExec(blackCmd()).
@@ -139,6 +153,8 @@ func (m *Homelab) LintPython(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
+	// +optional
+	container *dagger.Container,
 ) (string, error) {
 	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
 	if len(paths) > 0 {
@@ -146,6 +162,9 @@ func (m *Homelab) LintPython(ctx context.Context,
 	}
 	if len(pythonProjectPaths) == 0 {
 		return "Python lint skipped (no projects found)", nil
+	}
+	if container == nil {
+		container = m.ciContainer()
 	}
 
 	g := new(errgroup.Group)
@@ -155,7 +174,7 @@ func (m *Homelab) LintPython(ctx context.Context,
 			Source: source.Directory(projPath),
 		}
 		g.Go(func() error {
-			_, err := pp.Lint(ctx)
+			_, err := pp.Lint(ctx, container)
 			return err
 		})
 	}
@@ -177,13 +196,15 @@ func (m *Homelab) FormatPython(
 	source *dagger.Directory,
 	// +optional
 	paths []string,
+	// +optional
+	container *dagger.Container,
 ) *dagger.Changeset {
-	formatted := m.pythonFormat(ctx, source, paths)
+	formatted := m.pythonFormat(ctx, source, paths, container)
 	return formatted.Changes(source)
 }
 
 // pythonFormat runs black on all Python projects, returning the formatted directory.
-func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, paths []string) *dagger.Directory {
+func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, paths []string, container *dagger.Container) *dagger.Directory {
 	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
 	if len(paths) > 0 {
 		pythonProjectPaths = matchProjectPaths(paths, pythonProjectPaths)
@@ -191,10 +212,10 @@ func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, pa
 	if len(pythonProjectPaths) == 0 {
 		return source
 	}
-
-	container := dag.Container().
-		From(uvImage).
-		WithMountedDirectory("/src", source)
+	if container == nil {
+		container = m.ciContainer()
+	}
+	container = container.WithMountedDirectory("/src", source)
 
 	for _, dir := range pythonProjectPaths {
 		container = container.
@@ -215,6 +236,8 @@ func (m *Homelab) TestPython(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
+	// +optional
+	container *dagger.Container,
 ) (string, error) {
 	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
 	if len(paths) > 0 {
@@ -222,6 +245,9 @@ func (m *Homelab) TestPython(ctx context.Context,
 	}
 	if len(pythonProjectPaths) == 0 {
 		return "Python tests skipped (no projects found)", nil
+	}
+	if container == nil {
+		container = m.ciContainer()
 	}
 
 	g := new(errgroup.Group)
@@ -231,7 +257,7 @@ func (m *Homelab) TestPython(ctx context.Context,
 			Source: source.Directory(projPath),
 		}
 		g.Go(func() error {
-			_, err := pp.Test(ctx)
+			_, err := pp.Test(ctx, container)
 			return err
 		})
 	}

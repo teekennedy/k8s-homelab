@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"dagger/homelab/internal/dagger"
 	"fmt"
 	"path/filepath"
 	"sort"
+
+	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )

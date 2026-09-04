@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"dagger/homelab/internal/dagger"
 	"errors"
 	"fmt"
 	"strings"
+
+	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -14,14 +15,13 @@ import (
 // Exits non-zero when any danger-level checks fail.
 // If the chart directory contains a polaris.yaml, it is used as the Polaris config
 // (supports per-chart exemptions for expected RBAC or privilege requirements).
-// +check
-func (hc *HelmChart) Polaris(ctx context.Context) (string, error) {
-	if hc.Source == nil {
-		return "", fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
+func (hc *HelmChart) Polaris(ctx context.Context, container *dagger.Container) (string, error) {
+	if err := hc.usable(container); err != nil {
+		return "", err
 	}
 
-	manifest := hc.renderedManifest(ctx)
-	container := hc.polarisContainer(ctx, manifest)
+	manifest := hc.renderedManifest(ctx, container)
+	audit := hc.polarisContainer(ctx, container, manifest)
 
 	args := []string{
 		"polaris", "audit",
@@ -33,7 +33,7 @@ func (hc *HelmChart) Polaris(ctx context.Context) (string, error) {
 		"--merge-config",
 	}
 
-	out, err := container.WithExec(args).Stdout(ctx)
+	out, err := audit.WithExec(args).Stdout(ctx)
 	if err != nil {
 		var execErr *dagger.ExecError
 		if errors.As(err, &execErr) {
@@ -50,15 +50,14 @@ func (hc *HelmChart) Polaris(ctx context.Context) (string, error) {
 // missingNetworkPolicy and linuxHardening, which crash polaris 10.x with a nil pointer
 // when pod templates have no labels/annotations (polaris bug in their Go template renderer).
 // Per-chart exemptions from polaris.yaml are appended when present.
-func (hc *HelmChart) polarisContainer(ctx context.Context, manifest *dagger.File) *dagger.Container {
+func (hc *HelmChart) polarisContainer(ctx context.Context, toolchain *dagger.Container, manifest *dagger.File) *dagger.Container {
 	cfg := "checks:\n  missingNetworkPolicy: ignore\n  linuxHardening: ignore\n"
 
 	if chartCfg, err := hc.Source.File("polaris.yaml").Contents(ctx); err == nil && chartCfg != "" {
 		cfg += chartCfg
 	}
 
-	return dag.Container().
-		From(polarisImage).
+	return toolchain.
 		WithFile("/rendered.yaml", manifest).
 		WithNewFile("/polaris.yaml", cfg)
 }
@@ -69,13 +68,12 @@ func (hc *HelmChart) polarisContainer(ctx context.Context, manifest *dagger.File
 //
 // If the chart directory contains a kubeconform.yaml, its skipKinds list is filtered out of the
 // manifest before validation. Use this for kinds whose catalog schema is known to be stale.
-// +check
-func (hc *HelmChart) Kubeconform(ctx context.Context) (string, error) {
-	if hc.Source == nil {
-		return "", fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
+func (hc *HelmChart) Kubeconform(ctx context.Context, container *dagger.Container) (string, error) {
+	if err := hc.usable(container); err != nil {
+		return "", err
 	}
 
-	manifest := hc.renderedManifest(ctx)
+	manifest := hc.renderedManifest(ctx, container)
 
 	// Parse per-chart skip list
 	var skipKinds []string
@@ -84,7 +82,7 @@ func (hc *HelmChart) Kubeconform(ctx context.Context) (string, error) {
 	}
 
 	args := []string{
-		"/kubeconform",
+		"kubeconform",
 		"-strict",
 		"-ignore-missing-schemas",
 		"-schema-location", "default",
@@ -96,7 +94,7 @@ func (hc *HelmChart) Kubeconform(ctx context.Context) (string, error) {
 	}
 	args = append(args, "/rendered.yaml")
 
-	out, err := kubeconformContainerWithSchemas().
+	out, err := hc.kubeconformContainerWithSchemas(container).
 		WithFile("/rendered.yaml", manifest).
 		WithExec(args).
 		Stdout(ctx)
@@ -134,28 +132,19 @@ func parseKubeconformSkipKinds(cfg string) []string {
 	return skipKinds
 }
 
-// kubeconformContainerWithSchemas builds a kubeconform container with the datreeio CRDs-catalog
-// baked in at /schemas. Alpine is used as the base instead of the scratch kubeconform image so
-// that curl is available to fetch the catalog; the kubeconform binary is copied in from the
-// official image.
-func kubeconformContainerWithSchemas() *dagger.Container {
-	schemasDir := dag.Container().
-		From(alpineImage).
-		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
-		WithExec([]string{"mkdir", "/schemas"}).
-		WithExec([]string{
-			"sh", "-c",
-			"curl -sSfL https://github.com/datreeio/CRDs-catalog/archive/refs/heads/main.tar.gz" +
-				" | tar -xz --strip-components=1 -C /schemas",
-		}).
-		Directory("/schemas")
+// crdsCatalogURL is the datreeio CRDs-catalog archive used to validate custom resources
+// that have no built-in Kubernetes schema.
+const crdsCatalogURL = "https://github.com/datreeio/CRDs-catalog/archive/refs/heads/main.tar.gz"
 
-	kubeconformBin := dag.Container().From(kubeconformImage).File("/kubeconform")
+// kubeconformContainerWithSchemas returns the ci container with the datreeio CRDs-catalog
+// unpacked at /schemas.
+func (hc *HelmChart) kubeconformContainerWithSchemas(toolchain *dagger.Container) *dagger.Container {
+	catalog := dag.HTTP(crdsCatalogURL)
 
-	return dag.Container().
-		From(alpineImage).
-		WithFile("/kubeconform", kubeconformBin).
-		WithDirectory("/schemas", schemasDir)
+	return toolchain.
+		WithMountedFile("/tmp/crds-catalog.tar.gz", catalog).
+		WithExec([]string{"mkdir", "-p", "/schemas"}).
+		WithExec([]string{"tar", "-xz", "--strip-components=1", "-C", "/schemas", "-f", "/tmp/crds-catalog.tar.gz"})
 }
 
 // ValidatePolaris runs Polaris audit across all Helm charts.
@@ -167,6 +156,8 @@ func (m *Homelab) ValidatePolaris(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
+	// +optional
+	container *dagger.Container,
 ) (string, error) {
 	helmChartPaths := discoverHelmChartPaths(ctx, source)
 	if len(paths) > 0 {
@@ -174,6 +165,9 @@ func (m *Homelab) ValidatePolaris(ctx context.Context,
 	}
 	if len(helmChartPaths) == 0 {
 		return "Polaris validation skipped (no matching charts)", nil
+	}
+	if container == nil {
+		container = m.ciContainer()
 	}
 
 	var clusterValues *dagger.File
@@ -186,7 +180,7 @@ func (m *Homelab) ValidatePolaris(ctx context.Context,
 	for _, chartPath := range helmChartPaths {
 		hc := newHelmChart(source, chartPath, clusterValues)
 		g.Go(func() error {
-			_, err := hc.Polaris(ctx)
+			_, err := hc.Polaris(ctx, container)
 			return err
 		})
 	}
@@ -207,6 +201,8 @@ func (m *Homelab) ValidateKubeconform(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
+	// +optional
+	container *dagger.Container,
 ) (string, error) {
 	helmChartPaths := discoverHelmChartPaths(ctx, source)
 	if len(paths) > 0 {
@@ -214,6 +210,9 @@ func (m *Homelab) ValidateKubeconform(ctx context.Context,
 	}
 	if len(helmChartPaths) == 0 {
 		return "Kubeconform validation skipped (no matching charts)", nil
+	}
+	if container == nil {
+		container = m.ciContainer()
 	}
 
 	var clusterValues *dagger.File
@@ -226,7 +225,7 @@ func (m *Homelab) ValidateKubeconform(ctx context.Context,
 	for _, chartPath := range helmChartPaths {
 		hc := newHelmChart(source, chartPath, clusterValues)
 		g.Go(func() error {
-			_, err := hc.Kubeconform(ctx)
+			_, err := hc.Kubeconform(ctx, container)
 			return err
 		})
 	}

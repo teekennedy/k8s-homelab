@@ -2,7 +2,6 @@ package main
 
 import (
 	"dagger/homelab/internal/dagger"
-	"fmt"
 )
 
 // Container image constants with renovate annotations for automated updates.
@@ -11,54 +10,10 @@ const (
 	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.2.2"
 	// renovate: datasource=docker depName=nixos/nix
 	nixImage = "nixos/nix:2.35.2"
-	// renovate: datasource=docker depName=golang
-	golangImage = "golang:1.27-alpine"
-	// renovate: datasource=docker depName=golangci/golangci-lint
-	golangciLintImage = "golangci/golangci-lint:v2.13.1-alpine"
-	// renovate: datasource=docker depName=ghcr.io/astral-sh/uv
-	uvImage = "ghcr.io/astral-sh/uv:0.12.9-alpine"
-	// renovate: datasource=docker depName=cuelang/cue
-	cueImage = "cuelang/cue:0.17.1"
-	// renovate: datasource=docker depName=cytopia/yamllint
-	yamllintImage = "cytopia/yamllint:1"
-	// renovate: datasource=docker depName=ghcr.io/opentofu/opentofu
-	opentofuImage = "ghcr.io/opentofu/opentofu:1.12.6"
-	// renovate: datasource=docker depName=woodpeckerci/woodpecker-cli
-	woodpeckerImage = "woodpeckerci/woodpecker-cli:v3"
-	// renovate: datasource=docker depName=alpine/helm
-	helmImage = "alpine/helm:4.2.4"
-	// renovate: datasource=docker depName=alpine
-	alpineImage = "alpine:3.24.1"
-	// renovate: datasource=docker depName=us-docker.pkg.dev/fairwinds-ops/oss/polaris
-	polarisImage = "us-docker.pkg.dev/fairwinds-ops/oss/polaris:v10.2.2"
-	// renovate: datasource=docker depName=ghcr.io/yannh/kubeconform
-	kubeconformImage = "ghcr.io/yannh/kubeconform:v0.8.0"
 )
 
 func nixContainer() *dagger.Container {
 	return dag.Container().From(nixImage)
-}
-
-func golangContainer() *dagger.Container {
-	gomodcache := "/go/pkg/mod"
-	return dag.Container().
-		From(golangImage).
-		WithEnvVariable("GOMODCACHE", gomodcache).
-		WithMountedCache(gomodcache, dag.CacheVolume("GOMODCACHE-"+golangImage))
-}
-
-// golangciLintContainer returns a golangContainer with the golangci-lint binary
-// installed (copied in from the official image, so the Go toolchain version
-// stays pinned to golangImage), plus a persistent cache for golangci-lint's
-// own result cache (~/.cache/golangci-lint).
-func golangciLintContainer() *dagger.Container {
-	lintBin := dag.Container().From(golangciLintImage).File("/usr/bin/golangci-lint")
-	lintCache := "/root/.cache/golangci-lint"
-	cacheKey := fmt.Sprintf("golangci-lint-cache-%s", golangciLintImage)
-
-	return golangContainer().
-		WithFile("/usr/local/bin/golangci-lint", lintBin).
-		WithMountedCache(lintCache, dag.CacheVolume(cacheKey))
 }
 
 // devenvContainer returns a devenv container with a persistent nix store cache
@@ -75,6 +30,59 @@ func devenvContainer() *dagger.Container {
 		WithMountedCache("/nix", dag.CacheVolume(nixCacheKey), dagger.ContainerWithMountedCacheOpts{
 			Source: baseNix,
 		}).
-		// Suppress zsh-specific setup (compdef errors) and version nag in container context
+		// Suppress zsh-specific setup (compdef errors) in container context
 		WithEnvVariable("DEVENV_ZSH_DISABLE", "1")
+}
+
+// ciProfiles is the devenv profile set the check functions run in.
+var ciProfiles = []string{"ci"}
+
+// ciContainer returns the devenv "ci" profile as a container, ready to run a
+// check in. It is lazy: nothing here talks to the engine, so the result can be
+// rebuilt from a *dagger.Directory anywhere in the module rather than being
+// built once and passed around as state.
+func ciContainer(devenvSource *dagger.Directory) *dagger.Container {
+	return withToolchainCaches(devenvShell(devenvSource, nil, ciProfiles))
+}
+
+// withToolchainCaches attaches the caches every language toolchain in the ci
+// profile wants.
+//
+// They are attached once here rather than at each call site so that a Go check
+// and a Python check running in parallel share one cache volume each, and so
+// adding a tool to the ci profile doesn't mean remembering to wire up its cache
+// separately.
+//
+// Every path is named by the tool's own environment variable rather than left
+// to default under $HOME. The devenv image sets HOME=/env and User=user, and
+// hanging caches off that would couple the mount layout to devenv's container
+// internals; the execs run as root so the mounts are writable.
+func withToolchainCaches(c *dagger.Container) *dagger.Container {
+	const (
+		goModCache     = "/cache/go/mod"
+		goBuildCache   = "/cache/go/build"
+		uvCache        = "/cache/uv"
+		helmCacheHome  = "/cache/helm"
+		helmConfigHome = "/config/helm"
+		helmDataHome   = "/data/helm"
+	)
+
+	return c.
+		WithUser("root").
+		// Create statically linked go binaries
+		WithEnvVariable("CGO_ENABLED", "0").
+		// Do not stamp go binaries with version control information
+		WithEnvVariable("GOFLAGS", "-buildvcs=false").
+		WithEnvVariable("GOMODCACHE", goModCache).
+		WithMountedCache(goModCache, dag.CacheVolume("homelab-go-mod")).
+		WithEnvVariable("GOCACHE", goBuildCache).
+		WithMountedCache(goBuildCache, dag.CacheVolume("homelab-go-build")).
+		WithEnvVariable("UV_CACHE_DIR", uvCache).
+		WithMountedCache(uvCache, dag.CacheVolume("homelab-uv")).
+		WithEnvVariable("HELM_CACHE_HOME", helmCacheHome).
+		WithMountedCache(helmCacheHome, dag.CacheVolume("homelab-helm-cache")).
+		WithEnvVariable("HELM_CONFIG_HOME", helmConfigHome).
+		WithMountedCache(helmConfigHome, dag.CacheVolume("homelab-helm-config")).
+		WithEnvVariable("HELM_DATA_HOME", helmDataHome).
+		WithMountedCache(helmDataHome, dag.CacheVolume("homelab-helm-data"))
 }

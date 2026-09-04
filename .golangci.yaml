@@ -100,8 +100,21 @@ formatters:
   settings:
     gofumpt:
       # Module path which contains the source code being formatted.
+      #
+      # gofumpt's "std imports go in their own first group" rule classifies an
+      # import as stdlib when its first path element has no dot — unless the
+      # path is inside module-path. Dagger names its generated module
+      # `dagger/homelab`, so without this the `dagger/homelab/internal/dagger`
+      # import looks like stdlib and gets merged into the top group, while gopls
+      # (which reads go.mod) keeps it in the third-party group. That
+      # disagreement made every editor save fight the next `lint-go` run.
+      #
+      # The gofumpt CLI infers this from go.mod; golangci-lint does not, and a
+      # single root config serves all four modules here — harmless for the other
+      # three, whose module paths contain dots and none of whose imports share
+      # this prefix.
       # Default: ""
-      module-path: ""
+      module-path: "dagger/homelab"
 
       # Extra formatting rules.
       extra:

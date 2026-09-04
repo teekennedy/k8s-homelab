@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"dagger/homelab/internal/dagger"
 	"fmt"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -91,16 +92,15 @@ func (m *Homelab) HelmCharts(
 	return charts
 }
 
-// Validate runs helm lint on this chart.
-// +check
-func (hc *HelmChart) Validate(ctx context.Context) (string, error) {
-	if hc.Source == nil {
-		return "", fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
+// Validate runs helm lint on this chart, in the given toolchain container.
+func (hc *HelmChart) Validate(ctx context.Context, container *dagger.Container) (string, error) {
+	if err := hc.usable(container); err != nil {
+		return "", err
 	}
 
-	prepared := hc.sourceWithDeps()
+	prepared := hc.sourceWithDeps(container)
 
-	_, err := hc.container(prepared).
+	_, err := hc.chartContainer(container, prepared).
 		WithExec([]string{"helm", "lint", hc.chartDir()}).
 		Sync(ctx)
 	if err != nil {
@@ -111,13 +111,12 @@ func (hc *HelmChart) Validate(ctx context.Context) (string, error) {
 }
 
 // Build runs helm template on this chart to verify it renders valid YAML.
-// +check
-func (hc *HelmChart) Build(ctx context.Context) (string, error) {
-	if hc.Source == nil {
-		return "", fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
+func (hc *HelmChart) Build(ctx context.Context, container *dagger.Container) (string, error) {
+	if err := hc.usable(container); err != nil {
+		return "", err
 	}
 
-	manifest := hc.renderedManifest(ctx)
+	manifest := hc.renderedManifest(ctx, container)
 
 	if _, err := manifest.Sync(ctx); err != nil {
 		return "", fmt.Errorf("helm template failed for %s: %w", hc.Path, err)
@@ -150,8 +149,8 @@ func parseApplicationYaml(content, defaultName string) (releaseName, namespace s
 // renderedManifest runs helm template and returns the rendered YAML as a file.
 // The manifest is written to /rendered.yaml inside the container, then extracted.
 // Build, Polaris, and Kubeconform all call this so the render is cached once per chart.
-func (hc *HelmChart) renderedManifest(ctx context.Context) *dagger.File {
-	prepared := hc.sourceWithDeps()
+func (hc *HelmChart) renderedManifest(ctx context.Context, toolchain *dagger.Container) *dagger.File {
+	prepared := hc.sourceWithDeps(toolchain)
 	defaultName := filepath.Base(hc.Path)
 	releaseName, namespace := defaultName, defaultName
 
@@ -161,7 +160,7 @@ func (hc *HelmChart) renderedManifest(ctx context.Context) *dagger.File {
 
 	args := []string{"helm", "template", releaseName, hc.chartDir(), "--namespace", namespace, "--include-crds"}
 
-	container := hc.container(prepared)
+	container := hc.chartContainer(toolchain, prepared)
 	if hc.ClusterValues != nil {
 		container = container.WithMountedFile("/cluster-values.yaml", hc.ClusterValues)
 		args = append(args, "--values", "/cluster-values.yaml")
@@ -172,31 +171,40 @@ func (hc *HelmChart) renderedManifest(ctx context.Context) *dagger.File {
 	return container.WithExec([]string{"sh", "-c", cmd}).File("/rendered.yaml")
 }
 
-// container returns a helm container with the chart mounted and shared caches.
+// chartContainer mounts the chart into the toolchain container.
 //
 // chartSource is mounted at the chart's repo-relative path inside helmRepoRoot,
 // with SharedCharts alongside it, so that only the chart's own files (plus the
 // library charts) are in the build — per-chart caching is preserved, and a change
 // to a library chart correctly invalidates only its consumers.
-func (hc *HelmChart) container(chartSource *dagger.Directory) *dagger.Container {
+func (hc *HelmChart) chartContainer(toolchain *dagger.Container, chartSource *dagger.Directory) *dagger.Container {
 	composed := dag.Directory().WithDirectory(hc.Path, chartSource)
 	if hc.SharedCharts != nil && !strings.HasPrefix(hc.Path, sharedChartsPath+"/") {
 		composed = composed.WithDirectory(sharedChartsPath, hc.SharedCharts)
 	}
 
-	return dag.Container().
-		From(helmImage).
+	return toolchain.
 		WithMountedDirectory(helmRepoRoot, composed).
-		WithWorkdir(hc.chartDir()).
-		WithMountedCache("/root/.cache/helm/repository", dag.CacheVolume("helm-repo-cache")).
-		WithMountedCache("/root/.cache/helm/content", dag.CacheVolume("helm-content-cache")).
-		WithMountedCache("/root/.config/helm/registry", dag.CacheVolume("helm-registry-cache"))
+		WithWorkdir(hc.chartDir())
+}
+
+// usable reports why this chart cannot be worked on, if it cannot. Both fields
+// are populated by HelmCharts(); a zero HelmChart reaching here means someone
+// built one by hand or called a chart function without a toolchain.
+func (hc *HelmChart) usable(container *dagger.Container) error {
+	if hc.Source == nil {
+		return fmt.Errorf("HelmChart %s has no source directory; call HelmCharts() first", hc.Path)
+	}
+	if container == nil {
+		return fmt.Errorf("HelmChart %s: no toolchain container given", hc.Path)
+	}
+	return nil
 }
 
 // sourceWithDeps builds chart dependencies, returning the chart directory with
 // dependency tarballs populated in charts/ dir.
-func (hc *HelmChart) sourceWithDeps() *dagger.Directory {
-	return hc.container(hc.Source).
+func (hc *HelmChart) sourceWithDeps(toolchain *dagger.Container) *dagger.Directory {
+	return hc.chartContainer(toolchain, hc.Source).
 		WithExec([]string{"sh", "-c", `
 			if grep -q 'dependencies:' Chart.yaml 2>/dev/null; then
 				# Register non-OCI repos
@@ -225,6 +233,8 @@ func (m *Homelab) ValidateHelm(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
+	// +optional
+	container *dagger.Container,
 ) (string, error) {
 	helmChartPaths := discoverHelmChartPaths(ctx, source)
 	if len(paths) > 0 {
@@ -233,12 +243,15 @@ func (m *Homelab) ValidateHelm(ctx context.Context,
 	if len(helmChartPaths) == 0 {
 		return "Helm validation skipped (no matching charts)", nil
 	}
+	if container == nil {
+		container = m.ciContainer()
+	}
 
 	g := new(errgroup.Group)
 	for _, chartPath := range helmChartPaths {
 		hc := newHelmChart(source, chartPath, nil)
 		g.Go(func() error {
-			_, err := hc.Validate(ctx)
+			_, err := hc.Validate(ctx, container)
 			return err
 		})
 	}
@@ -261,6 +274,8 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
+	// +optional
+	container *dagger.Container,
 ) (string, error) {
 	helmChartPaths := discoverHelmChartPaths(ctx, source)
 	if len(paths) > 0 {
@@ -268,6 +283,9 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 	}
 	if len(helmChartPaths) == 0 {
 		return "Helm template rendering skipped (no matching charts)", nil
+	}
+	if container == nil {
+		container = m.ciContainer()
 	}
 
 	// Check for cluster-values.yaml (File() is lazy, so check existence via Stat)
@@ -281,7 +299,7 @@ func (m *Homelab) BuildHelm(ctx context.Context,
 	for _, chartPath := range helmChartPaths {
 		hc := newHelmChart(source, chartPath, clusterValues)
 		g.Go(func() error {
-			_, err := hc.Build(ctx)
+			_, err := hc.Build(ctx, container)
 			return err
 		})
 	}

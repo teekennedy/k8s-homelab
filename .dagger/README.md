@@ -22,10 +22,9 @@ files. This enables two levels of caching:
   entire TestGo result. If the filtered source (all `**/*.go` files) hasn't
   changed, the check returns instantly (~0.5s).
 
-- **Layer 1 (BuildKit content-addressed cache)**: Within the per-module calls
-  (`dagger call go-modules test`), each module's Test() runs against a scoped
-  subdirectory. Unchanged modules hit the BuildKit exec cache while only changed
-  modules re-run.
+- **Layer 1 (BuildKit content-addressed cache)**: Within TestGo, each module's
+  Test() runs against a scoped subdirectory. Unchanged modules hit the BuildKit
+  exec cache while only changed modules re-run.
 
 The combination means:
 - `dagger check` re-runs the fewest checks possible for any given file change
@@ -36,9 +35,10 @@ The combination means:
 | File | Contents |
 |---|---|
 | `main.go` | Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions |
-| `golang.go` | GoModule struct, per-module Test, aggregate TestGo/FormatGo/LintGo |
+| `golang.go` | GoModule struct, per-module Test/Lint, aggregate TestGo/LintGo |
 | `python.go` | PythonProject struct, per-project Test/Lint, aggregate LintPython/TestPython/FormatPython |
 | `helm.go` | HelmChart struct, per-chart Validate/Build, aggregate ValidateHelm/BuildHelm |
+| `kubernetes.go` | Per-chart Polaris/Kubeconform, aggregate ValidatePolaris/ValidateKubeconform |
 | `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
 | `containers.go` | Container image constants and helpers |
 | `paths.go` | Path filtering utilities |
@@ -96,14 +96,6 @@ dagger check 'validate*'
 dagger check lint-cue
 dagger check build-helm
 
-# Per-project operations (maximum cache granularity)
-dagger call go-modules test           # Test each Go module independently
-dagger call python-projects test      # Test each Python project independently
-dagger call python-projects lint      # Lint each Python project independently
-dagger call helm-charts validate      # Validate each Helm chart independently
-dagger call helm-charts build         # Render each Helm chart independently
-dagger call terraform-modules validate # Validate each Terraform module independently
-
 # List discovered projects
 dagger call go-modules                # Show all Go modules
 dagger call python-projects           # Show all Python projects
@@ -112,7 +104,6 @@ dagger call terraform-modules         # Show all Terraform modules
 
 # Auto-apply formatting fixes (use format-*/fix-* functions, not check)
 dagger call format-nix --auto-apply
-dagger call format-go --auto-apply
 dagger call lint-go --auto-apply      # go mod tidy + golangci-lint run --fix
 dagger call format-python --auto-apply
 
@@ -132,28 +123,73 @@ dagger call cli-nix --source=. export --path=./lab
 All check functions use pre-call filtering for optimal caching. Only relevant files are included.
 Functions annotated with `// +check` can be run via `dagger check`.
 
+### Toolchain injection
+
+**Every** `+check`/`+generate` function that runs in the devenv toolchain takes
+an optional `container` and falls back to `ciContainer()` when it is nil:
+
+```go
+if container == nil {
+    container = m.ciContainer()
+}
+```
+
+That is `FormatNix`, `LintYaml`, `ValidateWoodpecker`, `FormatCue`, `FixCue`,
+`TrimCue`, `ExportCue`, `TestGo`, `LintGo`, `LintPython`, `TestPython`,
+`FormatPython`, `ValidateHelm`, `BuildHelm`, `ValidatePolaris`,
+`ValidateKubeconform`, `ValidateTerraform`, `FormatTerraform` and
+`VerifyCacheGranularity`. The exceptions are the three that build with Nix
+rather than the devenv shell — `ValidateNix`, `BuildCli` and
+`UpdateGoVendorHash` all use `nixContainer()`, so there is nothing to inject.
+
+Three things this buys:
+
+- **One toolchain build per check, not per unit.** The aggregate builds it once
+  and hands the same `*dagger.Container` to every chart/module/project it fans
+  out to.
+- **A seam for the cache-granularity tests.** They pass a cheap stand-in so the
+  scenario table runs in seconds instead of waiting on a Nix build — see
+  `backend_engine_test.go`.
+- **Uniformity.** Any check can be driven with a container of the caller's
+  choosing, which is the prerequisite for covering it in `cache_test.go`.
+
+It also replaced a `+private DevenvSource *dagger.Directory` field that had been
+copied onto `HelmChart`, `PythonProject` and `TerraformModule` so each could
+rebuild the container for itself.
+
+`Cli` and `BuildCliGo` still build their own `ciContainer()`; they are plain
+functions rather than checks, so nothing drives them in a batch.
+
 ### Per-Project Module Types
+
+Each takes the toolchain `container` to run in. None of them are `+check`
+functions: `dagger check` only enumerates checks on the top-level `Homelab`
+object, so annotating a method on one of these types never had any effect.
+Because `container` is required, these are driven by their aggregate rather than
+called directly from the CLI.
 
 #### GoModule
 Discovered automatically from `go.mod` files. Each module gets a scoped source directory.
-- `Test()` - Run `go test` for this module (`+check`)
+- `Test(container)` - Run `go test` for this module
+- `Lint(configFile, container)` - `go mod tidy` + `golangci-lint run --fix`, returning a changeset
 
 #### PythonProject
 Discovered automatically from `pyproject.toml` files.
-- `Test()` - Run `pytest` for this project (`+check`)
-- `Lint()` - Run `black --check` for this project (`+check`)
-- `Format()` - Format with `black`, returning the formatted directory
+- `Test(container)` - Run `pytest` for this project
+- `Lint(container)` - Run `black --check` for this project
+- `Format(container)` - Format with `black`, returning the formatted directory
 
 #### HelmChart
 Discovered automatically from `Chart.yaml` files under `k8s/`.
-- `Validate()` - Run `helm lint` for this chart (`+check`)
-- `Build()` - Run `helm template` for this chart (`+check`)
+- `Validate(container)` - Run `helm lint` for this chart
+- `Build(container)` - Run `helm template` for this chart
+- `Polaris(container)` / `Kubeconform(container)` - Audit the rendered manifests
 
 #### TerraformModule
 Discovered automatically from `.tf` files under `terraform/`.
 Uses the full `terraform/` directory as source since modules can reference
 siblings via relative paths (e.g., `../k8s-secret`).
-- `Validate()` - Run `tofu init` + `tofu validate` for this module (`+check`)
+- `Validate(container)` - Run `tofu init` + `tofu validate` for this module
 
 ### Top-Level Checks
 
@@ -197,7 +233,6 @@ doesn't (e.g. `LintCue` also runs `cue vet`).
 ### Format Functions (`+generate`, auto-apply)
 These also run as part of `dagger check` (a non-empty changeset fails the check).
 - `FormatNix(source, paths)` - Format Nix files (`dagger call format-nix --auto-apply`)
-- `FormatGo(source)` - Format Go files (`dagger call format-go --auto-apply`)
 - `LintGo(source)` - `go mod tidy` + `golangci-lint run --fix` for each Go module;
   fails if issues remain that `--fix` can't resolve (e.g. cyclop, gosec)
   (`dagger call lint-go --auto-apply`)
@@ -225,10 +260,10 @@ directory content hash). When `dagger check test-go` runs and the filtered Go
 source hasn't changed, the entire TestGo result is returned from cache (~0.5s).
 
 **Layer 1 — BuildKit content-addressed cache**: Caches individual container
-operations (exec, mount, copy) based on the content of their inputs. When
-`dagger call go-modules test` runs, each GoModule.Test() independently checks
-the BuildKit cache. Modules with unchanged source directories hit the cache
-while only changed modules re-execute.
+operations (exec, mount, copy) based on the content of their inputs. Within one
+TestGo run, each GoModule.Test() independently checks the BuildKit cache.
+Modules with unchanged source directories hit the cache while only changed
+modules re-execute.
 
 ### How Caching Interacts with the Module Pattern
 
@@ -245,7 +280,7 @@ dagger check test-go
 ```
 
 ```
-dagger call go-modules test
+TestGo() fans out over the discovered modules
 ├─ GoModule{.dagger}.Test()       → Layer 1 cache hit (unchanged)
 ├─ GoModule{cmd/lab}.Test()       → Layer 1 cache MISS (file changed)
 ├─ GoModule{homepage/...}.Test()  → Layer 1 cache hit (unchanged)
@@ -299,11 +334,11 @@ dagger check  # Only FormatNix + ValidateNix re-run
 
 # Change Go code in one module - only that module re-tests
 echo "// comment" >> cmd/lab/main.go
-dagger check  # FormatGo/LintGo + TestGo re-run, but only cmd/lab module actually re-executes in TestGo
+dagger check  # LintGo + TestGo re-run, but only cmd/lab module actually re-executes
 
 # Change a Python file in one project
 echo "# comment" >> k8s/foundation/kured/files/kured-webhook/server.py
-dagger call python-projects test  # Only kured-webhook project re-tests
+dagger check test-python  # Only the kured-webhook project re-executes
 ```
 
 ## Development

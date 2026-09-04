@@ -3,60 +3,65 @@ package main
 import (
 	"bytes"
 	"context"
-	"dagger/homelab/internal/dagger"
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
+
+	"dagger/homelab/internal/dagger"
 )
 
-// cueContainer returns a base CUE container with source mounted at /src,
-// working directory set to /src/config (the CUE package root).
-func cueContainer(source *dagger.Directory) *dagger.Container {
-	return dag.Container().
-		From(cueImage).
+// cueContainer mounts source at /src in the toolchain container, with the
+// working directory set to /src/config (the CUE package root). A nil container
+// means "build the default toolchain"; see Toolchain injection in README.md.
+func (m *Homelab) cueContainer(source *dagger.Directory, container *dagger.Container) *dagger.Container {
+	if container == nil {
+		container = m.ciContainer()
+	}
+	return container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/config")
 }
 
 // FormatCue formats CUE files with cue fmt.
-// Returns a changeset. Use `dagger call format-cue --auto-apply` to apply.
 // +generate
 func (m *Homelab) FormatCue(
 	// +defaultPath="/"
 	// +ignore=["*", "!config/**/*.cue"]
 	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
 ) *dagger.Changeset {
-	formatted := cueContainer(source).
+	formatted := m.cueContainer(source, container).
 		WithExec([]string{"cue", "fmt", "./..."}).
 		Directory("/src")
 	return formatted.Changes(source)
 }
 
 // FixCue upgrades CUE syntax to the current language version using cue fix.
-// Returns a changeset. Use `dagger call fix-cue --auto-apply` to apply.
 // +generate
 func (m *Homelab) FixCue(
 	// +defaultPath="/"
 	// +ignore=["*", "!config/**/*.cue"]
 	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
 ) *dagger.Changeset {
-	fixed := cueContainer(source).
+	fixed := m.cueContainer(source, container).
 		WithExec([]string{"cue", "fix", "./..."}).
 		Directory("/src")
 	return fixed.Changes(source)
 }
 
 // TrimCue removes redundant values implied by schema constraints using cue trim.
-// Returns a changeset. Use `dagger call trim-cue --auto-apply` to apply.
-// Advisory only — no corresponding check function.
 // +generate
 func (m *Homelab) TrimCue(
 	// +defaultPath="/"
 	// +ignore=["*", "!config/**/*.cue"]
 	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
 ) *dagger.Changeset {
-	trimmed := cueContainer(source).
+	trimmed := m.cueContainer(source, container).
 		WithExec([]string{"cue", "trim", "./..."}).
 		Directory("/src")
 	return trimmed.Changes(source)
@@ -64,15 +69,16 @@ func (m *Homelab) TrimCue(
 
 // ExportCue exports each CUE environment to config/gen/<env>/env.json.
 // Environments are discovered dynamically from the package's exported top-level values.
-// Returns a changeset. Use `dagger call export-cue --auto-apply` to apply.
 // +generate
 func (m *Homelab) ExportCue(
 	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!config/**/*.cue", "!config/gen/**"]
 	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
 ) (*dagger.Changeset, error) {
-	ctr := cueContainer(source)
+	ctr := m.cueContainer(source, container)
 
 	allJSON, err := ctr.WithExec([]string{"cue", "export", "./..."}).Stdout(ctx)
 	if err != nil {
@@ -105,43 +111,4 @@ func (m *Homelab) ExportCue(
 	}
 
 	return ctr.Directory("/src").Changes(source), nil
-}
-
-// LintCue validates CUE formatting (cue fmt) and constraints (cue vet).
-// Fails if any files need formatting or have constraint violations.
-// Use `dagger call format-cue --auto-apply` to fix formatting.
-// +check
-func (m *Homelab) LintCue(
-	ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!config/**/*.cue"]
-	source *dagger.Directory,
-	// +optional
-	paths []string, //nolint:unparam // accepted for --paths uniformity across +check functions; CUE lint always checks the whole tree
-) (string, error) {
-	// Check formatting via changeset.
-	formatted := cueContainer(source).
-		WithExec([]string{"cue", "fmt", "./..."}).
-		Directory("/src")
-
-	changeset := formatted.Changes(source)
-	empty, err := changeset.IsEmpty(ctx)
-	if err != nil {
-		return "", fmt.Errorf("checking CUE formatting changes: %w", err)
-	}
-
-	if !empty {
-		modified, _ := changeset.ModifiedPaths(ctx)
-		return "", fmt.Errorf("CUE files need formatting: %s\nRun `dagger call format-cue --auto-apply` to fix", strings.Join(modified, ", "))
-	}
-
-	// Validate constraints.
-	_, err = cueContainer(source).
-		WithExec([]string{"cue", "vet", "./..."}).
-		Sync(ctx)
-	if err != nil {
-		return "", fmt.Errorf("cue vet failed: %w", err)
-	}
-
-	return "CUE lint passed", nil
 }

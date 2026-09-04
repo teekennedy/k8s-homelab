@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"dagger/homelab/internal/dagger"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -66,15 +67,17 @@ func (m *Homelab) TerraformModules(
 	return modules
 }
 
-// Validate runs tofu init and tofu validate for this module.
-// +check
-func (tm *TerraformModule) Validate(ctx context.Context) (string, error) {
+// Validate runs tofu init and tofu validate for this module, in the given
+// toolchain container.
+func (tm *TerraformModule) Validate(ctx context.Context, container *dagger.Container) (string, error) {
 	if tm.Source == nil {
 		return "", fmt.Errorf("TerraformModule %s has no source directory; call TerraformModules() first", tm.Path)
 	}
+	if container == nil {
+		return "", fmt.Errorf("TerraformModule %s: no toolchain container given", tm.Path)
+	}
 
-	_, err := dag.Container().
-		From(opentofuImage).
+	_, err := container.
 		WithMountedDirectory("/src", tm.Source).
 		WithWorkdir("/src/" + tm.Name).
 		WithExec([]string{"echo", ("================ " + tm.Name + " ================")}).
@@ -88,6 +91,33 @@ func (tm *TerraformModule) Validate(ctx context.Context) (string, error) {
 	return fmt.Sprintf("Terraform validation passed in %s", tm.Path), nil
 }
 
+// FormatTerraform formats Terraform/OpenTofu files with `tofu fmt`.
+//
+// `tofu fmt -recursive` is run once over the whole terraform/ tree rather than
+// per module, because unlike validate it needs no per-module init and the
+// modules already share a single source directory.
+// Returns a changeset. Use `dagger generate format-terraform --auto-apply` to apply.
+// +generate
+func (m *Homelab) FormatTerraform(
+	// +defaultPath="/"
+	// +ignore=["*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"]
+	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
+) *dagger.Changeset {
+	if container == nil {
+		container = m.ciContainer()
+	}
+
+	formatted := container.
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{"tofu", "fmt", "-recursive", "terraform"}).
+		Directory("/src")
+
+	return formatted.Changes(source)
+}
+
 // ValidateTerraform runs tofu validate on all discovered Terraform modules.
 // Each module is validated independently for parallel execution and individual
 // error reporting.
@@ -97,10 +127,15 @@ func (m *Homelab) ValidateTerraform(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!terraform/**/*"]
 	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
 ) (string, error) {
 	modulePaths := discoverTerraformModulePaths(ctx, source)
 	if len(modulePaths) == 0 {
 		return "Terraform validation skipped (no matching modules)", nil
+	}
+	if container == nil {
+		container = m.ciContainer()
 	}
 
 	tfDir := source.Directory("terraform")
@@ -114,7 +149,7 @@ func (m *Homelab) ValidateTerraform(ctx context.Context,
 			Source: tfDir,
 		}
 		g.Go(func() error {
-			_, err := tm.Validate(ctx)
+			_, err := tm.Validate(ctx, container)
 			return err
 		})
 	}
