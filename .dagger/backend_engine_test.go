@@ -31,9 +31,16 @@ import (
 // in-process with dag.Directory().WithNewFile(...) stays a chain, so
 // `source.Directory("a")` carries a fingerprint of its siblings and nothing
 // caches per-module — an artefact of how the fixture was built, not of the
-// module. So these tests write the fixture to disk and load it through
-// CurrentWorkspace(), which is the same path `+defaultPath` takes in a real
-// `dagger check`. The fake models the real path, not the in-process one.
+// module. So these tests write the fixture to disk and load it back off the
+// client filesystem, which is what `+defaultPath` does in a real `dagger check`.
+// The fake models that path, not the in-process one.
+//
+// The load goes through dag.Address(), not CurrentWorkspace(): a workspace
+// resolves relative paths from the workspace directory and absolute ones from
+// the workspace boundary, so it cannot name a t.TempDir() outside the repo,
+// whereas an address takes the host path as given. Both reach the same
+// Host.directory op, and a directory loaded either way content-addresses
+// identically — which is the property under test here.
 //
 // **A tree can't be edited in place.** The client filesystem sync is cached for
 // the life of a session, so a mid-session edit is invisible. Each variant is
@@ -57,6 +64,7 @@ import (
 // engineBackend runs the checks against a real engine.
 type engineBackend struct {
 	nonce   string
+	root    string
 	volume  *dagger.CacheVolume
 	planted int
 	reads   int
@@ -79,10 +87,10 @@ func newEngineBackend(t *testing.T) *engineBackend {
 	// Unique per process, so every run starts from a cold cache and run 1 can
 	// never be a hit left over from an earlier invocation.
 	nonce := fmt.Sprintf("%d-%d", time.Now().UnixNano(), os.Getpid())
-	t.Cleanup(func() { _ = os.RemoveAll(fixtureRoot) })
 
 	return &engineBackend{
 		nonce:  nonce,
+		root:   t.TempDir(),
 		volume: dag.CacheVolume("homelab-cachetest-" + nonce),
 	}
 }
@@ -91,18 +99,12 @@ func (e *engineBackend) name() string          { return "engine" }
 func (e *engineBackend) fixture(c check) repo  { return c.fixture(e.nonce) }
 func (e *engineBackend) buildsToolchain() bool { return false }
 
-// fixtureRoot is where fixtures are planted, relative to the test binary's
-// working directory. The Dagger client resolves CurrentWorkspace() paths
-// against its own process's directory, so a plain relative path works wherever
-// `dagger run` itself was invoked from.
-const fixtureRoot = ".cachetest-tmp"
-
-// plant writes a fixture to its own directory on disk and loads it the way the
-// CLI loads a +defaultPath argument.
+// plant writes a fixture to its own directory under the test's temp dir and
+// loads it the way the CLI loads a +defaultPath argument.
 func (e *engineBackend) plant(t *testing.T, files repo) *dagger.Directory {
 	t.Helper()
 	e.planted++
-	root := filepath.Join(fixtureRoot, e.nonce, fmt.Sprint(e.planted))
+	root := filepath.Join(e.root, fmt.Sprint(e.planted))
 
 	for _, p := range sortedKeys(files) {
 		full := filepath.Join(root, p)
@@ -114,11 +116,11 @@ func (e *engineBackend) plant(t *testing.T, files repo) *dagger.Directory {
 		}
 	}
 
-	dir := dag.CurrentWorkspace().Directory(root)
+	dir := dag.Address(root).Directory()
 	if _, err := dir.Entries(context.Background()); err != nil {
 		t.Fatalf("the engine could not read the fixture at %s: %v\n"+
-			"CurrentWorkspace() resolves paths against the test binary's working directory; "+
-			"run the tests from the .dagger directory", root, err)
+			"the address is an absolute host path, so the client has to be able to read it "+
+			"— check TMPDIR is visible to the process holding the Dagger session", root, err)
 	}
 	return dir
 }

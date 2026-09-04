@@ -3,4 +3,3 @@
 /internal/querybuilder
 /internal/telemetry
 /.env
-/.cachetest-tmp/

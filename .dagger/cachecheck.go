@@ -58,8 +58,8 @@ func (m *Homelab) VerifyCacheGranularity(
 			dagger.ContainerWithExecOpts{
 				// Gives the exec its own Dagger session, so cacheprobe steps
 				// aside and the engine-backed tests run for real. Their fixtures
-				// are planted in this container's filesystem and loaded through
-				// CurrentWorkspace(), which resolves against the nested client.
+				// are planted in this container's temp dir and loaded back off
+				// its filesystem by the nested client.
 				ExperimentalPrivilegedNesting: true,
 			},
 		).
