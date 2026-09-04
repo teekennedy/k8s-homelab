@@ -87,6 +87,7 @@ in {
         argocd
         dagger
         deploy-rs
+        forgejo-cli
         # Full git rather than the gitMinimal that prek already pulls into the
         # closure: this is the one on an interactive $PATH, so it should have the
         # perl subcommands. It stays out of the ci profile because no check
