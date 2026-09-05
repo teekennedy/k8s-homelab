@@ -183,34 +183,6 @@ func (r *PythonProject) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-func (r TerraformModule) MarshalJSON() ([]byte, error) {
-	var concrete struct {
-		Path   string
-		Name   string
-		Source *dagger.Directory
-	}
-	concrete.Path = r.Path
-	concrete.Name = r.Name
-	concrete.Source = r.Source
-	return json.Marshal(&concrete)
-}
-
-func (r *TerraformModule) UnmarshalJSON(bs []byte) error {
-	var concrete struct {
-		Path   string
-		Name   string
-		Source *dagger.Directory
-	}
-	err := json.Unmarshal(bs, &concrete)
-	if err != nil {
-		return err
-	}
-	r.Path = concrete.Path
-	r.Name = concrete.Name
-	r.Source = concrete.Source
-	return nil
-}
-
 func main() {
 	ctx := context.Background()
 
@@ -765,6 +737,27 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).HelmCharts(&parent, ctx, source), nil
+		case "InitTerraform":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var source *dagger.Directory
+			if inputArgs["source"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
+				}
+			}
+			var container *dagger.Container
+			if inputArgs["container"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
+				}
+			}
+			return (*Homelab).InitTerraform(&parent, ctx, source, container)
 		case "LintGo":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -856,20 +849,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).PythonProjects(&parent, ctx, source), nil
-		case "TerraformModules":
-			var parent Homelab
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			return (*Homelab).TerraformModules(&parent, ctx, source), nil
 		case "TestBuildHelm":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -1246,25 +1225,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*PythonProject).Test(&parent, ctx, container)
-		default:
-			return nil, fmt.Errorf("unknown function %s", fnName)
-		}
-	case "TerraformModule":
-		switch fnName {
-		case "Validate":
-			var parent TerraformModule
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var container *dagger.Container
-			if inputArgs["container"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
-				}
-			}
-			return (*TerraformModule).Validate(&parent, ctx, container)
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}

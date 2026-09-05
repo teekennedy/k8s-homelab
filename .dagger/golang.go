@@ -115,9 +115,6 @@ func (m *Homelab) LintGo(
 	}
 	configFile := source.File(".golangci.yaml")
 
-	// Indexed rather than collected through a channel: each goroutine owns one
-	// slot, so there is nothing to synchronize and the merge order stays the
-	// discovery order, which keeps the resulting changeset deterministic.
 	changesets := make([]*dagger.Changeset, len(goModules))
 	errs := make([]error, len(goModules))
 
@@ -129,9 +126,6 @@ func (m *Homelab) LintGo(
 	}
 	wg.Wait()
 
-	// Joined rather than first-error-wins: a `dagger check` run that reports
-	// every module's unfixable issues at once beats one that hides the second
-	// module behind the first.
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}

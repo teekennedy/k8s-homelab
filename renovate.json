@@ -358,6 +358,29 @@
       "sourceUrl": "https://codeberg.org/forgejo/forgejo"
     },
     {
+      "description": "Prefer releases from OpenTofu",
+      "matchDatasources": ["terraform-provider", "terraform-module"],
+      "registryUrls": ["https://registry.opentofu.org"]
+    },
+    {
+      "description": "Run tofu init to tidy up lockfiles after maintenance",
+      "matchManagers": [
+        "terraform"
+      ],
+      "matchFileNames": [
+        "**/.terraform.lock.hcl"
+      ],
+      "postUpgradeTasks": {
+        "commands": [
+          "dagger generate homelab:validate-terraform -y"
+        ],
+        "fileFilters": [
+          "**/.terraform.lock.hcl"
+        ],
+        "executionMode": "branch"
+      }
+    },
+    {
       "description": "The dagger SDK's own dependencies are owned by `dagger develop`, which rewrites them to whatever the pinned CLI wants. `dagger develop` runs as a post-upgrade task, which would overwrite renovate's changest to these packages.",
       "matchManagers": [
         "gomod"
