@@ -136,7 +136,7 @@ ddnsUpdater:
   enabled: true
   image:
     repository: alpine/curl
-    tag: "8.20.0"
+    tag: "8.21.0"
   period: "300" # seconds
   publicIpProvider: https://checkip.amazonaws.com
   resources:
