@@ -105,6 +105,11 @@
       SUDO = "/run/wrappers/bin/sudo";
       SELFUPDATE_CMD = selfupdateCommand;
       SENTINEL_CMD = sentinelCommand;
+      # How many times the trigger may re-start the unit when it turns out to
+      # have joined an update that was already running. Three covers the
+      # realistic case -- a couple of pushes landing while a slow build runs --
+      # without letting a host that is perpetually busy hang the pipeline.
+      MAX_ATTEMPTS = "3";
     };
     text = builtins.readFile ./trigger.sh;
   };

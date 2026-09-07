@@ -58,7 +58,7 @@ resolve_rev() {
 }
 
 main() {
-  local rev="" age target flake_ref booted staged
+  local rev="" age target last flake_ref booted staged
 
   if [ -f "$TARGET_REV_FILE" ]; then
     rev=$(cat "$TARGET_REV_FILE")
@@ -77,6 +77,29 @@ main() {
 
   fetch
   target=$(resolve_rev "$rev")
+
+  # Never move backwards. resolve_rev only proves the commit is *on* the branch,
+  # not that it is newer than what this host already built, and the order
+  # requests arrive in is not the order the commits were made: pipelines for
+  # consecutive pushes overlap, get cancelled, get restarted by hand, and their
+  # builds outlive the pipeline that asked for them. Without this, whichever
+  # request lands last wins, which is how the fleet ends up staging a commit
+  # older than the one it is already running.
+  #
+  # Deliberate rollback is still possible, it just has to be deliberate: remove
+  # LAST_REV_FILE first, or run nixos-rebuild by hand.
+  if [ -e "$LAST_REV_FILE" ]; then
+    last=$(cat "$LAST_REV_FILE")
+    # A git failure here (an unknown commit after a force-push, say) is a
+    # non-zero exit like any other, so an unanswerable question fails towards
+    # building rather than towards silently doing nothing.
+    if [ "$target" != "$last" ] &&
+      git -C "$REPO_DIR" merge-base --is-ancestor "$target" "$last"; then
+      echo "$target is an ancestor of the last built commit $last; refusing to move backwards"
+      return 0
+    fi
+  fi
+
   echo "building $ATTRIBUTE at $target"
 
   # A git+file ref rather than a plain path, so that self.rev and

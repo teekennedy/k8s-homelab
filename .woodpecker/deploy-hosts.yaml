@@ -43,23 +43,54 @@ steps:
         rm -f /tmp/cert.json
         chmod 600 "$HOME/.ssh/id_ed25519"
       - cp "$KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
-      # Stage each new generation sequentially, exiting early if any build
-      # fails. The host list is read from the rollout CronJob so it can act as
-      # the single source of truth.
+      # Stage every host at once. Staging order carries no meaning -- the hosts
+      # build independently and none of them reboots here -- and only the reboot
+      # order matters, which is the rollout Job's job. Sequentially this step ran
+      # for the sum of four builds, which on a nixpkgs bump exceeded the pipeline
+      # timeout; in parallel it runs for the slowest single host. That matters
+      # beyond throughput: this pipeline holds the WoodpeckerPipelineRunning gate
+      # and so blocks kured for exactly as long as it lasts.
+      #
+      # Output is collected per host and printed at the end rather than
+      # interleaved, since four concurrent nix builds share one stdout.
+      #
+      # The host list is read from the rollout CronJob so it can act as the
+      # single source of truth.
       - |
         set -e
         HOST_ORDER=$(kubectl get cronjob nixos-rollout \
           -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].env[?(@.name=="HOST_ORDER")].value}')
         test -n "$HOST_ORDER"
+
+        : >/tmp/stage.pids
         for entry in $HOST_ORDER; do
+          name=$${entry%%=*}
           ip=$${entry##*=}
-          echo "=== staging $CI_COMMIT_SHA on $ip"
-          timeout 40m ssh -n -o BatchMode=yes -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
-            -i "$HOME/.ssh/id_ed25519" \
-            -o CertificateFile="$HOME/.ssh/id_ed25519-cert.pub" \
-            "$SSH_USER@$ip" "deploy $CI_COMMIT_SHA"
+          # 40m each, as when this ran sequentially: a host that joins an update
+          # already in progress builds twice over, and the ceiling has to cover
+          # the pair rather than one build.
+          ( timeout 40m ssh -n -o BatchMode=yes -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
+              -i "$HOME/.ssh/id_ed25519" \
+              -o CertificateFile="$HOME/.ssh/id_ed25519-cert.pub" \
+              "$SSH_USER@$ip" "deploy $CI_COMMIT_SHA" \
+          ) >"/tmp/stage.$name.log" 2>&1 &
+          echo "$! $name" >>/tmp/stage.pids
         done
+
+        # No `set -e` bail here: every host is waited on before anything exits,
+        # so one failure still leaves the other three logs to read.
+        rc=0
+        while read -r pid name; do
+          if wait "$pid"; then
+            echo "=== $name: staged $CI_COMMIT_SHA"
+          else
+            echo "=== $name: FAILED to stage $CI_COMMIT_SHA"
+            rc=1
+          fi
+          cat "/tmp/stage.$name.log"
+        done </tmp/stage.pids
+        exit $rc
 
   - name: rollout
     image: alpine/k8s:1.37.0

@@ -19,8 +19,30 @@ woodpecker:
       # activated repo keeps whatever it was given, so set it once per repo in
       # the UI or with `woodpecker-cli repo update --timeout`. MAX is the ceiling
       # a repo setting may be raised to and does apply retroactively.
-      WOODPECKER_DEFAULT_PIPELINE_TIMEOUT: "30"
-      WOODPECKER_MAX_PIPELINE_TIMEOUT: "60"
+      #
+      # 60 was not enough for deploy-hosts.yaml when it staged the four borg
+      # hosts one after another and a nixpkgs bump made each one a real build --
+      # the pipeline was killed partway through the fleet, leaving it staged at
+      # a mix of commits. That step stages in parallel now, so the budget only
+      # has to cover the slowest single host, which its own `timeout 40m` caps.
+      # 60 is that 40 plus slack, not a guess; raising it is not the fix if a
+      # stage starts running long.
+      WOODPECKER_DEFAULT_PIPELINE_TIMEOUT: "60"
+      WOODPECKER_MAX_PIPELINE_TIMEOUT: "90"
+      # Supersede rather than queue. Renovate lands nix-touching commits in
+      # bursts, and with one agent each push used to wait out the whole fleet
+      # stage of the push before it before starting its own -- building commits
+      # that were out of date before the build began.
+      #
+      # Upstream already defaults this to "pull_request, push"; it is set
+      # explicitly because it is load-bearing here, and because the DEFAULT_
+      # caveat above applies to it too. It has no per-repo CLI flag, so an
+      # already activated repo needs it ticked in the repo settings UI (or
+      # PATCHed onto /api/repos/{id} as cancel_previous_pipeline_events).
+      #
+      # Only deploy-hosts.yaml runs on push: ci.yaml is pull_request and
+      # dagger-cache-prune.yaml is manual, so neither is affected.
+      WOODPECKER_DEFAULT_CANCEL_PREVIOUS_PIPELINE_EVENTS: "pull_request, push"
     extraSecretNamesForEnvFrom:
       - woodpecker-default-agent-secret
       # WOODPECKER_FORGEJO_CLIENT / _SECRET, written by the forgejo-resources

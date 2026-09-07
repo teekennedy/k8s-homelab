@@ -1,0 +1,88 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Did the NixOS rollout actually work?
+#
+# The pipeline is a poor thing to alert on. It can be killed by its own timeout
+# and reported as `killed` rather than `failure`, so a `when: status: [failure]`
+# notification step misses exactly the case worth hearing about; and the hosts
+# build under systemd, not under the ssh session, so a build outlives the
+# pipeline that asked for it and finishes -- or fails -- long after the pipeline
+# is gone. Pipeline status simply does not describe where the fleet ended up.
+#
+# These alert on the fleet instead, off the textfile-collector metrics that
+# nix/modules/selfupdate/metrics.sh refreshes every five minutes. They fire
+# whether the trigger was CI, the hosts' own fallback timer, or someone at a
+# terminal. Alertmanager routes everything to Discord by default (see
+# k8s/platform/monitoring-system/values.yaml), so no receiver wiring is needed.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: nixos-cd-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: nixos-cd
+      interval: 1m
+      rules:
+        # The fleet should converge on one commit. It briefly does not while a
+        # stage is in flight, which is why this waits an hour -- longer than the
+        # 40m ceiling on a single host's build, now that hosts stage in parallel.
+        # Sitting here for an hour means a stage never reached some host: a
+        # pipeline killed partway through the fleet, or a build that failed after
+        # its pipeline had already gone.
+        - alert: NixosFleetRevisionDrift
+          expr: |
+            count(count by (rev) (nixos_selfupdate_info)) > 1
+          for: 1h
+          labels:
+            severity: warning
+            component: nixos-cd
+          annotations:
+            summary: {{ "borg hosts are built from {{ $value }} different commits" | quote }}
+            description: {{ "The NixOS hosts have not converged on a single revision. A stage did not reach every host -- check the last deploy-hosts pipeline and `nixos_selfupdate_info` for which host is behind." | quote }}
+
+        # Staged but never booted. The rollout Job allows an hour per host and
+        # gives up after 4.5h total (nixosRollout.activeDeadlineSeconds), so
+        # anything still pending at six hours outlived the rollout that was meant
+        # to clear it -- or no rollout was ever created, which is what happens
+        # when the stage step fails and `rollout` never runs.
+        - alert: NixosRebootPendingTooLong
+          expr: nixos_selfupdate_reboot_pending == 1
+          for: 6h
+          labels:
+            severity: warning
+            component: nixos-cd
+          annotations:
+            summary: {{ "{{ $labels.instance }} has had a NixOS generation staged for 6h without rebooting" | quote }}
+            description: {{ "A new system generation is staged but not booted. Either no rollout Job was created, or kured never got to this host. `kubectl -n woodpecker create job --from=cronjob/nixos-rollout nixos-rollout-manual` rolls it out." | quote }}
+
+        # The unit failed on the host. Distinct from drift: this catches the
+        # build that broke rather than the one that never arrived, and it catches
+        # the fallback timer's runs, which no pipeline is watching at all.
+        - alert: NixosSelfupdateFailed
+          expr: node_systemd_unit_state{name="nixos-selfupdate.service", state="failed"} == 1
+          for: 5m
+          labels:
+            severity: warning
+            component: nixos-cd
+          annotations:
+            summary: {{ "nixos-selfupdate.service failed on {{ $labels.instance }}" | quote }}
+            description: {{ "The self-update unit is in a failed state. `journalctl -u nixos-selfupdate.service` on the host has the build output." | quote }}
+
+        # Nothing has updated this host in over a week. The host's own fallback
+        # timer acts at 7.5 days, so crossing 8 means the fallback did not save
+        # us either and the host is genuinely stranded.
+        - alert: NixosSelfupdateStale
+          expr: |
+            time() - nixos_selfupdate_last_success_timestamp_seconds > 8 * 24 * 60 * 60
+          for: 1h
+          labels:
+            severity: warning
+            component: nixos-cd
+          annotations:
+            summary: {{ "{{ $labels.instance }} has not completed a NixOS self-update in over 8 days" | quote }}
+            description: {{ "Neither CI nor the host's 7.5-day fallback timer has completed an update. Check that the host can reach git.msng.to or the GitHub mirror." | quote }}

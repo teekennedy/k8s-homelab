@@ -9,7 +9,7 @@ automatically, reducing toil.
 push to main (flake.nix, flake.lock, nix/**)
   │
   ├─ .woodpecker/deploy-hosts.yaml
-  │    step "stage":   ssh deploybot@host "deploy <sha>"    (sequential, fail-fast)
+  │    step "stage":   ssh deploybot@host "deploy <sha>"    (all hosts in parallel)
   │    step "rollout": kubectl create job --from=cronjob/nixos-rollout
   │
   └─ nixos-rollout Job (k8s/platform/woodpecker)
@@ -38,6 +38,38 @@ with no wildcards. The only input that CI has control over is the commit sha.
 anything that is not a full sha *and* an ancestor of the tracked branch. The
 worst a compromised Woodpecker can do is ask a host to re-deploy an older commit
 that was already on `main`.
+
+**A host never moves backwards.** Being on `main` does not make a commit newer
+than what the host already built, and requests do not arrive in commit order:
+Renovate lands nix-touching commits in bursts, pipelines for them overlap, get
+superseded, and get restarted by hand days later. So `nixos-selfupdate.service`
+refuses any commit that is an ancestor of the one it last built. Without it the
+last request to arrive wins, and a fleet ends up staging a commit older than the
+one it is running. Deliberate rollback still works, it just has to be
+deliberate — remove `/var/cache/nixos-selfupdate/last-rev` first.
+
+**A pipeline can only report its own build.** `systemctl start --wait` on a unit
+that is already running *joins* the running job rather than queueing a new one:
+it returns when that run finishes, and that run read its commit before this one
+was written. The trigger would then print a build of a commit nobody asked it
+for and exit 0. The unit consumes `TARGET_REV_FILE` when it reads it, so the
+file still existing afterwards is the signal that the run belonged to somebody
+else; the trigger starts the unit again, up to `MAX_ATTEMPTS` times, and fails
+rather than reporting a stranger's success.
+
+**Hosts stage in parallel, reboot in order.** Staging order carries no meaning —
+the hosts build independently and none of them reboots during the stage step —
+so the fleet is staged all at once and the step lasts as long as the slowest
+single host rather than the sum of four. Sequentially it exceeded the pipeline
+timeout on a nixpkgs bump and was killed partway through the fleet. Only reboot
+order matters, and that belongs to the rollout Job.
+
+**Superseded pipelines are cancelled, not queued.**
+`WOODPECKER_DEFAULT_CANCEL_PREVIOUS_PIPELINE_EVENTS` includes `push`, so a newer
+nix-touching commit kills the pipeline for the older one instead of leaving it to
+build a commit that is already out of date. Note this does not stop a build
+already running on a host: the unit runs under systemd, not under the ssh
+session, so it finishes on its own. That is what the backwards guard is for.
 
 **Staging and rebooting are separate.** A running pipeline pod fires the
 `WoodpeckerPipelineRunning` gate, which blocks kured so a drain cannot kill the
@@ -92,8 +124,13 @@ database.
    sudoers rules and the sshd config out entirely — the units are still there and
    can be driven by hand.
 3. Set the repo's pipeline timeout in the Woodpecker UI (or
-   `woodpecker-cli repo update --timeout 30`). `WOODPECKER_DEFAULT_PIPELINE_TIMEOUT`
+   `woodpecker-cli repo update --timeout 60`). `WOODPECKER_DEFAULT_PIPELINE_TIMEOUT`
    only applies to repos activated after it is set.
+4. Tick "cancel previous pipelines" for `push` in the repo settings UI. Same
+   caveat as the timeout — `WOODPECKER_DEFAULT_CANCEL_PREVIOUS_PIPELINE_EVENTS`
+   is only read when a repo is activated. There is no `woodpecker-cli` flag for
+   it; the API equivalent is `cancel_previous_pipeline_events` on
+   `PATCH /api/repos/{id}`.
 
 ## Operating it
 
@@ -116,6 +153,20 @@ Metrics land in the node-exporter textfile collector and are refreshed every
 - `nixos_selfupdate_last_success_timestamp_seconds`
 - `nixos_selfupdate_reboot_pending`
 - `nixos_selfupdate_info{rev,booted_system,staged_system}`
+
+Alerting is on the fleet, not on the pipeline, because pipeline status does not
+describe where the fleet ended up: a pipeline killed by its own timeout is
+reported as `killed` rather than `failure` (so a `when: status: [failure]`
+notification step would miss it), and a host's build outlives the pipeline that
+asked for it either way. `templates/prometheus-rule-nixos-cd.yaml` covers the
+four ways this goes wrong, and Alertmanager routes them to Discord by default:
+
+| alert | fires when |
+|---|---|
+| `NixosFleetRevisionDrift` | hosts built from different commits for 1h |
+| `NixosRebootPendingTooLong` | staged but not booted after 6h |
+| `NixosSelfupdateFailed` | `nixos-selfupdate.service` failed on a host |
+| `NixosSelfupdateStale` | no successful update in 8 days |
 
 ## Fallbacks
 
@@ -140,5 +191,6 @@ Metrics land in the node-exporter textfile collector and are refreshed every
 | RBAC, rollout job, netpol | `k8s/platform/woodpecker/templates/` |
 | rollout script, known_hosts | `k8s/platform/woodpecker/files/` |
 | kured gate alert | `k8s/foundation/kured/templates/prometheus-rule-woodpecker.yaml` |
+| rollout alerts | `k8s/platform/woodpecker/templates/prometheus-rule-nixos-cd.yaml` |
 | pipeline | `.woodpecker/deploy-hosts.yaml` |
 | setup helpers | `scripts/setup-ssh-ca.sh`, `scripts/update-known-hosts.sh` |

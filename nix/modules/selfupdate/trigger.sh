@@ -36,11 +36,39 @@ deploy)
   fi
   printf '%s\n' "$rev" >"$TARGET_REV_FILE"
 
-  status=0
-  # Deliberately unquoted: this is the exact argv the sudoers entry lists, built
-  # from the same nix binding, so the two cannot drift.
-  # shellcheck disable=SC2086
-  "$SUDO" -n $SELFUPDATE_CMD || status=$?
+  # `systemctl start --wait` on a unit that is already running joins the running
+  # job instead of queueing a new one. It returns when *that* run finishes -- a
+  # run that read its own commit before ours was ever written, and whose log
+  # below would then describe a build we did not ask for. Overlapping pipelines
+  # make this routine, and reporting someone else's build as this one's success
+  # is how a host ends up staging a commit nobody asked it to.
+  #
+  # The unit consumes TARGET_REV_FILE when it reads it, so the file still being
+  # there afterwards is exactly the signal that our request was not the one that
+  # ran. Start it again; the next run picks up the rev still sitting in the file.
+  # Bounded, because a busy enough host could otherwise be overtaken forever.
+  attempt=0
+  while :; do
+    attempt=$((attempt + 1))
+    status=0
+    # Deliberately unquoted: this is the exact argv the sudoers entry lists, built
+    # from the same nix binding, so the two cannot drift.
+    # shellcheck disable=SC2086
+    "$SUDO" -n $SELFUPDATE_CMD || status=$?
+
+    # Consumed, so this run was ours: either it built the rev, or it declined to
+    # move backwards. Both are answers about the commit we asked about.
+    [ -f "$TARGET_REV_FILE" ] || break
+
+    if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+      echo "error: $rev was never picked up; joined another update on all $attempt attempts" >&2
+      rm -f "$TARGET_REV_FILE"
+      status=75
+      break
+    fi
+    echo "joined an update already in progress; retrying ($attempt/$MAX_ATTEMPTS)" >&2
+  done
+
   # The unit tees its own output here so that reading it back needs no
   # systemd-journal group membership, which would expose the whole journal.
   if [ -f "$RUN_LOG" ]; then
