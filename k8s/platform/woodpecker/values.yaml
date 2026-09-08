@@ -56,6 +56,17 @@ woodpecker:
             name: woodpecker-grpc-secret
             key: WOODPECKER_GRPC_SECRET
             optional: false
+      # Enables /api/metrics/prometheus (404s otherwise) and doubles as its
+      # bearer token. woodpecker-servicemonitor.yaml scrapes it with the same
+      # secret; prometheus-rule-ci-failures.yaml alerts on the step-failure
+      # counter it exposes. Step-level metrics are on by default
+      # (WOODPECKER_STEP_LEVEL_METRICS), so no separate flag is needed for that.
+      WOODPECKER_PROMETHEUS_AUTH_TOKEN:
+        valueFrom:
+          secretKeyRef:
+            name: woodpecker-prometheus-secret
+            key: WOODPECKER_PROMETHEUS_AUTH_TOKEN
+            optional: false
     extraSecretNamesForEnvFrom:
       - woodpecker-default-agent-secret
       # WOODPECKER_FORGEJO_CLIENT / _SECRET, written by the forgejo-resources
@@ -80,7 +91,7 @@ woodpecker:
             - ci.msng.to
 
   agent:
-    replicaCount: 1
+    replicaCount: 2
     securityContext:
       runAsUser: 1000
       runAsGroup: 1000

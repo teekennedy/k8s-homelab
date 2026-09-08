@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/servicemonitor_v1.json
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: woodpecker-server
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: woodpecker
+      app.kubernetes.io/name: server
+  endpoints:
+    - port: http
+      path: /api/metrics/prometheus
+      interval: 30s
+      authorization:
+        credentials:
+          name: woodpecker-prometheus-secret
+          key: WOODPECKER_PROMETHEUS_AUTH_TOKEN

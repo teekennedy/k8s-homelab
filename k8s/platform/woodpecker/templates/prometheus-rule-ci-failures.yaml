@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Prometheus alerts based on Woodpecker metrics.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: woodpecker-ci-failures
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: woodpecker-ci
+      interval: 60s
+      rules:
+        # Generic "Pipeline step failed" alert.
+        #
+        # Sourced from woodpecker_step_failures_total, which the server only emits
+        # with step-level metrics on (WOODPECKER_STEP_LEVEL_METRICS, default true)
+        # and only exposes with WOODPECKER_PROMETHEUS_AUTH_TOKEN set.
+        - alert: WoodpeckerStepFailed
+          expr: increase(woodpecker_step_failures_total[5m]) > 0
+          labels:
+            severity: warning
+            component: ci
+          annotations:
+            summary: {{ "{{ $labels.repo }}: step {{ $labels.step }} failed" | quote }}
+            description: {{ "Step {{ $labels.step }} in workflow {{ $labels.workflow }} failed on {{ $labels.repo }}. Check https://ci.msng.to/{{ $labels.repo }} for the run." | quote }}
+
+        # Total CI outage: no agent connected at all, so nothing in the queue
+        # can ever run. `for: 5m` rides out a rollout/restart of the agent
+        # deployment rather than paging on a routine redeploy.
+        - alert: WoodpeckerNoWorkers
+          expr: woodpecker_worker_count == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: ci
+          annotations:
+            summary: "No Woodpecker agents connected"
+            description: "No pipeline can run until an agent reconnects. Check the agent deployment in the woodpecker namespace."
+
+        # Catches a stuck queue even when a worker is technically connected
+        # (e.g. an agent wedged on a hung step, or genuinely under-provisioned
+        # capacity). 15m is well above expected queueing during a Renovate burst.
+        - alert: WoodpeckerQueueBacklog
+          expr: woodpecker_pending_steps > 0
+          for: 15m
+          labels:
+            severity: warning
+            component: ci
+          annotations:
+            summary: {{ "{{ $value }} step(s) stuck pending" | quote }}
+            description: "CI steps have been queued for over 15m without running. An agent may be wedged or disconnected."
