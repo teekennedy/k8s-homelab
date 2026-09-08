@@ -2,14 +2,10 @@
 #
 # NixOS continuous deployment.
 #
-# This stages a new NixOS generation on every borg host and then kicks off a
-# job to perform the rollout. It deliberately does not wait for any reboot:
-# while this pipeline runs, the WoodpeckerPipelineRunning gate
+# This builds and stages a new NixOS generation on every borg host and then
+# kicks off a job to perform the rollout. It deliberately does not wait for any
+# reboot: while this pipeline runs, the WoodpeckerPipelineRunning gate
 # (k8s/foundation/kured) blocks kured, so waiting here would deadlock.
-#
-# SSH access is designed for least privilege. All the pipeline can do is name a
-# commit that is already an ancestor of main; the host fetches and builds it
-# itself. See nix/modules/selfupdate.
 when:
   - event: push
     branch: main
@@ -20,7 +16,7 @@ when:
         - "nix/**"
 
 steps:
-  - name: stage
+  - name: build
     image: alpine/kubectl:1.37.0
     backend_options:
       kubernetes:
@@ -46,11 +42,8 @@ steps:
         rm -f /tmp/cert.json
         chmod 600 "$HOME/.ssh/id_ed25519"
       - cp "$KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
-      # Build the updated NixOS derivation and stage it for activation on next
-      # boot. This is done in parallel on every host at once. Staging a host is
-      # an independent operation and can be done in any order. Staging hosts
-      # sequentially increases the risk of pipeline cancellation via timeout.
       - |
+        # Build the updated NixOS derivation on every host, canary first.
         set -e
 
         # Read the host list from the rollout CronJob so it can act as the
@@ -59,22 +52,110 @@ steps:
           -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].env[?(@.name=="HOST_ORDER")].value}')
         test -n "$HOST_ORDER"
 
+        # Choose the node with the most CPU as the canary. Once the canary is
+        # done building, it acts as a package cache (Nix substituter) for the
+        # rest of the cluster.
+        NAMES=$(for entry in $HOST_ORDER; do echo "$${entry%%=*}"; done | jq -R . | jq -s .)
+        CANARY=$(kubectl get nodes -o json | jq -r --argjson names "$NAMES" '
+          [.items[] | select(.metadata.name as $n | $names | index($n))
+                     | {name: .metadata.name, cpu: (.status.capacity.cpu | tonumber)}]
+          | max_by(.cpu) | .name
+        ')
+        test -n "$CANARY" && [ "$CANARY" != "null" ]
+
+        build_on() {
+          name=$1
+          ip=$2
+          # Ensure the build times out before the entire pipeline is killed,
+          # leaving time for the rest of this step's output to be collected.
+          timeout 40m ssh -n -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
+            -i "$HOME/.ssh/id_ed25519" \
+            -o CertificateFile="$HOME/.ssh/id_ed25519-cert.pub" \
+            "$SSH_USER@$ip" "build $CI_COMMIT_SHA" \
+            >"/tmp/build.$name.log" 2>&1
+        }
+
+        canary_ip=""
+        for entry in $HOST_ORDER; do
+          name=$${entry%%=*}
+          ip=$${entry##*=}
+          [ "$name" = "$CANARY" ] && canary_ip=$ip
+        done
+        test -n "$canary_ip"
+
+        echo "=== building $CANARY first"
+        if ! build_on "$CANARY" "$canary_ip"; then
+          echo "=== $CANARY: FAILED to build $CI_COMMIT_SHA"
+          cat "/tmp/build.$CANARY.log"
+          exit 1
+        fi
+        echo "=== $CANARY: built $CI_COMMIT_SHA"
+        cat "/tmp/build.$CANARY.log"
+
+        # Build remaining hosts in parallel
+        : >/tmp/build.pids
+        for entry in $HOST_ORDER; do
+          name=$${entry%%=*}
+          ip=$${entry##*=}
+          [ "$name" = "$CANARY" ] && continue
+          build_on "$name" "$ip" &
+          echo "$! $name" >>/tmp/build.pids
+        done
+
+        rc=0
+        while read -r pid name; do
+          if wait "$pid"; then
+            echo "=== $name: built $CI_COMMIT_SHA"
+          else
+            echo "=== $name: FAILED to build $CI_COMMIT_SHA"
+            rc=1
+          fi
+          cat "/tmp/build.$name.log"
+        done </tmp/build.pids
+        exit $rc
+
+  - name: stage
+    image: alpine/kubectl:1.37.0
+    depends_on: [build]
+    backend_options:
+      kubernetes:
+        serviceAccountName: nixos-deploy
+    environment:
+      SSH_USER: deploybot
+      CERT_SECRET: deploybot-ssh-cert
+      KNOWN_HOSTS: k8s/platform/woodpecker/files/known_hosts
+    commands:
+      - apk add --no-cache openssh-client jq
+      - install -d -m 700 "$HOME/.ssh"
+      - |
+        set -e
+        kubectl get secret "$CERT_SECRET" -o json > /tmp/cert.json
+        jq -r '.data.id_ed25519 | @base64d' /tmp/cert.json > "$HOME/.ssh/id_ed25519"
+        jq -r '.data["id_ed25519-cert.pub"] | @base64d' /tmp/cert.json > "$HOME/.ssh/id_ed25519-cert.pub"
+        rm -f /tmp/cert.json
+        chmod 600 "$HOME/.ssh/id_ed25519"
+      - cp "$KNOWN_HOSTS" "$HOME/.ssh/known_hosts"
+      - |
+        set -e
+
+        HOST_ORDER=$(kubectl get cronjob nixos-rollout \
+          -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].env[?(@.name=="HOST_ORDER")].value}')
+        test -n "$HOST_ORDER"
+
         : >/tmp/stage.pids
         for entry in $HOST_ORDER; do
           name=$${entry%%=*}
           ip=$${entry##*=}
-          # Ensure staging operations timeout before entire pipeline is killed,
-          # providing time for rollback operation to complete.
-          ( timeout 50m ssh -n -o BatchMode=yes -o IdentitiesOnly=yes \
+          ( timeout 10m ssh -n -o BatchMode=yes -o IdentitiesOnly=yes \
               -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
               -i "$HOME/.ssh/id_ed25519" \
               -o CertificateFile="$HOME/.ssh/id_ed25519-cert.pub" \
-              "$SSH_USER@$ip" "deploy $CI_COMMIT_SHA" \
+              "$SSH_USER@$ip" "stage $CI_COMMIT_SHA" \
           ) >"/tmp/stage.$name.log" 2>&1 &
           echo "$! $name" >>/tmp/stage.pids
         done
 
-        # Wait for each staging operation and print its logs when complete.
         rc=0
         while read -r pid name; do
           if wait "$pid"; then

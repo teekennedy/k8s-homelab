@@ -1,15 +1,18 @@
-# Body of nixos-selfupdate.service. Runs as root, oneshot.
+# Body of nixos-selfupdate-build.service. Runs as root, oneshot.
 #
-# Fetches the tracked branch, builds this host's NixOS configuration from a
-# specific commit, and stages it for the next boot. It does not create the kured
-# reboot sentinel file. That is handled by a separate unit, driven by the
-# in-cluster rollout job so that reboots happen in a controlled order.
+# Fetches the tracked branch and builds this host's NixOS configuration from a
+# specific commit, leaving the result as a GC-rooted symlink at
+# BUILT_SYSTEM_LINK. It does not touch /nix/var/nix/profiles/system and it does
+# not create the kured reboot sentinel file -- promotion is
+# nixos-selfupdate-stage.service's job, driven separately (see stage.sh), so a
+# build never has to wait on staging and vice versa.
 #
 # Two callers, distinguished only by whether TARGET_REV_FILE exists:
 #   * the deploybot trigger (CI), which writes the commit to it first
-#   * nixos-selfupdate.timer (fallback), which does not
-# The file is consumed on read, so a later timer run in the same boot cannot
-# re-deploy a stale pinned commit.
+#   * the fallback timer (nixos-selfupdate.service), which does not and so
+#     tracks the tip of BRANCH
+# The file is consumed on read, so a later run in the same boot cannot re-build
+# a stale pinned commit.
 
 fetch() {
   local url
@@ -58,33 +61,27 @@ resolve_rev() {
 }
 
 main() {
-  local rev="" age target last flake_ref booted staged started status follower
+  local rev="" target last flake_ref started status follower
 
   if [ -f "$TARGET_REV_FILE" ]; then
     rev=$(cat "$TARGET_REV_FILE")
     rm -f "$TARGET_REV_FILE"
     echo "commit requested by trigger: $rev"
-  elif [ -e "$STAMP_FILE" ]; then
-    age=$(($(date +%s) - $(stat -c %Y "$STAMP_FILE")))
-    if [ "$age" -lt "$STALENESS_SECONDS" ]; then
-      echo "last successful update was ${age}s ago, under the ${STALENESS_SECONDS}s fallback threshold; nothing to do"
-      return 0
-    fi
-    echo "last successful update was ${age}s ago; running the fallback update"
   else
-    echo "no successful update recorded yet; running the fallback update"
+    echo "no commit requested; tracking the tip of $BRANCH"
   fi
 
   fetch
   target=$(resolve_rev "$rev")
 
-  # Never move backwards. resolve_rev only proves the commit is *on* the branch,
-  # not that it is newer than what this host already built, and the order
-  # requests arrive in is not the order the commits were made: pipelines for
-  # consecutive pushes overlap, get cancelled, get restarted by hand, and their
-  # builds outlive the pipeline that asked for them. Without this, whichever
-  # request lands last wins, which is how the fleet ends up staging a commit
-  # older than the one it is already running.
+  # Never move backwards relative to what this host already has staged.
+  # resolve_rev only proves the commit is *on* the branch, not that it is newer
+  # than what this host is running, and the order requests arrive in is not the
+  # order the commits were made: pipelines for consecutive pushes overlap, get
+  # cancelled, get restarted by hand, and their builds outlive the pipeline
+  # that asked for them. Without this, whichever request lands last wins, which
+  # is how the fleet ends up staging a commit older than the one it is already
+  # running.
   #
   # Deliberate rollback is still possible, it just has to be deliberate: remove
   # LAST_REV_FILE first, or run nixos-rebuild by hand.
@@ -95,9 +92,18 @@ main() {
     # building rather than towards silently doing nothing.
     if [ "$target" != "$last" ] &&
       git -C "$REPO_DIR" merge-base --is-ancestor "$target" "$last"; then
-      echo "$target is an ancestor of the last built commit $last; refusing to move backwards"
+      echo "$target is an ancestor of the last staged commit $last; refusing to move backwards"
       return 0
     fi
+  fi
+
+  # Already built exactly this commit and the result is still there: nothing to
+  # do. This is what makes re-running `build` for a commit a host already
+  # handled -- a retried pipeline, or a stage that lags behind a second build
+  # -- cheap rather than a wasted rebuild.
+  if [ "$target" = "$(cat "$BUILT_REV_FILE" 2>/dev/null || true)" ] && [ -e "$BUILT_SYSTEM_LINK" ]; then
+    echo "$target is already built at $(readlink -f "$BUILT_SYSTEM_LINK")"
+    return 0
   fi
 
   echo "building $ATTRIBUTE at $target"
@@ -111,14 +117,13 @@ main() {
   # the human-readable output on stderr untouched (applyJSONLogger in
   # libutil/logging.cc wraps the existing logger rather than replacing it), so
   # this costs the log above nothing. It goes through NIX_CONFIG rather than a
-  # flag because nixos-rebuild spawns several nix processes and every one of
-  # them has to write to the same file; they append, which is what makes one
-  # log per run possible -- and why it is truncated first, or it would grow
+  # flag because `nix build` can spawn more than one nix process, and they all
+  # have to write to the same file; they append, which is what makes one log
+  # per run possible -- and why it is truncated first, or it would grow
   # without bound across deploys.
   #
   # The metrics this feeds are counts, not timings: the event stream carries no
-  # timestamps at all, so duration is measured out here around the whole
-  # rebuild.
+  # timestamps at all, so duration is measured out here around the whole build.
   : >"$NIX_LOG_JSON"
   export NIX_CONFIG="json-log-path = $NIX_LOG_JSON"
 
@@ -134,7 +139,12 @@ main() {
 
   started=$(date +%s)
   status=0
-  nixos-rebuild boot --flake "$flake_ref#$ATTRIBUTE" || status=$?
+  # -o (rather than the default ./result) roots the build directly at its
+  # final resting place: a GC root that survives this process exiting, at a
+  # fixed path stage.sh knows to look for.
+  nix build "$flake_ref#nixosConfigurations.$ATTRIBUTE.config.system.build.toplevel" \
+    --out-link "$BUILT_SYSTEM_LINK" || status=$?
+
   unset NIX_CONFIG
 
   # SIGTERM asks the follower to drain what is left and exit; the build is over
@@ -146,7 +156,7 @@ main() {
   # not a host.
   #
   # --output goes to the state dir, which is under /var/cache and so survives
-  # the reboot this deploy is about to cause; --publish puts the same bytes in
+  # the reboot a stage will eventually cause; --publish puts the same bytes in
   # the textfile collector directory, which does not. A tmpfiles rule copies
   # the state dir file back into place on the next boot. Only this file gets
   # that treatment: the timer-driven writers there rewrite themselves every
@@ -165,16 +175,8 @@ main() {
     return "$status"
   fi
 
-  printf '%s\n' "$target" >"$LAST_REV_FILE"
-  touch "$STAMP_FILE"
-
-  booted=$(readlink -f /run/booted-system)
-  staged=$(readlink -f /nix/var/nix/profiles/system)
-  if [ "$booted" = "$staged" ]; then
-    echo "staged generation matches the booted one; no reboot needed"
-  else
-    echo "staged $staged for next boot (booted: $booted)"
-  fi
+  printf '%s\n' "$target" >"$BUILT_REV_FILE"
+  echo "built $(readlink -f "$BUILT_SYSTEM_LINK")"
 }
 
 # Piped rather than `exec > >(tee ...)` so the shell waits for tee to flush:
@@ -190,7 +192,7 @@ main() {
 # reports progress even though no terminal is attached -- and the output never
 # passes through Nix's logger, which leaves `nix --quiet` and every flake
 # setting powerless over it. Discarding stderr wholesale is not the answer
-# either: it is the same stream as stdout by now, and it is where nixos-rebuild
+# either: it is the same stream as stdout by now, and it is where the build
 # reports the failures worth reading.
 #
 # tr first, because git separates progress updates with carriage returns rather

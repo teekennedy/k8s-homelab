@@ -23,12 +23,16 @@ woodpecker:
       # 60 was not enough for deploy-hosts.yaml when it staged the four borg
       # hosts one after another and a nixpkgs bump made each one a real build --
       # the pipeline was killed partway through the fleet, leaving it staged at
-      # a mix of commits. That step stages in parallel now, so the budget only
-      # has to cover the slowest single host, which its own `timeout 40m` caps.
-      # 60 is that 40 plus slack, not a guess; raising it is not the fix if a
-      # stage starts running long.
-      WOODPECKER_DEFAULT_PIPELINE_TIMEOUT: "60"
-      WOODPECKER_MAX_PIPELINE_TIMEOUT: "90"
+      # a mix of commits. Staging within a round is parallel now, but the
+      # "build" step runs two rounds back to back -- the canary alone, then the
+      # rest of the fleet -- each capped at `timeout 40m` per host, so the
+      # budget has to cover both rounds rather than one. 100 is 2x40m plus
+      # slack for the "stage" step's own `timeout 10m` (staging never builds,
+      # so it is fast) and the "rollout" step's kickoff. Raising this again is
+      # not the fix if a build or stage step starts running long by itself --
+      # that is what the per-host `timeout` values are for.
+      WOODPECKER_DEFAULT_PIPELINE_TIMEOUT: "100"
+      WOODPECKER_MAX_PIPELINE_TIMEOUT: "120"
       # Supersede rather than queue. Renovate lands nix-touching commits in
       # bursts, and with one agent each push used to wait out the whole fleet
       # stage of the push before it before starting its own -- building commits

@@ -46,11 +46,23 @@
   runDir = "/run/${user}";
 
   stampFile = "${stateDir}/last-success";
+  # Rev of the generation this host last *staged* (promoted to
+  # /nix/var/nix/profiles/system), not merely built. Both the build step's
+  # backwards guard and the stage step's match check read this.
   lastRevFile = "${stateDir}/last-rev";
+  # Rev this host most recently built successfully, and a GC root pointing at
+  # that build's toplevel. Staging never rebuilds: it just promotes whatever
+  # these two agree on.
+  builtRevFile = "${stateDir}/built-rev";
+  builtSystemLink = "${stateDir}/built-system";
   repoDir = "${stateDir}/repo.git";
-  targetRevFile = "${runDir}/target-rev";
-  runLog = "${runDir}/last-run.log";
-  # Nix's internal-json event stream for the run in progress, and the arrival
+  # Consumed on read, same pattern for both stages: the caller writes the rev
+  # it wants acted on, then starts the corresponding unit.
+  buildTargetFile = "${runDir}/build-target-rev";
+  stageTargetFile = "${runDir}/stage-target-rev";
+  buildLog = "${runDir}/last-build.log";
+  stageLog = "${runDir}/last-stage.log";
+  # Nix's internal-json event stream for the build in progress, and the arrival
   # timestamps the follower records alongside it. Both are in the run dir
   # rather than the state dir because they describe one run and are replaced at
   # the start of the next; nothing reads them after the exporter has.
@@ -75,32 +87,65 @@
   # The full argv, shared verbatim between the sudoers entries and the trigger
   # script, so the two cannot drift. sudo matches the whole argv; a mismatch
   # would fail closed (the trigger is denied) rather than open.
-  selfupdateCommand = "${systemctl} start --wait nixos-selfupdate.service";
+  buildCommand = "${systemctl} start --wait nixos-selfupdate-build.service";
+  stageCommand = "${systemctl} start --wait nixos-selfupdate-stage.service";
   sentinelCommand = "${systemctl} start nixos-reboot-sentinel.service";
 
-  selfupdateScript = pkgs.writeShellApplication {
-    name = "nixos-selfupdate";
+  buildScript = pkgs.writeShellApplication {
+    name = "nixos-selfupdate-build";
     # gnugrep for `grep --line-buffered`, which the script's output filter uses;
     # busybox grep has no such flag and the unit's PATH is not guaranteed to put
     # GNU grep first.
     runtimeInputs = [pkgs.git pkgs.coreutils pkgs.gnugrep];
     runtimeEnv = {
       REPO_DIR = repoDir;
-      STAMP_FILE = stampFile;
       LAST_REV_FILE = lastRevFile;
-      TARGET_REV_FILE = targetRevFile;
-      RUN_LOG = runLog;
+      BUILT_REV_FILE = builtRevFile;
+      BUILT_SYSTEM_LINK = builtSystemLink;
+      TARGET_REV_FILE = buildTargetFile;
+      RUN_LOG = buildLog;
       BRANCH = branch;
       ATTRIBUTE = attribute;
       FLAKE_URLS = lib.concatStringsSep " " flakeUrls;
-      STALENESS_SECONDS = toString stalenessSeconds;
       NIX_LOG_JSON = nixLogJson;
       NIX_TIMINGS = nixTimings;
       BUILD_METRICS_FILE = buildMetricsFile;
       TEXTFILE_DIR = textfileDir;
       METRICS_CMD = lib.getExe buildMetricsScript;
     };
-    text = builtins.readFile ./selfupdate.sh;
+    text = builtins.readFile ./build.sh;
+  };
+
+  stageScript = pkgs.writeShellApplication {
+    name = "nixos-selfupdate-stage";
+    # nix-env comes from the unit's `path` (the running system's nix), same
+    # reasoning as nixos-selfupdate-build.service above.
+    runtimeInputs = [pkgs.git pkgs.coreutils];
+    runtimeEnv = {
+      REPO_DIR = repoDir;
+      BUILT_REV_FILE = builtRevFile;
+      BUILT_SYSTEM_LINK = builtSystemLink;
+      LAST_REV_FILE = lastRevFile;
+      STAMP_FILE = stampFile;
+      TARGET_REV_FILE = stageTargetFile;
+      RUN_LOG = stageLog;
+    };
+    text = builtins.readFile ./stage.sh;
+  };
+
+  # The fallback timer's only caller: nothing gates it on the rest of the
+  # fleet, so it can safely chain build straight into stage on this host alone.
+  fallbackScript = pkgs.writeShellApplication {
+    name = "nixos-selfupdate-fallback";
+    runtimeInputs = [pkgs.coreutils];
+    runtimeEnv = {
+      STAMP_FILE = stampFile;
+      BUILT_REV_FILE = builtRevFile;
+      STAGE_TARGET_FILE = stageTargetFile;
+      STALENESS_SECONDS = toString stalenessSeconds;
+      SYSTEMCTL = systemctl;
+    };
+    text = builtins.readFile ./fallback.sh;
   };
 
   sentinelScript = pkgs.writeShellApplication {
@@ -110,10 +155,10 @@
     text = builtins.readFile ./sentinel.sh;
   };
 
-  # Reads the JSON event stream nixos-rebuild leaves at nixLogJson and writes
-  # the "what did this run actually do" half of the metrics: how many
-  # derivations this host built itself, and how many paths it pulled from
-  # cache.nixos.org versus from a peer over the LAN.
+  # Reads the JSON event stream the build leaves at nixLogJson and writes the
+  # "what did this run actually do" half of the metrics: how many derivations
+  # this host built itself, and how many paths it pulled from cache.nixos.org
+  # versus from a peer over the LAN.
   #
   # Its own directory with a pyproject.toml so it is discovered like every
   # other Python project in the repo. flakeIgnore is the standard
@@ -141,14 +186,18 @@
     name = "deploybot-trigger";
     runtimeInputs = [pkgs.coreutils];
     runtimeEnv = {
-      STAMP_FILE = stampFile;
+      BUILT_REV_FILE = builtRevFile;
       LAST_REV_FILE = lastRevFile;
-      TARGET_REV_FILE = targetRevFile;
-      RUN_LOG = runLog;
+      STAMP_FILE = stampFile;
+      BUILD_TARGET_FILE = buildTargetFile;
+      BUILD_LOG = buildLog;
+      STAGE_TARGET_FILE = stageTargetFile;
+      STAGE_LOG = stageLog;
       SUDO = "/run/wrappers/bin/sudo";
-      SELFUPDATE_CMD = selfupdateCommand;
+      BUILD_CMD = buildCommand;
+      STAGE_CMD = stageCommand;
       SENTINEL_CMD = sentinelCommand;
-      # How many times the trigger may re-start the unit when it turns out to
+      # How many times the trigger may re-start a unit when it turns out to
       # have joined an update that was already running. Three covers the
       # realistic case -- a couple of pushes landing while a slow build runs --
       # without letting a host that is perpetually busy hang the pipeline.
@@ -178,8 +227,12 @@ in {
 
   config = lib.mkIf cfg.enable (lib.mkMerge [
     {
-      systemd.services.nixos-selfupdate = {
-        description = "Build this host's NixOS configuration from git and stage it for next boot";
+      # Builds this host's NixOS configuration from git and leaves the result as
+      # a GC-rooted symlink; it does not touch the system profile. Separate from
+      # staging (see docs/nixos-cd.md for why) so staging is never held up
+      # rebuilding something that already succeeded.
+      systemd.services.nixos-selfupdate-build = {
+        description = "Build this host's NixOS configuration from git";
         after = ["network-online.target"];
         wants = ["network-online.target"];
         # /run/current-system/sw first so nix and nixos-rebuild come from the
@@ -188,7 +241,7 @@ in {
         path = ["/run/current-system/sw"];
         serviceConfig = {
           Type = "oneshot";
-          ExecStart = lib.getExe selfupdateScript;
+          ExecStart = lib.getExe buildScript;
           CacheDirectory = "nixos-selfupdate";
           CacheDirectoryMode = "0755";
           # A cold build of a NixOS toplevel on these hosts is minutes, not
@@ -197,12 +250,46 @@ in {
         };
       };
 
-      # Fallback only. Persistent=true needs OnCalendar (systemd.timer(5): "this
-      # setting only has an effect on timers configured with OnCalendar="), which
-      # is also why this is not OnUnitActiveSec=7.5d -- that measures from the
-      # unit's last activation, an in-memory timestamp that resets every boot, so
-      # on hosts kured reboots regularly it would sit disarmed exactly when it is
-      # needed. The 7.5-day check lives in the service instead.
+      # Promotes a build this host already made to the next-boot profile. Never
+      # builds anything itself, so it is fast and safe to run as soon as this
+      # host's own build has succeeded.
+      systemd.services.nixos-selfupdate-stage = {
+        description = "Stage this host's most recent NixOS build for next boot";
+        path = ["/run/current-system/sw"];
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = lib.getExe stageScript;
+          CacheDirectory = "nixos-selfupdate";
+          CacheDirectoryMode = "0755";
+          # Activation runs the new generation's activation scripts, which can
+          # do real work (users, systemd units), but nothing here builds.
+          TimeoutStartSec = "10m";
+        };
+      };
+
+      # Fallback only, driven by the timer below. Chains build straight into
+      # stage on this one host; there is no fleet to gate against when nothing
+      # triggered CI in over a week.
+      systemd.services.nixos-selfupdate = {
+        description = "Fallback NixOS self-update when CI has not run one recently";
+        path = ["/run/current-system/sw"];
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = lib.getExe fallbackScript;
+          # `start --wait` on both nixos-selfupdate-build (2h) and
+          # nixos-selfupdate-stage (10m) blocks inside this unit, so its own
+          # timeout has to cover both in full or systemd can kill it mid-stage
+          # after a build that ran close to its own cap.
+          TimeoutStartSec = "2h15min";
+        };
+      };
+
+      # Persistent=true needs OnCalendar (systemd.timer(5): "this setting only
+      # has an effect on timers configured with OnCalendar="), which is also
+      # why this is not OnUnitActiveSec=7.5d -- that measures from the unit's
+      # last activation, an in-memory timestamp that resets every boot, so on
+      # hosts kured reboots regularly it would sit disarmed exactly when it is
+      # needed. The 7.5-day check lives in fallback.sh instead.
       systemd.timers.nixos-selfupdate = {
         description = "Fallback NixOS self-update when CI has not run one recently";
         wantedBy = ["timers.target"];
@@ -244,18 +331,18 @@ in {
       # of whether the CA key -- and thus the deploybot user -- exists yet.
       users.groups.${user} = {};
 
-      # Unconditionally create rundir: nixos-selfupdate.service writes RUN_LOG
-      # here on every run (timer fallback included), not just when the CI
+      # Unconditionally create rundir: the build and stage units write their
+      # logs here on every run (timer fallback included), not just when the CI
       # trigger account below is enabled. Making the directory conditional on
       # userCaKeyFile means that `tee` will write to a directory that doesn't
       # exist when userCaKeyFile is null, which causes the unit to fail.
       #
-      # The runDir has two files: TARGET_REV_FILE and RUN_LOG. TARGET_REV_FILE
-      # is written by the deploybot user and read by nixos-selfupdate.service
-      # running as root. RUN_LOG is written by nixos-selfupdate.service and
-      # read by deploybot. The permissions are setup so that deploybot can
-      # write TARGET_REV_FILE and read RUN_LOG, while the sticky bit prevents
-      # deploybot from deleting or renaming RUN_LOG.
+      # The runDir holds four files: the two *_TARGET_FILEs, written by the
+      # deploybot user and read by the corresponding unit running as root, and
+      # the two *_LOGs, written by those units and read by deploybot. The
+      # permissions are set up so that deploybot can write the target files and
+      # read the logs, while the sticky bit prevents deploybot from deleting or
+      # renaming a log out from under the unit still writing it.
       systemd.tmpfiles.rules = [
         "d ${runDir} 1770 root ${user} -"
         # Put the last build's metrics back in the textfile collector directory
@@ -268,7 +355,7 @@ in {
         "C ${textfileDir}/nixos_selfupdate_build.prom 0644 root root - ${buildMetricsFile}"
       ];
       # Cache Nix's fetcher, tarball and eval caches for the root user, which
-      # is the user who runs nixos-selfupdate.service.
+      # is the user who runs the build and stage units.
       environment.persistence."/cache".directories = [
         {
           directory = "/root/.cache/nix";
@@ -299,7 +386,11 @@ in {
           users = [user];
           commands = [
             {
-              command = selfupdateCommand;
+              command = buildCommand;
+              options = ["NOPASSWD"];
+            }
+            {
+              command = stageCommand;
               options = ["NOPASSWD"];
             }
             {

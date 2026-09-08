@@ -2,16 +2,17 @@
 # Identities for the NixOS continuous deployment path.
 #
 # Two consumers, deliberately separate:
-#   nixos-deploy   the .woodpecker/deploy-hosts.yaml step. Reads the deploybot
-#                  credential, stages every host, then hands off by creating a
-#                  rollout Job. It never waits for a reboot.
+#   nixos-deploy   the .woodpecker/deploy-hosts.yaml steps. Reads node CPU
+#                  counts to pick a canary, builds and stages every host, then
+#                  hands off by creating a rollout Job. It never waits for a
+#                  reboot.
 #   nixos-rollout  the Job that does wait. It walks the fleet in k3s upgrade
 #                  order, so it has to survive its own node being rebooted --
 #                  which a Woodpecker step cannot.
 #
-# Neither holds anything nix-related. All they can do is present a short-lived
-# SSH certificate to a login whose shell is a three-verb script; see
-# nix/modules/selfupdate.
+# Neither holds anything nix-related. All they can do is list nodes and present
+# a short-lived SSH certificate to a login whose shell is a four-verb script;
+# see nix/modules/selfupdate.
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -109,6 +110,31 @@ subjects:
 roleRef:
   kind: ClusterRole
   name: nixos-rollout-nodes
+  apiGroup: rbac.authorization.k8s.io
+---
+# Read-only, and only nodes: the build step reads each node's allocatable CPU
+# to pick the canary host to build on first. Nodes are cluster-scoped, so this
+# cannot be narrowed to the namespaced Role above.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nixos-deploy-nodes
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nixos-deploy-nodes
+subjects:
+  - kind: ServiceAccount
+    name: nixos-deploy
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: nixos-deploy-nodes
   apiGroup: rbac.authorization.k8s.io
 ---
 # Lets the SSH cert issuer in cert-system publish the short-lived credential

@@ -60,18 +60,20 @@ spec:
             summary: {{ "{{ $labels.instance }} has had a NixOS generation staged for 6h without rebooting" | quote }}
             description: {{ "A new system generation is staged but not booted. Either no rollout Job was created, or kured never got to this host. `kubectl -n woodpecker create job --from=cronjob/nixos-rollout nixos-rollout-manual` rolls it out." | quote }}
 
-        # The unit failed on the host. Distinct from drift: this catches the
-        # build that broke rather than the one that never arrived, and it catches
-        # the fallback timer's runs, which no pipeline is watching at all.
+        # One of the build/stage/fallback units failed on the host. Distinct
+        # from drift: this catches the build or stage that broke rather than
+        # the one that never arrived, and it catches the fallback timer's runs
+        # (nixos-selfupdate.service), which no pipeline is watching at all.
         - alert: NixosSelfupdateFailed
-          expr: node_systemd_unit_state{name="nixos-selfupdate.service", state="failed"} == 1
+          expr: |
+            node_systemd_unit_state{name=~"nixos-selfupdate(-build|-stage)?\\.service", state="failed"} == 1
           for: 5m
           labels:
             severity: warning
             component: nixos-cd
           annotations:
-            summary: {{ "nixos-selfupdate.service failed on {{ $labels.instance }}" | quote }}
-            description: {{ "The self-update unit is in a failed state. `journalctl -u nixos-selfupdate.service` on the host has the build output." | quote }}
+            summary: {{ "{{ $labels.name }} failed on {{ $labels.instance }}" | quote }}
+            description: {{ "A self-update unit is in a failed state. `journalctl -u` that unit name on the host has the build output." | quote }}
 
         # Nothing has updated this host in over a week. The host's own fallback
         # timer acts at 7.5 days, so crossing 8 means the fallback did not save
