@@ -50,6 +50,25 @@
   repoDir = "${stateDir}/repo.git";
   targetRevFile = "${runDir}/target-rev";
   runLog = "${runDir}/last-run.log";
+  # Nix's internal-json event stream for the run in progress, and the arrival
+  # timestamps the follower records alongside it. Both are in the run dir
+  # rather than the state dir because they describe one run and are replaced at
+  # the start of the next; nothing reads them after the exporter has.
+  #
+  # /run being tmpfs is the point, not an accident. Nix flushes one line per
+  # event, and while paths are being substituted that runs at a few hundred
+  # KB/s -- roughly 1.6% of the store bytes fetched -- onto a disk the build is
+  # already writing the store to. Keeping it in RAM costs nothing here: the log
+  # is truncated at the start of every run, and 1.6% of even a very large
+  # rollout is far short of /run's default 25%-of-RAM ceiling.
+  nixLogJson = "${runDir}/nix-log.json";
+  nixTimings = "${runDir}/nix-timings.txt";
+
+  # The build metrics themselves live in the state dir, which is under
+  # /var/cache and so survives the reboot every rollout ends with. The copy in
+  # the textfile collector directory does not, hence the tmpfiles rule below.
+  buildMetricsFile = "${stateDir}/nixos_selfupdate_build.prom";
+  textfileDir = config.services.textfileCollector.directory;
 
   systemctl = "${config.systemd.package}/bin/systemctl";
 
@@ -61,7 +80,10 @@
 
   selfupdateScript = pkgs.writeShellApplication {
     name = "nixos-selfupdate";
-    runtimeInputs = [pkgs.git pkgs.coreutils];
+    # gnugrep for `grep --line-buffered`, which the script's output filter uses;
+    # busybox grep has no such flag and the unit's PATH is not guaranteed to put
+    # GNU grep first.
+    runtimeInputs = [pkgs.git pkgs.coreutils pkgs.gnugrep];
     runtimeEnv = {
       REPO_DIR = repoDir;
       STAMP_FILE = stampFile;
@@ -72,6 +94,11 @@
       ATTRIBUTE = attribute;
       FLAKE_URLS = lib.concatStringsSep " " flakeUrls;
       STALENESS_SECONDS = toString stalenessSeconds;
+      NIX_LOG_JSON = nixLogJson;
+      NIX_TIMINGS = nixTimings;
+      BUILD_METRICS_FILE = buildMetricsFile;
+      TEXTFILE_DIR = textfileDir;
+      METRICS_CMD = lib.getExe buildMetricsScript;
     };
     text = builtins.readFile ./selfupdate.sh;
   };
@@ -83,13 +110,29 @@
     text = builtins.readFile ./sentinel.sh;
   };
 
+  # Reads the JSON event stream nixos-rebuild leaves at nixLogJson and writes
+  # the "what did this run actually do" half of the metrics: how many
+  # derivations this host built itself, and how many paths it pulled from
+  # cache.nixos.org versus from a peer over the LAN.
+  #
+  # Its own directory with a pyproject.toml so it is discovered like every
+  # other Python project in the repo. flakeIgnore is the standard
+  # black-compatibility set: writePython3Bin builds flake8's
+  # --ignore, which replaces the default ignore list rather than extending it,
+  # so W503/W504 would otherwise become active on things black actively emits.
+  # See ../../hosts/borg-2/zfs-textfile-exporter.nix, which explains this at
+  # length.
+  buildMetricsScript = pkgs.writers.writePython3Bin "nixos-selfupdate-build-metrics" {
+    flakeIgnore = ["E203" "E501" "W503" "W504"];
+  } (builtins.readFile ./build-metrics/nix_build_metrics.py);
+
   metricsScript = pkgs.writeShellApplication {
     name = "nixos-selfupdate-metrics";
     runtimeInputs = [pkgs.coreutils];
     runtimeEnv = {
       STAMP_FILE = stampFile;
       LAST_REV_FILE = lastRevFile;
-      TEXTFILE_DIR = config.services.textfileCollector.directory;
+      TEXTFILE_DIR = textfileDir;
     };
     text = builtins.readFile ./metrics.sh;
   };
@@ -215,6 +258,22 @@ in {
       # deploybot from deleting or renaming RUN_LOG.
       systemd.tmpfiles.rules = [
         "d ${runDir} 1770 root ${user} -"
+        # Put the last build's metrics back in the textfile collector directory
+        # after the root subvolume is rolled back on boot. `C` only copies when
+        # the destination is missing, so a fresher file written later in the
+        # boot is never overwritten. Deliberately scoped to this one file: the
+        # timer-driven writers in that directory rewrite themselves every few
+        # minutes, and restoring their last output would let a broken writer
+        # hide behind a stale reading.
+        "C ${textfileDir}/nixos_selfupdate_build.prom 0644 root root - ${buildMetricsFile}"
+      ];
+      # Cache Nix's fetcher, tarball and eval caches for the root user, which
+      # is the user who runs nixos-selfupdate.service.
+      environment.persistence."/cache".directories = [
+        {
+          directory = "/root/.cache/nix";
+          mode = "0700";
+        }
       ];
     }
 

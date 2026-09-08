@@ -1,0 +1,17 @@
+[project]
+name = "nix-build-metrics"
+version = "1.0.0"
+description = "Summarises a Nix json-log-path event stream as Prometheus node-exporter textfile metrics for nixos-selfupdate"
+requires-python = ">=3.11"
+# No runtime dependencies: the script is built with pkgs.writers.writePython3Bin
+# (see ../default.nix) and uses only the standard library.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

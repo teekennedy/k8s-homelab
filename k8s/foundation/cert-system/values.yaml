@@ -18,9 +18,9 @@ trust-manager:
 # OpenSSH user CA backing the deploybot login on the borg hosts.
 # See templates/deploybot-ssh-ca.yaml for why this is not a cert-manager issuer.
 deploybotSshCa:
-  # alpine/k8s ships kubectl; openssh-keygen is apk-installed at runtime.
-  # renovate: datasource=docker depName=alpine/k8s
-  image: alpine/k8s:1.37.0
+  # alpine/kubectl ships kubectl; openssh-keygen is apk-installed at runtime.
+  # renovate: datasource=docker depName=alpine/kubectl
+  image: alpine/kubectl:1.37.0
   caSecretName: deploybot-ssh-ca
   certSecretName: deploybot-ssh-cert
   # Namespace the short-lived credential is published into. The RBAC allowing

@@ -228,6 +228,15 @@
       "groupName": "root"
     },
     {
+      "description": "One PR for everything .woodpecker/deploy-hosts.yaml watches. Every commit touching these paths stages a NixOS build on all four borg hosts, and lock file maintenance is automerged, so ungrouped these land as three separate commits minutes apart on a Tuesday morning: the root flake.lock, nix/modules/packages/lenovo_sa120_fanspeed/flake.lock and nix/hosts/borg-2/zfs-exporter/uv.lock. That is how two deploy-hosts pipelines ended up staging on the same hosts at once, doubling every host's build and killing both on the 60m timeout. Grouped, they are one commit and one pipeline. Woodpecker's 'cancel previous pipelines' repo setting covers the same failure, but it is ticked by hand in the settings UI (docs/nixos-cd.md, one-time setup) and would not survive rebuilding the cluster -- this does. Keep this list in sync with that pipeline's when.path.include.",
+      "matchFileNames": [
+        "flake.nix",
+        "flake.lock",
+        "nix/**"
+      ],
+      "groupName": "nixos hosts"
+    },
+    {
       "description": "Give lock file maintenance PRs a title that identifies the lock file type and directory, instead of the generic default 'chore(deps): lock file maintenance' that's identical across every PR.",
       "matchManagers": [
         "nix"
@@ -256,14 +265,16 @@
       "commitMessageAction": "{{packageFileDir}} uv lock file maintenance"
     },
     {
-      "description": "Root flake.lock has an empty packageFileDir, so give it an explicit title instead of a leading space.",
+      "description": "Title the grouped nixos-hosts PR. It spans three package file directories, so the per-directory commitMessageAction rules above would otherwise each claim the title; and the root flake.lock has an empty packageFileDir, which rendered as a leading space.",
       "matchFileNames": [
-        "flake.lock"
+        "flake.nix",
+        "flake.lock",
+        "nix/**"
       ],
       "matchUpdateTypes": [
         "lockFileMaintenance"
       ],
-      "commitMessageAction": "root flake lock file maintenance"
+      "commitMessageAction": "nixos host lock file maintenance"
     },
     {
       "description": "Don't apply minimumReleaseAge to jellyfin image+appVersion so they stay grouped",

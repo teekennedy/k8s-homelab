@@ -76,7 +76,7 @@ func (pp *PythonProject) usable(container *dagger.Container) error {
 func (m *Homelab) PythonProjects(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 ) []*PythonProject {
 	var projects []*PythonProject
@@ -149,7 +149,7 @@ func (pp *PythonProject) Format(container *dagger.Container) *dagger.Directory {
 // +check
 func (m *Homelab) LintPython(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,
@@ -192,7 +192,7 @@ func (m *Homelab) LintPython(ctx context.Context,
 func (m *Homelab) FormatPython(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,
@@ -232,7 +232,7 @@ func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, pa
 // +check
 func (m *Homelab) TestPython(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,

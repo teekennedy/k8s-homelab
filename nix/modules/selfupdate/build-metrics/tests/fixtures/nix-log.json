@@ -1,0 +1,144 @@
+{"action":"start","id":339302416384,"level":4,"parent":0,"text":"evaluating derivation 'github:NixOS/nixpkgs/3ed67ec0a4d3c7ab4ae1f04f8ee8df07bfa506a2#cowsay'","type":0}
+{"action":"stop","id":339302416384}
+{"action":"start","id":339302416385,"level":6,"parent":0,"text":"querying info about missing paths","type":0}
+{"action":"start","fields":["/nix/store/a8drsw78z9qyzm3lkgv53qaayvxxl13v-cowsay-3.8.4","https://cache.nixos.org"],"id":339302416386,"level":4,"parent":0,"text":"querying info about '/nix/store/a8drsw78z9qyzm3lkgv53qaayvxxl13v-cowsay-3.8.4' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["/nix/store/y3gnlmc7k1kc0pavl117lvhccidxnmni-cowsay-3.8.4-man","https://cache.nixos.org"],"id":339302416387,"level":4,"parent":0,"text":"querying info about '/nix/store/y3gnlmc7k1kc0pavl117lvhccidxnmni-cowsay-3.8.4-man' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["https://cache.nixos.org/a8drsw78z9qyzm3lkgv53qaayvxxl13v.narinfo"],"id":339302416388,"level":4,"parent":339302416386,"text":"downloading 'https://cache.nixos.org/a8drsw78z9qyzm3lkgv53qaayvxxl13v.narinfo'","type":101}
+{"action":"start","fields":["https://cache.nixos.org/y3gnlmc7k1kc0pavl117lvhccidxnmni.narinfo"],"id":339302416389,"level":4,"parent":339302416387,"text":"downloading 'https://cache.nixos.org/y3gnlmc7k1kc0pavl117lvhccidxnmni.narinfo'","type":101}
+{"action":"result","fields":[499,499,0,0],"id":339302416389,"type":105}
+{"action":"stop","id":339302416387}
+{"action":"stop","id":339302416389}
+{"action":"result","fields":[645,645,0,0],"id":339302416388,"type":105}
+{"action":"stop","id":339302416386}
+{"action":"stop","id":339302416388}
+{"action":"start","fields":["/nix/store/zg8n2mf1md8q3k217z11w1lzy451f59z-perl-5.42.3","https://cache.nixos.org"],"id":339302416390,"level":4,"parent":0,"text":"querying info about '/nix/store/zg8n2mf1md8q3k217z11w1lzy451f59z-perl-5.42.3' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["https://cache.nixos.org/zg8n2mf1md8q3k217z11w1lzy451f59z.narinfo"],"id":339302416391,"level":4,"parent":339302416390,"text":"downloading 'https://cache.nixos.org/zg8n2mf1md8q3k217z11w1lzy451f59z.narinfo'","type":101}
+{"action":"result","fields":[746,746,0,0],"id":339302416391,"type":105}
+{"action":"stop","id":339302416390}
+{"action":"stop","id":339302416391}
+{"action":"start","fields":["/nix/store/85k56vdxxb75xmgvxj4zhaawyafkchwh-coreutils-9.11","https://cache.nixos.org"],"id":339302416392,"level":4,"parent":0,"text":"querying info about '/nix/store/85k56vdxxb75xmgvxj4zhaawyafkchwh-coreutils-9.11' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["/nix/store/8gv5adkfjh3fllh3p54y1zislnc5h5qv-libxcrypt-4.5.2","https://cache.nixos.org"],"id":339302416393,"level":4,"parent":0,"text":"querying info about '/nix/store/8gv5adkfjh3fllh3p54y1zislnc5h5qv-libxcrypt-4.5.2' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["https://cache.nixos.org/85k56vdxxb75xmgvxj4zhaawyafkchwh.narinfo"],"id":339302416394,"level":4,"parent":339302416392,"text":"downloading 'https://cache.nixos.org/85k56vdxxb75xmgvxj4zhaawyafkchwh.narinfo'","type":101}
+{"action":"start","fields":["https://cache.nixos.org/8gv5adkfjh3fllh3p54y1zislnc5h5qv.narinfo"],"id":339302416395,"level":4,"parent":339302416393,"text":"downloading 'https://cache.nixos.org/8gv5adkfjh3fllh3p54y1zislnc5h5qv.narinfo'","type":101}
+{"action":"result","fields":[750,750,0,0],"id":339302416394,"type":105}
+{"action":"stop","id":339302416392}
+{"action":"stop","id":339302416394}
+{"action":"start","fields":["/nix/store/35n0fkfxgps5l598q0ffim7531icsqr5-gmp-with-cxx-6.3.0","https://cache.nixos.org"],"id":339302416396,"level":4,"parent":0,"text":"querying info about '/nix/store/35n0fkfxgps5l598q0ffim7531icsqr5-gmp-with-cxx-6.3.0' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["/nix/store/d1yiaq7bi8vrypdz8zx89lvlvc8w7m9b-acl-2.4.0","https://cache.nixos.org"],"id":339302416397,"level":4,"parent":0,"text":"querying info about '/nix/store/d1yiaq7bi8vrypdz8zx89lvlvc8w7m9b-acl-2.4.0' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["/nix/store/jbj54csimxfzdysyikvyyakkiazahmy7-attr-2.6.0","https://cache.nixos.org"],"id":339302416398,"level":4,"parent":0,"text":"querying info about '/nix/store/jbj54csimxfzdysyikvyyakkiazahmy7-attr-2.6.0' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["https://cache.nixos.org/35n0fkfxgps5l598q0ffim7531icsqr5.narinfo"],"id":339302416399,"level":4,"parent":339302416396,"text":"downloading 'https://cache.nixos.org/35n0fkfxgps5l598q0ffim7531icsqr5.narinfo'","type":101}
+{"action":"start","fields":["https://cache.nixos.org/d1yiaq7bi8vrypdz8zx89lvlvc8w7m9b.narinfo"],"id":339302416400,"level":4,"parent":339302416397,"text":"downloading 'https://cache.nixos.org/d1yiaq7bi8vrypdz8zx89lvlvc8w7m9b.narinfo'","type":101}
+{"action":"start","fields":["https://cache.nixos.org/jbj54csimxfzdysyikvyyakkiazahmy7.narinfo"],"id":339302416401,"level":4,"parent":339302416398,"text":"downloading 'https://cache.nixos.org/jbj54csimxfzdysyikvyyakkiazahmy7.narinfo'","type":101}
+{"action":"result","fields":[612,612,0,0],"id":339302416395,"type":105}
+{"action":"stop","id":339302416393}
+{"action":"stop","id":339302416395}
+{"action":"result","fields":[670,670,0,0],"id":339302416399,"type":105}
+{"action":"stop","id":339302416396}
+{"action":"stop","id":339302416399}
+{"action":"result","fields":[597,597,0,0],"id":339302416401,"type":105}
+{"action":"stop","id":339302416398}
+{"action":"stop","id":339302416401}
+{"action":"result","fields":[594,594,0,0],"id":339302416400,"type":105}
+{"action":"stop","id":339302416397}
+{"action":"stop","id":339302416400}
+{"action":"stop","id":339302416385}
+{"action":"msg","level":3,"msg":"these 8 paths will be fetched (14.1 MiB download, 59.7 MiB unpacked):"}
+{"action":"msg","level":3,"msg":"  /nix/store/d1yiaq7bi8vrypdz8zx89lvlvc8w7m9b-acl-2.4.0"}
+{"action":"msg","level":3,"msg":"  /nix/store/jbj54csimxfzdysyikvyyakkiazahmy7-attr-2.6.0"}
+{"action":"msg","level":3,"msg":"  /nix/store/85k56vdxxb75xmgvxj4zhaawyafkchwh-coreutils-9.11"}
+{"action":"msg","level":3,"msg":"  /nix/store/a8drsw78z9qyzm3lkgv53qaayvxxl13v-cowsay-3.8.4"}
+{"action":"msg","level":3,"msg":"  /nix/store/y3gnlmc7k1kc0pavl117lvhccidxnmni-cowsay-3.8.4-man"}
+{"action":"msg","level":3,"msg":"  /nix/store/35n0fkfxgps5l598q0ffim7531icsqr5-gmp-with-cxx-6.3.0"}
+{"action":"msg","level":3,"msg":"  /nix/store/8gv5adkfjh3fllh3p54y1zislnc5h5qv-libxcrypt-4.5.2"}
+{"action":"msg","level":3,"msg":"  /nix/store/zg8n2mf1md8q3k217z11w1lzy451f59z-perl-5.42.3"}
+{"action":"start","id":339302416402,"level":0,"parent":0,"text":"","type":102}
+{"action":"start","id":339302416403,"level":0,"parent":0,"text":"","type":104}
+{"action":"start","id":339302416404,"level":0,"parent":0,"text":"","type":103}
+{"action":"start","fields":["/nix/store/y3gnlmc7k1kc0pavl117lvhccidxnmni-cowsay-3.8.4-man","https://cache.nixos.org"],"id":339302416405,"level":0,"parent":0,"text":"","type":108}
+{"action":"start","fields":["/nix/store/y3gnlmc7k1kc0pavl117lvhccidxnmni-cowsay-3.8.4-man","https://cache.nixos.org","local"],"id":339302416406,"level":3,"parent":339302416405,"text":"copying path '/nix/store/y3gnlmc7k1kc0pavl117lvhccidxnmni-cowsay-3.8.4-man' from 'https://cache.nixos.org'","type":100}
+{"action":"start","fields":["/nix/store/8gv5adkfjh3fllh3p54y1zislnc5h5qv-libxcrypt-4.5.2","https://cache.nixos.org"],"id":339302416407,"level":0,"parent":0,"text":"","type":108}
+{"action":"start","fields":["/nix/store/8gv5adkfjh3fllh3p54y1zislnc5h5qv-libxcrypt-4.5.2","https://cache.nixos.org","local"],"id":339302416408,"level":3,"parent":339302416407,"text":"copying path '/nix/store/8gv5adkfjh3fllh3p54y1zislnc5h5qv-libxcrypt-4.5.2' from 'https://cache.nixos.org'","type":100}
+{"action":"start","fields":["https://cache.nixos.org/nar/1wch39acwjmyrdy1p5qgkmnd9km2sn0ji4a4zi4ib3mzlrnkc0z3.nar.zst"],"id":339302416409,"level":4,"parent":339302416406,"text":"downloading 'https://cache.nixos.org/nar/1wch39acwjmyrdy1p5qgkmnd9km2sn0ji4a4zi4ib3mzlrnkc0z3.nar.zst'","type":101}
+{"action":"start","fields":["/nix/store/d1yiaq7bi8vrypdz8zx89lvlvc8w7m9b-acl-2.4.0","https://cache.nixos.org"],"id":339302416410,"level":0,"parent":0,"text":"","type":108}
+{"action":"start","fields":["https://cache.nixos.org/nar/0c3fa2bavsajddcx2l7gzh0lkr0r06j176zr3mvm5pxqfbz37hbp.nar.zst"],"id":339302416411,"level":4,"parent":339302416408,"text":"downloading 'https://cache.nixos.org/nar/0c3fa2bavsajddcx2l7gzh0lkr0r06j176zr3mvm5pxqfbz37hbp.nar.zst'","type":101}
+{"action":"start","fields":["/nix/store/d1yiaq7bi8vrypdz8zx89lvlvc8w7m9b-acl-2.4.0","https://cache.nixos.org","local"],"id":339302416412,"level":3,"parent":339302416410,"text":"copying path '/nix/store/d1yiaq7bi8vrypdz8zx89lvlvc8w7m9b-acl-2.4.0' from 'https://cache.nixos.org'","type":100}
+{"action":"start","fields":["/nix/store/jbj54csimxfzdysyikvyyakkiazahmy7-attr-2.6.0","https://cache.nixos.org"],"id":339302416413,"level":0,"parent":0,"text":"","type":108}
+{"action":"start","fields":["/nix/store/35n0fkfxgps5l598q0ffim7531icsqr5-gmp-with-cxx-6.3.0","https://cache.nixos.org"],"id":339302416414,"level":0,"parent":0,"text":"","type":108}
+{"action":"start","fields":["/nix/store/35n0fkfxgps5l598q0ffim7531icsqr5-gmp-with-cxx-6.3.0","https://cache.nixos.org","local"],"id":339302416415,"level":3,"parent":339302416414,"text":"copying path '/nix/store/35n0fkfxgps5l598q0ffim7531icsqr5-gmp-with-cxx-6.3.0' from 'https://cache.nixos.org'","type":100}
+{"action":"start","fields":["/nix/store/jbj54csimxfzdysyikvyyakkiazahmy7-attr-2.6.0","https://cache.nixos.org","local"],"id":339302416416,"level":3,"parent":339302416413,"text":"copying path '/nix/store/jbj54csimxfzdysyikvyyakkiazahmy7-attr-2.6.0' from 'https://cache.nixos.org'","type":100}
+{"action":"start","fields":["https://cache.nixos.org/nar/1qrfqqkagzlcddm5zsgah7paaqp2qv4djqwd5qfw0g09y2r1202a.nar.zst"],"id":339302416417,"level":4,"parent":339302416415,"text":"downloading 'https://cache.nixos.org/nar/1qrfqqkagzlcddm5zsgah7paaqp2qv4djqwd5qfw0g09y2r1202a.nar.zst'","type":101}
+{"action":"start","fields":["https://cache.nixos.org/nar/1ixc0hpcxyvfi5j8bjvcvh97ibszi8811viysk5mp82zz73dcp2w.nar.zst"],"id":339302416418,"level":4,"parent":339302416412,"text":"downloading 'https://cache.nixos.org/nar/1ixc0hpcxyvfi5j8bjvcvh97ibszi8811viysk5mp82zz73dcp2w.nar.zst'","type":101}
+{"action":"start","fields":["https://cache.nixos.org/nar/17dfp7k77xspkhmry24nh8pq4kzbhb3pp4dq21pmj4rf0xlvpncb.nar.zst"],"id":339302416419,"level":4,"parent":339302416416,"text":"downloading 'https://cache.nixos.org/nar/17dfp7k77xspkhmry24nh8pq4kzbhb3pp4dq21pmj4rf0xlvpncb.nar.zst'","type":101}
+{"action":"result","fields":[3670,3670,0,0],"id":339302416409,"type":105}
+{"action":"stop","id":339302416409}
+{"action":"result","fields":[4416,4416,0,0],"id":339302416406,"type":105}
+{"action":"stop","id":339302416406}
+{"action":"stop","id":339302416405}
+{"action":"result","fields":[80858,80858,0,0],"id":339302416411,"type":105}
+{"action":"stop","id":339302416411}
+{"action":"result","fields":[159224,159224,0,0],"id":339302416408,"type":105}
+{"action":"stop","id":339302416408}
+{"action":"stop","id":339302416407}
+{"action":"result","fields":[21067,21067,0,0],"id":339302416419,"type":105}
+{"action":"stop","id":339302416419}
+{"action":"result","fields":[133240,133240,0,0],"id":339302416416,"type":105}
+{"action":"stop","id":339302416416}
+{"action":"stop","id":339302416413}
+{"action":"result","fields":[38201,38201,0,0],"id":339302416418,"type":105}
+{"action":"stop","id":339302416418}
+{"action":"result","fields":[158576,158576,0,0],"id":339302416412,"type":105}
+{"action":"stop","id":339302416412}
+{"action":"stop","id":339302416410}
+{"action":"result","fields":[297710,297710,0,0],"id":339302416417,"type":105}
+{"action":"stop","id":339302416417}
+{"action":"result","fields":[670384,670384,0,0],"id":339302416415,"type":105}
+{"action":"stop","id":339302416415}
+{"action":"stop","id":339302416414}
+{"action":"start","fields":["/nix/store/85k56vdxxb75xmgvxj4zhaawyafkchwh-coreutils-9.11","https://cache.nixos.org"],"id":339302416420,"level":0,"parent":0,"text":"","type":108}
+{"action":"start","fields":["/nix/store/85k56vdxxb75xmgvxj4zhaawyafkchwh-coreutils-9.11","https://cache.nixos.org","local"],"id":339302416421,"level":3,"parent":339302416420,"text":"copying path '/nix/store/85k56vdxxb75xmgvxj4zhaawyafkchwh-coreutils-9.11' from 'https://cache.nixos.org'","type":100}
+{"action":"start","fields":["https://cache.nixos.org/nar/0n8gx67bwpvszbhz555pghkdf5r7bnmz0cph415619f5vr63fxy1.nar.zst"],"id":339302416422,"level":4,"parent":339302416421,"text":"downloading 'https://cache.nixos.org/nar/0n8gx67bwpvszbhz555pghkdf5r7bnmz0cph415619f5vr63fxy1.nar.zst'","type":101}
+{"action":"result","fields":[792675,792675,0,0],"id":339302416422,"type":105}
+{"action":"stop","id":339302416422}
+{"action":"result","fields":[1914128,1914128,0,0],"id":339302416421,"type":105}
+{"action":"stop","id":339302416421}
+{"action":"stop","id":339302416420}
+{"action":"start","fields":["/nix/store/zg8n2mf1md8q3k217z11w1lzy451f59z-perl-5.42.3","https://cache.nixos.org"],"id":339302416423,"level":0,"parent":0,"text":"","type":108}
+{"action":"start","fields":["/nix/store/zg8n2mf1md8q3k217z11w1lzy451f59z-perl-5.42.3","https://cache.nixos.org","local"],"id":339302416424,"level":3,"parent":339302416423,"text":"copying path '/nix/store/zg8n2mf1md8q3k217z11w1lzy451f59z-perl-5.42.3' from 'https://cache.nixos.org'","type":100}
+{"action":"start","fields":["https://cache.nixos.org/nar/124g3cywjb9fczh79rwmq4rrc27axa6ycx5c1cb0hanzj74n1m12.nar.zst"],"id":339302416425,"level":4,"parent":339302416424,"text":"downloading 'https://cache.nixos.org/nar/124g3cywjb9fczh79rwmq4rrc27axa6ycx5c1cb0hanzj74n1m12.nar.zst'","type":101}
+{"action":"result","fields":[13563290,13563290,0,0],"id":339302416425,"type":105}
+{"action":"stop","id":339302416425}
+{"action":"result","fields":[59505896,59505896,0,0],"id":339302416424,"type":105}
+{"action":"stop","id":339302416424}
+{"action":"stop","id":339302416423}
+{"action":"start","fields":["/nix/store/a8drsw78z9qyzm3lkgv53qaayvxxl13v-cowsay-3.8.4","https://cache.nixos.org"],"id":339302416426,"level":0,"parent":0,"text":"","type":108}
+{"action":"start","fields":["/nix/store/a8drsw78z9qyzm3lkgv53qaayvxxl13v-cowsay-3.8.4","https://cache.nixos.org","local"],"id":339302416427,"level":3,"parent":339302416426,"text":"copying path '/nix/store/a8drsw78z9qyzm3lkgv53qaayvxxl13v-cowsay-3.8.4' from 'https://cache.nixos.org'","type":100}
+{"action":"start","fields":["https://cache.nixos.org/nar/05ljmg88vcqa0gwmj6psdb20dqw243lldkkrbpj5rdf2x4w82c60.nar.zst"],"id":339302416428,"level":4,"parent":339302416427,"text":"downloading 'https://cache.nixos.org/nar/05ljmg88vcqa0gwmj6psdb20dqw243lldkkrbpj5rdf2x4w82c60.nar.zst'","type":101}
+{"action":"result","fields":[12773,12773,0,0],"id":339302416428,"type":105}
+{"action":"stop","id":339302416428}
+{"action":"result","fields":[48032,48032,0,0],"id":339302416427,"type":105}
+{"action":"stop","id":339302416427}
+{"action":"stop","id":339302416426}
+{"action":"result","fields":[0,0,0,0],"id":339302416403,"type":105}
+{"action":"result","fields":[8,8,0,0],"id":339302416404,"type":105}
+{"action":"stop","id":339302416404}
+{"action":"stop","id":339302416403}
+{"action":"stop","id":339302416402}
+{"action":"start","id":412316860416,"level":6,"parent":0,"text":"querying info about missing paths","type":0}
+{"action":"start","fields":["/nix/store/rv37hsnw19fdxv6fainffkbdq3hpn2rq-nixos-selfupdate-metrics-probe","https://cache.nixos.org"],"id":412316860417,"level":4,"parent":0,"text":"querying info about '/nix/store/rv37hsnw19fdxv6fainffkbdq3hpn2rq-nixos-selfupdate-metrics-probe' on 'https://cache.nixos.org'","type":109}
+{"action":"start","fields":["https://cache.nixos.org/rv37hsnw19fdxv6fainffkbdq3hpn2rq.narinfo"],"id":412316860418,"level":4,"parent":412316860417,"text":"downloading 'https://cache.nixos.org/rv37hsnw19fdxv6fainffkbdq3hpn2rq.narinfo'","type":101}
+{"action":"result","fields":[3,3,0,0],"id":412316860418,"type":105}
+{"action":"stop","id":412316860417}
+{"action":"stop","id":412316860418}
+{"action":"stop","id":412316860416}
+{"action":"msg","level":3,"msg":"this derivation will be built:"}
+{"action":"msg","level":3,"msg":"  /nix/store/f1kwvg7hfbm2zxy3b6qcb7arznv6v96p-nixos-selfupdate-metrics-probe.drv"}
+{"action":"start","id":412316860419,"level":0,"parent":0,"text":"","type":102}
+{"action":"start","id":412316860420,"level":0,"parent":0,"text":"","type":104}
+{"action":"start","id":412316860421,"level":0,"parent":0,"text":"","type":103}
+{"action":"start","fields":["/nix/store/f1kwvg7hfbm2zxy3b6qcb7arznv6v96p-nixos-selfupdate-metrics-probe.drv","",1,1],"id":412316860422,"level":3,"parent":0,"text":"building '/nix/store/f1kwvg7hfbm2zxy3b6qcb7arznv6v96p-nixos-selfupdate-metrics-probe.drv'","type":105}
+{"action":"result","fields":[1,2,0,0],"id":412316860420,"type":105}
+{"action":"result","fields":[0,0,0,0],"id":412316860421,"type":105}
+{"action":"stop","id":412316860422}
+{"action":"stop","id":412316860421}
+{"action":"stop","id":412316860420}
+{"action":"stop","id":412316860419}

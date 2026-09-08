@@ -207,11 +207,11 @@
                   [
                     self.nixosModules.builders
                     {
-                      # Builder provider only. Accept builds but do not
-                      # forward them, preventing infinite forwarding loops.
+                      # Allow borg hosts to download already-built packages
+                      # from other members of the cluster.
                       nix.builders = {
                         cluster = "borg";
-                        remoteClusters = [];
+                        substituteFromClusters = ["borg"];
                       };
                     }
                     ./nix/hosts/common

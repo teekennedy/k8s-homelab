@@ -1,7 +1,8 @@
 # NixOS continuous deployment
 
-Pushes to `main` that touch flake-related files roll out to the borg hosts
-automatically, reducing toil.
+Pushes to `main` that touch a NixOS configuration roll out automatically. CI
+only triggers the rollout; each host fetches, builds, and activates its own
+updated derivation, so CI never needs privileged access to any host.
 
 ## Overview
 
@@ -22,10 +23,7 @@ The host itself handles building and activating the new NixOS generation.
 The systemd unit `nixos-selfupdate.service` clones the repo, checks out the
 deployment sha set by Woodpecker (defaults to main) builds this host's
 `nixosConfigurations` attribute, and runs `nixos-rebuild boot` to activate it
-on the next boot.
-
-
-CI never builds anything and never supplies any code.
+on the next boot. CI never builds anything and never supplies any code.
 
 ## Design
 
@@ -64,12 +62,38 @@ single host rather than the sum of four. Sequentially it exceeded the pipeline
 timeout on a nixpkgs bump and was killed partway through the fleet. Only reboot
 order matters, and that belongs to the rollout Job.
 
+**The hosts are binary caches for each other.** They share a nixpkgs pin and
+most of a system closure, so the same paths were being built or downloaded four
+times over. `nix.builders.substituteFromClusters` (see `nix/modules/builders`)
+points each host at its three peers as substituters, ahead of cache.nixos.org
+because the transfer is local. This is *not* the setting that caused the build
+delegation ring: `remoteClusters`, which hands builds to peers, stays empty. A
+substituter can only answer for paths it already has, so a miss falls through to
+a local build rather than to another hop.
+
+Staging in parallel means the hosts race and mostly miss each other's caches
+anyway. Staging one host first and then the rest in parallel would collect the
+win — one host pays for the build, three copy it over the LAN — at the cost of
+a longer step. `nixos_selfupdate_build_*` below is there to say whether that
+trade is worth making before it is made.
+
 **Superseded pipelines are cancelled, not queued.**
 `WOODPECKER_DEFAULT_CANCEL_PREVIOUS_PIPELINE_EVENTS` includes `push`, so a newer
 nix-touching commit kills the pipeline for the older one instead of leaving it to
 build a commit that is already out of date. Note this does not stop a build
 already running on a host: the unit runs under systemd, not under the ssh
 session, so it finishes on its own. That is what the backwards guard is for.
+
+**Renovate lands one commit, not three.** Cancellation above is the real fix for
+overlapping pipelines, but it is a per-repo setting ticked by hand in the
+Woodpecker UI (see one-time setup below), so it does not survive rebuilding the
+cluster. The second layer is in `renovate.json`: everything under this
+pipeline's `when.path.include` — the root flake, the `lenovo_sa120_fanspeed`
+flake and the `zfs-exporter` uv lock — is grouped into a single `nixos hosts`
+PR. Ungrouped and automerged, those arrive as separate commits minutes apart,
+which is how two pipelines once staged the same four hosts at the same time,
+gave every host two concurrent nix builds, and killed each other on the 60m
+timeout. Keep that rule's file list in sync with `when.path.include`.
 
 **Staging and rebooting are separate.** A running pipeline pod fires the
 `WoodpeckerPipelineRunning` gate, which blocks kured so a drain cannot kill the
@@ -147,12 +171,60 @@ kubectl -n woodpecker create job --from=cronjob/nixos-rollout nixos-rollout-manu
 kubectl -n woodpecker logs -f job/nixos-rollout-manual
 ```
 
-Metrics land in the node-exporter textfile collector and are refreshed every
-5 minutes:
+Metrics land in the node-exporter textfile collector. `nixos_selfupdate.prom`
+describes where the host *is* and is refreshed every 5 minutes by
+`metrics.sh`:
 
 - `nixos_selfupdate_last_success_timestamp_seconds`
 - `nixos_selfupdate_reboot_pending`
 - `nixos_selfupdate_info{rev,booted_system,staged_system}`
+
+`nixos_selfupdate_build.prom` describes what the last build *did*, and is
+written once per run by `build-metrics/nix_build_metrics.py`:
+
+- `nixos_selfupdate_build_duration_seconds`, `..._success`
+- `nixos_selfupdate_build_paths_built{machine}` — `machine="local"` is this host
+- `nixos_selfupdate_build_paths_substituted{substituter}`
+- `nixos_selfupdate_build_substituted_bytes{substituter}` — into the store
+- `nixos_selfupdate_build_downloaded_bytes{substituter}` — over the wire
+- `nixos_selfupdate_build_seconds{machine}` — time spent building
+- `nixos_selfupdate_build_substitute_seconds{substituter}` — time spent fetching
+- `nixos_selfupdate_build_timings_available`, `..._parse_errors` — see below
+
+The `substituter` label is what separates cache.nixos.org from a peer, so these
+answer whether peer substitution is earning its keep — bytes over seconds gives
+the throughput each substituter actually delivered — and
+`node_textfile_mtime_seconds{file="nixos_selfupdate_build.prom"}` says how old
+the answer is.
+
+The numbers come from `json-log-path`, which upstream marks internal and does
+not promise to keep stable (NixOS/nix#13935), so the parser never fails a
+build over an event it does not recognise — it counts it in `..._parse_errors`
+and carries on. `validate-nix-build-metrics` (see
+`nix/modules/selfupdate/build-metrics/`) exercises the parser and its test
+suite against a real Nix build in CI, so a format change shows up on the
+Renovate PR that bumps the Nix image rather than only on the fleet.
+
+Nix's event stream carries no timestamps, so a follower
+(`nix_build_metrics.py timings`) tails the log alongside the build, recording
+when each activity's start and stop *arrived*; the report pass joins those
+back on by activity id. It polls a plain file every 100ms rather than watching
+a named pipe or inotify — a pipe would hang the build if the follower were
+late, dead, or backed up, and a measured comparison showed inotify waking the
+follower 150,891 times over one 25-second build against 296 for the poll loop,
+for the same 3,320 records. A follower that never ran (or died) costs only
+timings, which is why `..._timings_available` exists rather than reporting
+zero seconds. Durations are per-activity and overlap, so they can exceed
+`duration_seconds`.
+
+The log lives in `/run/deploybot/` (tmpfs), sized at roughly 1.6% of the store
+bytes substituted — proportional to substitution, not compilation — so it
+never comes close to memory pressure. It is truncated at the start of every
+run. The metrics themselves are written to `/var/cache/nixos-selfupdate/`,
+which is persisted, and published into the (unpersisted) textfile collector
+directory; a `systemd-tmpfiles` `C` rule restores the persisted copy after a
+rollback so the last build's numbers survive the reboot every rollout ends
+with.
 
 Alerting is on the fleet, not on the pipeline, because pipeline status does not
 describe where the fleet ended up: a pipeline killed by its own timeout is
@@ -187,10 +259,13 @@ four ways this goes wrong, and Alertmanager routes them to Discord by default:
 | what | where |
 |---|---|
 | host module, scripts | `nix/modules/selfupdate/` |
+| build metrics parser | `nix/modules/selfupdate/build-metrics/` |
+| peer substituters | `nix/modules/builders/` |
 | SSH CA + issuer | `k8s/foundation/cert-system/templates/deploybot-ssh-ca.yaml` |
 | RBAC, rollout job, netpol | `k8s/platform/woodpecker/templates/` |
 | rollout script, known_hosts | `k8s/platform/woodpecker/files/` |
 | kured gate alert | `k8s/foundation/kured/templates/prometheus-rule-woodpecker.yaml` |
 | rollout alerts | `k8s/platform/woodpecker/templates/prometheus-rule-nixos-cd.yaml` |
 | pipeline | `.woodpecker/deploy-hosts.yaml` |
+| update grouping | `renovate.json` (`nixos hosts` rule) |
 | setup helpers | `scripts/setup-ssh-ca.sh`, `scripts/update-known-hosts.sh` |

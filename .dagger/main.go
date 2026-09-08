@@ -13,6 +13,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"runtime"
@@ -20,6 +21,9 @@ import (
 
 	"dagger/homelab/internal/dagger"
 )
+
+//go:embed scripts/nix-build-metrics-probe.sh
+var nixBuildMetricsProbe string
 
 // Homelab is the main Dagger module for k8s-homelab CI/CD
 type Homelab struct {
@@ -137,9 +141,13 @@ func (m *Homelab) ValidateNix(ctx context.Context,
 	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"]
 	source *dagger.Directory,
 	// +optional
-	paths []string, //nolint:unparam // accepted for --paths uniformity across +check functions; flake check always checks the whole tree
+	container *dagger.Container,
 ) (string, error) {
-	_, err := nixContainer().
+	if container == nil {
+		container = nixContainer()
+	}
+
+	_, err := container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "flake", "check", "--no-build"}).
@@ -149,6 +157,48 @@ func (m *Homelab) ValidateNix(ctx context.Context,
 	}
 
 	return "Nix flake validation passed", nil
+}
+
+// ValidateNixBuildMetrics runs a real Nix build through the selfupdate metrics
+// parser's Python test suite, so a Nix upgrade that changes the internal-json
+// event stream (NixOS/nix#13935) is caught here instead of only on a host.
+// +check
+func (m *Homelab) ValidateNixBuildMetrics(ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!flake.lock", "!nix/modules/selfupdate/build-metrics/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
+	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
+) (string, error) {
+	const project = "nix/modules/selfupdate/build-metrics"
+
+	probe := nixContainer().
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src").
+		WithNewFile("/probe.sh", nixBuildMetricsProbe, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
+		WithExec([]string{"/probe.sh"})
+
+	if container == nil {
+		container = m.ciContainer()
+	}
+
+	_, err := container.
+		WithMountedDirectory("/src", source.Directory(project)).
+		WithMountedFile("/tmp/nix-log.json", probe.File("/out/nix-log.json")).
+		WithMountedFile("/tmp/timings.txt", probe.File("/out/timings.txt")).
+		WithWorkdir("/src").
+		WithEnvVariable("NIX_BUILD_METRICS_LOG", "/tmp/nix-log.json").
+		WithEnvVariable("NIX_BUILD_METRICS_TIMINGS", "/tmp/timings.txt").
+		WithExec([]string{"uv", "run", "--no-cache", "--link-mode", "copy", "pytest"}).
+		Sync(ctx)
+	if err != nil {
+		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			return "", fmt.Errorf("nix build metrics parser failed:\n%s%s", execErr.Stdout, execErr.Stderr)
+		}
+		return "", fmt.Errorf("nix build metrics parser failed: %w", err)
+	}
+
+	return "Nix build metrics parser validated", nil
 }
 
 // ValidateWoodpecker lints Woodpecker CI pipeline configuration files
