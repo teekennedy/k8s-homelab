@@ -649,7 +649,6 @@ app-template:
         lldap:
           image:
             repository: ghcr.io/lldap/lldap
-            # TODO make sure renovatebot can update this
             tag: "2026-08-28-alpine-rootless"
             pullPolicy: IfNotPresent
           env:
