@@ -43,6 +43,15 @@ woodpecker:
       # Only deploy-hosts.yaml runs on push: ci.yaml is pull_request and
       # dagger-cache-prune.yaml is manual, so neither is affected.
       WOODPECKER_DEFAULT_CANCEL_PREVIOUS_PIPELINE_EVENTS: "pull_request, push"
+      # No pipeline here uses `services:` or `detach:` steps, so there's
+      # nothing that could start failing by turning this on ahead of v4.0.0.
+      WOODPECKER_FORCE_IGNORE_SERVICE_FAILURE: "false"
+      WOODPECKER_GRPC_SECRET:
+        valueFrom:
+          secretKeyRef:
+            name: woodpecker-grpc-secret
+            key: WOODPECKER_GRPC_SECRET
+            optional: false
     extraSecretNamesForEnvFrom:
       - woodpecker-default-agent-secret
       # WOODPECKER_FORGEJO_CLIENT / _SECRET, written by the forgejo-resources
