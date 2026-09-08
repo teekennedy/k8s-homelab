@@ -28,16 +28,13 @@ spec:
     - name: nixos-cd
       interval: 1m
       rules:
-        # The fleet should converge on one commit. It briefly does not while a
-        # stage is in flight, which is why this waits an hour -- longer than the
-        # 50m ceiling on a single host's build, now that hosts stage in parallel.
-        # Sitting here for an hour means a stage never reached some host: a
-        # pipeline killed partway through the fleet, or a build that failed after
-        # its pipeline had already gone.
+        # The fleet should be running off of the same commit, except for during
+        # an upgrade. The alert's pending window should accommodate the slowest
+        # expected upgrade duration.
         - alert: NixosFleetRevisionDrift
           expr: |
             count(count by (rev) (nixos_selfupdate_info)) > 1
-          for: 1h
+          for: 2h
           labels:
             severity: warning
             component: nixos-cd
