@@ -18,12 +18,22 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
+      name: woodpecker-default-agent-secret
+      namespace: woodpecker
+    - jsonPointers:
+        - /data
+      kind: Secret
       name: woodpecker-forgejo-oauth2
       namespace: woodpecker
     - jsonPointers:
         - /data
       kind: Secret
-      name: woodpecker-default-agent-secret
+      name: woodpecker-grpc-secret
+      namespace: woodpecker
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: woodpecker-prometheus-secret
       namespace: woodpecker
   project: default
   source:
