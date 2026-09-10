@@ -8,7 +8,7 @@ homepage:
   image:
     registry: ghcr.io
     repository: gethomepage/homepage
-    tag: "v2.2.0"
+    tag: "v2.3.0"
   # Homepage owns the apex msng.to Ingress and gates it with OIDC login.
   ingress:
     enabled: true
@@ -95,7 +95,7 @@ secret-sync:
   enabled: true
   image:
     repository: golang
-    tag: 1.27.0-alpine
+    tag: 1.27.1-alpine
   rollout:
     enabled: true
     namespace: homepage
