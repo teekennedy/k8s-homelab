@@ -11,9 +11,9 @@ qbittorrentPasswordHash:
 # monitoring-system so that a jellyfin deployment carries its own scrape
 # targets and alerts.
 #
-# Everything scoped to jellyfin-exporter also requires
-# app-template.controllers.exporter.enabled; turning the exporter off takes its
-# ServiceMonitor and alert rules with it, whatever these flags say.
+# Everything scoped to jellyfin-exporter also requires exporter.enabled below;
+# turning the exporter off takes its ServiceMonitor and alert rules with it,
+# whatever these flags say.
 monitoring:
   exporter:
     serviceMonitor:
@@ -25,6 +25,43 @@ monitoring:
   qbittorrent:
     serviceMonitor:
       enabled: true
+
+# Exports Jellyfin metrics to Prometheus.
+#
+# Deliberately not an app-template controller: its Deployment, Service and
+# ConfigMap live in templates/ so the pod template can carry a checksum over
+# files/jellyfin-exporter/exporter.py. app-template can only checksum ConfigMaps
+# it generates from its own values, and a subchart cannot read the parent
+# chart's files -- see templates/jellyfin-exporter-deployment.yaml. Because
+# those are all chart-owned, `enabled` here is the single switch for the whole
+# exporter: Deployment, Service, ConfigMap, ServiceMonitor and alert rules.
+exporter:
+  enabled: true
+  replicas: 1
+  image:
+    # The python-flavoured tag ships an interpreter, so a pod start only has to
+    # fetch exporter.py's own dependencies. The bare `uv` image would download a
+    # whole CPython first.
+    repository: ghcr.io/astral-sh/uv
+    tag: python3.14-alpine
+  # Same non-root uid/gid as the jellyfin container. The exporter only ever
+  # writes to its own emptyDir.
+  runAsUser: 1200
+  runAsGroup: 1200
+  port: 9101
+  jellyfinUrl: http://jellyfin-main:8096
+  # Created out of band, not by this chart: it holds a Jellyfin API key minted
+  # in the admin dashboard.
+  apiKeySecret:
+    name: jellyfin-exporter-api-key
+    key: JELLYFIN_API_KEY
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
 
 app-template:
   defaultPodOptions:
@@ -133,109 +170,6 @@ app-template:
               cpu: 4000m
               memory: 6Gi
               gpu.intel.com/i915: "1"
-    # Exports Jellyfin metrics to Prometheus.
-    #
-    # This `enabled` flag is the switch for the exporter. The chart's own
-    # ConfigMap, ServiceMonitor and alert rules read it directly, so they follow
-    # it. app-template's resources cannot: a subchart's values are not
-    # templatable from here, so turning the exporter off means setting
-    # `enabled: false` on all four of
-    #
-    #   controllers.exporter
-    #   service.exporter
-    #   persistence.jellyfin-exporter
-    #   persistence.jellyfin-exporter-project
-    #
-    # (app-template errors out on a volume mounted into a disabled controller,
-    # so it will tell you if you miss one).
-    exporter:
-      enabled: true
-      replicas: 1
-      pod:
-        securityContext:
-          runAsUser: 1200
-          runAsGroup: *gid
-          runAsNonRoot: true
-      containers:
-        exporter:
-          image:
-            # The python-flavoured tag ships an interpreter, so a pod start
-            # only has to fetch exporter.py's own dependencies. The bare `uv`
-            # image would download a whole CPython first.
-            repository: ghcr.io/astral-sh/uv
-            tag: python3.14-alpine
-          command:
-            - sh
-            - -c
-            - |-
-              set -eu
-              # uv builds the script's environment beside the script, and /app
-              # is a read-only ConfigMap mount, so run from a writable copy.
-              cp -rL /app/. /project/
-              mkdir -p /project/tmp
-              cd /project
-              uv run --no-cache --link-mode copy --script exporter.py
-          env:
-            JELLYFIN_URL: http://jellyfin-main:8096
-            JELLYFIN_API_KEY:
-              valueFrom:
-                secretKeyRef:
-                  name: jellyfin-exporter-api-key
-                  key: JELLYFIN_API_KEY
-            # uv keeps its state under HOME and unpacks wheels through a temp
-            # directory; the root filesystem is read-only, so both point at the
-            # emptyDir.
-            HOME: /project
-            TMPDIR: /project/tmp
-            # Block-buffered stdout would hold log lines until the process
-            # exits, which for a long-running server means forever.
-            PYTHONUNBUFFERED: "1"
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
-          probes:
-            # The first thing the container does is resolve and install its
-            # dependencies from PyPI, so hold liveness off until it is serving
-            # rather than restarting it midway through a slow install.
-            startup:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /healthz
-                  port: 9101
-                failureThreshold: 30
-                periodSeconds: 5
-                timeoutSeconds: 3
-            liveness:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /healthz
-                  port: 9101
-                failureThreshold: 3
-                periodSeconds: 30
-                timeoutSeconds: 5
-            readiness:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /healthz
-                  port: 9101
-                failureThreshold: 3
-                periodSeconds: 10
-                timeoutSeconds: 5
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
     seerr:
       replicas: 1
       pod:
@@ -555,14 +489,6 @@ app-template:
         http:
           port: 8096
           protocol: HTTP
-    exporter:
-      # Keep in step with controllers.exporter.enabled.
-      enabled: true
-      controller: exporter
-      ports:
-        metrics:
-          port: 9101
-          protocol: HTTP
     seerr:
       controller: seerr
       ports:
@@ -791,24 +717,6 @@ app-template:
             - path: /etc/ssl/certs/ca-certificates.crt
               readOnly: true
               subPath: ca-certificates.crt
-    jellyfin-exporter:
-      enabled: true
-      type: configMap
-      name: jellyfin-exporter
-      advancedMounts:
-        exporter:
-          exporter:
-            - path: /app
-              readOnly: true
-    # Writable working copy of /app: uv creates the script's environment in the
-    # working directory and its own state under HOME, and both point here.
-    jellyfin-exporter-project:
-      enabled: true
-      type: emptyDir
-      advancedMounts:
-        exporter:
-          exporter:
-            - path: /project
     jellyfin-configs:
       type: configMap
       name: jellyfin-configs

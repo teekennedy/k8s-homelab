@@ -1,5 +1,4 @@
-{{- $exporter := (index .Values "app-template" "controllers" "exporter") | default dict }}
-{{- if and $exporter.enabled .Values.monitoring.exporter.serviceMonitor.enabled }}
+{{- if and .Values.exporter.enabled .Values.monitoring.exporter.serviceMonitor.enabled }}
 # yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/servicemonitor_v1.json
 ---
 apiVersion: monitoring.coreos.com/v1

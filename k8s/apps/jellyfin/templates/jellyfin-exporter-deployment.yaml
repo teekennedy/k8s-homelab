@@ -1,0 +1,144 @@
+{{- if .Values.exporter.enabled }}
+{{- /*
+Hand-rolled rather than an app-template controller, so that the pod template can
+carry a checksum over exporter.py.
+
+app-template's own checksum/configMaps only covers ConfigMaps it generates from
+its values, and a subchart cannot reach the parent chart's files: inside
+app-template, `.Files.Get "files/jellyfin-exporter/exporter.py"` renders empty.
+Values are plain YAML and are never templated, so the annotation cannot be
+injected from values.yaml either. Living here is what makes .Files work.
+
+The selector below is what app-template used to generate, and a Deployment's
+selector is immutable -- changing any of those three labels means deleting the
+Deployment before the next sync rather than getting an in-place update.
+*/}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/controller: exporter
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.exporter.replicas }}
+  revisionHistoryLimit: 3
+  strategy:
+    # One exporter at a time. Two would each hold a Jellyfin websocket and
+    # double-count sessions for as long as the old pod took to go away, and
+    # jellyfin_active_streams gates node reboots.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/controller: exporter
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ .Chart.Name }}
+  template:
+    metadata:
+      annotations:
+        # The reason this Deployment is not an app-template controller. uv reads
+        # exporter.py once at startup, and a ConfigMap change on its own never
+        # restarts a pod -- the file under /app is replaced while the running
+        # interpreter keeps executing the code it loaded. Without this the
+        # exporter silently serves stale code until something else happens to
+        # restart it.
+        checksum/config: {{ .Files.Get "files/jellyfin-exporter/exporter.py" | sha256sum }}
+      labels:
+        app.kubernetes.io/controller: exporter
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ .Chart.Name }}
+    spec:
+      serviceAccountName: jellyfin
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsUser: {{ .Values.exporter.runAsUser }}
+        runAsGroup: {{ .Values.exporter.runAsGroup }}
+        runAsNonRoot: true
+      containers:
+        - name: exporter
+          image: "{{ .Values.exporter.image.repository }}:{{ .Values.exporter.image.tag }}"
+          command:
+            - sh
+            - -c
+            - |-
+              set -eu
+              # uv builds the script's environment beside the script, and /app
+              # is a read-only ConfigMap mount, so run from a writable copy.
+              cp -rL /app/. /project/
+              mkdir -p /project/tmp
+              cd /project
+              uv run --no-cache --link-mode copy --script exporter.py
+          env:
+            - name: JELLYFIN_URL
+              value: {{ .Values.exporter.jellyfinUrl | quote }}
+            - name: JELLYFIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.exporter.apiKeySecret.name }}
+                  key: {{ .Values.exporter.apiKeySecret.key }}
+            # uv keeps its state under HOME and unpacks wheels through a temp
+            # directory; the root filesystem is read-only, so both point at the
+            # emptyDir.
+            - name: HOME
+              value: /project
+            - name: TMPDIR
+              value: /project/tmp
+            # Block-buffered stdout would hold log lines until the process
+            # exits, which for a long-running server means forever.
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.exporter.port }}
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # The first thing the container does is resolve and install its
+          # dependencies from PyPI, so hold liveness off until it is serving
+          # rather than restarting it midway through a slow install.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            failureThreshold: 3
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            failureThreshold: 3
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.exporter.resources | nindent 12 }}
+          volumeMounts:
+            - name: jellyfin-exporter
+              mountPath: /app
+              readOnly: true
+            - name: jellyfin-exporter-project
+              mountPath: /project
+      volumes:
+        - name: jellyfin-exporter
+          configMap:
+            name: jellyfin-exporter
+        # Writable working copy of /app: uv creates the script's environment in
+        # the working directory and its own state under HOME, and both point
+        # here.
+        - name: jellyfin-exporter-project
+          emptyDir: {}
+{{- end }}

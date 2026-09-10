@@ -1,5 +1,4 @@
-{{- $exporter := (index .Values "app-template" "controllers" "exporter") | default dict }}
-{{- if $exporter.enabled }}
+{{- if .Values.exporter.enabled }}
 {{- /*
 Mounted at /app in the jellyfin-exporter pod, which copies it somewhere
 writable and runs it with `uv run --script`: exporter.py's PEP 723 header

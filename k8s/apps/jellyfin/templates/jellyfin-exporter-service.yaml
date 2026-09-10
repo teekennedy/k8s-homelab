@@ -1,0 +1,28 @@
+{{- if .Values.exporter.enabled }}
+{{- /*
+The app.kubernetes.io/service label is what jellyfin-exporter-servicemonitor.yaml
+selects on. It was app-template's naming convention; it is kept so the
+ServiceMonitor keeps matching.
+*/}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyfin-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/service: jellyfin-exporter
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/controller: exporter
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+  ports:
+    - name: metrics
+      port: {{ .Values.exporter.port }}
+      targetPort: metrics
+      protocol: TCP
+{{- end }}

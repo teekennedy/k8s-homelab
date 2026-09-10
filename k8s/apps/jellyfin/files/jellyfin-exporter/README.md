@@ -60,6 +60,13 @@ socket cannot pin the reboot gate open.
 header at the top of the file; keep that pin and `pyproject.toml` in step, since
 the tests resolve against the latter.
 
+Because `uv` reads the script once at startup, a ConfigMap change on its own
+would leave the running interpreter on the old code. The Deployment therefore
+carries a `checksum/config` annotation over this file, which is why it lives in
+`templates/jellyfin-exporter-deployment.yaml` rather than being an app-template
+controller: a subchart cannot read the parent chart's `files/`, so
+app-template's own `checksum/configMaps` can never see this script.
+
 The consequence worth knowing: a pod start fetches `websockets` from PyPI, so
 the exporter cannot start while PyPI is unreachable. That degrades to
 `jellyfin_up` absent, which *permits* node reboots rather than blocking them —
@@ -69,7 +76,7 @@ see `JellyfinExporterDown` below.
 
 | Value | Effect |
 | --- | --- |
-| `app-template.controllers.exporter.enabled` | The exporter itself. Its ConfigMap, ServiceMonitor and alert rules follow it. Also flip `service.exporter`, `persistence.jellyfin-exporter` and `persistence.jellyfin-exporter-project` — a subchart's values cannot be templated from the parent. |
+| `exporter.enabled` | The exporter itself — Deployment, Service, ConfigMap, ServiceMonitor and alert rules all follow this one flag. |
 | `monitoring.exporter.serviceMonitor.enabled` | Prometheus scrapes the exporter. |
 | `monitoring.exporter.prometheusRule.enabled` | `JellyfinStreamActive` / `JellyfinStuckSession` / `JellyfinExporterDown`. Turning this off leaves node reboots ungated. |
 

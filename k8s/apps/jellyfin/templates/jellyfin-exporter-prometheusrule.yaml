@@ -1,5 +1,4 @@
-{{- $exporter := (index .Values "app-template" "controllers" "exporter") | default dict }}
-{{- if and $exporter.enabled .Values.monitoring.exporter.prometheusRule.enabled }}
+{{- if and .Values.exporter.enabled .Values.monitoring.exporter.prometheusRule.enabled }}
 {{- /*
 These are maintenance gates as much as alerts: kured reads firing alert names
 straight off the Prometheus API, so JellyfinStreamActive blocks a node reboot
