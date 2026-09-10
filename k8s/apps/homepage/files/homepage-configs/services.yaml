@@ -10,6 +10,7 @@
           type: jellyfin
           url: https://jellyfin.msng.to
           key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
+          version: 2
           cache: 3
     - Seerr:
         icon: sh-seerr.svg
