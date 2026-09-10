@@ -42,12 +42,7 @@ app-template:
             - infinity
 
     main:
-      # Held at 0 for the 10.11.11 -> 12.0 upgrade: the schema migration is
-      # one-way, so Jellyfin is stopped here (rather than by hand, where the
-      # next Argo CD sync would just start it again) while the jellyfin-data
-      # and jellyfin-cache volumes are snapshotted in Longhorn. The commit that
-      # bumps the image tag puts this back to 1.
-      replicas: 0
+      replicas: 1
       pod:
         securityContext:
           fsGroup: &gid 1200
@@ -74,7 +69,7 @@ app-template:
         jellyfin:
           image:
             repository: ghcr.io/jellyfin/jellyfin
-            tag: 10.11.11
+            tag: 12.0@sha256:74f4d87d9cf262c52d62be6be265c0355c6a7e21d0477ab6c654a49a4f8b1fd4
           env:
             TZ: America/Denver
             JELLYFIN_DATA_DIR: "/data"
@@ -82,17 +77,29 @@ app-template:
             JELLYFIN_CACHE_DIR: "/data/cache"
             JELLYFIN_LOG_DIR: "/data/log"
           probes:
-            # Jellyfin starts up in as little as 5 seconds.
-            # Allow for up to 100 seconds for things like migrations.
+            # Use /System/Ping for startup probe.
+            #
+            # Jellyfin runs a "setup server" during schema migrations before
+            # Kestrel starts (Jellyfin.Server/ServerSetupApp/SetupServer.cs).
+            # The setup server maps /health to a check that reports 200
+            # Degraded, flipping the response code to 503 if migrations fail.
+            #
+            # /System/Ping, on the other hand, returns 200 only once the real
+            # server is listening, which makes for a much better startup probe.
+            # It keeps liveness out of the migration window, and a failed
+            # migration sits un-Ready and readable instead of crashlooping.
+            #
+            # 180 x 10s = 30 minutes, which is the migration budget; the 10s
+            # period keeps an ordinary no-migration restart detected quickly.
             startup:
               enabled: true
               custom: true
               spec:
                 httpGet:
-                  path: /health
+                  path: /System/Ping
                   port: 8096
-                failureThreshold: 20
-                periodSeconds: 5
+                failureThreshold: 180
+                periodSeconds: 10
                 successThreshold: 1
                 timeoutSeconds: 3
             liveness:
