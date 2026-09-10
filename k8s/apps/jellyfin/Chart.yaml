@@ -1,6 +1,6 @@
 apiVersion: v2
 name: jellyfin
-version: 0.0.14
+version: 0.0.15
 appVersion: v10.11.11
 dependencies:
   - name: app-template

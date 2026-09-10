@@ -42,7 +42,12 @@ app-template:
             - infinity
 
     main:
-      replicas: 1
+      # Held at 0 for the 10.11.11 -> 12.0 upgrade: the schema migration is
+      # one-way, so Jellyfin is stopped here (rather than by hand, where the
+      # next Argo CD sync would just start it again) while the jellyfin-data
+      # and jellyfin-cache volumes are snapshotted in Longhorn. The commit that
+      # bumps the image tag puts this back to 1.
+      replicas: 0
       pod:
         securityContext:
           fsGroup: &gid 1200
