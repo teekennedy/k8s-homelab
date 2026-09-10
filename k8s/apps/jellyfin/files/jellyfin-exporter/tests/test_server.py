@@ -17,11 +17,22 @@ class TestRestReconcile:
             client = exporter.JellyfinClient(jf.url, jf.api_key)
             assert len(client.get_sessions()) == 2
 
-    def test_sends_the_api_key_as_a_token_header(self, stub_jellyfin):
-        """Query-string keys end up in access logs; use the header instead."""
+    def test_sends_the_api_key_in_a_mediabrowser_authorization_header(
+        self, stub_jellyfin
+    ):
+        """Query-string keys end up in access logs; use the header instead.
+
+        It has to be the MediaBrowser scheme specifically: the X-Emby-Token
+        header this used to send is legacy, and Jellyfin 12.0 turns legacy
+        authorization off on first boot.
+        """
         exporter.JellyfinClient(stub_jellyfin.url, stub_jellyfin.api_key).get_sessions()
         _, headers = stub_jellyfin.rest_requests[0]
-        assert headers.get("X-Emby-Token") == stub_jellyfin.api_key
+        assert (
+            headers.get("Authorization")
+            == f'MediaBrowser Token="{stub_jellyfin.api_key}"'
+        )
+        assert headers.get("X-Emby-Token") is None
 
     def test_requests_the_sessions_endpoint(self, stub_jellyfin):
         exporter.JellyfinClient(stub_jellyfin.url, stub_jellyfin.api_key).get_sessions()

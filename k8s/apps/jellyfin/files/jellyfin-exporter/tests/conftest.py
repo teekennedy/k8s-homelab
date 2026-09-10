@@ -112,7 +112,7 @@ class FakeJellyfin:
             # Jellyfin authenticates the socket by query parameter; there is
             # no header to carry the token through a browser upgrade.
             params = urllib.parse.parse_qs(query)
-            if params.get("api_key", [""])[0] != self.api_key:
+            if params.get("ApiKey", [""])[0] != self.api_key:
                 with self._lock:
                     self.rejected_handshakes.append(request.path)
                 return _json_response(401, "Unauthorized", {"error": "bad api key"})
@@ -124,7 +124,10 @@ class FakeJellyfin:
         with self._lock:
             self.rest_requests.append((request.path, request.headers))
 
-        if request.headers.get("X-Emby-Token") != self.api_key:
+        if (
+            request.headers.get("Authorization")
+            != f'MediaBrowser Token="{self.api_key}"'
+        ):
             return _json_response(401, "Unauthorized", {"error": "bad api key"})
         if path.rstrip("/") != "/Sessions":
             return _json_response(404, "Not Found", {"error": "no such endpoint"})

@@ -56,7 +56,8 @@ class TestFeed:
         try:
             assert wait_for(lambda: stub_jellyfin.handshake_paths)
             path = stub_jellyfin.handshake_paths[0]
-            assert f"api_key={stub_jellyfin.api_key}" in path
+            assert f"ApiKey={stub_jellyfin.api_key}" in path
+            assert "api_key=" not in path
             assert "deviceId=dev-9" in path
         finally:
             stop.set()

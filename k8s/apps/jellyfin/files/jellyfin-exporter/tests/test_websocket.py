@@ -12,9 +12,16 @@ import exporter
 
 class TestSocketUrl:
     def test_socket_url_carries_api_key_and_device_id(self):
+        """The parameter is `ApiKey`, not the legacy `api_key`.
+
+        Jellyfin 12.0 only reads the lowercase spelling when
+        EnableLegacyAuthorization is on, and its first-boot migration forces
+        that off.
+        """
         url = exporter.socket_url("http://jf:8096", "SECRET", "dev-1")
         assert url.startswith("ws://jf:8096/socket?")
-        assert "api_key=SECRET" in url
+        assert "ApiKey=SECRET" in url
+        assert "api_key=" not in url
         assert "deviceId=dev-1" in url
 
     def test_https_maps_to_wss(self):
@@ -24,7 +31,7 @@ class TestSocketUrl:
 
     def test_special_characters_in_the_key_are_encoded(self):
         url = exporter.socket_url("http://jf", "a+b/c=", "d")
-        assert "api_key=a%2Bb%2Fc%3D" in url
+        assert "ApiKey=a%2Bb%2Fc%3D" in url
 
 
 class TestSubscriptionMessage:

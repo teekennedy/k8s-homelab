@@ -212,9 +212,18 @@ def render(
 
 
 def socket_url(base_url: str, api_key: str, device_id: str) -> str:
+    """Address /socket with the ApiKey query parameter.
+
+    A browser cannot set headers on a WebSocket upgrade, so the token has to
+    ride in the query string here. `ApiKey` is the supported spelling; the
+    lowercase `api_key` is one of the legacy mechanisms Jellyfin 12.0 gates
+    behind EnableLegacyAuthorization, which its first-boot migration forces
+    off. Jellyfin reads `ApiKey` unconditionally on 10.11 too, so this works
+    on both sides of the upgrade.
+    """
     parts = urllib.parse.urlsplit(base_url)
     scheme = "wss" if parts.scheme == "https" else "ws"
-    query = urllib.parse.urlencode({"api_key": api_key, "deviceId": device_id})
+    query = urllib.parse.urlencode({"ApiKey": api_key, "deviceId": device_id})
     return urllib.parse.urlunsplit((scheme, parts.netloc, "/socket", query, ""))
 
 
@@ -271,8 +280,16 @@ class JellyfinClient:
         request = urllib.request.Request(
             f"{self.base_url}/Sessions",
             # Passing the key as a header keeps it out of Jellyfin's
-            # request log, unlike the api_key query parameter.
-            headers={"X-Emby-Token": self.api_key, "Accept": "application/json"},
+            # request log, unlike the ApiKey query parameter. The MediaBrowser
+            # scheme is the only header form Jellyfin 12.0 still accepts:
+            # X-Emby-Token, X-MediaBrowser-Token and X-Emby-Authorization are
+            # legacy, and 12.0's DisableLegacyAuthorization migration rewrites
+            # EnableLegacyAuthorization to false on first boot. 10.11 accepts
+            # this form as well, so it is safe to ship ahead of the upgrade.
+            headers={
+                "Authorization": f'MediaBrowser Token="{self.api_key}"',
+                "Accept": "application/json",
+            },
         )
         with urllib.request.urlopen(request, timeout=self.timeout) as response:
             return json.loads(response.read().decode("utf-8"))

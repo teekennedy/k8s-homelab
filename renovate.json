@@ -315,11 +315,13 @@
       "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:[.-]r?(?<build>\\d+))?$"
     },
     {
+      "description": "Customize jellyfin tag format and changelog source.",
       "matchPackageNames": [
         "ghcr.io/jellyfin/jellyfin"
       ],
       "sourceUrl": "https://github.com/jellyfin/jellyfin",
-      "versioning": "semver"
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)(?:\\.(?<patch>\\d+))?$",
+      "pinDigests": true
     },
     {
       "matchDatasources": [
