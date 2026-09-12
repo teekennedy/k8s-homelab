@@ -7,7 +7,7 @@ import (
 // Container image constants with renovate annotations for automated updates.
 const (
 	// renovate: datasource=docker depName=ghcr.io/cachix/devenv/devenv
-	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.2.2"
+	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.3.1"
 	// renovate: datasource=docker depName=nixos/nix
 	nixImage = "nixos/nix:2.35.2"
 )
