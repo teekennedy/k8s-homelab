@@ -24,6 +24,12 @@ spec:
       checkpoint_timeout: 15min
       # Increase WAL size to allow less frequent checkpoints
       max_wal_size: 2GB
+      # Cap how much WAL an HA slot may pin. Default is -1 (unlimited).
+      # A standby that missed a segment not covered by WAL can get stuck
+      # replicating forever, and the WAL would continue to grow unbounded.
+      # Sized so that maximum volume usage (db + max_wal_size +
+      # max_slot_wal_keep_size) is less than the volume capacity.
+      max_slot_wal_keep_size: 1GB
   monitoring:
     enablePodMonitor: true
   enablePDB: true

@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Cluster-wide CloudNativePG alerts. These ship with the operator rather than
+# with an individual database chart because every CNPG Cluster in the cluster
+# exports the same metrics from the same PodMonitor, so one rule object covers
+# all clusters at once.
+#
+# The failure these exist for: in Sep 2026 crowdsec-psql-1 fell off replication
+# during a kured reboot and came back on a diverged timeline (12 vs the
+# cluster's 25). It could neither stream (the primary's segments for its
+# timeline were long gone) nor restore (that cluster has no WAL archive by
+# design), so its HA slot's restart_lsn never advanced and the primary could not
+# recycle a single WAL segment. pg_wal grew at a flat 4.85GB/day and filled a
+# 20Gi volume, then a 40Gi one, eight days apart.
+#
+# Nothing caught it. CNPG reported `Cluster in healthy state`, `3/3 ready`, and
+# listed the dead instance under `instancesStatus.healthy`, because its health
+# check does not compare timelines.
+#
+# Note on the `and on (namespace, pod) cnpg_pg_replication_in_recovery == 0`
+# join, which is load-bearing on every slot rule here: CNPG synchronises HA slot
+# state to the standbys so it survives failover, so *every* instance exports
+# cnpg_pg_replication_slots_*, and on a standby `active` is always 0 (the
+# walsender for that slot lives on the primary). Without the join these alerts
+# fire permanently for every replica in every cluster. in_recovery == 0 is true
+# only on the primary.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: cnpg
+      interval: 1m
+      rules:
+        # The direct catch: a slot the primary is holding open for a standby that
+        # is not connected to it.
+        - alert: CNPGReplicationSlotInactive
+          expr: |
+            cnpg_pg_replication_slots_active == 0
+              and on (namespace, pod) cnpg_pg_replication_in_recovery == 0
+          # A planned node reboot results in inactive replication slot metrics
+          # for 3 minutes maxium. This duration covers that by a wide margin.
+          for: 1h
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: {{ "CloudNativePG replication slot {{ $labels.slot_name }} is inactive" | quote }}
+            description: {{ "Slot {{ $labels.slot_name }} on primary {{ $labels.namespace }}/{{ $labels.pod }} has had no connected standby for an hour. While it stays inactive the primary cannot recycle WAL, so pg_wal will grow until the volume fills. Check `kubectl cnpg -n {{ $labels.namespace }} status <cluster> -v`: the standby will be missing from the Streaming Replication table entirely. Recovery is to re-clone it (`kubectl cnpg destroy <cluster> <n>`), which drops and recreates the slot." | quote }}
+
+        # WAL archiving is failing on a cluster that has it configured. Left
+        # unattended this fills pg_wal the same way a stuck slot does, because
+        # Postgres will not recycle a segment it has not archived. Does not apply
+        # to crowdsec-psql, which has no archiver and so never increments this.
+        - alert: CNPGWALArchiveFailing
+          expr: |
+            increase(cnpg_pg_stat_archiver_failed_count[30m]) > 0
+              and on (namespace, pod) cnpg_pg_replication_in_recovery == 0
+          for: 30m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: {{ "CloudNativePG WAL archiving is failing for {{ $labels.namespace }}/{{ $labels.pod }}" | quote }}
+            description: {{ "archive_command has failed {{ $value | printf \"%.0f\" }} times in the last 30 minutes on primary {{ $labels.namespace }}/{{ $labels.pod }}. Unarchived segments are not recycled, so pg_wal grows until the volume fills. Check the barman-cloud plugin and the s3proxy endpoint." | quote }}
+
+        # A standby whose timeline has diverged from the primary's reports itself
+        # ready to Kubernetes and healthy to CNPG, but can never catch up.
+        #
+        # Expect this to co-fire with CNPGInstanceNotReady when a primary is
+        # crash-looping: the standbys legitimately lose their WAL receiver each
+        # time it goes down.
+        - alert: CNPGStandbyNotStreaming
+          expr: |
+            cnpg_pg_replication_is_wal_receiver_up == 0
+              and on (namespace, pod) cnpg_pg_replication_in_recovery == 1
+          for: 1h
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: {{ "CloudNativePG standby {{ $labels.namespace }}/{{ $labels.pod }} is not streaming" | quote }}
+            description: {{ "The WAL receiver on standby {{ $labels.namespace }}/{{ $labels.pod }} has been down for an hour. The pod may still report Ready and CNPG may still call the cluster healthy. Check the pod log for 'requested WAL segment has already been removed', which means it has diverged and needs a re-clone." | quote }}

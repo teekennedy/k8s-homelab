@@ -27,6 +27,19 @@ spec:
       # HA replication slots handle replica WAL retention; keep_size adds no value and wastes disk
       max_wal_size: 512MB
       wal_keep_size: "0"
+      # Cap how much WAL an HA slot may pin. Default is -1 (unlimited).
+      # A standby that missed a segment not covered by WAL can get stuck
+      # replicating forever, and the WAL would continue to grow unbounded.
+      # Sized so that maximum volume usage (db + max_wal_size +
+      # max_slot_wal_keep_size) is less than the volume capacity.
+      max_slot_wal_keep_size: 2GB
+      # This cluster deliberately has no backups: losing it just means CrowdSec
+      # re-downloads the blocklists, and the live bans are ephemeral. CNPG's
+      # default archive_timeout of 5min forces a 16MB segment switch every five
+      # minutes purely to feed an archive that does not exist. It was
+      # generating 4.6GB/day of near-empty segments against ~92MB/day of real
+      # WAL. At 1h that drops ~92%.
+      archive_timeout: "1h"
   monitoring:
     enablePodMonitor: true
   enablePDB: true
