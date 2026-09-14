@@ -46,6 +46,7 @@ func (m *Homelab) terraformContainer(container *dagger.Container) *dagger.Contai
 	}
 
 	return container.
+		WithEnvVariable("TF_IN_AUTOMATION", "1").
 		WithEnvVariable("TF_PLUGIN_CACHE_DIR", tfPluginCache).
 		WithMountedCache(tfPluginCache, dag.CacheVolume("homelab-tf-plugins"))
 }
@@ -59,7 +60,7 @@ func (m *Homelab) initTerraformModule(ctx context.Context, source *dagger.Direct
 		WithMountedDirectory("/src", source).
 		WithWorkdir(modWorkdir).
 		WithExec([]string{"echo", ("================ " + terraformModuleName(modPath) + " ================")}).
-		WithExec([]string{"tofu", "init", "-backend=false"}).
+		WithExec([]string{"tofu", "init", "-backend=false", "-input=false"}).
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
@@ -167,6 +168,47 @@ func (m *Homelab) validateTerraformModule(ctx context.Context, source *dagger.Di
 	after := dag.Directory().WithDirectory(modPath, fixed.Directory(modWorkdir)).WithoutDirectory(modPath + "/.terraform")
 
 	return after.Changes(before), nil
+}
+
+// LintTerraform runs trivy config against the Terraform/OpenTofu tree to catch
+// misconfigurations (unencrypted resources, over-permissive IAM, etc.).
+//
+// Trivy supersedes tfsec (the two tools' checks now live in the same
+// aquasecurity org, and tfsec is in maintenance-only mode), so this uses
+// trivy rather than tfsec directly. --skip-check-update and --skip-version-check
+// keep it network-independent and quiet.
+// +check
+func (m *Homelab) LintTerraform(ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"]
+	source *dagger.Directory,
+	// +optional
+	container *dagger.Container,
+) (string, error) {
+	if container == nil {
+		container = m.ciContainer()
+	}
+
+	out, err := container.
+		WithMountedDirectory("/src", source).
+		WithWorkdir("/src").
+		WithExec([]string{
+			"trivy", "config",
+			"--quiet",
+			"--skip-check-update",
+			"--skip-version-check",
+			"--exit-code", "1",
+			"terraform",
+		}).
+		Stdout(ctx)
+	if err != nil {
+		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			return "", fmt.Errorf("trivy config failed:\n%s%s", execErr.Stdout, execErr.Stderr)
+		}
+		return "", fmt.Errorf("trivy config failed: %w\n%s", err, out)
+	}
+
+	return "Terraform linting passed", nil
 }
 
 // ValidateTerraform runs tofu init and tofu validate on all discovered Terraform modules.

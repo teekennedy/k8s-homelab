@@ -26,8 +26,13 @@ data "aws_iam_policy_document" "ses_notifications" {
   }
 }
 
+#tfsec:ignore:aws-sns-topic-encryption-use-cmk trivy:ignore:AWS-0136
 resource "aws_sns_topic" "ses_notifications" {
   name = local.ses_notification_topic_name
+
+  # AWS managed key: no monthly charge like a customer-managed key would incur,
+  # just negligible per-request KMS usage for the occasional bounce/complaint.
+  kms_master_key_id = "alias/aws/sns"
 }
 
 resource "aws_sns_topic_policy" "ses_notifications" {

@@ -65,14 +65,11 @@ in {
         gnutar
         gzip
         kubeconform
-        # Deliberately the unwrapped helm. The wrapped build pulls helm-diff
-        # and helm-s3 (131MB) for plugins nothing in this repo invokes — the
-        # only helm subcommands used anywhere are `dependency build/update`
-        # and `template`.
         kubernetes-helm
         kubernetes-polaris
         opentofu
         python3
+        trivy # The successor to tfsec, apparently
         uv
         woodpecker-cli
         yamllint

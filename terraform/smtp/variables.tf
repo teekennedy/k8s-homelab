@@ -3,6 +3,11 @@ variable "username" {
   type        = string
 }
 
+variable "group_name" {
+  description = "Name of the IAM group that SES permissions will be attached to"
+  type        = string
+}
+
 variable "domain" {
   description = "Domain that will be used for sending email"
   type        = string

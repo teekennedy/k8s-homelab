@@ -16,6 +16,7 @@ module "smtp" {
   source             = "./smtp"
   domain             = local.cloudflare_domain
   username           = join("-", [replace(local.cloudflare_domain, ".", "-"), "smtp-user"])
+  group_name         = join("-", [replace(local.cloudflare_domain, ".", "-"), "mailers"])
   pgp_key            = local.pgp_key
   notification_email = local.notification_email
 }

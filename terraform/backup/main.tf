@@ -8,8 +8,9 @@ locals {
 
 # Backup software (e.g. restic) is expected to manage multiple snapshot / restore points on its own.
 # Therefore, versioning is purposely disabled as it wastes S3 bucket size.
-# Bucket logging is disabled because auditability is not a concern here.
-#tfsec:ignore:aws-s3-enable-bucket-logging tfsec:ignore:aws-s3-enable-versioning
+# Bucket logging is disabled: restic encrypts backups client-side before upload,
+# so a principal who can read this bucket only sees ciphertext.
+#tfsec:ignore:aws-s3-enable-bucket-logging tfsec:ignore:aws-s3-enable-versioning trivy:ignore:AWS-0089 trivy:ignore:AWS-0090
 resource "aws_s3_bucket" "backup" {
   bucket = local.bucket_name
 

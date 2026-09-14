@@ -9,8 +9,9 @@ locals {
 }
 
 # Access logging is disabled: it would need a second bucket, and CloudTrail data
-# events already cover "who read state" for the rare times that is asked.
-#tfsec:ignore:aws-s3-enable-bucket-logging
+# events already cover "who read state" for the rare times that is asked. OpenTofu's
+# pbkdf2 state encryption also means a reader of the raw objects sees ciphertext.
+#tfsec:ignore:aws-s3-enable-bucket-logging trivy:ignore:AWS-0089
 resource "aws_s3_bucket" "state" {
   bucket = local.name
 
@@ -40,7 +41,7 @@ resource "aws_s3_bucket_versioning" "state" {
 # grants the whole account anyway, so KMS would add per-request charges on every
 # state read and write without narrowing access. OpenTofu's own pbkdf2 state
 # encryption is the layer that actually keeps secrets in state unreadable.
-#tfsec:aws-s3-enable-bucket-encryption
+#tfsec:ignore:aws-s3-encryption-customer-key trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
   bucket = aws_s3_bucket.state.id
 
@@ -138,7 +139,7 @@ resource "aws_dynamodb_table" "locks" {
   # Encryption with the AWS managed alias/aws/dynamodb key. Without this block
   # the table is still encrypted, but with an AWS *owned* key that is invisible
   # in KMS and cannot be audited.
-  #tfsec:ignore:aws-dynamodb-table-customer-key
+  #tfsec:ignore:aws-dynamodb-table-customer-key trivy:ignore:AWS-0025
   server_side_encryption {
     enabled = true
   }

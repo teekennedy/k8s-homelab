@@ -2,13 +2,26 @@ resource "aws_iam_user" "mail" {
   name = var.username
 }
 
-resource "aws_iam_user_policy_attachment" "send_mail" {
+# MFA enforcement targets human console logins; this group's only member uses
+# long-lived SMTP access keys with no interactive/MFA-capable login at all.
+#tfsec:ignore:aws-iam-enforce-group-mfa trivy:ignore:AWS-0123
+resource "aws_iam_group" "mail" {
+  name = var.group_name
+}
+
+resource "aws_iam_group_membership" "mail" {
+  name  = var.group_name
+  group = aws_iam_group.mail.name
+  users = [aws_iam_user.mail.name]
+}
+
+resource "aws_iam_group_policy_attachment" "send_mail" {
   policy_arn = aws_iam_policy.send_mail.arn
-  user       = aws_iam_user.mail.name
+  group      = aws_iam_group.mail.name
 }
 
 resource "aws_iam_policy" "send_mail" {
-  name   = "${var.username}-send-mail"
+  name   = join("-", [replace(var.domain, ".", "-"), "send-mail"])
   policy = data.aws_iam_policy_document.send_mail.json
 }
 
