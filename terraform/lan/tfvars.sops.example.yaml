@@ -1,3 +1,5 @@
+# Passphrase for encrypting state. Without this, the Unifi API key gets stored in the clear.
+tofu_state_passphrase: xxxxx
 # API key for unifi controller. See readme for instructions on generating one.
 unifi_api_key: xxxxx
 # local url for api

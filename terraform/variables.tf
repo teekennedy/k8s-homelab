@@ -46,3 +46,15 @@ variable "notification_email" {
   description = "Email address where SES bounce / complaint notifications will be sent."
   default     = ""
 }
+
+variable "aws_region" {
+  type        = string
+  description = "AWS region holding the remote state bucket and lock table."
+  default     = "us-west-2"
+}
+
+variable "state_bucket_name" {
+  type        = string
+  description = "Base name of the remote state bucket and lock table. The region is appended automatically."
+  default     = "missingtoken-terraform-state"
+}

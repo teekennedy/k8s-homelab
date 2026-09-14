@@ -1,21 +1,30 @@
-# Passphrase to encrypt local state
-tofu_local_state_passphrase: "ChangeMe!!1!"
+# Passphrase to encrypt state
+tofu_state_passphrase: "ChangeMe!!1!"
 # https://dash.cloudflare.com/profile
 cloudflare_email: "myaccount@example.com"
 # https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids
 cloudflare_account_id: "asdflkjaseflakjes"
 # https://dash.cloudflare.com/profile/api-tokens
 cloudflare_api_key: "asdflkjaseflakjes"
+# Apex domain used for cluster resources
+cloudflare_domain: example.com
+
 # PGP key reference for the smtp IAM user
-pgp_key: "keybase:tkennedy"
+pgp_key: "keybase:alice"
 
 # Email address where SES bounce / complaint notifications will be sent
 notification_email: "me@example.com"
 
+# Name of S3 bucket that restic will use for backups
+backup_bucket_name: my-backup-bucket
+
+# Environment name used to tag resources. Default: k8s-homelab
+environment: k8s-homelab
+
 extra_secrets: {
 # Ex:
-# my-app-creds:
-#   namespace: my-app
+# renovate-dockerhub-creds:
+#   namespace: renovate
 #   data:
 #     username: "alice"
 #     password: "asdfkjasdfakjse"

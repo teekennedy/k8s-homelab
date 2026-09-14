@@ -25,3 +25,21 @@ variable "unifi_site" {
   default     = "default"
   sensitive   = false
 }
+
+variable "aws_region" {
+  type        = string
+  description = "AWS region holding the remote state bucket and lock table."
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  type        = string
+  description = "Environment name. Also the first path segment of the state key."
+  default     = "k8s-homelab"
+}
+
+variable "state_bucket_name" {
+  type        = string
+  description = "Base name of the remote state bucket and lock table. The region is appended automatically."
+  default     = "missingtoken-terraform-state"
+}

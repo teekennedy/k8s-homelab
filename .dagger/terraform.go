@@ -50,31 +50,28 @@ func (m *Homelab) terraformContainer(container *dagger.Container) *dagger.Contai
 		WithMountedCache(tfPluginCache, dag.CacheVolume("homelab-tf-plugins"))
 }
 
-// initTerraform runs tofu init for all discovered Terraform modules and returns
-// the updated source tree. The .terraform working directories are removed so
-// the resulting changeset only contains commit-worthy files such as lockfiles.
-func (m *Homelab) initTerraform(ctx context.Context, source *dagger.Directory, container *dagger.Container) (*dagger.Directory, error) {
-	modulePaths := discoverTerraformModulePaths(ctx, source)
-	if len(modulePaths) == 0 {
-		return source, nil
-	}
-	container = m.terraformContainer(container)
+// initTerraformModule runs tofu init against the module given by modPath and
+// returns a Changeset of files modified, as well as the initialized container.
+func (m *Homelab) initTerraformModule(ctx context.Context, source *dagger.Directory, container *dagger.Container, modPath string) (*dagger.Changeset, *dagger.Container, error) {
+	modWorkdir := "/src/" + modPath
 
-	ctr := container.WithMountedDirectory("/src", source)
-	for _, modPath := range modulePaths {
-		ctr = ctr.
-			WithWorkdir("/src/" + modPath).
-			WithExec([]string{"echo", ("================ " + terraformModuleName(modPath) + " ================")}).
-			WithExec([]string{"tofu", "init", "-backend=false"}).
-			WithoutDirectory("/src/" + modPath + "/.terraform")
-	}
-
-	updated, err := ctr.Sync(ctx)
+	updated, err := container.
+		WithMountedDirectory("/src", source).
+		WithWorkdir(modWorkdir).
+		WithExec([]string{"echo", ("================ " + terraformModuleName(modPath) + " ================")}).
+		WithExec([]string{"tofu", "init", "-backend=false"}).
+		Sync(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("tofu init failed: %w", err)
+		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			return nil, nil, fmt.Errorf("terraform module %s: init failed:\n%s", modPath, execErr.Stderr)
+		}
+		return nil, nil, fmt.Errorf("terraform module %s: init failed: %w", modPath, err)
 	}
 
-	return updated.Directory("/src"), nil
+	before := dag.Directory().WithDirectory(modPath, source.Directory(modPath))
+	after := dag.Directory().WithDirectory(modPath, updated.Directory(modWorkdir)).WithoutDirectory(modPath + "/.terraform")
+
+	return after.Changes(before), updated, nil
 }
 
 // InitTerraform runs tofu init for all Terraform/OpenTofu modules.
@@ -90,12 +87,28 @@ func (m *Homelab) InitTerraform(
 	// +optional
 	container *dagger.Container,
 ) (*dagger.Changeset, error) {
-	initialized, err := m.initTerraform(ctx, source, container)
-	if err != nil {
+	modulePaths := discoverTerraformModulePaths(ctx, source)
+	if len(modulePaths) == 0 {
+		return dag.Changeset(), nil
+	}
+	container = m.terraformContainer(container)
+
+	changesets := make([]*dagger.Changeset, len(modulePaths))
+	errs := make([]error, len(modulePaths))
+
+	var wg sync.WaitGroup
+	for i, modPath := range modulePaths {
+		wg.Go(func() {
+			changesets[i], _, errs[i] = m.initTerraformModule(ctx, source, container, modPath)
+		})
+	}
+	wg.Wait()
+
+	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
 
-	return initialized.Changes(source), nil
+	return dag.Changeset().WithChangesets(changesets), nil
 }
 
 // FormatTerraform formats Terraform/OpenTofu files with `tofu fmt`.
@@ -133,14 +146,14 @@ func (m *Homelab) validateTerraformModule(ctx context.Context, source *dagger.Di
 		return nil, fmt.Errorf("terraform module %s: no toolchain container given", modPath)
 	}
 
-	modSource := source.Directory(modPath)
 	modWorkdir := "/src/" + modPath
 
-	fixed, err := container.
-		WithMountedDirectory("/src", source).
-		WithWorkdir(modWorkdir).
-		WithExec([]string{"echo", ("================ " + terraformModuleName(modPath) + " ================")}).
-		WithExec([]string{"tofu", "init", "-backend=false"}).
+	_, initializedContainer, err := m.initTerraformModule(ctx, source, container, modPath)
+	if err != nil {
+		return nil, err
+	}
+
+	fixed, err := initializedContainer.
 		WithExec([]string{"tofu", "validate"}).
 		Sync(ctx)
 	if err != nil {
@@ -150,7 +163,7 @@ func (m *Homelab) validateTerraformModule(ctx context.Context, source *dagger.Di
 		return nil, fmt.Errorf("terraform module %s: validation failed: %w", modPath, err)
 	}
 
-	before := dag.Directory().WithDirectory(modPath, modSource)
+	before := dag.Directory().WithDirectory(modPath, source.Directory(modPath))
 	after := dag.Directory().WithDirectory(modPath, fixed.Directory(modWorkdir)).WithoutDirectory(modPath + "/.terraform")
 
 	return after.Changes(before), nil

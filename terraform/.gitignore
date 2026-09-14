@@ -1,1 +1,6 @@
+# Providers cache
 .terraform/
+
+# Ignore local state
+*.tfstate
+*.tfstate.*
