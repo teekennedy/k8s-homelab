@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -70,8 +69,7 @@ func (a *forgeAuth) mintToken(ctx context.Context, login, password string) (stri
 	return a.createToken(ctx)
 }
 
-// loginToForgejo posts the web login form and confirms the resulting session
-// really belongs to login.
+// loginToForgejo posts the web login form and confirms it was accepted.
 func (a *forgeAuth) loginToForgejo(ctx context.Context, login, password string) error {
 	loginURL := a.forgejoURL + "/user/login"
 
@@ -86,27 +84,23 @@ func (a *forgeAuth) loginToForgejo(ctx context.Context, login, password string) 
 	form.Set("user_name", login)
 	form.Set("password", password)
 
-	if _, err := a.postForm(ctx, loginURL, form); err != nil {
+	result, err := a.postForm(ctx, loginURL, form)
+	if err != nil {
 		return fmt.Errorf("post forgejo login form: %w", err)
 	}
 
-	// A wrong password re-renders the login page with HTTP 200, so the POST
-	// succeeding proves nothing. Ask Forgejo who we are instead — its API
-	// accepts the web session cookie, which is also what the OAuth authorize
-	// endpoint will read in the next step.
-	who, err := a.get(ctx, a.forgejoURL+"/api/v1/user")
-	if err != nil {
-		return fmt.Errorf("forgejo login as %s did not establish a session: %w", login, err)
-	}
-	var self struct {
-		Login string `json:"login"`
-	}
-	if err := json.Unmarshal(who, &self); err != nil {
-		return fmt.Errorf("parse forgejo /api/v1/user response: %w", err)
-	}
-	if !strings.EqualFold(self.Login, login) {
-		// Never interpolate self.Login: it came back over the wire.
-		return fmt.Errorf("forgejo session belongs to a different account than %s", login)
+	// A wrong password re-renders /user/login with HTTP 200 instead of
+	// redirecting away from it, so the POST succeeding proves nothing by
+	// itself — the presence of that same form in the response is the signal.
+	//
+	// This used to instead confirm the session against GET /api/v1/user, but
+	// Forgejo's API rejects session-cookie auth outright ("token is
+	// required": reqToken in its api router, a deliberate CSRF hardening —
+	// API routes only take a token or basic auth). That made this step fail
+	// on a correct login exactly as it would on a wrong one, so there is no
+	// API endpoint left to ask "who did that log in as" here.
+	if _, err := hiddenInputs(result, "/user/login"); err == nil {
+		return fmt.Errorf("forgejo rejected the login form for %s", login)
 	}
 	return nil
 }

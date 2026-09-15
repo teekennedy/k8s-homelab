@@ -42,22 +42,22 @@ const grantPage = `<!DOCTYPE html>
   </form>
 </body></html>`
 
-// forge is a Forgejo stub: web login, the API identity check, and the OAuth
-// authorize/grant pair.
+// forge is a Forgejo stub: web login and the OAuth authorize/grant pair.
+//
+// It deliberately has no /api/v1/user handler: the real Forgejo rejects
+// session-cookie auth on its API routes outright ("token is required"), so
+// nothing here may depend on that endpoint working.
 type forge struct {
 	*httptest.Server
 	login, password string
-	// apiLogin is who /api/v1/user reports. Normally the same as login;
-	// overridden to model a jar that carried a session between identities.
-	apiLogin       string
-	woodpeckerURL  func() string
-	granted        bool
-	grantSubmitted bool
+	woodpeckerURL   func() string
+	granted         bool
+	grantSubmitted  bool
 }
 
 func newForge(t *testing.T, login, password string) *forge {
 	t.Helper()
-	f := &forge{login: login, password: password, apiLogin: login}
+	f := &forge{login: login, password: password}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/user/login", func(w http.ResponseWriter, r *http.Request) {
@@ -65,8 +65,8 @@ func newForge(t *testing.T, login, password string) *forge {
 			writeHTML(w, loginPage)
 			return
 		}
-		// A wrong password re-renders the page with HTTP 200 — the behaviour
-		// that makes the /api/v1/user check below load-bearing.
+		// A wrong password re-renders the page with HTTP 200 instead of
+		// redirecting away from it — the behaviour loginToForgejo detects.
 		if r.FormValue("_csrf") != "CSRF-LOGIN" ||
 			r.FormValue("user_name") != f.login || r.FormValue("password") != f.password {
 			writeHTML(w, loginPage)
@@ -77,15 +77,6 @@ func newForge(t *testing.T, login, password string) *forge {
 		//nolint:gosec // G124: test stub over http, not a real session cookie.
 		http.SetCookie(w, &http.Cookie{Name: "i_like_gitea", Value: "session", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode})
 		http.Redirect(w, r, "/", http.StatusSeeOther)
-	})
-
-	mux.HandleFunc("/api/v1/user", func(w http.ResponseWriter, r *http.Request) {
-		if !hasCookie(r, "i_like_gitea") {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"login":%q}`, f.apiLogin)
 	})
 
 	mux.HandleFunc("/login/oauth/authorize", func(w http.ResponseWriter, r *http.Request) {
@@ -224,7 +215,7 @@ func TestMintTokenSkipsAnAlreadyGrantedApp(t *testing.T) {
 }
 
 // The failure mode this guards: Forgejo answers a bad password with HTTP 200
-// and the login page, so the POST alone proves nothing.
+// and the login page again, so the POST succeeding alone proves nothing.
 func TestMintTokenRejectsABadPassword(t *testing.T) {
 	f, c := wire(t)
 
@@ -233,28 +224,8 @@ func TestMintTokenRejectsABadPassword(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error for a wrong password")
 	}
-	if !strings.Contains(err.Error(), "did not establish a session") {
+	if !strings.Contains(err.Error(), "rejected the login form") {
 		t.Fatalf("unhelpful error: %v", err)
-	}
-}
-
-// A jar carried between identities would mint the second account's token as
-// the first. The check is cheap; the failure would be invisible.
-func TestMintTokenRejectsASessionForAnotherAccount(t *testing.T) {
-	f, c := wire(t)
-	f.apiLogin = "someone-else"
-
-	auth, _ := newForgeAuth(f.URL, c.URL)
-	_, err := auth.mintToken(context.Background(), testLogin, testPassword)
-	if err == nil {
-		t.Fatal("expected an error when the session belongs to another account")
-	}
-	if !strings.Contains(err.Error(), "different account") {
-		t.Fatalf("unhelpful error: %v", err)
-	}
-	// The wrong login must not be echoed: it came back over the wire.
-	if strings.Contains(err.Error(), "someone-else") {
-		t.Fatalf("error interpolates a server-supplied login: %v", err)
 	}
 }
 
