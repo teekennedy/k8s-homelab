@@ -108,8 +108,15 @@ func newForge(t *testing.T, login, password string) *forge {
 	return f
 }
 
+// testCSRFToken is what /web-config.js hands back for the session this stub
+// sets. The real value is a signed JWT; a fixed string is enough here since
+// nothing in forgeauth.go inspects it beyond lifting it out of that page and
+// echoing it back in a header.
+const testCSRFToken = "csrf-token-for-sess" //nolint:gosec // G101: not a credential, an arbitrary stub value.
+
 // ci is a Woodpecker stub: the OAuth entry point, the callback that sets
-// user_sess, and the token endpoint that only that cookie unlocks.
+// user_sess, the web-config.js a session cookie unlocks a CSRF token from,
+// and the token endpoint that only cookie *and* that header unlock.
 type ci struct {
 	*httptest.Server
 	forgeURL func() string
@@ -132,8 +139,20 @@ func newCI(t *testing.T, token string) *ci {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
 
+	// The real Woodpecker only renders a CSRF value here when the request
+	// carries a valid user_sess cookie — modelled by echoing testCSRFToken
+	// only in that case, matching server/web.Config.
+	mux.HandleFunc("/web-config.js", func(w http.ResponseWriter, r *http.Request) {
+		csrf := ""
+		if hasCookie(r, "user_sess") {
+			csrf = testCSRFToken
+		}
+		w.Header().Set("Content-Type", "text/javascript")
+		_, _ = fmt.Fprintf(w, `window.WOODPECKER_CSRF = %q;`, csrf)
+	})
+
 	mux.HandleFunc("/api/user/token", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || !hasCookie(r, "user_sess") {
+		if r.Method != http.MethodPost || !hasCookie(r, "user_sess") || r.Header.Get("X-CSRF-TOKEN") != testCSRFToken {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -249,6 +268,28 @@ func TestMintTokenFailsWhenNoSessionCookieIsSet(t *testing.T) {
 	_, err := auth.mintToken(context.Background(), testLogin, testPassword)
 	if err == nil || !strings.Contains(err.Error(), "user_sess") {
 		t.Fatalf("want a user_sess error, got %v", err)
+	}
+}
+
+// The failure mode this guards: a user_sess cookie authenticates fine
+// against everything except a non-GET API call, which Woodpecker also demands
+// a CSRF header for. Getting the cookie was never enough by itself.
+func TestMintTokenFailsWhenWebConfigCarriesNoCSRFToken(t *testing.T) {
+	f, c := wire(t)
+	// Override /web-config.js after wiring so the rest of the flow (login,
+	// grant, callback) runs exactly as in the happy path.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/web-config.js", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/javascript")
+		_, _ = fmt.Fprint(w, `window.WOODPECKER_CSRF = "";`)
+	})
+	mux.Handle("/", c.Config.Handler)
+	c.Config.Handler = mux
+
+	auth, _ := newForgeAuth(f.URL, c.URL)
+	_, err := auth.mintToken(context.Background(), testLogin, testPassword)
+	if err == nil || !strings.Contains(err.Error(), "CSRF") {
+		t.Fatalf("want a CSRF error, got %v", err)
 	}
 }
 
