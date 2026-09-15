@@ -229,6 +229,19 @@ forgejo-resources:
             - read:user
             - write:issue
             - read:organization
+    # The account the woodpecker-resources Job authenticates as. Woodpecker has
+    # no API that mints a token for another user, so that job logs in through
+    # this account's Forgejo password (the OAuth redirect chain) to get one.
+    #
+    # No access tokens: nothing reads the Forgejo API as this account. What it
+    # needs is the `CI` team below, whose `admin` permission is what lets
+    # Woodpecker activate a repo — POST /api/repos requires the forge to report
+    # the caller as an admin of it, not merely a writer.
+    - name: woodpecker-resources
+      fullName: Woodpecker Resources
+      email: woodpecker-resources@msng.to
+      secretName: woodpecker-resources-forgejo-user
+      secretNamespace: woodpecker
     - name: tkennedy
       fullName: Terrance Kennedy
       email: terrance@missingtoken.net
@@ -278,6 +291,12 @@ forgejo-resources:
           members:
             - renovate
             - archon
+        # Separate from Bots because of the permission: `admin` is what
+        # Woodpecker's repo activation requires, and nothing else here needs it.
+        - name: CI
+          permission: admin
+          members:
+            - woodpecker-resources
   repositories:
     - name: k8s-homelab
       owner: ops

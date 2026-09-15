@@ -13,7 +13,7 @@ SCRIPT_NAME=open-pr
 
 BRANCH="$(branch_name)"
 BASE_BRANCH="$(base_branch)"
-head_sha="$(cat "$ARTIFACTS_DIR/head-sha" 2>/dev/null || true)"
+head_sha="$(current_head_sha)"
 [ -n "$head_sha" ] || die "no head SHA recorded — did run-agent.sh implement run?"
 
 # Reuse an existing open PR for this head branch.

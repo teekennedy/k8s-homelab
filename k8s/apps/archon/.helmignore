@@ -21,3 +21,9 @@
 .idea/
 *.tmproj
 .vscode/
+# Local test scaffolding for files/ci-signal. Only server.py is templated into
+# the ConfigMap, and a vendored virtualenv would otherwise be packaged.
+files/ci-signal/.venv
+files/ci-signal/__pycache__
+files/ci-signal/tests/__pycache__
+files/ci-signal/.pytest_cache

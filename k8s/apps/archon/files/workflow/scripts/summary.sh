@@ -10,8 +10,8 @@ SCRIPT_NAME=summary
 # shellcheck source=./common.sh
 . "${WORKFLOW_DIR:?}/scripts/common.sh"
 
-branch="$(cat "$ARTIFACTS_DIR/branch" 2>/dev/null || branch_name)"
-head_sha="$(cat "$ARTIFACTS_DIR/head-sha" 2>/dev/null || true)"
+branch="$(current_branch)"
+head_sha="$(current_head_sha)"
 pr_number="$(cat "$ARTIFACTS_DIR/pr-number" 2>/dev/null || true)"
 attempts="$(cat "$ARTIFACTS_DIR/attempt" 2>/dev/null || echo 0)"
 

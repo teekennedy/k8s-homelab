@@ -22,3 +22,13 @@ exemptions:
       - notReadOnlyRootFilesystem
       - automountServiceAccountToken
       - priorityClassNotSet
+  # woodpecker-resources-config carries the job's Go source and its config.yaml.
+  # Polaris flags it on the strength of the word "secret" appearing throughout —
+  # in field NAMES (`secretName`, `tokenSecret`, `mirrorSecret`) and in the
+  # base64 module hashes in go.sum, neither of which is a credential. Every
+  # actual value the job handles comes from a Secret at runtime; the only thing
+  # it ever writes into a ConfigMap is source code.
+  - controllerNames:
+      - woodpecker-resources-config
+    rules:
+      - sensitiveConfigmapContent

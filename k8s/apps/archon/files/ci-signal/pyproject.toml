@@ -1,0 +1,14 @@
+[project]
+name = "ci-signal"
+version = "0.1.0"
+description = "Turns a Woodpecker pipeline notification into an Archon durable-wait signal"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -69,8 +69,8 @@ printf '%s\n' "${ARGUMENTS:-}" > "$task_dir/task.md"
 cm_args=(--from-file="task.md=$task_dir/task.md")
 if [ "$mode" = fix ]; then
   ci_log="$ARTIFACTS_DIR/ci-failure.log"
-  [ -s "$ci_log" ] || die "fix attempt but no CI log at $ci_log — await-ci.sh should have written it"
-  # await-ci.sh already truncated to $CI_LOG_TAIL_BYTES; this is the belt to that
+  [ -s "$ci_log" ] || die "fix attempt but no CI log at $ci_log — ci-verdict.sh should have written it"
+  # ci-verdict.sh already truncated to $CI_LOG_TAIL_BYTES; this is the belt to that
   # braces, because a ConfigMap over 1 MiB is rejected by the API server and
   # would fail the attempt for a reason that looks nothing like its cause.
   tail -c "${CI_LOG_TAIL_BYTES:-262144}" "$ci_log" > "$task_dir/ci-log.txt"
@@ -162,7 +162,6 @@ if [ -n "$pushed_sha" ] && [ "$pushed_sha" != "$server_sha" ]; then
   die "branch '$BRANCH' is at $server_sha but the agent pushed $pushed_sha — concurrent write?"
 fi
 
-printf '%s\n' "$server_sha" > "$ARTIFACTS_DIR/head-sha"
-printf '%s\n' "$BRANCH" > "$ARTIFACTS_DIR/branch"
+record_head "$BRANCH" "$server_sha"
 log "attempt $ATTEMPT pushed $server_sha to $BRANCH"
 printf '%s\n' "$server_sha"

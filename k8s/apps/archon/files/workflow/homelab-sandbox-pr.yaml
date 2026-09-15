@@ -14,8 +14,8 @@ description: |
   that needs to write to the live cluster — the sandbox's cluster access is
   read-only by design.
 
-# Every node is a bash node driving kubectl and the Forgejo/Woodpecker APIs;
-# the model runs inside the sandbox, not here.
+# Every node is a bash node driving kubectl and the Forgejo/Woodpecker APIs, or
+# a durable wait; the model runs inside the sandbox, not here.
 #
 # Script paths are absolute rather than "$WORKFLOW_DIR/...": Archon rewrites
 # `$NAME` tokens in a node body before the shell sees them, so the one path
@@ -41,31 +41,53 @@ nodes:
     timeout: 120000
 
   # -------------------------------------------------------------------------
-  # Green-until loop. Each iteration waits out the PR check on whatever is
-  # currently at the head of the branch; if it is red, a NEW sandbox is created
-  # with the branch checked out and the failing log mounted, and it pushes a fix.
-  # The next iteration then waits on that new commit.
+  # Green-until loop. Each iteration reports on the pipeline the previous
+  # iteration waited for, fixes it if it was red, then arms and waits for the
+  # pipeline covering whatever is now at the head of the branch.
   #
-  # `await-ci` exits 0 whether the build is red or green — its stdout is the
-  # verdict, and both the gate below and `until_bash` read it. A non-zero exit
-  # means the verdict could not be determined at all, which fails the run.
+  # The wait is durable, not a poll: Archon persists an absolute deadline and
+  # releases the worker until a signal resumes the run. What sends that signal
+  # is the ci-signal relay sidecar; see README.md, "The CI loop".
+  #
+  # `await-ci` is last on purpose: a loop_group supports a wait only as the sole
+  # terminal sink of its body. That is why the fix happens at the TOP of the
+  # next iteration rather than after the wait in the same one.
   - id: ci-loop
     depends_on: [open-pr]
     loop_group:
       nodes:
-        - id: await-ci
-          bash: /opt/archon-workflow/scripts/await-ci.sh
-          # CI_WAIT_TIMEOUT_SECONDS (45m) plus slack for log collection.
-          timeout: 3300000
+        - id: ci-verdict
+          bash: /opt/archon-workflow/scripts/ci-verdict.sh
+          # Prints none | success | failure. On failure it also writes the tail
+          # of the failing Woodpecker step logs to $ARTIFACTS_DIR/ci-failure.log.
+          timeout: 600000
         - id: fix
           bash: /opt/archon-workflow/scripts/run-agent.sh fix
-          depends_on: [await-ci]
-          when: "$await-ci.output != 'success'"
+          depends_on: [ci-verdict]
+          # Skipped on the first iteration, where there is no verdict yet.
+          when: "$ci-verdict.output == 'failure'"
           timeout: 4500000
-      until_bash: 'test "$await-ci.output" = "success"'
-      # 1 implement pass + up to 5 waits. Exhausting the bound fails the run
-      # rather than reporting a still-red PR as done.
-      max_iterations: 5
+        - id: arm-ci
+          bash: /opt/archon-workflow/scripts/arm-ci.sh
+          depends_on: [fix]
+          # `fix` is skipped on the first iteration and whenever CI was green,
+          # so this cannot join on its success.
+          trigger_rule: all_done
+          timeout: 300000
+        - id: await-ci
+          depends_on: [arm-ci]
+          wait:
+            event: ci.complete
+            # 45 minutes. Must stay under ciSignal.deadlineSeconds (1h), so
+            # a notification that beats this node still has something to retry
+            # against. Expiring is not the end of the run: ci-verdict.sh fails
+            # it on the next iteration and says the signal never arrived.
+            deadline_ms: 2700000
+      until_bash: /opt/archon-workflow/scripts/ci-green.sh
+      # Up to 6 pipelines waited on, so up to 5 fix attempts (the first
+      # iteration has nothing to fix). Exhausting the bound fails the run rather
+      # than reporting a still-red PR as done.
+      max_iterations: 6
 
   # -------------------------------------------------------------------------
   # Terminal output: one JSON object naming the PR, the branch, the commit CI

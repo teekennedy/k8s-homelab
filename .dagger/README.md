@@ -36,7 +36,7 @@ The combination means:
 |---|---|
 | `main.go` | Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions |
 | `golang.go` | GoModule struct, per-module Test/Lint, aggregate TestGo/LintGo |
-| `python.go` | PythonProject struct, per-project Test/Lint, aggregate LintPython/TestPython/FormatPython |
+| `python.go` | PythonProject struct, per-project Test/Format, aggregate TestPython/FormatPython |
 | `helm.go` | HelmChart struct, per-chart Validate/Build, aggregate ValidateHelm/BuildHelm |
 | `kubernetes.go` | Per-chart Polaris/Kubeconform, aggregate ValidatePolaris/ValidateKubeconform |
 | `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
@@ -135,8 +135,7 @@ if container == nil {
 ```
 
 That is `FormatNix`, `LintYaml`, `ValidateWoodpecker`, `FormatCue`, `FixCue`,
-`TrimCue`, `ExportCue`, `TestGo`, `LintGo`, `LintPython`, `TestPython`,
-`FormatPython`, `ValidateHelm`, `BuildHelm`, `ValidatePolaris`,
+`TrimCue`, `ExportCue`, `TestGo`, `LintGo`, `TestPython`, `FormatPython`, `ValidateHelm`, `BuildHelm`, `ValidatePolaris`,
 `ValidateKubeconform`, `ValidateTerraform`, `FormatTerraform` and
 `VerifyCacheGranularity`. The exceptions are the three that build with Nix
 rather than the devenv shell — `ValidateNix`, `BuildCli` and
@@ -204,9 +203,6 @@ doesn't (e.g. `LintCue` also runs `cue vet`).
 - `LintCue(source, paths)` - CUE formatting and constraint validation (`cue fmt` + `cue vet`)
   - Filters: `config/**/*.cue`
   - Fix: `dagger call format-cue --auto-apply`
-- `LintPython(source, paths)` - Python formatting validation (delegates to PythonProject.Lint)
-  - Tools: `black`
-  - Fix: `dagger call format-python --auto-apply`
 - `LintYaml(source, paths)` - YAML linting
   - Filters: `**/*.yaml`, `**/*.yml`, `.yamllint.yaml`
 
@@ -236,7 +232,8 @@ These also run as part of `dagger check` (a non-empty changeset fails the check)
 - `LintGo(source)` - `go mod tidy` + `golangci-lint run --fix` for each Go module;
   fails if issues remain that `--fix` can't resolve (e.g. cyclop, gosec)
   (`dagger call lint-go --auto-apply`)
-- `FormatPython(source, paths)` - Format Python files (`dagger call format-python --auto-apply`)
+- `FormatPython(source, paths)` - Run `black` on each Python project
+  (`dagger call format-python --auto-apply`)
 - `FormatCue(source)` / `FixCue(source)` / `ExportCue(source)` - CUE formatting,
   syntax upgrades, and `config/gen/<env>/env.json` export
 - `UpdateGoVendorHash(source)` - Recompute the nix buildGoModule vendorHash for `cmd/lab`

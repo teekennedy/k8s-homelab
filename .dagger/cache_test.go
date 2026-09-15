@@ -49,7 +49,7 @@ import (
 // is the check's own module function — the fake backend needs to pass nil for
 // the toolchain container and the engine backend a shim, so the function needs
 // the optional `container` parameter that TestGo and LintGo have and that
-// LintPython, ValidateHelm and ValidateTerraform currently do not.
+// ValidateHelm and ValidateTerraform currently do not.
 
 // ---------------------------------------------------------------------------
 // the workspace under test

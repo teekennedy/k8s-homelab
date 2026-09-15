@@ -2,53 +2,33 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"dagger/homelab/internal/dagger"
 
 	"golang.org/x/sync/errgroup"
 )
 
-// blackCmd is the single definition of how black is invoked. Every call site
-// uses it: lint, per-project format, and the aggregate format all have to agree
-// with each other. Three hand-maintained copies of this argument list previously
-// drifted apart, so the `dagger check` gate and `dagger call format-python`
-// disagreed on line length.
+// blackCmd is the single definition of how black is invoked, so that the
+// `dagger check` gate and `dagger call format-python` cannot disagree on what
+// formatted means — three hand-maintained copies of this list once did.
 //
-// black comes from the ci profile, so its version is pinned by devenv.lock.
-// This used to be `uv tool run black`, which resolves the newest release on
-// PyPI at run time: the old black pre-commit hook in devenv.nix ran a
-// Nix-pinned black while CI ran whatever had just been published, and nothing
-// held the two to the same version. (The `black>=24.0.0` in the various
-// pyproject.toml files is a dev dependency; `uv tool run` never read it.)
-//
-// No --line-length is passed on purpose — black's default is the one width that
-// needs no agreement between call sites.
+// black comes from the ci profile, so devenv.lock pins its version. It used to
+// be `uv tool run black`, which resolves the newest PyPI release at run time
+// while the pre-commit hook ran a Nix-pinned one. No --line-length on purpose:
+// black's default is the one width that needs no agreement between call sites.
 func blackCmd() []string {
 	return []string{"black", "."}
 }
 
-// discoverPythonProjectPaths finds all Python project directories in source.
-func discoverPythonProjectPaths(ctx context.Context, source *dagger.Directory) []string {
-	pyprojectFiles, _ := source.Glob(ctx, "**/pyproject.toml")
-	var paths []string
-	for _, f := range pyprojectFiles {
-		dir := filepath.Dir(f)
-		if dir != "." {
-			paths = append(paths, dir)
-		}
-	}
-	sort.Strings(paths)
-	return paths
-}
-
-// PythonProject is a Python project with a scoped source directory.
-// Each PythonProject carries only the files for its project, enabling
-// per-project caching: changing files in one project won't invalidate
-// the cache for other projects.
+// PythonProject is one Python project — a directory with a pyproject.toml —
+// carrying only that project's files, so changing one project does not
+// invalidate the BuildKit cache for the others.
 type PythonProject struct {
 	// Path is the project's directory relative to the repo root
 	// (e.g. "k8s/foundation/kured/files/kured-webhook").
@@ -70,23 +50,38 @@ func (pp *PythonProject) usable(container *dagger.Container) error {
 	return nil
 }
 
-// PythonProjects returns all discovered Python projects with scoped source directories.
-// Each project's Source is a subdirectory of the +defaultPath source, so
-// Directory IDs are stable across sessions and cache independently.
+// pythonProjects finds every project under source, narrowed to the ones
+// containing `paths` when that is set. Each Source is a subdirectory of the
+// +defaultPath source, so Directory IDs are stable across sessions.
+func pythonProjects(ctx context.Context, source *dagger.Directory, paths []string) []*PythonProject {
+	pyprojectFiles, _ := source.Glob(ctx, "**/pyproject.toml")
+	var projectPaths []string
+	for _, f := range pyprojectFiles {
+		if dir := filepath.Dir(f); dir != "." {
+			projectPaths = append(projectPaths, dir)
+		}
+	}
+	sort.Strings(projectPaths)
+	if len(paths) > 0 {
+		projectPaths = matchProjectPaths(paths, projectPaths)
+	}
+
+	projects := make([]*PythonProject, len(projectPaths))
+	for i, projPath := range projectPaths {
+		projects[i] = &PythonProject{Path: projPath, Source: source.Directory(projPath)}
+	}
+	return projects
+}
+
+// PythonProjects returns all discovered Python projects with scoped source
+// directories.
 func (m *Homelab) PythonProjects(
 	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 ) []*PythonProject {
-	var projects []*PythonProject
-	for _, projPath := range discoverPythonProjectPaths(ctx, source) {
-		projects = append(projects, &PythonProject{
-			Path:   projPath,
-			Source: source.Directory(projPath),
-		})
-	}
-	return projects
+	return pythonProjects(ctx, source, nil)
 }
 
 // Test runs pytest for this Python project, in the given toolchain container.
@@ -101,89 +96,40 @@ func (pp *PythonProject) Test(ctx context.Context, container *dagger.Container) 
 		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest", "-v"}).
 		Sync(ctx)
 	if err != nil {
+		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			return "", fmt.Errorf("pytest failed in %s:\n%s%s%w", pp.Path, execErr.Stdout, execErr.Stderr, err)
+		}
 		return "", fmt.Errorf("pytest failed in %s: %w", pp.Path, err)
 	}
 	return fmt.Sprintf("Python tests passed in %s", pp.Path), nil
 }
 
-// Lint runs black formatting check for this Python project.
-func (pp *PythonProject) Lint(ctx context.Context, container *dagger.Container) (string, error) {
+// Format runs black on this project, returning the resulting changes.
+func (pp *PythonProject) Format(ctx context.Context, container *dagger.Container) (*dagger.Changeset, error) {
 	if err := pp.usable(container); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	formatted := container.
+	formatted, err := container.
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
 		WithExec(blackCmd()).
-		Directory("/src")
-
-	changeset := formatted.Changes(pp.Source)
-	empty, err := changeset.IsEmpty(ctx)
+		Sync(ctx)
 	if err != nil {
-		return "", fmt.Errorf("checking for python formatting changes in %s: %w", pp.Path, err)
-	}
-
-	if !empty {
-		modified, _ := changeset.ModifiedPaths(ctx)
-		return "", fmt.Errorf("python files need formatting in %s: %s\nRun `dagger call format-python --auto-apply` to fix",
-			pp.Path, strings.Join(modified, ", "))
-	}
-
-	return fmt.Sprintf("Python lint passed in %s", pp.Path), nil
-}
-
-// Format formats Python files with black for this project, returning the formatted directory.
-func (pp *PythonProject) Format(container *dagger.Container) *dagger.Directory {
-	return container.
-		WithMountedDirectory("/src", pp.Source).
-		WithWorkdir("/src").
-		WithExec(blackCmd()).
-		Directory("/src")
-}
-
-// LintPython runs Python formatting validation with black.
-// Each project is linted with a scoped source directory so that changes
-// in one project don't invalidate the BuildKit cache for other projects.
-// Fails if any files need formatting. Use `dagger call format-python --auto-apply` to fix.
-// +check
-func (m *Homelab) LintPython(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
-	source *dagger.Directory,
-	// +optional
-	paths []string,
-	// +optional
-	container *dagger.Container,
-) (string, error) {
-	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
-	if len(paths) > 0 {
-		pythonProjectPaths = matchProjectPaths(paths, pythonProjectPaths)
-	}
-	if len(pythonProjectPaths) == 0 {
-		return "Python lint skipped (no projects found)", nil
-	}
-	if container == nil {
-		container = m.ciContainer()
-	}
-
-	g := new(errgroup.Group)
-	for _, projPath := range pythonProjectPaths {
-		pp := &PythonProject{
-			Path:   projPath,
-			Source: source.Directory(projPath),
+		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			return nil, fmt.Errorf("black failed in %s:\n%s%w", pp.Path, execErr.Stderr, err)
 		}
-		g.Go(func() error {
-			_, err := pp.Lint(ctx, container)
-			return err
-		})
+		return nil, fmt.Errorf("black failed in %s: %w", pp.Path, err)
 	}
 
-	if err := g.Wait(); err != nil {
-		return "", fmt.Errorf("python lint failed: %w", err)
-	}
+	// Re-rooted under pp.Path before diffing. Both sides are project-scoped, so
+	// diffing them directly yields paths relative to the project, and
+	// `--auto-apply` — which writes relative to the repo root — would drop the
+	// file in the wrong place.
+	before := dag.Directory().WithDirectory(pp.Path, pp.Source)
+	after := dag.Directory().WithDirectory(pp.Path, formatted.Directory("/src"))
 
-	return "Python lint passed", nil
+	return after.Changes(before), nil
 }
 
 // FormatPython formats Python files with black across all discovered projects.
@@ -198,37 +144,34 @@ func (m *Homelab) FormatPython(
 	paths []string,
 	// +optional
 	container *dagger.Container,
-) *dagger.Changeset {
-	formatted := m.pythonFormat(ctx, source, paths, container)
-	return formatted.Changes(source)
-}
-
-// pythonFormat runs black on all Python projects, returning the formatted directory.
-func (m *Homelab) pythonFormat(ctx context.Context, source *dagger.Directory, paths []string, container *dagger.Container) *dagger.Directory {
-	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
-	if len(paths) > 0 {
-		pythonProjectPaths = matchProjectPaths(paths, pythonProjectPaths)
-	}
-	if len(pythonProjectPaths) == 0 {
-		return source
+) (*dagger.Changeset, error) {
+	projects := pythonProjects(ctx, source, paths)
+	if len(projects) == 0 {
+		return dag.Changeset(), nil
 	}
 	if container == nil {
 		container = m.ciContainer()
 	}
-	container = container.WithMountedDirectory("/src", source)
 
-	for _, dir := range pythonProjectPaths {
-		container = container.
-			WithWorkdir("/src/" + dir).
-			WithExec(blackCmd())
+	changesets := make([]*dagger.Changeset, len(projects))
+	errs := make([]error, len(projects))
+
+	var wg sync.WaitGroup
+	for i, pp := range projects {
+		wg.Go(func() {
+			changesets[i], errs[i] = pp.Format(ctx, container)
+		})
+	}
+	wg.Wait()
+
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
 	}
 
-	return container.Directory("/src")
+	return dag.Changeset().WithChangesets(changesets), nil
 }
 
 // TestPython runs pytest for all discovered Python projects.
-// Each project is tested with a scoped source directory so that changes
-// in one project don't invalidate the BuildKit cache for other projects.
 // +check
 func (m *Homelab) TestPython(ctx context.Context,
 	// +defaultPath="/"
@@ -239,11 +182,8 @@ func (m *Homelab) TestPython(ctx context.Context,
 	// +optional
 	container *dagger.Container,
 ) (string, error) {
-	pythonProjectPaths := discoverPythonProjectPaths(ctx, source)
-	if len(paths) > 0 {
-		pythonProjectPaths = matchProjectPaths(paths, pythonProjectPaths)
-	}
-	if len(pythonProjectPaths) == 0 {
+	projects := pythonProjects(ctx, source, paths)
+	if len(projects) == 0 {
 		return "Python tests skipped (no projects found)", nil
 	}
 	if container == nil {
@@ -251,11 +191,7 @@ func (m *Homelab) TestPython(ctx context.Context,
 	}
 
 	g := new(errgroup.Group)
-	for _, projPath := range pythonProjectPaths {
-		pp := &PythonProject{
-			Path:   projPath,
-			Source: source.Directory(projPath),
-		}
+	for _, pp := range projects {
 		g.Go(func() error {
 			_, err := pp.Test(ctx, container)
 			return err

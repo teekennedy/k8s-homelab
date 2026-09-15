@@ -1,7 +1,9 @@
 {{- $sandboxLabels := dict "app.kubernetes.io/part-of" (printf "%s-sandbox" (include "archon.fullname" .)) -}}
 ---
 # This is what makes ARCHON_WEB_AUTH_HEADER trusted-header auth safe — see
-# README.md, "Security posture".
+# README.md, "Security posture". Both rules select the same pod: oauth2-proxy
+# reaches Archon's app port, Woodpecker reaches the ci-signal sidecar's, and
+# neither can reach the other's.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -23,6 +25,15 @@ spec:
               app.kubernetes.io/instance: {{ .Release.Name }}
       ports:
         - port: http
+          protocol: TCP
+    # The HMAC on the body is what actually authenticates a notification; this
+    # just keeps the rest of the cluster off the port.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.ciSignal.woodpeckerNamespace }}
+      ports:
+        - port: ci-signal
           protocol: TCP
 ---
 # oauth2-proxy itself: reachable only from the gateway.

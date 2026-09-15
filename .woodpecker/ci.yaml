@@ -18,3 +18,37 @@ steps:
       - apk add --no-cache curl kubectl
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       - timeout 25m dagger check
+
+  # Woodpecker has no outgoing webhooks, so this step IS the notification: it
+  # releases the durable wait in Archon's homelab-sandbox-pr workflow, which
+  # would otherwise have to poll. It posts to the ci-signal relay's ClusterIP —
+  # the relay checks the HMAC and signals Archon over loopback, so Archon's own
+  # port is never reached from here.
+  #
+  # `status: [success, failure]` makes this run whatever the `ci` step did — a
+  # red build is the case the workflow most needs to hear about.
+  - name: notify-archon
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    when:
+      - status: [success, failure]
+    environment:
+      # Provisioned as a repo secret by the woodpecker-resources job, which
+      # writes the same value into the archon namespace for the relay.
+      CI_SIGNAL_SECRET:
+        from_secret: archon_ci_signal_secret
+      CI_SIGNAL_URL: "http://archon-ci-signal.archon.svc.cluster.local:9100/ci"
+    commands:
+      - apk add --no-cache curl openssl
+      # CI_COMMIT_SHA is what the relay correlates on.
+      - |
+        body=$(printf '{"commit":"%s","status":"%s","branch":"%s","pipeline_number":"%s","pipeline_url":"%s","repo_id":"%s"}' \
+          "$CI_COMMIT_SHA" "$CI_PIPELINE_STATUS" "$CI_COMMIT_SOURCE_BRANCH" \
+          "$CI_PIPELINE_NUMBER" "$CI_PIPELINE_URL" "$CI_REPO_ID")
+        signature=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$CI_SIGNAL_SECRET" -r | cut -d' ' -f1)
+        # --fail-with-body so a rejected signature shows up in the step log.
+        # Never fatal: the wait has its own deadline to fall back on.
+        curl --silent --show-error --fail-with-body --max-time 30 \
+          --request POST "$CI_SIGNAL_URL" \
+          --header 'Content-Type: application/json' \
+          --header "X-CI-Signature: $signature" \
+          --data-binary "$body" || echo "ci-signal notification failed; the archon wait will fall back to its deadline"

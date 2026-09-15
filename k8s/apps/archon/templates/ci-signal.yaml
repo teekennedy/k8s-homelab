@@ -1,0 +1,34 @@
+{{- $fullName := include "archon.fullname" . -}}
+---
+# The relay's source, mounted into the sidecar. Stdlib-only Python run straight
+# out of a ConfigMap: no image to build.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullName }}-ci-signal
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+data:
+  server.py: |
+{{ .Files.Get "files/ci-signal/server.py" | indent 4 }}
+---
+# Reached only by Woodpecker agents, in-cluster, over a ClusterIP. Separate from
+# the Archon Service so the sidecar's port is addressable without publishing
+# Archon's alongside it; see templates/networkpolicy.yaml for what may reach it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-ci-signal
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.ciSignal.port }}
+      targetPort: ci-signal
+      protocol: TCP
+      name: ci-signal
+  selector:
+    {{- include "archon.selectorLabels" . | nindent 4 }}

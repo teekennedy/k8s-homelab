@@ -124,6 +124,45 @@ branch_head_sha() {
 }
 
 # ---------------------------------------------------------------------------
+# Run state
+# ---------------------------------------------------------------------------
+# The branch and commit the loop is currently about, shared between nodes
+# through $ARTIFACTS_DIR: run-agent.sh records them after every push, arm-ci.sh
+# before every wait.
+record_head() {
+  printf '%s\n' "$1" > "$ARTIFACTS_DIR/branch"
+  printf '%s\n' "$2" > "$ARTIFACTS_DIR/head-sha"
+}
+
+current_branch() { cat "$ARTIFACTS_DIR/branch" 2>/dev/null || branch_name; }
+current_head_sha() { cat "$ARTIFACTS_DIR/head-sha" 2>/dev/null || true; }
+
+# ---------------------------------------------------------------------------
+# CI events
+# ---------------------------------------------------------------------------
+# Where these scripts and the ci-signal relay sidecar meet; both mount the
+# Archon data volume. Correlation is by commit SHA because that is the only
+# identifier Woodpecker's notification and this workflow both already know —
+# and a 40-char hex string needs no escaping to be used as a filename.
+CI_EVENTS_DIR="${CI_EVENTS_DIR:-/.archon/ci-events}"
+
+# ci_wait_file <sha> — the arming record, written here, read by the relay.
+ci_wait_file() { printf '%s/waits/%s.json' "$CI_EVENTS_DIR" "$1"; }
+
+# ci_verdict_file <sha> — the pipeline result, written by the relay, read here.
+ci_verdict_file() { printf '%s/verdicts/%s.json' "$CI_EVENTS_DIR" "$1"; }
+
+# write_atomic <path> — read stdin, then replace <path> in one rename. The relay
+# polls these directories, so a half-written file would be read as a real one.
+write_atomic() {
+  local target="$1" staging
+  mkdir -p "$(dirname "$target")"
+  staging="$(mktemp "$(dirname "$target")/.tmp.XXXXXX")"
+  cat > "$staging"
+  mv -f "$staging" "$target"
+}
+
+# ---------------------------------------------------------------------------
 # kubectl
 # ---------------------------------------------------------------------------
 # Always namespace-scoped: the ServiceAccount has no cluster-wide grants, so an

@@ -1,0 +1,214 @@
+{{- $cfg := index .Values "woodpecker-resources" }}
+---
+# Reconciles declarative Woodpecker state: users and their personal access
+# tokens, repo activation and per-repo settings, and repo secrets. The
+# counterpart of the forgejo-resources Job in k8s/platform/forgejo, and
+# deliberately shaped the same way.
+#
+# sync-wave 2, one behind forgejo-resources' wave 1: every identity here logs
+# in through Forgejo with a password that job creates, so its accounts have to
+# exist first.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: woodpecker-resources
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    helm.sh/hook: post-install,post-upgrade
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: woodpecker-resources-job
+      restartPolicy: Never
+      containers:
+        - name: apply
+          image: "{{ .Values.woodpeckerResources.golangImage }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: GOCACHE
+              value: /tmp/go-cache
+            - name: GOMODCACHE
+              value: /tmp/go-modules
+            - name: HOME
+              value: /tmp
+          workingDir: /go/src/woodpecker-resources
+          command:
+            - sh
+            - -c
+          args:
+            - |
+              # Both URLs are the PUBLIC ones (see the note on `forgejo.url` in
+              # values.yaml), so the wait is on the ingress path the OAuth
+              # redirect chain will actually take, not on a Service.
+              timeout 300 sh -c 'until wget -q -O /dev/null "{{ $cfg.woodpecker.url }}/healthz"; do sleep 5; done'
+              go run .
+          volumeMounts:
+            - name: source
+              mountPath: /go/src/woodpecker-resources
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: go-cache
+              mountPath: /tmp/go-cache
+              subPath: go-cache
+            - name: go-modules
+              mountPath: /tmp/go-modules
+              subPath: go-modules
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+      volumes:
+        - name: source
+          configMap:
+            name: woodpecker-resources-config
+        - name: tmp
+          emptyDir: {}
+        - name: go-cache
+          persistentVolumeClaim:
+            claimName: woodpecker-resources-go-cache
+        - name: go-modules
+          persistentVolumeClaim:
+            claimName: woodpecker-resources-go-cache
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: woodpecker-resources-go-cache
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: woodpecker-resources-config
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yaml: |
+    {{- toYaml $cfg | nindent 4 }}
+  {{- /*
+    Ranged rather than `.Files.Glob.AsConfig` so test files can be skipped:
+    `go run .` ignores them, but there is no reason to mount the job's source
+    with them in it. Glob has no negation, hence the explicit filter.
+  */}}
+  {{- range $path, $_ := .Files.Glob "files/woodpecker-resources/*" }}
+  {{- if not (hasSuffix "_test.go" $path) }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+  {{- end }}
+  {{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: woodpecker-resources-job
+  namespace: {{ .Release.Namespace }}
+---
+{{- /*
+  Collect the Secrets this job touches, grouped by namespace and split by the
+  access it actually needs: the Forgejo credential Secrets are only ever read,
+  while token and mirror Secrets are written. Keeping them apart means the
+  password this job logs in with is not something it could also overwrite.
+*/}}
+{{- $written := dict }}
+{{- $read := dict }}
+{{- define "woodpecker.recordSecret" -}}
+  {{- $acc := index . 0 }}
+  {{- $ns := index . 1 }}
+  {{- $secret := index . 2 }}
+  {{- if and $ns $secret }}
+    {{- $_ := set $acc $ns (append (get $acc $ns | default (list)) $secret | uniq) }}
+  {{- end }}
+{{- end }}
+
+{{- $identities := list }}
+{{- if $cfg.bootstrap }}
+  {{- $identities = append $identities $cfg.bootstrap }}
+{{- end }}
+{{- range $cfg.users | default (list) }}
+  {{- $identities = append $identities . }}
+{{- end }}
+{{- range $identities }}
+  {{- include "woodpecker.recordSecret" (list $read .credentialsSecret.namespace .credentialsSecret.name) }}
+  {{- include "woodpecker.recordSecret" (list $written .tokenSecret.namespace .tokenSecret.name) }}
+{{- end }}
+{{- range $cfg.repositories | default (list) }}
+  {{- range .secrets | default (list) }}
+    {{- if .mirrorSecret }}
+      {{- include "woodpecker.recordSecret" (list $written .mirrorSecret.namespace .mirrorSecret.name) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- $namespaces := keys (merge (dict) $written $read) | sortAlpha }}
+{{- range $ns := $namespaces }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: woodpecker-resources-secrets
+  namespace: {{ $ns }}
+rules:
+  {{- $writeNames := get $written $ns | default (list) | sortAlpha }}
+  {{- $readNames := get $read $ns | default (list) | sortAlpha }}
+  {{- if $writeNames }}
+  # The create verb is incompatible with resourceNames, so it is granted
+  # unnamed; every other verb is pinned to the names listed below.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+{{- range $writeNames }}
+      - {{ . }}
+{{- end }}
+    verbs: ["get", "update", "patch"]
+  {{- end }}
+  {{- /* Read-only: a credential Secret this job logs in with, nothing more. */}}
+  {{- $readOnly := $readNames }}
+  {{- range $name := $writeNames }}
+    {{- $readOnly = without $readOnly $name }}
+  {{- end }}
+  {{- if $readOnly }}
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+{{- range $readOnly | sortAlpha }}
+      - {{ . }}
+{{- end }}
+    verbs: ["get"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: woodpecker-resources-secrets
+  namespace: {{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: woodpecker-resources-job
+    namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: woodpecker-resources-secrets
+  apiGroup: rbac.authorization.k8s.io
+---
+{{- end }}

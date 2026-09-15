@@ -115,6 +115,38 @@ spec:
         - protocol: TCP
           port: 22
 ---
+# The notify-archon step in .woodpecker/ci.yaml POSTs the pipeline result to the
+# ci-signal relay in the archon namespace, which is what releases the durable
+# wait in Archon's homelab-sandbox-pr workflow. It is not covered by the common
+# internet rule (RFC1918 is excluded there) nor by the Traefik rule -- this is a
+# direct pod-to-pod call on a ClusterIP, deliberately bypassing any ingress.
+#
+# Scoped to step pods only via the label above: neither the server nor the agent
+# has any business talking to it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: woodpecker-step-ci-signal-egress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: woodpecker-ci.org/step
+        operator: Exists
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.ciSignal.namespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Values.ciSignal.appName }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ciSignal.port }}
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

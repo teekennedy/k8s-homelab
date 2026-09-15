@@ -70,11 +70,8 @@ The script is tested and linted via Dagger functions:
 # Run tests
 dagger call test-python --source=.
 
-# Check formatting
-dagger call lint-python --source=.
-
-# Fix formatting
-dagger call lint-python --source=. --fix=true
+# Format (a non-empty changeset also fails `dagger check`)
+dagger call format-python --source=. --auto-apply
 ```
 
 ## Architecture
