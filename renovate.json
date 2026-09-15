@@ -249,6 +249,13 @@
       "groupName": "nixos hosts"
     },
     {
+      "description": "One PR for all terraform module updates.",
+      "matchFileNames": [
+        "terraform/**"
+      ],
+      "groupName": "terraform"
+    },
+    {
       "description": "Give lock file maintenance PRs a title that identifies the lock file type and directory, instead of the generic default 'chore(deps): lock file maintenance' that's identical across every PR.",
       "matchManagers": [
         "nix"
@@ -265,7 +272,7 @@
       "matchUpdateTypes": [
         "lockFileMaintenance"
       ],
-      "commitMessageAction": "{{packageFileDir}} terraform lock file maintenance"
+      "commitMessageAction": "terraform lock file maintenance"
     },
     {
       "matchManagers": [
@@ -391,9 +398,6 @@
       "description": "Run tofu init to tidy up lockfiles after maintenance",
       "matchManagers": [
         "terraform"
-      ],
-      "matchFileNames": [
-        "**/.terraform.lock.hcl"
       ],
       "postUpgradeTasks": {
         "commands": [
