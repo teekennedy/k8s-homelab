@@ -106,7 +106,7 @@ app-template:
         jellyfin:
           image:
             repository: ghcr.io/jellyfin/jellyfin
-            tag: 12.0@sha256:74f4d87d9cf262c52d62be6be265c0355c6a7e21d0477ab6c654a49a4f8b1fd4
+            tag: 12.1@sha256:008ec8024bdaaa6f0a3f0de468e185633eeba9d67c56936e8dbf5ef6b8d6200f
           env:
             TZ: America/Denver
             JELLYFIN_DATA_DIR: "/data"
@@ -326,7 +326,7 @@ app-template:
           # https://cleanuparr.github.io/Cleanuparr/
           image:
             repository: ghcr.io/cleanuparr/cleanuparr
-            tag: 2.10.5
+            tag: 2.10.6
           env:
             TZ: America/Denver
             PORT: "11011"
@@ -477,7 +477,7 @@ app-template:
         configarr:
           image:
             repository: ghcr.io/raydak-labs/configarr
-            tag: 1.30.2
+            tag: 1.31.0
             pullPolicy: IfNotPresent
           tty: true # for color support
           env:
