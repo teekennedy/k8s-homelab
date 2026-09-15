@@ -1,0 +1,24 @@
+{{/*
+Everything under files/workflow/, flattened. Mounted in templates/deployment.yaml;
+see README.md, "Where the code lives" for the two mount points and why.
+
+Keys are flat because ConfigMap keys cannot contain "/" — the volume's `items`
+mapping (archon.workflowVolumeItems in _helpers.tpl) puts scripts/ back under a
+subdirectory.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "archon.fullname" . }}-workflow
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+data:
+  {{- range $path, $_ := .Files.Glob "files/workflow/*" }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+  {{- end }}
+  {{- range $path, $_ := .Files.Glob "files/workflow/scripts/*" }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+  {{- end }}

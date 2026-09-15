@@ -1,0 +1,281 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "archon.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # Single writer: /.archon and /home/appuser are RWO, and Archon's run state
+  # assumes one process owns them.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "archon.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "archon.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # The workflow definition and its scripts live in a ConfigMap this chart
+        # owns, and Archon reads them at process start — so a change to
+        # files/workflow/** has to roll the pod, not just update the volume.
+        checksum/workflow: {{ include (print $.Template.BasePath "/configmap-workflow.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "archon.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        # Copies kubectl out of alpine/kubectl rather than forking the Archon
+        # image just to add one static binary.
+        - name: install-kubectl
+          image: {{ .Values.kubectl.image }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              cp /usr/local/bin/kubectl /opt/bin/kubectl
+              chmod 0755 /opt/bin/kubectl
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: bin
+              mountPath: /opt/bin
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: PATH
+              # Prepended, not replaced: the image's own PATH must still resolve.
+              value: /opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            - name: HOST
+              value: {{ .Values.archon.host | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.archon.logLevel | quote }}
+            - name: MAX_CONCURRENT_CONVERSATIONS
+              value: {{ .Values.archon.maxConcurrentConversations | quote }}
+            {{- if .Values.archon.telemetryDisabled }}
+            - name: ARCHON_TELEMETRY_DISABLED
+              value: "1"
+            - name: DO_NOT_TRACK
+              value: "1"
+            {{- end }}
+            - name: DEFAULT_AI_ASSISTANT
+              value: {{ .Values.archon.defaultAiAssistant | quote }}
+            # Trusted-header auth — see README.md, "Security posture".
+            - name: ARCHON_WEB_AUTH_HEADER
+              value: {{ .Values.archon.webAuthHeader | quote }}
+            # The sandboxed agent authenticates separately; see sandbox-pod.yaml.
+            - name: CLAUDE_USE_GLOBAL_AUTH
+              value: "false"
+            # --- Forge: the community Gitea/Forgejo adapter -------------------
+            # All three of GITEA_URL / GITEA_TOKEN / GITEA_WEBHOOK_SECRET must be
+            # present or the adapter silently does not register. Forgejo is a
+            # Gitea fork and speaks the same API, so the adapter works against it
+            # unmodified.
+            - name: GITEA_URL
+              value: {{ .Values.forge.url | quote }}
+            - name: GITEA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: token
+            - name: GITEA_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "archon.fullname" . }}-webhook
+                  key: webhook-secret
+            - name: GITEA_ALLOWED_USERS
+              value: {{ .Values.forge.adapter.allowedUsers | join "," | quote }}
+            - name: GITEA_BOT_MENTION
+              value: {{ .Values.forge.adapter.botMention | quote }}
+            # Read by the workflow's bash nodes (files/workflow/scripts).
+            # FORGEJO_* rather than GITEA_* so the scripts don't read as if
+            # they're talking to gitea.com.
+            - name: FORGEJO_URL
+              value: {{ .Values.forge.url | quote }}
+            - name: FORGEJO_OWNER
+              value: {{ .Values.forge.owner | quote }}
+            - name: FORGEJO_REPO
+              value: {{ .Values.forge.repo | quote }}
+            - name: FORGEJO_CLONE_URL
+              value: {{ .Values.forge.cloneURL | quote }}
+            - name: FORGEJO_DEFAULT_BRANCH
+              value: {{ .Values.forge.defaultBranch | quote }}
+            - name: FORGEJO_BRANCH_PREFIX
+              value: {{ .Values.forge.branchPrefix | quote }}
+            - name: FORGEJO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: username
+            - name: FORGEJO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: token
+            # --- CI ----------------------------------------------------------
+            - name: WOODPECKER_URL
+              value: {{ .Values.ci.url | quote }}
+            - name: WOODPECKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ci.secretName }}
+                  key: token
+            - name: CI_STATUS_CONTEXT
+              value: {{ .Values.ci.statusContext | quote }}
+            - name: CI_WAIT_TIMEOUT_SECONDS
+              value: {{ .Values.ci.waitTimeoutSeconds | quote }}
+            - name: CI_POLL_INTERVAL_SECONDS
+              value: {{ .Values.ci.pollIntervalSeconds | quote }}
+            - name: CI_LOG_TAIL_BYTES
+              value: {{ .Values.ci.logTailBytes | quote }}
+            # --- Sandbox driver ----------------------------------------------
+            - name: SANDBOX_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: SANDBOX_IMAGE
+              value: {{ .Values.sandbox.image | quote }}
+            - name: SANDBOX_MODEL
+              value: {{ .Values.sandbox.model | quote }}
+            - name: SANDBOX_SERVICE_ACCOUNT
+              value: {{ .Values.sandbox.serviceAccountName | quote }}
+            - name: SANDBOX_ANTHROPIC_SECRET
+              value: {{ .Values.sandbox.anthropicSecretName | quote }}
+            - name: SANDBOX_FORGE_SECRET
+              value: {{ .Values.forge.secretName | quote }}
+            - name: SANDBOX_TIMEOUT_SECONDS
+              value: {{ .Values.sandbox.timeoutSeconds | quote }}
+            - name: SANDBOX_WORKDIR_SIZE
+              value: {{ .Values.sandbox.storage.workdirSize | quote }}
+            - name: SANDBOX_CPU_REQUEST
+              value: {{ .Values.sandbox.resources.requests.cpu | quote }}
+            - name: SANDBOX_MEMORY_REQUEST
+              value: {{ .Values.sandbox.resources.requests.memory | quote }}
+            - name: SANDBOX_CPU_LIMIT
+              value: {{ .Values.sandbox.resources.limits.cpu | quote }}
+            - name: SANDBOX_MEMORY_LIMIT
+              value: {{ .Values.sandbox.resources.limits.memory | quote }}
+            - name: SANDBOX_POD_TEMPLATE
+              value: /opt/archon-workflow/sandbox-pod.yaml
+            - name: WORKFLOW_DIR
+              value: /opt/archon-workflow
+            # --- Database ----------------------------------------------------
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.psql.clusterName }}-app
+                  key: uri
+          envFrom:
+            # ANTHROPIC_API_KEY and/or CLAUDE_CODE_OAUTH_TOKEN.
+            - secretRef:
+                name: {{ .Values.sandbox.anthropicSecretName }}
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            # Up to 5 minutes: a cold start runs `bun run setup-auth` and the
+            # Postgres migrations before the server binds.
+            failureThreshold: 30
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /.archon
+            - name: home
+              mountPath: /home/appuser
+            - name: bin
+              mountPath: /opt/bin
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            # The workflow, its scripts, and the Sandbox pod template, at a
+            # stable path the scripts reference via $WORKFLOW_DIR.
+            - name: workflow
+              mountPath: /opt/archon-workflow
+              readOnly: true
+            # Archon discovers workflows by walking ~/.archon/workflows, treating
+            # every *.yaml there as one — so only the workflow definition itself
+            # is projected here, not sandbox-pod.yaml.
+            - name: workflow-definition
+              mountPath: /.archon/workflows/homelab
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "archon.fullname" . }}-data
+        - name: home
+          persistentVolumeClaim:
+            claimName: {{ include "archon.fullname" . }}-home
+        - name: bin
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: workflow
+          configMap:
+            name: {{ include "archon.fullname" . }}-workflow
+            defaultMode: 0555
+            items:
+              {{- include "archon.workflowVolumeItems" . | nindent 14 }}
+        - name: workflow-definition
+          configMap:
+            name: {{ include "archon.fullname" . }}-workflow
+            defaultMode: 0444
+            items:
+              - key: homelab-sandbox-pr.yaml
+                path: homelab-sandbox-pr.yaml
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

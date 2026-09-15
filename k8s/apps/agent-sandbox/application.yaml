@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: agent-sandbox
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: agent-sandbox-system
+  # Unlike most apps here, this Application OWNS the Sandbox CRD (fetched from
+  # the upstream release manifest in kustomization.yaml), so it intentionally
+  # does NOT ignore differences on apiextensions.k8s.io/CustomResourceDefinition
+  # — doing so would stop it from ever reconciling a CRD upgrade.
+  project: default
+  source:
+    path: k8s/apps/agent-sandbox
+    repoURL: https://git.msng.to/ops/k8s-homelab
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      # The Sandbox CRD embeds a full PodTemplateSpec twice (podTemplate and
+      # volumeClaimTemplates), which puts it well over the 262144-byte
+      # client-side-apply annotation limit.
+      - ServerSideApply=true

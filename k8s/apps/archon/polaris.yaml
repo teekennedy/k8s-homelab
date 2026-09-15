@@ -1,0 +1,8 @@
+exemptions:
+  # FORGEJO_TOKEN / WOODPECKER_TOKEN / DATABASE_URL all come from a
+  # secretKeyRef, not a literal value, but polaris flags the env var name
+  # regardless of source.
+  - controllerNames:
+      - archon
+    rules:
+      - sensitiveContainerEnvVar

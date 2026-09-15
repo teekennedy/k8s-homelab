@@ -1,0 +1,154 @@
+{{- $fullName := include "archon.fullname" . -}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "archon.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+---
+# The agent's identity — separate from the control plane's; see README.md,
+# "Shape".
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.sandbox.serviceAccountName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+automountServiceAccountToken: true
+---
+# No pods/exec: the agent runs as the pod's entrypoint and exits, so there is
+# nothing to attach to.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $fullName }}-sandbox-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - agents.x-k8s.io
+    resources:
+      - sandboxes
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - agents.x-k8s.io
+    resources:
+      - sandboxes/status
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+  # Task ConfigMaps: the prompt and, on a fix attempt, the tail of the failing
+  # CI log. Created per attempt, mounted read-only into the sandbox, deleted
+  # with it.
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $fullName }}-sandbox-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $fullName }}-sandbox-operator
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "archon.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- if .Values.clusterRead.create }}
+---
+# `secrets` is absent from the core-group list and unreachable through the
+# wildcard rules below, which only name non-core API groups. RBAC has no deny
+# verb, so that omission IS the control — the `fail` below exists to keep it
+# that way.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $fullName }}-agent-cluster-read
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      {{- toYaml .Values.clusterRead.coreResources | nindent 6 }}
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      {{- range .Values.clusterRead.apiGroups }}
+      {{- if eq . "" }}
+      {{- fail "clusterRead.apiGroups must not contain the core (\"\") group: it would grant read on secrets. Add to clusterRead.coreResources instead." }}
+      {{- end }}
+      {{- end }}
+      {{- toYaml .Values.clusterRead.apiGroups | nindent 6 }}
+    resources:
+      - "*"
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $fullName }}-agent-cluster-read
+  labels:
+    {{- include "archon.labels" . | nindent 4 }}
+  annotations:
+    # False positive: this ClusterRole grants get/list/watch only — no pods/exec
+    # and no pods/attach (grep the rules above). Polaris resolves the roleRef
+    # statically and, finding no ClusterRole of this name in the rendered
+    # manifest stream it happens to be auditing, falls through to the
+    # "unresolvable" branch of the check and fails closed.
+    polaris.fairwinds.com/clusterrolebindingPodExecAttach-exempt: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $fullName }}-agent-cluster-read
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.sandbox.serviceAccountName }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -1,0 +1,318 @@
+# Default values for archon. See README.md for the Archon/sandbox split this
+# chart implements.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/coleam00/archon
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Internal only — see README.md, "Security posture".
+host: archon.msng.to
+
+service:
+  port: 3000
+
+# --- Archon app config -----------------------------------------------------
+archon:
+  host: "0.0.0.0"
+  logLevel: info
+  # Each workflow run also holds one Sandbox, so this doubles as the cap on
+  # simultaneous in-cluster agents.
+  maxConcurrentConversations: 4
+  # Anonymous PostHog telemetry. Off: workflow names and run outcomes for a
+  # private infrastructure repo are not ours to ship offsite.
+  telemetryDisabled: true
+  # Trusted-header auth — see README.md, "Security posture".
+  webAuthHeader: X-Auth-Request-User
+  defaultAiAssistant: claude
+  # Turning off the 19 bundled workflows is a separate one-time step; see
+  # README.md, "Prerequisites" — it lives in a file Archon itself writes, so
+  # it isn't templated here.
+
+# --- Forge (Forgejo) --------------------------------------------------------
+forge:
+  url: https://git.msng.to
+  owner: ops
+  repo: k8s-homelab
+  cloneURL: https://git.msng.to/ops/k8s-homelab.git
+  defaultBranch: main
+  # Prefix for the branches the agent pushes. Matches nothing CI protects.
+  branchPrefix: agent
+  # Provisioned by the forgejo-resources Job in k8s/platform/forgejo (see the
+  # `archon` entry under forgejo-resources.users there). Keys: username,
+  # password, token.
+  secretName: archon-forgejo-user
+
+  adapter:
+    # Empty = ANY Forgejo user who can comment on the repo can trigger a run.
+    # This list plus the webhook HMAC is the entire access control on that
+    # surface (see README.md, "Security posture") — keep it populated.
+    allowedUsers:
+      - tkennedy
+    # Mention that wakes the bot. Must match the Forgejo account name created by
+    # forgejo-resources, or people will @-mention a real user and get nothing.
+    botMention: archon
+
+# --- CI (Woodpecker) --------------------------------------------------------
+ci:
+  url: https://ci.msng.to
+  # PREFIX of the Forgejo commit-status contexts Woodpecker reports under
+  # (`<prefix>/<event>/<workflow name>`), matched as a prefix so a second
+  # Woodpecker workflow file added later is waited on automatically.
+  statusContext: ci/woodpecker/pr
+  # How long a single CI run may take before the workflow gives up waiting.
+  waitTimeoutSeconds: 2700
+  pollIntervalSeconds: 20
+  # Personal access token for a Woodpecker user that can read this repo's
+  # pipeline logs. Created by hand in the Woodpecker UI (Woodpecker has no
+  # forgejo-resources equivalent); key: token.
+  secretName: archon-woodpecker
+  # Bytes of failing-step log handed to the fixing agent. The task ConfigMap is
+  # capped at 1 MiB by the API server, and the tail is where the errors are.
+  logTailBytes: 262144
+
+# --- Sandbox (the thing that actually runs Claude Code) ---------------------
+sandbox:
+  # Built from files/image/Dockerfile; see README.md, "The sandbox image".
+  image: ghcr.io/teekennedy/k8s-homelab-agent:v0.1.0
+  model: opus
+  # Hard cap on one agent attempt, as the pod's activeDeadlineSeconds. The
+  # per-run attempt cap is `max_iterations` in the workflow itself, not here.
+  timeoutSeconds: 3600
+  storage:
+    # Working copy of the repo. Ephemeral on purpose — every attempt starts from
+    # a fresh clone of the branch that is actually on the server, so a wedged
+    # local checkout can never poison the next attempt.
+    workdirSize: 8Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+  # Anthropic credentials for the sandboxed agent. Create by hand; either
+  # ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN.
+  anthropicSecretName: archon-anthropic
+  # Cluster-read ServiceAccount the sandbox pod runs as. See templates/rbac.yaml.
+  serviceAccountName: archon-agent
+
+# --- Cluster-read role for the sandboxed agent ------------------------------
+# An explicit allowlist rather than the built-in `view` ClusterRole, so the
+# absence of `secrets` is a reviewable property of this chart instead of a
+# fact you have to go look up.
+clusterRead:
+  create: true
+  coreResources:
+    - configmaps
+    - endpoints
+    - events
+    - limitranges
+    - namespaces
+    - nodes
+    - persistentvolumeclaims
+    - persistentvolumes
+    - pods
+    - pods/log
+    - pods/status
+    - replicationcontrollers
+    - resourcequotas
+    - serviceaccounts
+    - services
+  apiGroups:
+    - apps
+    - autoscaling
+    - batch
+    - policy
+    - discovery.k8s.io
+    - networking.k8s.io
+    - node.k8s.io
+    - storage.k8s.io
+    - scheduling.k8s.io
+    - coordination.k8s.io
+    - apiextensions.k8s.io
+    - admissionregistration.k8s.io
+    - apiregistration.k8s.io
+    - events.k8s.io
+    - metrics.k8s.io
+    # Reading the RBAC graph is read access, and the agent edits RBAC in this
+    # repo — but note it does reveal who can do what cluster-wide.
+    - rbac.authorization.k8s.io
+    # Gateway API + Traefik: the agent writes HTTPRoutes and needs to see how
+    # the live ones are shaped.
+    - gateway.networking.k8s.io
+    - traefik.io
+    # The CRDs this repo's charts actually produce.
+    - agents.x-k8s.io
+    - argoproj.io
+    - postgresql.cnpg.io
+    - barmancloud.cnpg.io
+    - longhorn.io
+    - monitoring.coreos.com
+    - cert-manager.io
+    - trust.cert-manager.io
+    - external-secrets.io
+    - crd.projectcalico.org
+    - metallb.io
+    - nfd.k8s-sigs.io
+    - kured.io
+
+# --- Postgres (CNPG) --------------------------------------------------------
+# Archon defaults to SQLite; Postgres is used instead so the run history has a
+# proper backup story (see templates/cnpg-backup.yaml) rather than living only
+# on a single RWO volume.
+psql:
+  clusterName: archon-psql
+  image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
+  database: archon
+  owner: archon
+  storageSize: 10Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  # The image's `appuser` (uid 1001); fsGroup below is what gets the mounted
+  # volumes owned by it, since running non-root skips the image's own chown.
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  # False: the image writes to /app (bun's transpile cache) outside any mounted
+  # volume. See README.md, "Known rough edges".
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+persistence:
+  # /.archon — workspaces, worktrees, run artifacts. Enrolled in the Longhorn
+  # recurring backup group: it is the only copy of a run's artifacts.
+  data:
+    size: 20Gi
+    storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/backup: "enabled"
+  # /home/appuser — Claude/Codex config, ~/.gitconfig, shell history. Rebuildable,
+  # so not backed up.
+  home:
+    size: 5Gi
+    storageClass: longhorn
+
+# kubectl injected via an initContainer so the upstream Archon image stays
+# unmodified; the workflow's bash nodes need it on PATH to drive Sandboxes.
+kubectl:
+  image: alpine/kubectl:1.37.0
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+traefikNamespace: kube-system
+
+networkPolicy:
+  # kube API server ClusterIP — the sandbox's read-only oracle.
+  kubeApiCidr: "10.43.0.1/32"
+  # Internal subnet git.msng.to and ci.msng.to resolve into.
+  lanCidr: "10.69.0.0/16"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+podLabels: {}
+
+# --- SSO front door ---------------------------------------------------------
+# A dedicated oauth2-proxy instance in reverse-proxy mode: it owns
+# archon.msng.to and forwards authenticated traffic to Archon, rather than
+# using Archon's own Better Auth, which would be a second identity store for
+# the same humans Authelia already knows.
+oauth2ProxyInstance:
+  # Must equal the Authelia client_id and the auth-system
+  # oidcClientSecrets.clients key.
+  clientId: archon
+  # Must equal oauth2-proxy.config.existingSecret, and the auth-system
+  # oidcClientSecrets.clients value must point at <namespace>/<this name>.
+  secretName: archon-oauth2-proxy-secrets
+  labelsTemplate: archon.labels
+  middleware:
+    # false: this instance owns the hostname, so Traefik never does a
+    # forwardAuth subrequest.
+    enabled: false
+
+oauth2-proxy:
+  fullnameOverride: archon-auth
+  config:
+    existingSecret: archon-oauth2-proxy-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://archon.msng.to/oauth2/callback"
+      cookie_domains = ["archon.msng.to"]
+      cookie_name = "_oauth2_proxy_archon"
+      cookie_expire = "168h"
+      cookie_refresh = "1h"
+      cookie_secure = true
+      cookie_httponly = true
+      cookie_samesite = "lax"
+      whitelist_domains = ["archon.msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      pass_authorization_header = true
+      pass_access_token = true
+      # Sets X-Auth-Request-User, which Archon reads as ARCHON_WEB_AUTH_HEADER.
+      set_xauthrequest = true
+      code_challenge_method = "S256"
+      scope = "openid profile email groups"
+      real_client_ip_header = "X-Real-Ip"
+      skip_provider_button = true
+      allowed_groups = ["archon-admins", "full-admin"]
+      # The one hole in the SSO gate: Forgejo's webhook can't carry an Authelia
+      # session. See README.md, "Security posture".
+      skip_auth_routes = ["POST=^/webhooks/gitea$"]
+      upstreams = ["http://archon.archon.svc.cluster.local:3000/"]
+      trusted_proxy_ips = ["10.42.0.0/16"]
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  ingress:
+    enabled: false
+  gatewayApi:
+    enabled: true
+    gatewayRef:
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecure
+    hostnames:
+      - archon.msng.to

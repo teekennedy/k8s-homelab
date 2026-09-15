@@ -209,6 +209,26 @@ forgejo-resources:
             secretName: argocd-repo-k8s-homelab
             secretNamespace: argocd
             url: https://git.msng.to/ops/k8s-homelab
+    # Identity the Archon agent pushes and opens PRs as (k8s/apps/archon). It is
+    # deliberately a bot account and not tkennedy: every branch and PR the
+    # sandboxed model produces has to be attributable to the automation at a
+    # glance, and the token's scopes are the blast radius.
+    #
+    # No read:misc — unlike renovate, nothing here reads server metadata. No
+    # admin. The `Bots` team membership below is what gives it push access to
+    # ops/k8s-homelab; it has no standing access to anything else.
+    - name: archon
+      fullName: Archon
+      email: archon@msng.to
+      secretName: archon-forgejo-user
+      secretNamespace: archon
+      accessTokens:
+        - name: archon
+          scopes:
+            - write:repository
+            - read:user
+            - write:issue
+            - read:organization
     - name: tkennedy
       fullName: Terrance Kennedy
       email: terrance@missingtoken.net
@@ -257,19 +277,49 @@ forgejo-resources:
           permission: write
           members:
             - renovate
+            - archon
   repositories:
     - name: k8s-homelab
       owner: ops
       description: my bare-metal k8s homelab
       private: false
-      webhook:
+      # Reconciled by URL on every job run — events, branchFilter and the shared
+      # secret all converge, and a `type` change is handled as a delete +
+      # recreate (the Forgejo API cannot PATCH a hook's payload format).
+      #
+      # `type` is required and has no default: it selects both the payload
+      # format and the signature header the receiver verifies (gogs ->
+      # X-Gogs-Signature, gitea -> X-Gitea-Signature). A wrong value registers
+      # happily and then fails every delivery at the receiver.
+      webhooks:
         # Forgejo has no native ArgoCD hook type, but ArgoCD's /api/webhook
         # endpoint natively understands the Gogs payload format, which Forgejo
         # can emit. Patches the shared secret into argocd-secret's
         # webhook.gogs.secret key (additive, doesn't touch ArgoCD's other
         # auto-managed keys there).
-        url: http://argocd-server.argocd.svc.cluster.local/api/webhook
-        branchFilter: main
-        secretName: argocd-secret
-        secretNamespace: argocd
-        secretKey: webhook.gogs.secret
+        - url: http://argocd-server.argocd.svc.cluster.local/api/webhook
+          type: gogs
+          events:
+            - push
+          branchFilter: main
+          secretName: argocd-secret
+          secretNamespace: argocd
+          secretKey: webhook.gogs.secret
+        # Archon's community Gitea adapter (k8s/apps/archon). Must be the
+        # `gitea` type: the adapter verifies X-Gitea-Signature, which only that
+        # payload format sends.
+        #
+        # No branchFilter — it only constrains push events, and none of the
+        # events below are pushes. The adapter wakes on an @mention in an issue
+        # or PR *comment*; the issues/pull_request events are what let it see
+        # the thread the comment belongs to.
+        - url: https://archon.msng.to/webhooks/gitea
+          type: gitea
+          events:
+            - issues
+            - issue_comment
+            - pull_request
+            - pull_request_comment
+          secretName: archon-webhook
+          secretNamespace: archon
+          secretKey: webhook-secret

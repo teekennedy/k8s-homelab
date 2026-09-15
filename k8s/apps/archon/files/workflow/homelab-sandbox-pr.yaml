@@ -1,0 +1,76 @@
+name: homelab-sandbox-pr
+description: |
+  Make a change to ops/k8s-homelab with Claude Code running in a single-use
+  Kubernetes agent-sandbox, open a pull request on git.msng.to, and keep fixing
+  the branch until the Woodpecker PR check goes green.
+
+  Use when: you want a change made to the homelab repo — a chart, a NixOS
+  module, CI, OpenTofu — and you want it to arrive as a PR whose checks already
+  pass. Describe the change in the trigger message; that message is the agent's
+  whole brief.
+
+  NOT for: answering questions about the repo (nothing is pushed, so there is
+  nothing to open), changes to a repo other than ops/k8s-homelab, or anything
+  that needs to write to the live cluster — the sandbox's cluster access is
+  read-only by design.
+
+# Every node is a bash node driving kubectl and the Forgejo/Woodpecker APIs;
+# the model runs inside the sandbox, not here.
+#
+# Script paths are absolute rather than "$WORKFLOW_DIR/...": Archon rewrites
+# `$NAME` tokens in a node body before the shell sees them, so the one path
+# that matters is kept out of that pass. The scripts still read $WORKFLOW_DIR
+# from the environment to find each other.
+mutates_checkout: false
+interactive: false
+returns: summary
+
+nodes:
+  # -------------------------------------------------------------------------
+  - id: implement
+    # Fresh sandbox off $BASE_BRANCH. Prints the pushed commit SHA.
+    bash: /opt/archon-workflow/scripts/run-agent.sh implement
+    # Sandbox budget (SANDBOX_TIMEOUT_SECONDS, 1h) plus the driver's own slack
+    # for image pull, PVC provisioning and log collection.
+    timeout: 4500000
+
+  # -------------------------------------------------------------------------
+  - id: open-pr
+    bash: /opt/archon-workflow/scripts/open-pr.sh
+    depends_on: [implement]
+    timeout: 120000
+
+  # -------------------------------------------------------------------------
+  # Green-until loop. Each iteration waits out the PR check on whatever is
+  # currently at the head of the branch; if it is red, a NEW sandbox is created
+  # with the branch checked out and the failing log mounted, and it pushes a fix.
+  # The next iteration then waits on that new commit.
+  #
+  # `await-ci` exits 0 whether the build is red or green — its stdout is the
+  # verdict, and both the gate below and `until_bash` read it. A non-zero exit
+  # means the verdict could not be determined at all, which fails the run.
+  - id: ci-loop
+    depends_on: [open-pr]
+    loop_group:
+      nodes:
+        - id: await-ci
+          bash: /opt/archon-workflow/scripts/await-ci.sh
+          # CI_WAIT_TIMEOUT_SECONDS (45m) plus slack for log collection.
+          timeout: 3300000
+        - id: fix
+          bash: /opt/archon-workflow/scripts/run-agent.sh fix
+          depends_on: [await-ci]
+          when: "$await-ci.output != 'success'"
+          timeout: 4500000
+      until_bash: 'test "$await-ci.output" = "success"'
+      # 1 implement pass + up to 5 waits. Exhausting the bound fails the run
+      # rather than reporting a still-red PR as done.
+      max_iterations: 5
+
+  # -------------------------------------------------------------------------
+  # Terminal output: one JSON object naming the PR, the branch, the commit CI
+  # actually went green on, and how many sandbox attempts it took.
+  - id: summary
+    bash: /opt/archon-workflow/scripts/summary.sh
+    depends_on: [ci-loop]
+    timeout: 60000

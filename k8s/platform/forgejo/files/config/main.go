@@ -48,20 +48,92 @@ type Repository struct {
 		Source string
 		Mirror bool
 	}
-	Webhook *RepoWebhook `yaml:"webhook"`
+	// Webhook is the retired single-hook form. It is still parsed so that a
+	// stale config fails loudly in validate() rather than being silently
+	// dropped by yaml.v3, which ignores unknown keys.
+	Webhook  *RepoWebhook  `yaml:"webhook"`
+	Webhooks []RepoWebhook `yaml:"webhooks"`
 }
 
-// RepoWebhook creates a Gogs-payload-compatible Forgejo webhook (the format
-// ArgoCD's /api/webhook endpoint natively understands, since ArgoCD has no
-// Forgejo-specific handler). The shared secret is generated once and stored
-// under SecretKey in the target Secret, which is expected to already exist
-// (e.g. argocd-secret) — patched additively so unrelated keys are untouched.
+// RepoWebhook is one Forgejo repository webhook, reconciled by URL.
+//
+// Type selects the payload format AND the signature header the receiver has to
+// verify — `gogs` signs with X-Gogs-Signature, `gitea` with X-Gitea-Signature.
+// Getting it wrong does not fail the create: the hook is registered and then
+// every delivery is rejected by the receiver as an HMAC mismatch, which is a
+// miserable thing to debug. So it is required rather than defaulted.
+//
+// The shared secret is generated once and stored under SecretKey in the target
+// Secret, which is expected to already exist (e.g. argocd-secret) — patched
+// additively so unrelated keys are untouched.
 type RepoWebhook struct {
-	URL             string `yaml:"url"`
-	BranchFilter    string `yaml:"branchFilter"`
-	SecretName      string `yaml:"secretName"`
-	SecretNamespace string `yaml:"secretNamespace"`
-	SecretKey       string `yaml:"secretKey"`
+	URL string `yaml:"url"`
+	// Type is "gogs" or "gitea". Deliberately not the full SDK set: the chat
+	// types (slack, discord, ...) take entirely different Config keys, and
+	// nothing here would populate them.
+	Type string `yaml:"type"`
+	// Events defaults to ["push"] when empty, matching the single-hook form
+	// this replaced. Values are Forgejo's event names, e.g. push, issues,
+	// issue_comment, pull_request, pull_request_comment.
+	Events          []string `yaml:"events"`
+	BranchFilter    string   `yaml:"branchFilter"`
+	SecretName      string   `yaml:"secretName"`
+	SecretNamespace string   `yaml:"secretNamespace"`
+	SecretKey       string   `yaml:"secretKey"`
+}
+
+// hookTypes are the payload formats this provisioner knows how to configure.
+var hookTypes = []string{string(gitea.HookTypeGogs), string(gitea.HookTypeGitea)}
+
+// validate reports every problem with a repository's webhook config at once, so
+// a typo does not take one job run per mistake to find.
+func (r Repository) validate() []error {
+	var errs []error
+	if r.Webhook != nil {
+		errs = append(errs, fmt.Errorf(
+			"%s/%s: `webhook:` is no longer supported; move it under `webhooks:` as a list item and give it an explicit `type:` (was implicitly gogs) and `events:` (was implicitly [push])",
+			r.Owner, r.Name))
+	}
+	// Shared across the list so a duplicate URL is caught wherever it appears.
+	seen := map[string]bool{}
+	for i, wh := range r.Webhooks {
+		errs = append(errs, wh.validate(fmt.Sprintf("%s/%s webhooks[%d]", r.Owner, r.Name, i), seen)...)
+	}
+	return errs
+}
+
+// validate checks one webhook entry. ref names it in messages; seen carries the
+// URLs already claimed by earlier entries and is updated here.
+func (wh RepoWebhook) validate(ref string, seen map[string]bool) []error {
+	var errs []error
+	if wh.URL != "" {
+		ref = fmt.Sprintf("%s (%s)", ref, wh.URL)
+	}
+	switch {
+	case wh.URL == "":
+		errs = append(errs, fmt.Errorf("%s: url is required", ref))
+	case seen[wh.URL]:
+		// Two entries for one URL would reconcile the same hook twice, last one
+		// winning, which is never what anyone meant.
+		errs = append(errs, fmt.Errorf("%s: duplicate url", ref))
+	default:
+		seen[wh.URL] = true
+	}
+	if !slices.Contains(hookTypes, wh.Type) {
+		errs = append(errs, fmt.Errorf("%s: type must be one of %v, got %q", ref, hookTypes, wh.Type))
+	}
+	if wh.SecretName == "" || wh.SecretNamespace == "" || wh.SecretKey == "" {
+		errs = append(errs, fmt.Errorf("%s: secretName, secretNamespace and secretKey are all required", ref))
+	}
+	return errs
+}
+
+// events returns the configured events, defaulting to push.
+func (wh RepoWebhook) events() []string {
+	if len(wh.Events) == 0 {
+		return []string{"push"}
+	}
+	return wh.Events
 }
 
 type AccessToken struct {
@@ -431,53 +503,137 @@ func upsertRepoCredentialSecret(ctx context.Context, k8sClient *kubernetes.Clien
 	return nil
 }
 
-func upsertRepoWebhook(ctx context.Context, client *gitea.Client, k8sClient *kubernetes.Clientset, owner, repo string, wh *RepoWebhook) error {
+// webhookSecret returns the hook's shared secret, generating and storing one on
+// first use. The target Secret must already exist; it is patched additively so
+// unrelated keys (argocd-secret's own auto-managed keys, say) are untouched.
+func webhookSecret(ctx context.Context, k8sClient *kubernetes.Clientset, wh RepoWebhook) (string, error) {
 	secretClient := k8sClient.CoreV1().Secrets(wh.SecretNamespace)
 	secret, err := secretClient.Get(ctx, wh.SecretName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("get secret %s in %s: %w", wh.SecretName, wh.SecretNamespace, err)
+		return "", fmt.Errorf("get secret %s in %s: %w", wh.SecretName, wh.SecretNamespace, err)
 	}
 
-	sharedSecret := string(secret.Data[wh.SecretKey])
-	if sharedSecret == "" {
-		sharedSecret, err = generatePassword(48)
-		if err != nil {
-			return fmt.Errorf("generate webhook secret: %w", err)
-		}
-		patch := map[string]any{"stringData": map[string]string{wh.SecretKey: sharedSecret}}
-		patchBytes, _ := json.Marshal(patch)
-		_, err = secretClient.Patch(ctx, wh.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
-		if err != nil {
-			return fmt.Errorf("patch secret %s in %s: %w", wh.SecretName, wh.SecretNamespace, err)
-		}
+	if existing := string(secret.Data[wh.SecretKey]); existing != "" {
+		return existing, nil
 	}
 
+	generated, err := generatePassword(48)
+	if err != nil {
+		return "", fmt.Errorf("generate webhook secret: %w", err)
+	}
+	patch := map[string]any{"stringData": map[string]string{wh.SecretKey: generated}}
+	patchBytes, _ := json.Marshal(patch)
+	if _, err := secretClient.Patch(ctx, wh.SecretName, k8sTypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+		return "", fmt.Errorf("patch secret %s in %s: %w", wh.SecretName, wh.SecretNamespace, err)
+	}
+	return generated, nil
+}
+
+// findRepoHook returns the hook whose configured URL matches, or nil.
+//
+// Matching is on Config["url"]: the SDK's Hook.URL field is tagged `json:"-"`
+// and is never populated from an API response.
+func findRepoHook(client *gitea.Client, owner, repo, url string) (*gitea.Hook, error) {
 	hooks, _, err := client.ListRepoHooks(owner, repo, gitea.ListHooksOptions{ListOptions: gitea.ListOptions{Page: -1}})
 	if err != nil {
-		return fmt.Errorf("list hooks for %s/%s: %w", owner, repo, err)
+		return nil, fmt.Errorf("list hooks for %s/%s: %w", owner, repo, err)
 	}
 	for _, h := range hooks {
-		if h.Config["url"] == wh.URL {
-			log.Printf("Webhook %s already exists on %s/%s", wh.URL, owner, repo)
-			return nil
+		if h.Config["url"] == url {
+			return h, nil
 		}
 	}
+	return nil, nil
+}
 
-	_, _, err = client.CreateRepoHook(owner, repo, gitea.CreateHookOption{
-		Type: gitea.HookTypeGogs,
-		Config: map[string]string{
-			"url":          wh.URL,
-			"content_type": "json",
-			"secret":       sharedSecret,
-		},
-		Events:       []string{"push"},
+// hookDrift names the fields of an existing hook that do not match the desired
+// state. Field NAMES only, never the observed values: everything in a
+// gitea.Hook came back over the wire, and interpolating it into a log line is
+// how you get forged log entries (gosec G706).
+func hookDrift(existing *gitea.Hook, events []string, branchFilter string) []string {
+	var drift []string
+	if !slices.Equal(existing.Events, events) {
+		drift = append(drift, "events")
+	}
+	if existing.BranchFilter != branchFilter {
+		drift = append(drift, "branchFilter")
+	}
+	if !existing.Active {
+		drift = append(drift, "active")
+	}
+	return drift
+}
+
+// editRepoWebhook converges an existing hook onto the desired state.
+func editRepoWebhook(client *gitea.Client, owner, repo string, existing *gitea.Hook, config map[string]string, wh RepoWebhook) error {
+	events := wh.events()
+	active := true
+	if _, err := client.EditRepoHook(owner, repo, existing.ID, gitea.EditHookOption{
+		Config:       config,
+		Events:       events,
+		BranchFilter: wh.BranchFilter,
+		Active:       &active,
+	}); err != nil {
+		return fmt.Errorf("update webhook %s on %s/%s: %w", wh.URL, owner, repo, err)
+	}
+	if drift := hookDrift(existing, events, wh.BranchFilter); len(drift) > 0 {
+		log.Printf("Reconciled webhook %s on %s/%s (%s); now type %s, events %v, branchFilter %q",
+			wh.URL, owner, repo, strings.Join(drift, ", "), wh.Type, events, wh.BranchFilter)
+	} else {
+		log.Printf("Webhook %s on %s/%s already matches", wh.URL, owner, repo)
+	}
+	return nil
+}
+
+// upsertRepoWebhook reconciles one webhook.
+//
+// This reconciles rather than create-only: events and branchFilter are now
+// configurable, and a config knob that silently does nothing once the hook
+// exists is a trap. The secret is rewritten on every pass for the same reason —
+// Forgejo never returns it, so it cannot be compared, and converging it is the
+// only way a rotation in the Secret reaches the hook.
+func upsertRepoWebhook(ctx context.Context, client *gitea.Client, k8sClient *kubernetes.Clientset, owner, repo string, wh RepoWebhook) error {
+	sharedSecret, err := webhookSecret(ctx, k8sClient, wh)
+	if err != nil {
+		return err
+	}
+
+	existing, err := findRepoHook(client, owner, repo, wh.URL)
+	if err != nil {
+		return err
+	}
+
+	// EditHookOption carries no Type, so a payload-format change is a
+	// delete-and-recreate. Leaving the old type in place would keep signing
+	// deliveries with the wrong header forever.
+	if existing != nil && existing.Type != wh.Type {
+		log.Printf("Webhook %s on %s/%s has the wrong payload type, want %s — recreating", wh.URL, owner, repo, wh.Type)
+		if _, err := client.DeleteRepoHook(owner, repo, existing.ID); err != nil {
+			return fmt.Errorf("delete webhook %s on %s/%s: %w", wh.URL, owner, repo, err)
+		}
+		existing = nil
+	}
+
+	config := map[string]string{
+		"url":          wh.URL,
+		"content_type": "json",
+		"secret":       sharedSecret,
+	}
+
+	if existing != nil {
+		return editRepoWebhook(client, owner, repo, existing, config, wh)
+	}
+
+	if _, _, err := client.CreateRepoHook(owner, repo, gitea.CreateHookOption{
+		Type:         gitea.HookType(wh.Type),
+		Config:       config,
+		Events:       wh.events(),
 		BranchFilter: wh.BranchFilter,
 		Active:       true,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("create webhook for %s/%s: %w", owner, repo, err)
 	}
-	log.Printf("Created webhook %s for %s/%s", wh.URL, owner, repo)
+	log.Printf("Created %s webhook %s for %s/%s (events %v)", wh.Type, wh.URL, owner, repo, wh.events())
 	return nil
 }
 
@@ -491,6 +647,22 @@ func main() {
 	config := Config{}
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		log.Fatalf("error: %v", err)
+	}
+
+	// Fail before touching Forgejo. Everything downstream logs-and-continues so
+	// one bad entry cannot block the rest of the reconcile, which is the right
+	// call for API errors but the wrong one for a malformed config: a webhook
+	// with the wrong `type` registers fine and then silently fails every
+	// delivery at the receiver.
+	var configErrs []error
+	for _, repo := range config.Repositories {
+		configErrs = append(configErrs, repo.validate()...)
+	}
+	if len(configErrs) > 0 {
+		for _, err := range configErrs {
+			log.Printf("config error: %v", err)
+		}
+		log.Fatalf("%d config error(s); refusing to reconcile", len(configErrs))
 	}
 
 	forgejoHost := os.Getenv("FORGEJO_HOST")
@@ -765,9 +937,9 @@ func syncRepository(ctx context.Context, client *gitea.Client, k8sClient *kubern
 		log.Printf("Create %s/%s: %v", repo.Owner, repo.Name, err)
 	}
 
-	if repo.Webhook != nil {
-		if err := upsertRepoWebhook(ctx, client, k8sClient, repo.Owner, repo.Name, repo.Webhook); err != nil {
-			log.Printf("Upsert webhook for %s/%s: %v", repo.Owner, repo.Name, err)
+	for _, wh := range repo.Webhooks {
+		if err := upsertRepoWebhook(ctx, client, k8sClient, repo.Owner, repo.Name, wh); err != nil {
+			log.Printf("Upsert webhook %s for %s/%s: %v", wh.URL, repo.Owner, repo.Name, err)
 		}
 	}
 }

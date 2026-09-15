@@ -56,10 +56,58 @@ hardcoded values:
   the Secret via `envFrom`), so they belong to the consumer, not to us.
 - `podExec.container`.
 
-The webhook stays `gogs`-typed: ArgoCD's `/api/webhook` natively understands the
-Gogs payload and reads the shared secret from `argocd-secret`'s
-`webhook.gogs.secret`. Forgejo still accepts `gogs` as a hook type. This is
-ArgoCD compatibility, not leftover naming.
+### Repository webhooks
+
+`repositories[].webhooks` is a list; each entry is reconciled by its URL on
+every job run.
+
+```yaml
+webhooks:
+  - url: https://…
+    type: gogs | gitea   # required, no default
+    events: [push]       # optional, defaults to [push]
+    branchFilter: main   # optional; only constrains push events
+    secretName: …        # the Secret that holds (or will hold) the shared secret
+    secretNamespace: …
+    secretKey: …
+```
+
+**`type` is required on purpose.** It selects both the payload format and the
+signature header the receiver verifies — `gogs` signs `X-Gogs-Signature`,
+`gitea` signs `X-Gitea-Signature`. A wrong value registers happily and then
+fails every delivery at the far end, which is a miserable thing to debug from
+this side. Only those two are accepted; the SDK's chat types (slack, discord, …)
+take entirely different `Config` keys and nothing here populates them.
+
+The ArgoCD hook stays `gogs`-typed: ArgoCD's `/api/webhook` natively
+understands the Gogs payload and reads the shared secret from `argocd-secret`'s
+`webhook.gogs.secret`. That is ArgoCD compatibility, not leftover naming.
+Archon's hook (`k8s/apps/archon`) is `gitea`-typed and subscribes to the issue
+and PR events its adapter wakes on.
+
+Reconcile semantics, since they are easy to get wrong:
+
+- Matching is by `Config["url"]` — the SDK's `Hook.URL` field is `json:"-"` and
+  is never populated from the API.
+- Events, `branchFilter` and `active` are converged on every pass, so changing
+  `events:` in values actually takes effect on an existing hook. (The previous
+  single-hook form was create-only and silently ignored later edits.)
+- The shared secret is rewritten every pass too: Forgejo never returns it, so it
+  cannot be compared, and rewriting is the only way a rotation in the Secret
+  reaches the hook.
+- A `type:` change is a delete-and-recreate — the Forgejo API has no way to
+  PATCH a hook's payload format.
+- The target Secret must already exist; it is patched additively, so unrelated
+  keys (argocd-secret's own auto-managed ones) are untouched. On a cold
+  bootstrap the Job may run before a consuming app's namespace exists — it logs
+  that one hook and retries on the next sync.
+
+Config problems (`type` missing or unknown, duplicate URLs, missing secret
+coordinates, or the retired singular `webhook:` key) are collected and the job
+exits **before** touching Forgejo, rather than the usual log-and-continue —
+partial reconciliation of a malformed hook is worse than none. `webhook_test.go`
+pins that behaviour, and the chart's own template `fail`s on the singular key so
+the error usually surfaces at render time instead.
 
 ## Cutover runbook
 

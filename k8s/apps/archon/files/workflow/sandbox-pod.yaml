@@ -1,0 +1,170 @@
+# Sandbox manifest template, rendered by scripts/run-agent.sh via
+# render_template (scripts/common.sh). Every ${PLACEHOLDER} below must be named
+# in that call, or the render fails loudly instead of leaving it unsubstituted.
+apiVersion: agents.x-k8s.io/v1beta1
+kind: Sandbox
+metadata:
+  name: ${SANDBOX_NAME}
+  namespace: ${SANDBOX_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: archon-sandbox
+    app.kubernetes.io/part-of: archon-sandbox
+    archon.msng.to/run-id: "${RUN_ID}"
+    archon.msng.to/attempt: "${ATTEMPT}"
+spec:
+  # Retain: the pod must outlive the agent process so the driver can read its
+  # log after the Finished condition flips; run-agent.sh deletes it explicitly.
+  shutdownPolicy: Retain
+  service: false
+  podTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: archon-sandbox
+        app.kubernetes.io/part-of: archon-sandbox
+        archon.msng.to/run-id: "${RUN_ID}"
+        archon.msng.to/attempt: "${ATTEMPT}"
+    spec:
+      # The attempt either finishes or fails. A restart would re-run the agent
+      # against a half-mutated checkout with a fresh context.
+      restartPolicy: Never
+      # Bounded by the controller too, but this is what actually reaps a wedged
+      # agent: the kubelet kills the pod and the Finished condition reports
+      # PodFailed.
+      activeDeadlineSeconds: ${SANDBOX_TIMEOUT_SECONDS}
+      serviceAccountName: ${SANDBOX_SERVICE_ACCOUNT}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Own container so a clone failure is distinguishable from an agent
+        # failure in `kubectl describe`.
+        - name: clone
+          image: ${SANDBOX_IMAGE}
+          command: ["/opt/agent/entrypoint.sh", "clone"]
+          env:
+            - name: REPO_CLONE_URL
+              value: "${FORGEJO_CLONE_URL}"
+            - name: REPO_REF
+              value: "${REPO_REF}"
+            - name: WORKDIR
+              value: /work
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          volumeMounts:
+            - name: work
+              mountPath: /work
+            - name: agent
+              mountPath: /opt/agent
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: agent
+          image: ${SANDBOX_IMAGE}
+          command: ["/opt/agent/entrypoint.sh", "${AGENT_MODE}"]
+          env:
+            - name: WORKDIR
+              value: /work
+            - name: REPO_DIR
+              value: /work/repo
+            - name: TASK_DIR
+              value: /task
+            - name: BRANCH
+              value: "${BRANCH}"
+            - name: BASE_BRANCH
+              value: "${BASE_BRANCH}"
+            - name: CLAUDE_MODEL
+              value: "${SANDBOX_MODEL}"
+            - name: REPO_PUSH_URL
+              value: "${FORGEJO_CLONE_URL}"
+            - name: GIT_AUTHOR_NAME
+              value: "Archon Agent"
+            - name: GIT_AUTHOR_EMAIL
+              value: "archon@msng.to"
+            - name: HOME
+              value: /work/home
+            # Push credentials. Read from the same Secret the forgejo-resources
+            # Job writes; never echoed, and consumed through a credential helper
+            # rather than embedded in a remote URL (which git would log).
+            - name: FORGEJO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ${SANDBOX_FORGE_SECRET}
+                  key: username
+            - name: FORGEJO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ${SANDBOX_FORGE_SECRET}
+                  key: token
+          envFrom:
+            # ANTHROPIC_API_KEY and/or CLAUDE_CODE_OAUTH_TOKEN.
+            - secretRef:
+                name: ${SANDBOX_ANTHROPIC_SECRET}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: "${SANDBOX_CPU_REQUEST}"
+              memory: "${SANDBOX_MEMORY_REQUEST}"
+            limits:
+              cpu: "${SANDBOX_CPU_LIMIT}"
+              memory: "${SANDBOX_MEMORY_LIMIT}"
+          volumeMounts:
+            - name: work
+              mountPath: /work
+            - name: agent
+              mountPath: /opt/agent
+              readOnly: true
+            - name: task
+              mountPath: /task
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: agent
+          configMap:
+            name: ${WORKFLOW_CONFIGMAP}
+            defaultMode: 0555
+            items:
+              - key: agent-entrypoint.sh
+                path: entrypoint.sh
+              - key: agent-prompt.md
+                path: prompt.md
+        # Per-attempt task: the human's prompt and, on a fix attempt, the tail of
+        # the failing CI log. Created and deleted by run-agent.sh.
+        - name: task
+          configMap:
+            name: ${TASK_CONFIGMAP}
+            defaultMode: 0444
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    # The checkout. Ephemeral: every attempt re-clones fresh, so a wedged local
+    # tree can't poison the next one.
+    - metadata:
+        name: work
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: ${SANDBOX_WORKDIR_SIZE}

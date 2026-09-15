@@ -90,7 +90,17 @@ metadata:
 data:
   config.yaml: |
     {{- index .Values "forgejo-resources" | toYaml | nindent 4 }}
-  {{ (.Files.Glob "files/config/*").AsConfig | nindent 2 }}
+  {{- /*
+    Ranged rather than `.Files.Glob.AsConfig` so test files can be skipped:
+    `go run .` ignores them, but there is no reason to mount the job's source
+    with them in it. Glob has no negation, hence the explicit filter.
+  */}}
+  {{- range $path, $_ := .Files.Glob "files/config/*" }}
+  {{- if not (hasSuffix "_test.go" $path) }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+  {{- end }}
+  {{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -131,7 +141,10 @@ metadata:
 {{- end }}
 {{- range $cfg.repositories | default (list) }}
   {{- if .webhook }}
-    {{- include "forgejo.recordSecret" (list $namespaceSecrets .webhook.secretNamespace .webhook.secretName) }}
+    {{- fail "forgejo-resources.repositories[].webhook is no longer supported; use `webhooks:` (a list, with an explicit `type:` and `events:`). Rendering stops here rather than letting the job's config validation be the thing that finds it." }}
+  {{- end }}
+  {{- range .webhooks | default (list) }}
+    {{- include "forgejo.recordSecret" (list $namespaceSecrets .secretNamespace .secretName) }}
   {{- end }}
 {{- end }}
 

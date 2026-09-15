@@ -1,0 +1,6 @@
+{{/*
+No middleware pair: this instance is a reverse proxy (see values.yaml,
+oauth2ProxyInstance), so Traefik never does a forwardAuth subrequest.
+*/}}
+{{- include "oauth2ProxyInstance.secret" . }}
+{{- include "oauth2ProxyInstance.middleware" . }}

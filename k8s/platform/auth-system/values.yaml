@@ -51,6 +51,7 @@ oidcClientSecrets:
   # blanks the whole configuration and makes every unrelated option report
   # itself as missing.
   clients:
+    archon: archon/archon-oauth2-proxy-secrets
     jellyfin: jellyfin/jellyfin-oidc-authelia
     grafana: monitoring-system/grafana-oidc-authelia
     forgejo: forgejo/forgejo-oidc-authelia
@@ -307,6 +308,16 @@ authelia:
         hmac_secret:
           path: identity_providers.oidc.hmac.key
         authorization_policies:
+          # Archon (k8s/apps/archon). Anyone who gets a session here can run
+          # agentic workflows that cost real money. There is no one_factor rung
+          # and no viewer tier: two groups, both two_factor.
+          archon:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:archon-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
           argocd:
             default_policy: deny
             rules:
@@ -355,6 +366,29 @@ authelia:
               - policy: one_factor
                 subject: "group:jellyfin-users"
         clients:
+          # Archon, fronted by oauth2-proxy in reverse-proxy mode.
+          - client_id: archon
+            client_name: Archon
+            consent_mode: implicit
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/archon
+            token_endpoint_auth_method: client_secret_post
+            authorization_policy: archon
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+              # Groups is required for oauth2-proxy to manage access to
+              # specific endpoints.
+              - groups
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://archon.msng.to/oauth2/callback
           - client_id: argocd
             client_name: Argo CD
             consent_mode: implicit
@@ -610,6 +644,8 @@ authelia:
             path: password.txt
       authelia-oidc-client-secrets:
         items:
+          - key: archon
+            path: archon
           - key: copyparty
             path: copyparty
           - key: forgejo

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: archon
+description: Archon workflow engine driving Claude Code inside agent-sandbox Sandboxes, opening PRs against ops/k8s-homelab until CI is green.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the ghcr.io/coleam00/archon image tag deployed by this chart.
+appVersion: "0.10.1"
+dependencies:
+  # Dedicated instance reverse-proxying the Archon web UI; see values.yaml,
+  # "SSO front door".
+  - name: oauth2-proxy
+    version: 10.7.0
+    repository: https://oauth2-proxy.github.io/manifests
+  # Shared glue for that instance. Library chart, renders nothing itself.
+  - name: oauth2-proxy-instance
+    version: 0.1.0
+    repository: file://../../charts/oauth2-proxy-instance

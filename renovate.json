@@ -22,6 +22,18 @@
       ]
     },
     {
+      "description": "kustomize's built-in manager has no github-releases datasource, so track agent-sandbox's pinned release manifest URL by regex instead",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "k8s/apps/agent-sandbox/kustomization.yaml"
+      ],
+      "matchStrings": [
+        "releases/download/(?<currentValue>[^/]+)/sandbox\\.yaml"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kubernetes-sigs/agent-sandbox"
+    },
+    {
       "description": "Sync ArgoCD appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
