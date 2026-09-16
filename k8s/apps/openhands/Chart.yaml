@@ -1,0 +1,18 @@
+apiVersion: v2
+name: openhands
+description: OpenHands Agent Canvas — the agent control plane. Web UI, session history and automations, driving Claude Code over ACP.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the ghcr.io/openhands/agent-canvas image tag deployed by this chart.
+appVersion: "1.19.0"
+dependencies:
+  # Dedicated instance reverse-proxying the web UI; see values.yaml,
+  # "SSO front door".
+  - name: oauth2-proxy
+    version: 10.7.0
+    repository: https://oauth2-proxy.github.io/manifests
+  # Shared glue for that instance. Library chart, renders nothing itself.
+  - name: oauth2-proxy-instance
+    version: 0.1.0
+    repository: file://../../charts/oauth2-proxy-instance

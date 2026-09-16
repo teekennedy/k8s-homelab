@@ -52,6 +52,7 @@ oidcClientSecrets:
   # itself as missing.
   clients:
     archon: archon/archon-oauth2-proxy-secrets
+    openhands: openhands/openhands-oauth2-proxy-secrets
     jellyfin: jellyfin/jellyfin-oidc-authelia
     grafana: monitoring-system/grafana-oidc-authelia
     forgejo: forgejo/forgejo-oidc-authelia
@@ -318,6 +319,17 @@ authelia:
                 subject: "group:archon-admins"
               - policy: two_factor
                 subject: "group:full-admin"
+          # OpenHands (k8s/apps/openhands). Anyone who gets a session here can
+          # run agents that cost real money and push to ops/k8s-homelab. There
+          # is no one_factor rung and no viewer tier: two groups, both
+          # two_factor.
+          openhands:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:openhands-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
           argocd:
             default_policy: deny
             rules:
@@ -389,6 +401,29 @@ authelia:
               - code
             redirect_uris:
               - https://archon.msng.to/oauth2/callback
+          # OpenHands, fronted by oauth2-proxy in reverse-proxy mode.
+          - client_id: openhands
+            client_name: OpenHands
+            consent_mode: implicit
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/openhands
+            token_endpoint_auth_method: client_secret_post
+            authorization_policy: openhands
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+              # Groups is required for oauth2-proxy to manage access to
+              # specific endpoints.
+              - groups
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://openhands.msng.to/oauth2/callback
           - client_id: argocd
             client_name: Argo CD
             consent_mode: implicit
@@ -658,6 +693,8 @@ authelia:
             path: jellyfin
           - key: homepage
             path: homepage
+          - key: openhands
+            path: openhands
           - key: oauth2-proxy-internal
             path: oauth2-proxy-internal
       smtp-creds:

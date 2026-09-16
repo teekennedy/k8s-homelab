@@ -1,0 +1,187 @@
+# Default values for openhands. See README.md for the architecture this chart
+# implements.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/openhands/agent-canvas
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  # The image's unified entry point: the static frontend plus a path-routing
+  # proxy in front of the agent server and the automation backend. Nothing else
+  # in the pod is meant to be reached from outside it.
+  port: 8000
+
+# --- Application config -----------------------------------------------------
+app:
+  # Anonymous PostHog telemetry. Off: session titles and run outcomes for a
+  # private infrastructure repo are not ours to ship offsite. One variable
+  # covers the frontend, the automation backend and the agent server.
+  telemetryDisabled: true
+  # Used to build callback URLs and injected into automation runs, so it has to
+  # be the externally reachable URL rather than the Service name.
+  baseURL: https://openhands.msng.to
+
+# --- Forge (Forgejo) --------------------------------------------------------
+forge:
+  url: https://git.msng.to
+  # Committer identity on everything the agent pushes.
+  authorName: OpenHands
+  authorEmail: openhands@msng.to
+  # Provisioned by the forgejo-resources Job in k8s/platform/forgejo (see the
+  # `openhands` entry under forgejo-resources.users there). Keys: username,
+  # password, token.
+  secretName: openhands-forgejo-user
+  # Where the credential helper in templates/configmap-gitconfig.yaml is
+  # mounted. GIT_CONFIG_GLOBAL points every git invocation in the pod at it.
+  gitConfigPath: /etc/openhands/gitconfig
+
+# --- Model credentials ------------------------------------------------------
+# Read by the ACP agent the agent server spawns. Created by hand; see README.md,
+# "Prerequisites". Optional so the pod still starts before it exists — the
+# failure is then a session that cannot authenticate, which is visible in the
+# UI, rather than a pod that never schedules.
+anthropic:
+  secretName: openhands-anthropic
+
+podSecurityContext:
+  runAsNonRoot: true
+  # The image's `openhands` user; fsGroup is what gets the mounted volumes
+  # owned by it, since running non-root skips the image's own chown.
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  # False, and not fixable by mounting more volumes: running shell commands
+  # anywhere on the filesystem is what the agent is for.
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "4"
+    memory: 8Gi
+
+persistence:
+  # ~/.openhands — settings, the encrypted secret store, conversation history,
+  # event stores, and the automation SQLite database. Enrolled in the Longhorn
+  # recurring backup group: it is the only copy of a session's history, and the
+  # key that decrypts the secret store is generated onto it on first boot.
+  data:
+    mountPath: /home/openhands/.openhands
+    size: 20Gi
+    storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/backup: "enabled"
+  # ~/workspace — per-session working directories. Clones of branches that are
+  # on the server anyway, so not backed up.
+  workspace:
+    mountPath: /home/openhands/workspace
+    size: 20Gi
+    storageClass: longhorn
+
+serviceAccount:
+  create: true
+  # No cluster access: nothing in this chart reads or writes the Kubernetes API.
+  automount: false
+  annotations: {}
+  name: ""
+
+traefikNamespace: kube-system
+
+networkPolicy:
+  # MetalLB VIP pool (.100-.119) that git.msng.to resolves into; /27 at .96 is
+  # the smallest CIDR-aligned block covering the full pool.
+  lanCidr: "10.69.80.96/27"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+podLabels: {}
+
+# --- SSO front door ---------------------------------------------------------
+# A dedicated oauth2-proxy instance in reverse-proxy mode: it owns
+# openhands.msng.to and forwards authenticated traffic on. The application
+# authenticates its own API with a session key that it generates and injects
+# into the page it serves, which gates nothing a browser cannot replay — this
+# proxy is the access control. See README.md, "Security posture".
+oauth2ProxyInstance:
+  # Must equal the Authelia client_id and the auth-system
+  # oidcClientSecrets.clients key.
+  clientId: openhands
+  # Must equal oauth2-proxy.config.existingSecret, and the auth-system
+  # oidcClientSecrets.clients value must point at <namespace>/<this name>.
+  secretName: openhands-oauth2-proxy-secrets
+  labelsTemplate: openhands.labels
+  middleware:
+    # false: this instance owns the hostname, so Traefik never does a
+    # forwardAuth subrequest.
+    enabled: false
+
+oauth2-proxy:
+  fullnameOverride: openhands-auth
+  config:
+    existingSecret: openhands-oauth2-proxy-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://openhands.msng.to/oauth2/callback"
+      cookie_domains = ["openhands.msng.to"]
+      cookie_name = "_oauth2_proxy_openhands"
+      cookie_expire = "168h"
+      cookie_refresh = "1h"
+      cookie_secure = true
+      cookie_httponly = true
+      cookie_samesite = "lax"
+      whitelist_domains = ["openhands.msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      code_challenge_method = "S256"
+      scope = "openid profile email groups"
+      real_client_ip_header = "X-Real-Ip"
+      skip_provider_button = true
+      allowed_groups = ["openhands-admins", "full-admin"]
+      upstreams = ["http://openhands.openhands.svc.cluster.local:8000/"]
+      trusted_proxy_ips = ["10.42.0.0/16"]
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  ingress:
+    enabled: false
+  gatewayApi:
+    enabled: true
+    gatewayRef:
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecure
+    hostnames:
+      - openhands.msng.to

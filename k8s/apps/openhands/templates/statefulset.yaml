@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "openhands.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+spec:
+  # Headless Service for stable pod DNS. Nothing addresses the pod by its
+  # ordinal name, but a StatefulSet requires the field.
+  serviceName: {{ include "openhands.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  # Single writer: both volumes are ReadWriteOnce, and the agent server's
+  # session state assumes one process owns them. A StatefulSet rollout
+  # terminates the old pod before creating its replacement, which is what makes
+  # that safe; the claims are separate objects rather than volumeClaimTemplates
+  # so they can carry backup labels and be resized without the immutability
+  # rules on a StatefulSet's claim templates.
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "openhands.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "openhands.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # GIT_CONFIG_GLOBAL is read once per git process, but the mounted file
+        # is what supplies the credential helper — roll the pod when it changes
+        # so a session started before the edit isn't left with the old one.
+        checksum/gitconfig: {{ include (print $.Template.BasePath "/configmap-gitconfig.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "openhands.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            # Goes into automation callback URLs and is injected into runs, so
+            # it has to be the URL a browser uses, not the Service name.
+            - name: AUTOMATION_BASE_URL
+              value: {{ .Values.app.baseURL | quote }}
+            {{- if .Values.app.telemetryDisabled }}
+            # The entrypoint fans this out to the frontend, the automation
+            # backend and the agent server's own exporter.
+            - name: VITE_DO_NOT_TRACK
+              value: "1"
+            {{- end }}
+            # --- Forge ------------------------------------------------------
+            # Read by the credential helper in the mounted gitconfig, and by
+            # anything else in a session that needs to call the Forgejo API.
+            - name: GIT_CONFIG_GLOBAL
+              value: {{ .Values.forge.gitConfigPath | quote }}
+            - name: FORGEJO_URL
+              value: {{ .Values.forge.url | quote }}
+            - name: FORGEJO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: username
+            - name: FORGEJO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: token
+          envFrom:
+            # CLAUDE_CODE_OAUTH_TOKEN and/or ANTHROPIC_API_KEY; see README.md,
+            # "Prerequisites".
+            - secretRef:
+                name: {{ .Values.anthropic.secretName }}
+                optional: true
+          # /alive is proxied through to the agent server, so it answers only
+          # once the process behind the entry point is actually up.
+          startupProbe:
+            httpGet:
+              path: /alive
+              port: http
+            periodSeconds: 10
+            # Up to 5 minutes: a first boot generates the encryption key and
+            # the session key and runs the automation database migrations
+            # before anything binds.
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /alive
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /alive
+              port: http
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.data.mountPath }}
+            - name: workspace
+              mountPath: {{ .Values.persistence.workspace.mountPath }}
+            - name: gitconfig
+              mountPath: {{ .Values.forge.gitConfigPath }}
+              subPath: gitconfig
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "openhands.fullname" . }}-data
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ include "openhands.fullname" . }}-workspace
+        - name: gitconfig
+          configMap:
+            name: {{ include "openhands.fullname" . }}-gitconfig
+            defaultMode: 0444
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

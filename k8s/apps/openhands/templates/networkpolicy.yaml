@@ -1,0 +1,87 @@
+---
+# The application has no authentication of its own worth the name — the session
+# key it mints is injected into the page it serves — so the only thing between
+# a pod in this cluster and a shell on the agent's filesystem is this policy
+# plus oauth2-proxy. See README.md, "Security posture".
+#
+# Egress is deliberately narrow and deliberately not "all ports": verified on
+# this cluster's netpol controller (k3s/kube-router) that a portless egress
+# rule is enforced as allow-nothing, not allow-all, once the same policy has
+# other rules that do name ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "openhands.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "openhands.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The entry point only. The agent server, the automation backend and the
+    # bundled editor listen on their own ports in this pod and are reached
+    # through paths on this one; none of them is exposed here.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: oauth2-proxy
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - port: http
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # git.msng.to, on the MetalLB VIP pool. RFC1918 is excluded from the
+    # internet rule below, so this is the only private-range destination.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.lanCidr }}
+      ports:
+        - port: 443
+          protocol: TCP
+    # The model API, and the package registries the ACP agent's own toolchain
+    # pulls from.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+---
+# oauth2-proxy itself: reachable only from the gateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "openhands.fullname" . }}-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: oauth2-proxy
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.traefikNamespace }}

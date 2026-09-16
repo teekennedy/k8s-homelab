@@ -229,6 +229,26 @@ forgejo-resources:
             - read:user
             - write:issue
             - read:organization
+    # Identity the OpenHands agent pushes and opens PRs as (k8s/apps/openhands).
+    # It is deliberately a bot account and not tkennedy: every branch and PR a
+    # session produces has to be attributable to the automation at a glance, and
+    # the token's scopes are the blast radius.
+    #
+    # No read:misc — unlike renovate, nothing here reads server metadata. No
+    # admin. The `Bots` team membership below is what gives it push access to
+    # ops/k8s-homelab; it has no standing access to anything else.
+    - name: openhands
+      fullName: OpenHands
+      email: openhands@msng.to
+      secretName: openhands-forgejo-user
+      secretNamespace: openhands
+      accessTokens:
+        - name: openhands
+          scopes:
+            - write:repository
+            - read:user
+            - write:issue
+            - read:organization
     # The account the woodpecker-resources Job authenticates as. Woodpecker has
     # no API that mints a token for another user, so that job logs in through
     # this account's Forgejo password (the OAuth redirect chain) to get one.
@@ -291,6 +311,7 @@ forgejo-resources:
           members:
             - renovate
             - archon
+            - openhands
         # Separate from Bots because of the permission: `admin` is what
         # Woodpecker's repo activation requires, and nothing else here needs it.
         - name: CI

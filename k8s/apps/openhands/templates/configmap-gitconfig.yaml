@@ -1,0 +1,25 @@
+{{- $forge := urlParse .Values.forge.url -}}
+---
+# GIT_CONFIG_GLOBAL points at this, so every git invocation in the pod picks up
+# the credential helper without a writable home directory or a token on disk:
+# the helper echoes the values the pod already has in its environment.
+#
+# The whole helper is one double-quoted git-config value because it contains
+# `;`, which starts a comment in an unquoted one; the inner quotes are escaped
+# so the token survives word splitting.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openhands.fullname" . }}-gitconfig
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+data:
+  gitconfig: |
+    [credential "{{ $forge.scheme }}://{{ $forge.host }}"]
+    	helper = "!f() { echo username=\"$FORGEJO_USERNAME\"; echo password=\"$FORGEJO_TOKEN\"; }; f"
+    [user]
+    	name = {{ .Values.forge.authorName }}
+    	email = {{ .Values.forge.authorEmail }}
+    [init]
+    	defaultBranch = main
