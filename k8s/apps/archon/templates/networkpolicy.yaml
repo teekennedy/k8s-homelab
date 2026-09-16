@@ -89,9 +89,20 @@ spec:
     - to:
         - ipBlock:
             cidr: {{ .Values.networkPolicy.kubeApiCidr }}
+      ports:
+        - port: 443
+          protocol: TCP
+    # Ports explicit here too, not left implicit as "all ports": verified by
+    # test pod that this cluster's netpol controller (k3s/kube-router)
+    # enforces a portless egress rule as allow-nothing rather than allow-all
+    # once the same NetworkPolicy has other rules that do specify ports.
+    # git.msng.to and ci.msng.to are both https-only Traefik ingresses.
     - to:
         - ipBlock:
             cidr: {{ .Values.networkPolicy.lanCidr }}
+      ports:
+        - port: 443
+          protocol: TCP
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

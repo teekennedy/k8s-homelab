@@ -270,8 +270,9 @@ traefikNamespace: kube-system
 networkPolicy:
   # kube API server ClusterIP — the sandbox's read-only oracle.
   kubeApiCidr: "10.43.0.1/32"
-  # Internal subnet git.msng.to and ci.msng.to resolve into.
-  lanCidr: "10.69.0.0/16"
+  # MetalLB VIP pool (.100-.119) that git.msng.to and ci.msng.to resolve into;
+  # /27 at .96 is the smallest CIDR-aligned block covering the full pool.
+  lanCidr: "10.69.80.96/27"
 
 nodeSelector: {}
 tolerations: []
