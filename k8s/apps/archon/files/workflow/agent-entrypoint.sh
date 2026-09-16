@@ -117,6 +117,7 @@ log "running claude (model=${CLAUDE_MODEL:-default})"
 set +e
 claude \
   --print \
+  --verbose \
   --dangerously-skip-permissions \
   ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"} \
   < "$prompt_file"
