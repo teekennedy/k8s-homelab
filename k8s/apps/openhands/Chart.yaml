@@ -1,6 +1,7 @@
 apiVersion: v2
 name: openhands
 description: OpenHands Agent Canvas — the agent control plane. Web UI, session history and automations, driving Claude Code over ACP.
+icon: https://raw.githubusercontent.com/OpenHands/OpenHands/main/public/favicon-32x32.png
 type: application
 # Bump on any change to the chart templates/values.
 version: 0.2.0
