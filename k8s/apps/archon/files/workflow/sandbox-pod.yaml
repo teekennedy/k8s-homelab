@@ -1,6 +1,8 @@
 # Sandbox manifest template, rendered by scripts/run-agent.sh via
-# render_template (scripts/common.sh). Every ${PLACEHOLDER} below must be named
-# in that call, or the render fails loudly instead of leaving it unsubstituted.
+# render_template (scripts/common.sh). Every "dollar brace name brace" token
+# below must be named in that call, or the render fails loudly instead of
+# leaving it unsubstituted. (Written out in prose here so this comment itself
+# doesn't trip that same leftover-placeholder check.)
 apiVersion: agents.x-k8s.io/v1beta1
 kind: Sandbox
 metadata:
