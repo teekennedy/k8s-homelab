@@ -200,7 +200,7 @@ spec:
                   name: {{ .Values.psql.clusterName }}-app
                   key: uri
           envFrom:
-            # ANTHROPIC_API_KEY and/or CLAUDE_CODE_OAUTH_TOKEN.
+            # CLAUDE_API_KEY and/or CLAUDE_CODE_OAUTH_TOKEN.
             - secretRef:
                 name: {{ .Values.sandbox.anthropicSecretName }}
           livenessProbe:
@@ -245,8 +245,14 @@ spec:
             # Archon discovers workflows by walking ~/.archon/workflows, treating
             # every *.yaml there as one — so only the workflow definition itself
             # is projected here, not sandbox-pod.yaml.
+            #
+            # ~ is /home/appuser (the image runs as uid 1001, not root), which is
+            # the `home` PVC, not the `data` PVC mounted at /.archon above. Nested
+            # under the `home` volume's own mountPath, not /.archon — those are two
+            # different volumes and Archon never looks in the latter for either
+            # this or its self-written config.yaml.
             - name: workflow-definition
-              mountPath: /.archon/workflows/homelab
+              mountPath: /home/appuser/.archon/workflows/homelab
               readOnly: true
         # ---------------------------------------------------------------------
         # Receives the notify step from .woodpecker/ci.yaml and signals the

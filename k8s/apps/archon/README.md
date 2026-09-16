@@ -136,9 +136,12 @@ Everything under `files/workflow/` is rendered into one ConfigMap
 (`templates/configmap-workflow.yaml`) and mounted in two places:
 
 - the Archon pod, at `/opt/archon-workflow` (scripts + the Sandbox template) and
-  at `/.archon/workflows/homelab` (just the workflow definition — Archon's
-  discovery treats every `*.yaml` it finds there as a workflow, and
-  `sandbox-pod.yaml` is a Kubernetes manifest);
+  at `/home/appuser/.archon/workflows/homelab` (just the workflow definition —
+  Archon's discovery walks `~/.archon/workflows` treating every `*.yaml` it
+  finds there as a workflow, and `sandbox-pod.yaml` is a Kubernetes manifest).
+  `~` is `/home/appuser` (the image runs as uid 1001), the `home` PVC — **not**
+  `/.archon`, which is a different volume (the `data` PVC, used for
+  `ci-events` state shared with the `ci-signal` sidecar);
 - every Sandbox pod, at `/opt/agent` — but only `agent-entrypoint.sh` and
   `agent-prompt.md`, selected by `items` in `sandbox-pod.yaml`. The sandbox never
   sees the driver scripts or the API paths they use.
@@ -153,11 +156,11 @@ each of the two, so editing either rolls the pod.
 
 | Secret | Keys | Where from |
 | --- | --- | --- |
-| `archon-anthropic` | `ANTHROPIC_API_KEY` **or** `CLAUDE_CODE_OAUTH_TOKEN` | console.anthropic.com, or `claude setup-token` |
+| `archon-anthropic` | `CLAUDE_CODE_OAUTH_TOKEN` | `claude setup-token` |
 
 ```sh
 kubectl -n archon create secret generic archon-anthropic \
-  --from-literal=ANTHROPIC_API_KEY=sk-ant-...
+  --from-literal=CLAUDE_CODE_OAUTH_TOKEN=sk-ant-...
 ```
 
 It is mounted by name into the sandbox pod template; the Archon ServiceAccount
@@ -213,9 +216,15 @@ Only needed if you intend to start runs from the **web UI**. Triggering through
 the Gitea adapter does this for you: the first `@archon` mention on a repo
 clones it into `/.archon/workspaces/` and registers it as a codebase.
 
+The web UI calls this a **Project**, not a codebase, but that's frontend only.
+The API, DB schema, and every server-side log line still say `codebase`.
+
 ```sh
 kubectl -n archon exec -it deploy/archon -- \
-  bun run archon codebase add k8s-homelab https://git.msng.to/ops/k8s-homelab.git
+  curl -s -X POST http://127.0.0.1:3000/api/codebases \
+    -H 'X-Auth-Request-User: <your-authelia-username>' \
+    -H 'Content-Type: application/json' \
+    -d '{"url": "https://git.msng.to/ops/k8s-homelab.git"}'
 ```
 
 The workflow itself never touches that checkout (`mutates_checkout: false`) —
@@ -223,35 +232,21 @@ all the real work happens in the sandbox — but Archon wants one to exist.
 
 While you are in there, turn off the 19 bundled workflows: they're GitHub-shaped
 and would only clutter the router's choices for an install that runs one
-workflow against one Forgejo repo. The setting lives in `/.archon/config.yaml`,
-which is on the data PVC and which Archon writes itself, so it is deliberately
-not templated by this chart:
+workflow against one Forgejo repo. The setting lives in
+`/home/appuser/.archon/config.yaml` — **not** `/.archon/config.yaml`; `~` is
+`/home/appuser` (the image runs as uid 1001), on the `home` PVC, a different
+volume from `/.archon` (the `data` PVC) — which Archon writes itself, so it is
+deliberately not templated by this chart. Archon writes it as a single-line
+flow-style mapping, so append a raw `defaults:` block rather than `>>`-ing one
+on — two top-level nodes in one YAML document is invalid and Archon will
+silently fall back to defaults on a parse error. Inject the key into the
+existing flow mapping instead:
 
 ```sh
 kubectl -n archon exec -it deploy/archon -- \
-  sh -c 'printf "defaults:\n  loadDefaultWorkflows: false\n" >> /.archon/config.yaml'
+  sh -c 'sed -i "s/^{/{defaults:{loadDefaultWorkflows:false},/" /home/appuser/.archon/config.yaml'
 kubectl -n archon rollout restart deploy/archon
 ```
-
-### 6. The Forgejo webhook
-
-Nothing to do — it is provisioned. This is what turns a comment into a run, and
-it is declared in `k8s/platform/forgejo/values.yaml` under
-`forgejo-resources.repositories[].webhooks`:
-
-```yaml
-- url: https://archon.msng.to/webhooks/gitea
-  type: gitea            # X-Gitea-Signature; `gogs` would sign the wrong header
-  events: [issues, issue_comment, pull_request, pull_request_comment]
-  secretName: archon-webhook
-  secretNamespace: archon
-  secretKey: webhook-secret
-```
-
-The `forgejo-resources` Job generates the shared secret, writes it into this
-namespace's `archon-webhook` Secret, and registers the hook with the same value.
-On a cold bootstrap the Job may run before this namespace exists — it logs the
-failure for that one hook and registers it on the next forgejo sync.
 
 ## Security posture
 

@@ -135,7 +135,7 @@ sandbox:
       cpu: "4"
       memory: 8Gi
   # Anthropic credentials for the sandboxed agent. Create by hand; either
-  # ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN.
+  # CLAUDE_API_KEY or CLAUDE_CODE_OAUTH_TOKEN.
   anthropicSecretName: archon-anthropic
   # Cluster-read ServiceAccount the sandbox pod runs as. See templates/rbac.yaml.
   serviceAccountName: archon-agent
