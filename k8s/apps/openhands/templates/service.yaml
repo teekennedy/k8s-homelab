@@ -5,6 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "openhands.labels" . | nindent 4 }}
+    app.kubernetes.io/component: canvas
 spec:
   type: ClusterIP
   ports:
@@ -19,7 +20,7 @@ spec:
       name: metrics
     {{- end }}
   selector:
-    {{- include "openhands.selectorLabels" . | nindent 4 }}
+    {{- include "openhands.canvasSelectorLabels" . | nindent 4 }}
 {{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/monitoring.coreos.com/servicemonitor_v1.json
@@ -36,7 +37,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "openhands.selectorLabels" . | nindent 6 }}
+      {{- include "openhands.canvasSelectorLabels" . | nindent 6 }}
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}

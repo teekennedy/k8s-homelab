@@ -51,6 +51,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Selector labels for the canvas pod alone. The labels above identify the whole
+release, so every sibling workload in it carries them too; anything that means
+"the entry point" — its Service, its NetworkPolicy — has to select on this.
+*/}}
+{{- define "openhands.canvasSelectorLabels" -}}
+{{ include "openhands.selectorLabels" . }}
+app.kubernetes.io/component: canvas
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "openhands.serviceAccountName" -}}

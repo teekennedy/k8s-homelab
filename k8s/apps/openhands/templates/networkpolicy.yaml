@@ -18,7 +18,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      {{- include "openhands.selectorLabels" . | nindent 6 }}
+      {{- include "openhands.canvasSelectorLabels" . | nindent 6 }}
   policyTypes:
     - Ingress
     - Egress

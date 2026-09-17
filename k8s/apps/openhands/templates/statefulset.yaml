@@ -26,6 +26,7 @@ spec:
     metadata:
       labels:
         {{- include "openhands.labels" . | nindent 8 }}
+        app.kubernetes.io/component: canvas
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
