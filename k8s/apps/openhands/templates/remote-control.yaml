@@ -1,0 +1,301 @@
+{{- if .Values.remoteControl.enabled }}
+{{- $name := printf "%s-remote-control" (include "openhands.fullname" .) -}}
+{{- $selector := dict "app.kubernetes.io/name" (include "openhands.name" .) "app.kubernetes.io/instance" .Release.Name "app.kubernetes.io/component" "remote-control" -}}
+{{- $repo := urlParse .Values.forge.url -}}
+---
+# Checkout, trust record and CLI state. Long-lived rather than single-use: this
+# pod is a place someone reattaches to from a phone, so losing the working tree
+# on every restart would defeat the point.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.remoteControl.storage.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.remoteControl.storage.size }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+    app.kubernetes.io/component: remote-control
+spec:
+  replicas: 1
+  # Single writer on a ReadWriteOnce volume.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- toYaml $selector | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "openhands.labels" . | nindent 8 }}
+        app.kubernetes.io/component: remote-control
+      annotations:
+        checksum/gitconfig: {{ include (print $.Template.BasePath "/configmap-gitconfig.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        # The node image's own `node` user. Unrelated to the canvas image's
+        # uid — these two pods share no volume.
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Installs the CLI into an emptyDir rather than forking an image to add
+        # one npm package. Re-runs on every restart, so the pinned version in
+        # values.yaml is always what is running.
+        - name: install-cli
+          image: {{ .Values.remoteControl.nodeImage }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              npm install --global --prefix /opt/claude \
+                "@anthropic-ai/claude-code@${CLI_VERSION}"
+          env:
+            - name: CLI_VERSION
+              value: {{ .Values.remoteControl.cliVersion | quote }}
+            # npm needs a writable home for its cache.
+            - name: HOME
+              value: /tmp
+          securityContext:
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: cli
+              mountPath: /opt/claude
+            - name: tmp
+              mountPath: /tmp
+        # Clones the repo on first start and pre-accepts workspace trust. The
+        # trust dialog cannot be answered by a pod with no terminal, and Claude
+        # Code records the decision per project directory in ~/.claude.json —
+        # so the record is written here rather than waited for.
+        - name: seed-workspace
+          image: {{ .Values.remoteControl.nodeImage }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              if [ ! -d "$PROJECT_DIR/.git" ]; then
+                git clone "$CLONE_URL" "$PROJECT_DIR"
+              fi
+              # Merge rather than overwrite: everything else in this file is
+              # the CLI's own state, accumulated across restarts.
+              node -e '
+                const fs = require("fs");
+                const path = process.env.HOME + "/.claude.json";
+                let cfg = {};
+                try { cfg = JSON.parse(fs.readFileSync(path, "utf8")); } catch {}
+                cfg.projects = cfg.projects || {};
+                const dir = process.env.PROJECT_DIR;
+                cfg.projects[dir] = { ...(cfg.projects[dir] || {}), hasTrustDialogAccepted: true };
+                fs.writeFileSync(path, JSON.stringify(cfg, null, 2));
+              '
+          env:
+            - name: HOME
+              value: {{ .Values.remoteControl.home | quote }}
+            - name: PROJECT_DIR
+              value: {{ printf "%s/%s" .Values.remoteControl.home .Values.forge.repo | quote }}
+            - name: CLONE_URL
+              value: {{ printf "%s/%s/%s.git" (trimSuffix "/" .Values.forge.url) .Values.forge.owner .Values.forge.repo | quote }}
+            - name: GIT_CONFIG_GLOBAL
+              value: {{ .Values.forge.gitConfigPath | quote }}
+            - name: FORGEJO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: username
+            - name: FORGEJO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: token
+          securityContext:
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: work
+              mountPath: {{ .Values.remoteControl.home }}
+            - name: gitconfig
+              mountPath: {{ .Values.forge.gitConfigPath }}
+              subPath: gitconfig
+              readOnly: true
+      containers:
+        - name: remote-control
+          image: {{ .Values.remoteControl.nodeImage }}
+          workingDir: {{ printf "%s/%s" .Values.remoteControl.home .Values.forge.repo | quote }}
+          command:
+            - /opt/claude/bin/claude
+            - remote-control
+            - --name
+            - {{ .Values.remoteControl.sessionName | quote }}
+          securityContext:
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: HOME
+              value: {{ .Values.remoteControl.home | quote }}
+            # Deliberately absent, and each one silently disables Remote
+            # Control if reintroduced: DO_NOT_TRACK, DISABLE_TELEMETRY,
+            # CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, DISABLE_GROWTHBOOK.
+            # ANTHROPIC_BASE_URL disables it too, which is why the model
+            # credential Secret must not carry one.
+            - name: GIT_CONFIG_GLOBAL
+              value: {{ .Values.forge.gitConfigPath | quote }}
+            - name: FORGEJO_URL
+              value: {{ .Values.forge.url | quote }}
+            - name: FORGEJO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: username
+            - name: FORGEJO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: token
+          envFrom:
+            # CLAUDE_CODE_OAUTH_TOKEN. An API key is not enough here: Remote
+            # Control is a subscription feature and rejects key-only auth.
+            - secretRef:
+                name: {{ .Values.anthropic.secretName }}
+          resources:
+            {{- toYaml .Values.remoteControl.resources | nindent 12 }}
+          volumeMounts:
+            - name: work
+              mountPath: {{ .Values.remoteControl.home }}
+            - name: cli
+              mountPath: /opt/claude
+              readOnly: true
+            - name: gitconfig
+              mountPath: {{ .Values.forge.gitConfigPath }}
+              subPath: gitconfig
+              readOnly: true
+      volumes:
+        - name: work
+          persistentVolumeClaim:
+            claimName: {{ $name }}
+        - name: cli
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: gitconfig
+          configMap:
+            name: {{ include "openhands.fullname" . }}-gitconfig
+            defaultMode: 0444
+---
+# Outbound only, and no ingress at all: nothing dials this pod, it dials
+# claude.ai. Same shape as the canvas, for the same reason.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $selector | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # The forge. Its name resolves to a MetalLB VIP, but traffic raised inside
+    # the cluster is DNAT'd to the ingress controller's pod before egress policy
+    # is evaluated — so the destination this rule has to name is Traefik, not
+    # the VIP. The ipBlock below stays for a genuine off-cluster LAN address.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.traefikNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        # The gateway's container port, not 443: egress policy is evaluated
+        # after the Service DNAT, so by the time this rule is matched the
+        # destination is the Traefik pod on its own websecure port. Naming the
+        # port rather than hardcoding 8443 resolves it from that pod's spec.
+        - port: websecure
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.lanCidr }}
+      ports:
+        - port: 443
+          protocol: TCP
+    # claude.ai, the model API, and the npm registry the initContainer pulls
+    # the CLI from.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+{{- end }}

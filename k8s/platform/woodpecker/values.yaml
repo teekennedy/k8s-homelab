@@ -176,6 +176,20 @@ woodpecker-resources:
         name: archon-woodpecker
         namespace: archon
         key: token
+    # Used by the forgejo-iterate skill in k8s/apps/openhands to pull the
+    # failing step logs for a red PR check and to restart a pipeline it judges
+    # flaky. Membership of ops/Bots is what gives it read access to the repo;
+    # restarting a pipeline needs no more than that.
+    - login: openhands
+      email: openhands@msng.to
+      admin: false
+      credentialsSecret:
+        name: openhands-forgejo-user
+        namespace: openhands
+      tokenSecret:
+        name: openhands-woodpecker
+        namespace: openhands
+        key: token
 
   repositories:
     - owner: ops
@@ -192,6 +206,13 @@ woodpecker-resources:
         cancelPreviousPipelineEvents:
           - pull_request
           - push
+        # Authors whose pipelines skip the approval gate. Woodpecker blocks a
+        # pipeline "pending approval" for any author not listed here, per the
+        # repo's requireApproval mode — which is what a bot's PR hits, since
+        # nothing ever approves it. Naming the bot exempts that one account
+        # rather than loosening the mode for every contributor on a public repo.
+        approvalAllowedUsers:
+          - openhands
       secrets:
         # Shared HMAC key between the notify step in .woodpecker/ci.yaml and the
         # ci-signal relay in the archon namespace. Generated once into the

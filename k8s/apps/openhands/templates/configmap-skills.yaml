@@ -1,0 +1,18 @@
+---
+# Agent Skills, seeded into the agent's home by the seed-skills initContainer.
+#
+# ConfigMap keys cannot contain "/", so each file is stored flat as
+# "<skill>.<filename>" and the directory layout is restored by the volume's
+# `items` (see the skillVolumeItems helper). One level: files/skills/<skill>/<file>.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openhands.fullname" . }}-skills
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+data:
+  {{- range $path, $_ := .Files.Glob "files/skills/*/*" }}
+  {{ printf "%s.%s" (base (dir $path)) (base $path) }}: |-
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- end }}

@@ -34,6 +34,12 @@ spec:
         # is what supplies the credential helper — roll the pod when it changes
         # so a session started before the edit isn't left with the old one.
         checksum/gitconfig: {{ include (print $.Template.BasePath "/configmap-gitconfig.yaml") . | sha256sum }}
+        # Skills are copied into the agent's home at pod start, so a change to
+        # files/skills/ only takes effect on a fresh pod.
+        checksum/skills: {{ include (print $.Template.BasePath "/configmap-skills.yaml") . | sha256sum }}
+        {{- if .Values.metrics.enabled }}
+        checksum/metrics: {{ include (print $.Template.BasePath "/configmap-metrics.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -42,6 +48,38 @@ spec:
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        # Agent Skills are read from $HOME/.claude, which the agent also writes
+        # to — so the ConfigMap is copied in rather than mounted there. A
+        # ConfigMap mounted under ~/.claude would make that directory
+        # root-owned, and the agent could no longer write its own state beside
+        # it. The copy re-runs on every start, so git stays the source of truth.
+        - name: seed-skills
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p "$HOME/.claude/skills"
+              # -L: ConfigMap entries are symlinks into ..data.
+              cp -rLf /opt/openhands-skills/. "$HOME/.claude/skills/"
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: claude-home
+              mountPath: /home/openhands/.claude
+            - name: skills
+              mountPath: /opt/openhands-skills
+              readOnly: true
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -60,9 +98,11 @@ spec:
             - name: AUTOMATION_BASE_URL
               value: {{ .Values.app.baseURL | quote }}
             {{- if .Values.app.telemetryDisabled }}
-            # The entrypoint fans this out to the frontend, the automation
-            # backend and the agent server's own exporter.
+            # Two variables, covering the server side and the browser
+            # separately — see values.yaml, app.telemetryDisabled.
             - name: VITE_DO_NOT_TRACK
+              value: "1"
+            - name: AGENT_CANVAS_DISABLE_TELEMETRY
               value: "1"
             {{- end }}
             # --- Forge ------------------------------------------------------
@@ -72,6 +112,10 @@ spec:
               value: {{ .Values.forge.gitConfigPath | quote }}
             - name: FORGEJO_URL
               value: {{ .Values.forge.url | quote }}
+            - name: FORGEJO_OWNER
+              value: {{ .Values.forge.owner | quote }}
+            - name: FORGEJO_REPO
+              value: {{ .Values.forge.repo | quote }}
             - name: FORGEJO_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -82,6 +126,20 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.forge.secretName }}
                   key: token
+            # --- CI ---------------------------------------------------------
+            # Read by the forgejo-iterate skill to pull failing step logs and
+            # restart a flaky pipeline.
+            - name: WOODPECKER_URL
+              value: {{ .Values.ci.url | quote }}
+            - name: WOODPECKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.ci.secretName }}
+                  key: token
+                  # Provisioned by a Job that may not have run yet on a cold
+                  # bootstrap. Optional because only the log-reading half of
+                  # the skill needs it.
+                  optional: true
           envFrom:
             # CLAUDE_CODE_OAUTH_TOKEN and/or ANTHROPIC_API_KEY; see README.md,
             # "Prerequisites".
@@ -118,10 +176,70 @@ spec:
               mountPath: {{ .Values.persistence.data.mountPath }}
             - name: workspace
               mountPath: {{ .Values.persistence.workspace.mountPath }}
+            # The agent's own config directory: skills seeded above, plus
+            # whatever state it writes. Deliberately not persisted — the skills
+            # come from git on every start and the rest is rebuildable.
+            - name: claude-home
+              mountPath: /home/openhands/.claude
             - name: gitconfig
               mountPath: {{ .Values.forge.gitConfigPath }}
               subPath: gitconfig
               readOnly: true
+        {{- if .Values.metrics.enabled }}
+        # Reads the conversation list over loopback and renders it as Prometheus
+        # text. In this pod, not its own Deployment, because the session key it
+        # authenticates with lives on the data volume.
+        - name: metrics
+          image: {{ .Values.metrics.image }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /app/server.py
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: LOG_LEVEL
+              value: info
+            - name: METRICS_PORT
+              value: {{ .Values.metrics.port | quote }}
+            - name: AGENT_SERVER_URL
+              value: "http://127.0.0.1:18000"
+            - name: SESSION_API_KEY_FILE
+              value: {{ printf "%s/agent-canvas/api-key.txt" .Values.persistence.data.mountPath | quote }}
+            - name: MIN_SCRAPE_INTERVAL_SECONDS
+              value: {{ .Values.metrics.minScrapeIntervalSeconds | quote }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.metrics.resources | nindent 12 }}
+          volumeMounts:
+            # Read-only: the sidecar only ever reads the session key.
+            - name: data
+              mountPath: {{ .Values.persistence.data.mountPath }}
+              readOnly: true
+            - name: metrics-src
+              mountPath: /app
+              readOnly: true
+        {{- end }}
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -129,6 +247,20 @@ spec:
         - name: workspace
           persistentVolumeClaim:
             claimName: {{ include "openhands.fullname" . }}-workspace
+        - name: claude-home
+          emptyDir: {}
+        {{- if .Values.metrics.enabled }}
+        - name: metrics-src
+          configMap:
+            name: {{ include "openhands.fullname" . }}-metrics
+            defaultMode: 0444
+        {{- end }}
+        - name: skills
+          configMap:
+            name: {{ include "openhands.fullname" . }}-skills
+            defaultMode: 0444
+            items:
+              {{- include "openhands.skillVolumeItems" . | nindent 14 }}
         - name: gitconfig
           configMap:
             name: {{ include "openhands.fullname" . }}-gitconfig

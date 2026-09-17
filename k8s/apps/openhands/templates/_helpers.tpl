@@ -60,3 +60,16 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+ConfigMap volume `items` restoring the directory layout the flat ConfigMap keys
+had to give up. Kept next to the ConfigMap's own glob in
+templates/configmap-skills.yaml so adding a file under files/skills/ needs no
+edit in either place.
+*/}}
+{{- define "openhands.skillVolumeItems" -}}
+{{- range $path, $_ := .Files.Glob "files/skills/*/*" }}
+- key: {{ printf "%s.%s" (base (dir $path)) (base $path) }}
+  path: {{ printf "%s/%s" (base (dir $path)) (base $path) }}
+{{- end }}
+{{- end }}

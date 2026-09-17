@@ -89,6 +89,10 @@ type RepoSettings struct {
 	AllowPullRequests            *bool    `yaml:"allowPullRequests"`
 	AllowDeploy                  *bool    `yaml:"allowDeploy"`
 	CancelPreviousPipelineEvents []string `yaml:"cancelPreviousPipelineEvents"`
+	// Authors whose pipelines skip the approval gate. Woodpecker blocks a
+	// pipeline pending approval per requireApproval mode; naming a bot here
+	// exempts that one account without loosening the mode for everyone.
+	ApprovalAllowedUsers []string `yaml:"approvalAllowedUsers"`
 }
 
 func (r *RepoSettings) validate(ref string) []error {
@@ -105,6 +109,11 @@ func (r *RepoSettings) validate(ref string) []error {
 	for _, event := range r.CancelPreviousPipelineEvents {
 		if !slices.Contains(webhookEvents, event) {
 			errs = append(errs, fmt.Errorf("%s settings: cancelPreviousPipelineEvents %q is not one of %v", ref, event, webhookEvents))
+		}
+	}
+	for _, login := range r.ApprovalAllowedUsers {
+		if strings.TrimSpace(login) == "" {
+			errs = append(errs, fmt.Errorf("%s settings: approvalAllowedUsers must not contain an empty login", ref))
 		}
 	}
 	return errs

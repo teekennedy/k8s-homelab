@@ -30,10 +30,11 @@ the automation backend, and `/vscode` to a bundled editor. The two backend
 ports and the editor port are internal to the pod; the NetworkPolicy admits
 only `:8000`, and only from oauth2-proxy.
 
-**The agent runs inside this pod.** It gets a shell on the pod's filesystem and
-whatever network egress the NetworkPolicy allows — there is no per-session
-container. That is the property to keep in mind when deciding what this
-namespace is allowed to reach.
+**The agent runs inside this pod.** Per-session isolation is a git worktree
+under `~/workspace`, not a container: the agent server only ever builds a local
+workspace, so every session shares this pod's filesystem, shell and network.
+That is the property to keep in mind when deciding what this namespace is
+allowed to reach.
 
 ## Security posture
 
@@ -131,6 +132,161 @@ chart, so two things are done once through the UI and then persist:
 Codex and Gemini CLI ship as presets alongside Claude Code, and **Custom**
 accepts the launch command of any stdio ACP server.
 
+## Skills
+
+`files/skills/` holds Agent Skills that the chart seeds into the agent's home at
+`~/.claude/skills/` on every pod start, so git is the source of truth and a
+change takes effect on the next rollout.
+
+They are copied in by an initContainer rather than mounted. A ConfigMap mounted
+under `~/.claude` would make that directory root-owned, and the agent — which
+writes its own state there — could no longer use it.
+
+| Skill | What it does |
+| --- | --- |
+| `forgejo-iterate` | Drives a Forgejo pull request to green: polls the combined commit status, pulls failing step logs out of Woodpecker, classifies the failure, fixes or restarts, and repeats. |
+
+The ACP adapter passes `settingSources: ["user", "project", "local"]` to the
+agent, which is what makes a skill in the home directory load at all. Nothing in
+`forgejo-iterate` is specific to this deployment — it is `curl` and `jq` against
+two HTTP APIs, and works in any Claude Code session with the same environment
+variables set.
+
+## Remote Control
+
+`remoteControl.enabled` adds a second, long-lived pod running
+`claude remote-control` in server mode, so a session can be driven from
+claude.ai/code or the Claude mobile app. It shares only the namespace and the
+model credential with the canvas.
+
+It has to be a separate pod. Remote Control refuses to start when any of
+`DO_NOT_TRACK`, `DISABLE_TELEMETRY`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`
+or `DISABLE_GROWTHBOOK` is set, and the canvas sets the first of those on
+purpose — one process cannot have both.
+
+Three things in that pod spec are load-bearing, and each one silently disables
+Remote Control if it goes missing:
+
+- **A subscription login.** `CLAUDE_CODE_OAUTH_TOKEN`, not an API key.
+- **No `ANTHROPIC_BASE_URL`**, anywhere — including in the credential Secret.
+- **Workspace trust, pre-accepted.** A pod has no terminal to answer the trust
+  dialog with, so the initContainer writes the decision into `~/.claude.json`
+  for the checkout directory before the CLI ever starts.
+
+Default off: whether a `claude setup-token` OAuth token counts as an eligible
+subscription login is unverified. The pod exits with "You must be logged in to
+use Remote Control" if it does not.
+
+## Sandbox profiles
+
+Additional agent servers, each in its own pod with its own ServiceAccount,
+NetworkPolicy, resource limits and credentials. They appear in the UI under
+**Manage backends**; choosing a backend is what chooses the isolation.
+
+| Profile | Reaches | Forge credentials |
+| --- | --- | --- |
+| `repo` | the model API and `git.msng.to` | yes |
+| `isolated` | the model API only — nothing on the LAN | no |
+
+Each profile is served at `https://openhands.msng.to/sandbox/<name>`: a more
+specific path on the canvas's own hostname, which Gateway API gives precedence
+over the `/` route. Sharing the origin means one Authelia session covers
+everything and there is no CORS to configure. Traefik authenticates the path
+with a `forwardAuth` subrequest against the same oauth2-proxy, then strips the
+prefix before the agent server sees the request — the agent server has no
+concept of being served under one.
+
+Add a backend with the URL above and the profile's session key:
+
+```sh
+kubectl -n openhands get secret openhands-sandbox-repo \
+  -o jsonpath='{.data.session-api-key}' | base64 -d
+```
+
+### Why profiles and not per-session pods
+
+The plan this replaced assumed the isolation boundary could be per session. It
+cannot: the agent server builds a `LocalWorkspace` and isolates a session with a
+git worktree, and there is no configuration hook for a remote one. The SDK does
+ship an `AgentSandboxWorkspace` that runs a session in a Kubernetes pod, but it
+is a *client-side* class — something a Python program that drives an agent server
+uses, not something an agent server can be pointed at.
+
+So the pod boundary is the only isolation boundary available, and it has to be
+something a session can be pointed at up front. A profile is that: sessions on
+the same profile share its pod, sessions on different profiles share nothing —
+not a ServiceAccount, not a volume, not a network path, not a forge token.
+
+These are long-lived Deployments rather than `Sandbox` resources. A `Sandbox`
+earns its keep when a pod is created and destroyed per unit of work; a backend
+that has to keep a stable DNS name for the browser to reach is a Deployment.
+
+## Automations
+
+Scheduled and event-driven runs live in the automation backend. They are rows in
+the database on the data volume, created through the UI — this chart creates
+none of them, and there is no declarative form for one.
+
+Cron triggers work out of the box. Event triggers need a webhook source
+registered first, because the deployment ships no built-in forge providers:
+`GET /api/automation/v1/capabilities` reports `triggerKinds: ["cron"]` until one
+exists.
+
+To wire up Forgejo:
+
+1. Register a custom webhook source in the automation service — **Automations →
+   Webhooks** in the UI, or `POST /api/automation/v1/webhooks`:
+
+   | Field | Value |
+   | --- | --- |
+   | `source` | `forgejo` |
+   | `signature_header` | `X-Gitea-Signature` |
+   | `signature_scheme` | `hmac_sha256_hex` |
+   | `event_key_expr` | `action` |
+
+   Forgejo signs the raw body with hex HMAC-SHA256 under that header, which is
+   exactly what `hmac_sha256_hex` verifies. The response carries the generated
+   secret and the delivery URL **once**.
+
+2. Add a webhook on `ops/k8s-homelab` in Forgejo pointing at that URL, type
+   `gitea`, with that secret, restricted to the events you want to act on.
+
+3. `event_key_expr: action` means the event key is the payload's `action`
+   (`created`, `opened`, `closed`), so restrict the Forgejo webhook to one event
+   type rather than relying on the key to tell them apart.
+
+`oauth2-proxy` already skips authentication for `POST` on the event path — a
+webhook carries no Authelia session. The HMAC is what authenticates a delivery;
+the path answers 404 for a source nobody has registered.
+
+> A comment-triggered automation on a **public** repo means anyone with a
+> Forgejo account can start a run. The HMAC proves the delivery came from
+> Forgejo, not that the commenter is allowed to spend model budget. There is no
+> author filter on a Forgejo webhook and no allowlist in the automation service,
+> so the only place to enforce one is the automation's own prompt — which is a
+> soft control. Prefer a schedule, or an event the bot account alone can raise.
+
+## Metrics
+
+`files/metrics/` is a sidecar that walks the conversation list and renders
+per-model token and cost figures as Prometheus text on `:9102`, scraped by the
+existing kube-prometheus-stack through a ServiceMonitor. The agent server
+records the figures but exposes no `/metrics` endpoint of its own, and no
+upstream usage dashboard exists.
+
+It is a sidecar rather than its own Deployment because the session key it
+authenticates with is generated onto the data volume on first boot — reading it
+there is what keeps that key single-owned rather than copied into a Secret with
+two owners. The volume is mounted read-only.
+
+Series and their caveats are in `files/metrics/README.md`. The short version:
+they are **gauges**, recomputed from the conversations that still exist, so
+deleting a conversation makes the numbers go down.
+
+The NetworkPolicy admits the monitoring namespace to the exporter's port and
+nothing else — the scraper cannot reach the entry point, and oauth2-proxy
+cannot reach the exporter.
+
 ## Storage
 
 Two ReadWriteOnce Longhorn volumes, which is why this is a single replica:
@@ -160,5 +316,8 @@ single volume ever stops being enough.
 - **Concurrent sessions on the same provider share a HOME**, so they can race on
   the CLI's auth and config files. Upstream tracks per-session data directories
   in [agent-canvas#2114](https://github.com/OpenHands/agent-canvas/issues/2114).
-- **No usage or cost metrics.** Centralized token/cost accounting is an open
-  upstream request, [#16308](https://github.com/OpenHands/OpenHands/issues/16308).
+- **No per-session container.** The agent server builds a `LocalWorkspace` and
+  isolates a session with a git worktree; there is no hook for a remote one, so
+  a session cannot be moved into a pod of its own by configuration. The SDK's
+  `AgentSandboxWorkspace` does that, but it is a client-side class for programs
+  that drive an agent server — not something this server can be pointed at.

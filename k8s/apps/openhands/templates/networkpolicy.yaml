@@ -34,6 +34,17 @@ spec:
       ports:
         - port: http
           protocol: TCP
+    {{- if .Values.metrics.enabled }}
+    # The metrics sidecar's port, and only it: the scraper cannot reach the
+    # entry point and oauth2-proxy cannot reach the exporter.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.monitoringNamespace }}
+      ports:
+        - port: metrics
+          protocol: TCP
+    {{- end }}
   egress:
     - to:
         - namespaceSelector:
@@ -44,8 +55,24 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
-    # git.msng.to, on the MetalLB VIP pool. RFC1918 is excluded from the
-    # internet rule below, so this is the only private-range destination.
+    # The forge. Its name resolves to a MetalLB VIP, but traffic raised inside
+    # the cluster is DNAT'd to the ingress controller's pod before egress policy
+    # is evaluated — so the destination this rule has to name is Traefik, not
+    # the VIP. The ipBlock below stays for a genuine off-cluster LAN address.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.traefikNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        # The gateway's container port, not 443: egress policy is evaluated
+        # after the Service DNAT, so by the time this rule is matched the
+        # destination is the Traefik pod on its own websecure port. Naming the
+        # port rather than hardcoding 8443 resolves it from that pod's spec.
+        - port: websecure
+          protocol: TCP
     - to:
         - ipBlock:
             cidr: {{ .Values.networkPolicy.lanCidr }}

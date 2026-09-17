@@ -1,0 +1,17 @@
+# Patterns to ignore when building packages.
+.DS_Store
+.git/
+.gitignore
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.idea/
+.vscode/
+# Local test scaffolding for files/metrics. Only server.py is templated into the
+# ConfigMap, and a vendored virtualenv would otherwise be packaged.
+files/metrics/.venv
+files/metrics/__pycache__
+files/metrics/tests/__pycache__
+files/metrics/.pytest_cache

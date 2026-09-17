@@ -331,10 +331,17 @@ func repoPatchFor(active *wpRepo, want *RepoSettings) (patch wpRepoPatch, drift 
 	}
 
 	if want.CancelPreviousPipelineEvents != nil &&
-		!sameEvents(active.CancelPreviousPipelineEvents, want.CancelPreviousPipelineEvents) {
+		!sameSet(active.CancelPreviousPipelineEvents, want.CancelPreviousPipelineEvents) {
 		events := slices.Clone(want.CancelPreviousPipelineEvents)
 		patch.CancelPreviousPipelineEvents = &events
 		drift = append(drift, "cancelPreviousPipelineEvents")
+	}
+
+	if want.ApprovalAllowedUsers != nil &&
+		!sameSet(active.ApprovalAllowedUsers, want.ApprovalAllowedUsers) {
+		users := slices.Clone(want.ApprovalAllowedUsers)
+		patch.ApprovalAllowedUsers = &users
+		drift = append(drift, "approvalAllowedUsers")
 	}
 	return patch, drift
 }
@@ -348,9 +355,9 @@ func driftedPtr[T comparable](current T, want *T) *T {
 	return want
 }
 
-// sameEvents compares two event lists as sets: Woodpecker does not promise an
+// sameSet compares two string lists as sets: Woodpecker does not promise an
 // order, and an order-sensitive comparison would PATCH on every single run.
-func sameEvents(got, want []string) bool {
+func sameSet(got, want []string) bool {
 	if len(got) != len(want) {
 		return false
 	}

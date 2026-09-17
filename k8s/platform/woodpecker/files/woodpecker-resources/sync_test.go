@@ -64,12 +64,35 @@ func TestRepoPatchForDetectsEveryKnob(t *testing.T) {
 		AllowPullRequests:            ptr(true),
 		AllowDeploy:                  ptr(false),
 		CancelPreviousPipelineEvents: []string{"push"},
+		ApprovalAllowedUsers:         []string{"openhands"},
 	})
-	if len(drift) != 5 {
-		t.Fatalf("drift: got %v, want all five", drift)
+	if len(drift) != 6 {
+		t.Fatalf("drift: got %v, want all six", drift)
 	}
 	if patch.AllowPull == nil || !*patch.AllowPull || patch.AllowDeploy == nil || *patch.AllowDeploy {
 		t.Fatalf("bool knobs: %+v", patch)
+	}
+}
+
+// Same set semantics as the event list, and for the same reason: Woodpecker
+// returns this list in no particular order.
+func TestApprovalAllowedUsersCompareAsASet(t *testing.T) {
+	active := &wpRepo{ApprovalAllowedUsers: []string{"renovate", "openhands"}}
+	_, drift := repoPatchFor(active, &RepoSettings{
+		ApprovalAllowedUsers: []string{"openhands", "renovate"},
+	})
+	if len(drift) != 0 {
+		t.Fatalf("reordering is not drift, got %v", drift)
+	}
+}
+
+// An unset list means "leave the allowlist alone". Sending an empty one would
+// clear it, which would silently start gating a bot's pipelines again.
+func TestUnsetApprovalAllowedUsersIsNotDrift(t *testing.T) {
+	active := &wpRepo{ApprovalAllowedUsers: []string{"openhands"}}
+	patch, drift := repoPatchFor(active, &RepoSettings{})
+	if len(drift) != 0 || patch.ApprovalAllowedUsers != nil {
+		t.Fatalf("unset list must not patch: drift=%v patch=%+v", drift, patch.ApprovalAllowedUsers)
 	}
 }
 

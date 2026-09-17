@@ -1,0 +1,12 @@
+---
+# Mounted read-only into the metrics sidecar.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openhands.fullname" . }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+data:
+  server.py: |-
+    {{- .Files.Get "files/metrics/server.py" | nindent 4 }}

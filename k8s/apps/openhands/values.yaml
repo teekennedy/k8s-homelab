@@ -21,8 +21,22 @@ service:
 # --- Application config -----------------------------------------------------
 app:
   # Anonymous PostHog telemetry. Off: session titles and run outcomes for a
-  # private infrastructure repo are not ours to ship offsite. One variable
-  # covers the frontend, the automation backend and the agent server.
+  # private infrastructure repo are not ours to ship offsite.
+  #
+  # Takes two variables, because the frontend's PostHog key is baked into the
+  # published bundle at build time and cannot be unset from here:
+  #   VITE_DO_NOT_TRACK          read by the entrypoint, which turns off the
+  #                              agent server's exporter and the automation
+  #                              backend. Not read by the browser at runtime.
+  #   AGENT_CANVAS_DISABLE_TELEMETRY
+  #                              read by the static server, which injects
+  #                              window.__AGENT_CANVAS_DO_NOT_TRACK__ into the
+  #                              page. The frontend then never initializes
+  #                              PostHog at all.
+  #
+  # The second is the one that matters for the browser: without it the consent
+  # modal appears, the anonymous install event is sent *before* anyone answers
+  # it, and a "no" is only ever recorded in that one browser's localStorage.
   telemetryDisabled: true
   # Used to build callback URLs and injected into automation runs, so it has to
   # be the externally reachable URL rather than the Service name.
@@ -31,6 +45,8 @@ app:
 # --- Forge (Forgejo) --------------------------------------------------------
 forge:
   url: https://git.msng.to
+  owner: ops
+  repo: k8s-homelab
   # Committer identity on everything the agent pushes.
   authorName: OpenHands
   authorEmail: openhands@msng.to
@@ -42,6 +58,15 @@ forge:
   # mounted. GIT_CONFIG_GLOBAL points every git invocation in the pod at it.
   gitConfigPath: /etc/openhands/gitconfig
 
+# --- CI (Woodpecker) --------------------------------------------------------
+ci:
+  url: https://ci.msng.to
+  # Personal access token for a Woodpecker account that can read this repo's
+  # pipeline logs and restart a pipeline. Provisioned by the
+  # woodpecker-resources Job in k8s/platform/woodpecker (see the `openhands`
+  # entry under woodpecker-resources.users there); key: token.
+  secretName: openhands-woodpecker
+
 # --- Model credentials ------------------------------------------------------
 # Read by the ACP agent the agent server spawns. Created by hand; see README.md,
 # "Prerequisites". Optional so the pod still starts before it exists — the
@@ -49,6 +74,47 @@ forge:
 # UI, rather than a pod that never schedules.
 anthropic:
   secretName: openhands-anthropic
+
+# --- Remote Control ---------------------------------------------------------
+# A separate, long-lived pod running `claude remote-control` in server mode, so
+# a session can be driven from claude.ai/code or the Claude mobile app. It
+# shares only the namespace and the model credential with the canvas.
+#
+# It has to be its own pod rather than a feature of the canvas: Remote Control
+# refuses to start when any of DO_NOT_TRACK, DISABLE_TELEMETRY,
+# CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC or DISABLE_GROWTHBOOK is set, and
+# the canvas sets the first of those deliberately (see app.telemetryDisabled).
+# There is no way to have both in one process.
+remoteControl:
+  # Off by default: Remote Control requires an eligible claude.ai subscription
+  # login, and whether a `claude setup-token` OAuth token counts as one is the
+  # open question this gate exists for. Turn on once verified — the pod exits
+  # with "You must be logged in to use Remote Control" if it is not.
+  enabled: false
+  # Shown in claude.ai/code and the mobile app's session list.
+  sessionName: homelab
+  # The CLI is installed by an initContainer rather than baked into an image of
+  # our own. Pinned and in values.yaml so renovate can see it; the canvas image
+  # bundles a copy of the binary, but at a path inside the ACP adapter's
+  # node_modules that no version constraint here would govern.
+  # renovate: datasource=npm depName=@anthropic-ai/claude-code
+  cliVersion: "2.1.273"
+  # renovate: datasource=docker depName=node
+  nodeImage: node:22-slim
+  # HOME for the session, on the volume below: the checkout, the trust record
+  # and the CLI's own state all live here, so a restart resumes rather than
+  # starts over.
+  home: /work
+  storage:
+    size: 10Gi
+    storageClass: longhorn
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 4Gi
 
 podSecurityContext:
   runAsNonRoot: true
@@ -105,6 +171,7 @@ serviceAccount:
   name: ""
 
 traefikNamespace: kube-system
+monitoringNamespace: monitoring-system
 
 networkPolicy:
   # MetalLB VIP pool (.100-.119) that git.msng.to resolves into; /27 at .96 is
@@ -116,6 +183,98 @@ tolerations: []
 affinity: {}
 podAnnotations: {}
 podLabels: {}
+
+# --- Metrics ----------------------------------------------------------------
+# Sidecar exporting per-model token and cost figures. It exists because the
+# agent server records them but exposes no /metrics endpoint, and no upstream
+# usage dashboard exists.
+#
+# A sidecar rather than its own Deployment: the session key it authenticates
+# with is generated onto the data volume on first boot, so reading it there is
+# what keeps that key single-owned instead of copied into a Secret.
+metrics:
+  enabled: true
+  # Stdlib only — files/metrics/server.py imports nothing off the standard
+  # library, so a bare python image is the whole runtime.
+  # renovate: datasource=docker depName=python
+  image: python:3.14-alpine
+  port: 9102
+  # A scrape walks the whole conversation history, so it is not free. Scrapes
+  # inside this window are served from the previous render.
+  minScrapeIntervalSeconds: 25
+  serviceMonitor:
+    enabled: true
+    interval: 60s
+    # kube-prometheus-stack in monitoring-system discovers by this label.
+    labels:
+      release: monitoring-system
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# --- Sandbox profiles -------------------------------------------------------
+# Additional agent servers, each in its own pod with its own ServiceAccount,
+# NetworkPolicy, resource limits and credentials. Registered in the UI under
+# Manage backends; picking a backend is what picks the isolation.
+#
+# A profile is a long-lived backend, not a per-session pod: the agent server
+# isolates a session with a git worktree and has no hook for a remote workspace,
+# so the pod boundary is the only isolation boundary available and it has to be
+# something a session can be *pointed at*. Sessions on the same profile share
+# its pod; sessions on different profiles share nothing.
+#
+# Reached at https://openhands.msng.to/sandbox/<name> — same origin as the
+# canvas, so no CORS and one Authelia session covers everything.
+sandboxProfiles:
+  # The agent server on its own, without the canvas frontend or the automation
+  # backend. Track the tag the canvas image is built from.
+  # renovate: datasource=docker depName=ghcr.io/openhands/agent-server
+  image: ghcr.io/openhands/agent-server:1.48.0-python
+  # Path prefix on the canvas hostname under which the profiles are served.
+  basePath: /sandbox
+  profiles:
+    # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
+    repo:
+      egress: lan
+      forgeCredentials: true
+      storage:
+        size: 20Gi
+        storageClass: longhorn
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+    # Anything whose input is not trusted. Reaches the model and nothing on the
+    # LAN — no forge token, no git credentials, no route to any homelab service.
+    isolated:
+      egress: internet
+      forgeCredentials: false
+      storage:
+        size: 10Gi
+        storageClass: longhorn
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+
+# --- Automations ------------------------------------------------------------
+# Scheduled and event-driven runs. The automations themselves are rows in the
+# automation database on the data volume, created through the UI — there is no
+# declarative form for them, and nothing here creates one.
+#
+# What this chart owns is the one piece that cannot be configured from inside
+# the application: the hole in the SSO gate that lets a forge webhook reach the
+# event endpoint. See README.md, "Automations".
 
 # --- SSO front door ---------------------------------------------------------
 # A dedicated oauth2-proxy instance in reverse-proxy mode: it owns
@@ -132,9 +291,16 @@ oauth2ProxyInstance:
   secretName: openhands-oauth2-proxy-secrets
   labelsTemplate: openhands.labels
   middleware:
-    # false: this instance owns the hostname, so Traefik never does a
-    # forwardAuth subrequest.
-    enabled: false
+    # The canvas itself does not need these — this instance owns the hostname
+    # and proxies it directly. The sandbox profiles do: they are routed by
+    # Traefik on a more specific path of the same hostname, so they get their
+    # authentication from a forwardAuth subrequest against this same instance,
+    # sharing its cookie and its Authelia session.
+    enabled: true
+    # Must equal oauth2-proxy.fullnameOverride.
+    serviceName: openhands-auth
+    authResponseHeaders:
+      - X-Auth-Request-User
 
 oauth2-proxy:
   fullnameOverride: openhands-auth
@@ -158,7 +324,16 @@ oauth2-proxy:
       scope = "openid profile email groups"
       real_client_ip_header = "X-Real-Ip"
       skip_provider_button = true
+      # Emits X-Auth-Request-User on the auth subrequest, which is the header
+      # the sandbox profiles' forwardAuth middleware copies through.
+      set_xauthrequest = true
       allowed_groups = ["openhands-admins", "full-admin"]
+      # The one hole in the SSO gate: a forge webhook carries no Authelia
+      # session. Scoped to POST on the event-ingestion path, where an HMAC over
+      # the raw body is the authentication — the automation service rejects an
+      # unsigned delivery, and answers 404 for a source nobody has registered.
+      # See README.md, "Automations".
+      skip_auth_routes = ["POST=^/api/automation/v1/events/"]
       upstreams = ["http://openhands.openhands.svc.cluster.local:8000/"]
       trusted_proxy_ips = ["10.42.0.0/16"]
 

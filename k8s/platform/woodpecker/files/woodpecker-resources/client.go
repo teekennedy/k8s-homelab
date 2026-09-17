@@ -45,6 +45,7 @@ type wpRepo struct {
 	AllowPull                    bool     `json:"allow_pr"`
 	AllowDeploy                  bool     `json:"allow_deploy"`
 	CancelPreviousPipelineEvents []string `json:"cancel_previous_pipeline_events"`
+	ApprovalAllowedUsers         []string `json:"approval_allowed_users"`
 }
 
 // wpRepoPatch mirrors model.RepoPatch. Pointers throughout: Woodpecker applies
@@ -55,6 +56,7 @@ type wpRepoPatch struct {
 	AllowPull                    *bool     `json:"allow_pr,omitempty"`
 	AllowDeploy                  *bool     `json:"allow_deploy,omitempty"`
 	CancelPreviousPipelineEvents *[]string `json:"cancel_previous_pipeline_events,omitempty"`
+	ApprovalAllowedUsers         *[]string `json:"approval_allowed_users,omitempty"`
 }
 
 // wpSecret mirrors model.Secret. Value comes back empty on every read —
