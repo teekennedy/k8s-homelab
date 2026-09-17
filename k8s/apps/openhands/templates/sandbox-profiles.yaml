@@ -77,11 +77,50 @@ spec:
         openhands.msng.to/profile: {{ $profile }}
       annotations:
         checksum/gitconfig: {{ include (print $root.Template.BasePath "/configmap-gitconfig.yaml") $root | sha256sum }}
+        checksum/skills: {{ include (print $root.Template.BasePath "/configmap-skills.yaml") $root | sha256sum }}
     spec:
       serviceAccountName: {{ $name }}
       automountServiceAccountToken: false
       securityContext:
         {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        # A profile is a backend a session actually runs on, so it needs the
+        # same skill library the canvas has — see the seed-skills container in
+        # templates/statefulset.yaml for why there are two destinations and why
+        # they are copied rather than mounted. A profile without the
+        # credentials a given skill needs simply cannot use it; each skill
+        # states its own required variables.
+        - name: seed-skills
+          image: {{ $sp.image | quote }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills"
+              for src in /opt/openhands-skills/*/; do
+                [ -d "$src" ] || continue
+                cp -rLf "$src" "$HOME/.agents/skills/"
+                cp -rLf "$src" "$HOME/.claude/skills/"
+              done
+          securityContext:
+            {{- toYaml $root.Values.securityContext | nindent 12 }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: agents-home
+              mountPath: /home/openhands/.agents
+            - name: claude-home
+              mountPath: /home/openhands/.claude
+            - name: skills
+              mountPath: /opt/openhands-skills
+              readOnly: true
       containers:
         - name: agent-server
           image: {{ $sp.image | quote }}
@@ -163,6 +202,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /home/openhands/.openhands
+            - name: agents-home
+              mountPath: /home/openhands/.agents
             - name: claude-home
               mountPath: /home/openhands/.claude
             {{- if $cfg.forgeCredentials }}
@@ -175,8 +216,16 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ $name }}
+        - name: agents-home
+          emptyDir: {}
         - name: claude-home
           emptyDir: {}
+        - name: skills
+          configMap:
+            name: {{ $fullName }}-skills
+            defaultMode: 0444
+            items:
+              {{- include "openhands.skillVolumeItems" $root | nindent 14 }}
         {{- if $cfg.forgeCredentials }}
         - name: gitconfig
           configMap:

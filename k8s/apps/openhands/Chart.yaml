@@ -3,9 +3,9 @@ name: openhands
 description: OpenHands Agent Canvas — the agent control plane. Web UI, session history and automations, driving Claude Code over ACP.
 type: application
 # Bump on any change to the chart templates/values.
-version: 0.1.0
+version: 0.2.0
 # Tracks the ghcr.io/openhands/agent-canvas image tag deployed by this chart.
-appVersion: "1.19.0"
+appVersion: "1.20.0"
 dependencies:
   # Dedicated instance reverse-proxying the web UI; see values.yaml,
   # "SSO front door".

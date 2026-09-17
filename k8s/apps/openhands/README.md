@@ -134,13 +134,29 @@ accepts the launch command of any stdio ACP server.
 
 ## Skills
 
-`files/skills/` holds Agent Skills that the chart seeds into the agent's home at
-`~/.claude/skills/` on every pod start, so git is the source of truth and a
-change takes effect on the next rollout.
+`files/skills/` holds Agent Skills that the chart seeds into the agent's home on
+every pod start, so git is the source of truth and a change takes effect on the
+next rollout. Both the canvas and every sandbox profile get the same set.
+
+They go to **two** directories, because two different readers look for them and
+neither reads the other's path:
+
+| Path | Read by |
+| --- | --- |
+| `~/.agents/skills/` | the agent server's user-skill search, which is what lists a skill in the UI under **Skills** and puts it in the agent context |
+| `~/.claude/skills/` | the Claude Code CLI that an ACP session spawns, natively |
+
+Seeding only the second is a silent failure: the skill still works inside a
+Claude Code session, but nothing in OpenHands knows it exists, so it appears
+neither as installed nor as installable. The agent server searches
+`~/.agents/skills/`, `~/.openhands/skills/` and `~/.openhands/microagents/`, in
+that order; `~/.agents/skills/` is the one this chart uses because the other two
+are on the data volume, where a removed skill would outlive git.
 
 They are copied in by an initContainer rather than mounted. A ConfigMap mounted
-under `~/.claude` would make that directory root-owned, and the agent — which
-writes its own state there — could no longer use it.
+at either path would make that directory root-owned and read-only, and the agent
+writes its own state beside the skills in both. Both directories are `emptyDir`,
+so the copy is a full refresh and a deleted skill does not linger.
 
 | Skill | What it does |
 | --- | --- |
@@ -180,8 +196,8 @@ use Remote Control" if it does not.
 ## Sandbox profiles
 
 Additional agent servers, each in its own pod with its own ServiceAccount,
-NetworkPolicy, resource limits and credentials. They appear in the UI under
-**Manage backends**; choosing a backend is what chooses the isolation.
+NetworkPolicy, resource limits and credentials. Choosing a backend in the UI is
+what chooses the isolation.
 
 | Profile | Reaches | Forge credentials |
 | --- | --- | --- |
@@ -196,12 +212,31 @@ with a `forwardAuth` subrequest against the same oauth2-proxy, then strips the
 prefix before the agent server sees the request — the agent server has no
 concept of being served under one.
 
-Add a backend with the URL above and the profile's session key:
+### Registering a profile in the UI
+
+**The backend list is browser state, not server state.** It lives in
+`localStorage` under `openhands-backends`, so nothing in this chart can
+pre-register a profile and every browser and device has to be told once. Until
+then the switcher shows only the built-in `Local` entry — id `default-local`,
+pointing at this origin with the session key injected into the page — which is
+the canvas pod itself, not a profile.
+
+Open the backend switcher, choose **Add a backend**, and give it:
+
+| Field | Value |
+| --- | --- |
+| Name | `repo` (anything; it is the label in the switcher) |
+| Host | `https://openhands.msng.to/sandbox/repo` |
+| API key | the profile's `session-api-key`, below |
 
 ```sh
 kubectl -n openhands get secret openhands-sandbox-repo \
   -o jsonpath='{.data.session-api-key}' | base64 -d
 ```
+
+Repeat for `isolated`. The session key is a second lock behind the Authelia
+gate: reaching the path at all already requires a session, because Traefik runs
+the `forwardAuth` subrequest before it proxies.
 
 ### Why profiles and not per-session pods
 
