@@ -150,7 +150,7 @@ app-template:
         copy-etc:
           image:
             repository: freshrss/freshrss
-            tag: &imageTag "1.29.1"
+            tag: &imageTag "1.30.0"
             pullPolicy: IfNotPresent
           command:
             - /bin/sh
