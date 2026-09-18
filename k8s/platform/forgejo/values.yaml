@@ -32,7 +32,7 @@ forgejo:
     runAsNonRoot: true
     runAsUser: 1000
   image:
-    tag: "16.0.3"
+    tag: "16.0.4"
     rootless: true
   ingress:
     enabled: true
