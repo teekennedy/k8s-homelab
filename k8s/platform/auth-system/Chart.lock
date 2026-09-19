@@ -1,9 +1,9 @@
 dependencies:
 - name: authelia
   repository: https://charts.authelia.com
-  version: 0.11.21
+  version: 0.11.22
 - name: app-template
   repository: https://bjw-s-labs.github.io/helm-charts
   version: 5.1.0
-digest: sha256:a57a905a0e2dea052ba599d76b18d37d141abb752d10470a36a0adbce7dc16f3
-generated: "2026-09-17T11:24:12.343570713Z"
+digest: sha256:a67d702405e61b00ff5a031f4b57ef3f8c52e6a781746df0d5fc6d45df6d9e90
+generated: "2026-09-19T11:26:14.508728111Z"
