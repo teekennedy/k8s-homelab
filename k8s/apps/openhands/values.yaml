@@ -233,7 +233,7 @@ sandboxProfiles:
   # The agent server on its own, without the canvas frontend or the automation
   # backend. Track the tag the canvas image is built from.
   # renovate: datasource=docker depName=ghcr.io/openhands/agent-server
-  image: ghcr.io/openhands/agent-server:1.49.2-python
+  image: ghcr.io/openhands/agent-server:1.49.3-python
   # Path prefix on the canvas hostname under which the profiles are served.
   basePath: /sandbox
   profiles:
