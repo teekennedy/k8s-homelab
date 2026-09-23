@@ -722,7 +722,7 @@ app-template:
         lldap:
           image:
             repository: ghcr.io/lldap/lldap
-            tag: "2026-08-28-alpine-rootless"
+            tag: "2026-09-22-alpine-rootless"
             pullPolicy: IfNotPresent
           env:
             # debugging
