@@ -215,34 +215,33 @@ func (m *Homelab) LintTerraform(ctx context.Context,
 // Each module is validated independently for parallel execution and individual
 // error reporting.
 // When paths are provided, only matching modules are validated.
-// +generate
+// +check
 func (m *Homelab) ValidateTerraform(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"]
 	source *dagger.Directory,
 	// +optional
 	container *dagger.Container,
-) (*dagger.Changeset, error) {
+) (string, error) {
 	modulePaths := discoverTerraformModulePaths(ctx, source)
 	if len(modulePaths) == 0 {
-		return dag.Changeset(), nil
+		return "No terraform modules found", nil
 	}
 	container = m.terraformContainer(container)
 
-	changesets := make([]*dagger.Changeset, len(modulePaths))
 	errs := make([]error, len(modulePaths))
 
 	var wg sync.WaitGroup
 	for i, modPath := range modulePaths {
 		wg.Go(func() {
-			changesets[i], errs[i] = m.validateTerraformModule(ctx, source, container, modPath)
+			_, errs[i] = m.validateTerraformModule(ctx, source, container, modPath)
 		})
 	}
 	wg.Wait()
 
 	if err := errors.Join(errs...); err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return dag.Changeset().WithChangesets(changesets), nil
+	return "Terraform validate passed", nil
 }
