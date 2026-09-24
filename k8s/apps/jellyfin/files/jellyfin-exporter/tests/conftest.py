@@ -118,6 +118,12 @@ class FakeJellyfin:
                 return _json_response(401, "Unauthorized", {"error": "bad api key"})
             with self._lock:
                 self.handshake_paths.append(request.path)
+                # Track the connection here, not in _handle: _handle only
+                # runs once the upgrade has fully completed, which leaves a
+                # window where a test sees handshake_paths grow and calls
+                # disconnect_all() before the connection is trackable --
+                # closing nothing and stranding the client connected.
+                self._connections.append(connection)
             return None
 
         # Anything else is a plain HTTP request; answer it and never upgrade.
@@ -137,8 +143,6 @@ class FakeJellyfin:
             return _json_response(200, "OK", list(self.sessions))
 
     def _handle(self, connection: ServerConnection) -> None:
-        with self._lock:
-            self._connections.append(connection)
         try:
             for raw in connection:
                 message = json.loads(raw)
