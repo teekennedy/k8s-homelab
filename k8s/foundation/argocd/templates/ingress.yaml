@@ -7,7 +7,7 @@ metadata:
   annotations:
     # External-dns cannot autodetect the load balancer IP for a Traefik IngressRoute
     # Explicitly set an A record target.
-    external-dns.alpha.kubernetes.io/target: 10.69.80.100
+    external-dns.kubernetes.io/target: 10.69.80.100
 spec:
   entryPoints:
     - websecure

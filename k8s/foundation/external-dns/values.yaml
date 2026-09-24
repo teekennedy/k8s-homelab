@@ -1,6 +1,7 @@
 external-dns:
   provider:
     name: cloudflare
+  policy: sync
   txtOwnerId: homelab
   env:
     - name: CF_API_TOKEN
@@ -33,6 +34,7 @@ external-dns:
 # in Unifi DNS so internal clients avoid NAT reflection.
 external-dns-internal:
   fullnameOverride: external-dns-internal
+  policy: sync
   provider:
     name: webhook
     webhook:
@@ -83,6 +85,7 @@ external-dns-internal:
 # to the public MetalLB VIP in Unifi DNS so they're reachable from the LAN.
 external-dns-public-internal:
   fullnameOverride: external-dns-public-internal
+  policy: sync
   provider:
     name: webhook
     webhook:

@@ -76,7 +76,7 @@ guiProxy:
 # is never exposed here.
 syncLoadBalancer:
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: syncthing-sync.msng.to
+    external-dns.kubernetes.io/hostname: syncthing-sync.msng.to
     # This service is not routed through Traefik.
     # This annotation is purely to get external-dns to match this resource
     traefik.ingress.kubernetes.io/router.entrypoints: wspublic
