@@ -326,7 +326,7 @@ app-template:
           # https://cleanuparr.github.io/Cleanuparr/
           image:
             repository: ghcr.io/cleanuparr/cleanuparr
-            tag: 2.10.7
+            tag: 2.10.8
           env:
             TZ: America/Denver
             PORT: "11011"
