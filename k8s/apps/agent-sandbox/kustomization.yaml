@@ -4,7 +4,7 @@ kind: Kustomization
 # Pinned release: renovate.json's kustomize customManager tracks this URL
 # (kustomize's built-in manager has no github-releases datasource).
 resources:
-  - https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.2/sandbox.yaml
+  - https://github.com/kubernetes-sigs/agent-sandbox/releases/download/v1.0.3/sandbox.yaml
   - networkpolicy.yaml
   - servicemonitor.yaml
 
