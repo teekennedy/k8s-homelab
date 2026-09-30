@@ -92,7 +92,8 @@ func (r Repository) validate() []error {
 	if r.Webhook != nil {
 		errs = append(errs, fmt.Errorf(
 			"%s/%s: `webhook:` is no longer supported; move it under `webhooks:` as a list item and give it an explicit `type:` (was implicitly gogs) and `events:` (was implicitly [push])",
-			r.Owner, r.Name))
+			r.Owner, r.Name,
+		))
 	}
 	// Shared across the list so a duplicate URL is caught wherever it appears.
 	seen := map[string]bool{}

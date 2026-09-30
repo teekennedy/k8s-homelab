@@ -9,7 +9,9 @@ renovate:
     schedule: '22 5 * * *'
     ttlSecondsAfterFinished: 259200 # 3 days
     concurrencyPolicy: Forbid
-    jobBackoffLimit: 1
+    # Exponential pod-retry backoff (10s, 20s, 40s, 80s) must outlast a
+    # Forgejo Recreate rollout, which returns 503 for a minute or two.
+    jobBackoffLimit: 4
     # Put the dagger wrapper (mounted from the renovate-dagger-wrapper
     # ConfigMap) and kubectl on PATH for renovate and everything it spawns, so
     # the post-upgrade tasks in renovate.json can find them. See

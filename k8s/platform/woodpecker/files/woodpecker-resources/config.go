@@ -153,7 +153,8 @@ func (s RepoSecret) validate(ref string, seen map[string]bool) []error {
 	if !woodpeckerSecretName.MatchString(s.Name) {
 		errs = append(errs, fmt.Errorf(
 			"%s: name %q must match %s — Woodpecker lowercases secret names server-side, so anything else never reconciles",
-			ref, s.Name, woodpeckerSecretName))
+			ref, s.Name, woodpeckerSecretName,
+		))
 	}
 	ref = fmt.Sprintf("%s (%s)", ref, s.Name)
 	if seen[s.Name] {
