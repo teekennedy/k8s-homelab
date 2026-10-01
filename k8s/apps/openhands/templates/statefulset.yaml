@@ -38,6 +38,7 @@ spec:
         # Skills are copied into the agent's home at pod start, so a change to
         # files/skills/ only takes effect on a fresh pod.
         checksum/skills: {{ include (print $.Template.BasePath "/configmap-skills.yaml") . | sha256sum }}
+        checksum/start: {{ .Files.Get "files/canvas/start.sh" | sha256sum }}
         {{- if .Values.metrics.enabled }}
         checksum/metrics: {{ include (print $.Template.BasePath "/configmap-metrics.yaml") . | sha256sum }}
         {{- end }}
@@ -82,15 +83,39 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # files/canvas/start.sh, not the image's entrypoint: that one cannot
+          # lock the frontend to the app server's cloud API.
+          command:
+            - /usr/bin/tini
+            - --
+            - bash
+            - /etc/openhands-canvas/start.sh
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+            # Reached by the app server only, which forwards the browser's
+            # automation calls with this service's key.
+            - name: automation
+              containerPort: {{ .Values.automation.port }}
+              protocol: TCP
           env:
             - name: PORT
               value: {{ .Values.service.port | quote }}
+            - name: APP_SERVER_URL
+              value: {{ include "openhands.appServerURL" . | quote }}
+            # Same origin as the page, which is what makes the frontend
+            # authenticate by cookie — the oauth2-proxy session — rather than
+            # ask for an API key.
+            - name: LOCK_TO_CLOUD
+              value: {{ .Values.app.baseURL | quote }}
+            - name: LOCAL_BACKEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openhands.fullname" . }}-canvas-keys
+                  key: session-api-key
             # Goes into automation callback URLs and is injected into runs, so
             # it has to be the URL a browser uses, not the Service name.
             - name: AUTOMATION_BASE_URL
@@ -113,26 +138,23 @@ spec:
             - secretRef:
                 name: {{ .Values.anthropic.secretName }}
                 optional: true
-          # /alive is proxied through to the agent server, so it answers only
-          # once the process behind the entry point is actually up.
+          # The static frontend: what a browser loads first, and what the pod
+          # lives and dies with (see start.sh).
           startupProbe:
             httpGet:
-              path: /alive
+              path: /canvas/
               port: http
-            periodSeconds: 10
-            # Up to 5 minutes: a first boot generates the encryption key and
-            # the session key and runs the automation database migrations
-            # before anything binds.
-            failureThreshold: 30
+            periodSeconds: 5
+            failureThreshold: 24
           readinessProbe:
             httpGet:
-              path: /alive
+              path: /canvas/
               port: http
             periodSeconds: 10
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /alive
+              path: /canvas/
               port: http
             periodSeconds: 30
             failureThreshold: 5
@@ -154,6 +176,9 @@ spec:
             - name: gitconfig
               mountPath: {{ .Values.forge.gitConfigPath }}
               subPath: gitconfig
+              readOnly: true
+            - name: start
+              mountPath: /etc/openhands-canvas
               readOnly: true
         {{- if .Values.metrics.enabled }}
         # Reads the conversation list over loopback and renders it as Prometheus
@@ -236,6 +261,10 @@ spec:
         - name: gitconfig
           configMap:
             name: {{ include "openhands.fullname" . }}-gitconfig
+            defaultMode: 0444
+        - name: start
+          configMap:
+            name: {{ include "openhands.fullname" . }}-canvas-start
             defaultMode: 0444
       {{- with .Values.nodeSelector }}
       nodeSelector:

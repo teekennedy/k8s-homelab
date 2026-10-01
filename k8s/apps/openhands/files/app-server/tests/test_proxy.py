@@ -1,3 +1,5 @@
+import uuid
+
 import httpx
 
 from app_server.proxy import upstream_headers
@@ -67,7 +69,7 @@ def test_proxy_refuses_unminted_and_deleted(api, user):
 def test_webhook_requires_the_sandboxes_own_key(api, hooks, user):
     a = api.post("/api/v1/sandboxes", headers=user).json()
     b = api.post("/api/v1/sandboxes", headers=user).json()
-    path = f"/sandboxes/{a['id']}/events/0123abcd"
+    path = f"/sandboxes/{a['id']}/events/{uuid.uuid4().hex}"
     assert hooks.post(path, json=[]).status_code == 401
     wrong = {"X-Session-API-Key": b["session_api_key"]}
     assert hooks.post(path, json=[], headers=wrong).status_code == 401

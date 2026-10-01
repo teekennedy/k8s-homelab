@@ -9,6 +9,7 @@ WebhookSubscriber and ConversationWebhookSubscriber.
 """
 
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, Request
@@ -35,6 +36,10 @@ async def events(
     body: list[dict[str, Any]] = Body(),
 ) -> dict[str, bool]:
     _authenticate(request, sandbox_id)
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        raise HTTPException(422, "conversation id must be a UUID")
     sink = request.app.state.event_sink
     if sink is not None:
         await sink.events(sandbox_id, conversation_id, body)

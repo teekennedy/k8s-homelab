@@ -49,6 +49,8 @@ class FakeKube:
     def __init__(self) -> None:
         self.objects: dict[str, dict[str, dict[str, Any]]] = {}
         self.fail_create: set[str] = set()
+        # Sandboxes report Ready the moment they are created.
+        self.auto_ready = False
 
     def _bucket(self, res: Resource) -> dict[str, dict[str, Any]]:
         return self.objects.setdefault(res.path.rsplit("/", 1)[-1], {})
@@ -69,6 +71,8 @@ class FakeKube:
         obj["metadata"]["uid"] = str(uuid.uuid4())
         obj["metadata"]["creationTimestamp"] = datetime.now(UTC).isoformat()
         self._bucket(res)[obj["metadata"]["name"]] = obj
+        if self.auto_ready and kind == "sandboxes":
+            self.set_ready(obj["metadata"]["name"])
         return obj
 
     async def patch(self, res, name, patch):
@@ -104,11 +108,29 @@ class FakeKube:
         }
 
 
+SEED = {
+    "agent_settings": {"agent_kind": "acp", "acp_server": "claude-code"},
+    "conversation_settings": {"max_iterations": 77},
+    "app_preferences": {"language": "en"},
+    "agent_profile": {
+        "name": "default",
+        "agent_kind": "acp",
+        "acp_server": "claude-code",
+        "acp_model": "opus[1m]",
+    },
+}
+
+
 @pytest.fixture
 def settings(tmp_path) -> Settings:
     specs = tmp_path / "specs"
     specs.mkdir()
     (specs / "repo.json").write_text(json.dumps(SPEC))
+    schemas = tmp_path / "schemas"
+    schemas.mkdir()
+    (schemas / "agent-schema.json").write_text('{"model_name": "AgentSettings"}')
+    seed = tmp_path / "seed.json"
+    seed.write_text(json.dumps(SEED))
     return Settings(
         namespace="openhands",
         data_dir=tmp_path,
@@ -123,6 +145,11 @@ def settings(tmp_path) -> Settings:
         http_port=8080,
         webhook_port=8081,
         reconcile_interval=60,
+        schemas_dir=schemas,
+        settings_seed_file=seed,
+        automation_url="http://canvas:18001",
+        automation_api_key="automation-key",
+        start_timeout=5,
     )
 
 
@@ -140,7 +167,10 @@ def state(settings, kube) -> State:
 
 @pytest.fixture
 def api(state) -> TestClient:
-    return TestClient(build_api(state))
+    # Entered, so the event loop — and the start tasks it runs — outlive a
+    # single request.
+    with TestClient(build_api(state)) as client:
+        yield client
 
 
 @pytest.fixture

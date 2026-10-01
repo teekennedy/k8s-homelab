@@ -235,3 +235,14 @@ for src in /opt/openhands-skills/*/; do
   cp -rLf "$src" "$HOME/.claude/skills/"
 done
 {{- end }}
+
+{{/*
+In-cluster URLs of the app server's two ports.
+*/}}
+{{- define "openhands.appServerURL" -}}
+{{- printf "http://%s-app-server.%s.svc.cluster.local:%v" (include "openhands.fullname" .) .Release.Namespace .Values.appServer.port }}
+{{- end }}
+
+{{- define "openhands.appServerWebhookURL" -}}
+{{- printf "http://%s-app-server.%s.svc.cluster.local:%v" (include "openhands.fullname" .) .Release.Namespace .Values.appServer.webhookPort }}
+{{- end }}

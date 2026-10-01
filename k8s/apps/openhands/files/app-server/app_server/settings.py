@@ -34,6 +34,17 @@ class Settings:
     http_port: int
     webhook_port: int
     reconcile_interval: float
+    # Agent and conversation settings schemas, dumped at pod start from the
+    # same agent-server image the sandboxes run.
+    schemas_dir: Path
+    # First-boot settings and agent profile, from values.yaml.
+    settings_seed_file: Path
+    # The automation service in the canvas pod, and the key it accepts while
+    # it runs in local mode.
+    automation_url: str
+    automation_api_key: str
+    # How long a new conversation may wait for its sandbox to be RUNNING.
+    start_timeout: float
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -51,4 +62,9 @@ class Settings:
             http_port=int(_env("HTTP_PORT")),
             webhook_port=int(_env("WEBHOOK_PORT")),
             reconcile_interval=float(_env("RECONCILE_INTERVAL_SECONDS")),
+            schemas_dir=Path(_env("SCHEMAS_DIR")),
+            settings_seed_file=Path(_env("SETTINGS_SEED_FILE")),
+            automation_url=_env("AUTOMATION_URL").rstrip("/"),
+            automation_api_key=_env("AUTOMATION_API_KEY"),
+            start_timeout=float(_env("START_TIMEOUT_SECONDS")),
         )

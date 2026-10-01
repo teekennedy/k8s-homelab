@@ -39,8 +39,14 @@ app:
   # it, and a "no" is only ever recorded in that one browser's localStorage.
   telemetryDisabled: true
   # Used to build callback URLs and injected into automation runs, so it has to
-  # be the externally reachable URL rather than the Service name.
+  # be the externally reachable URL rather than the Service name. Also the
+  # cloud API the frontend is locked to: the same origin, so it authenticates
+  # by the oauth2-proxy cookie.
   baseURL: https://openhands.msng.to
+
+automation:
+  # The automation service in the canvas pod. Reached by the app server only.
+  port: 18001
 
 # --- Forge (Forgejo) --------------------------------------------------------
 forge:
@@ -286,6 +292,27 @@ appServer:
   userHeader: X-Forwarded-User
   # How often the reconciler compares rows to Sandboxes in the cluster.
   reconcileIntervalSeconds: 60
+  # How long a new conversation may wait for its sandbox to report RUNNING.
+  startTimeoutSeconds: 300
+  # First-boot settings and agent profile, so a browser on a new device needs
+  # no setup. Written to the database once; the Settings UI owns them after
+  # that. Shapes: GET /api/v1/settings and POST /api/agent-profiles/{name}.
+  defaults:
+    agent_settings:
+      agent_kind: acp
+      acp_server: claude-code
+      acp_model: "opus[1m]"
+    conversation_settings:
+      max_iterations: 500
+      confirmation_mode: false
+    app_preferences:
+      language: en
+      user_consents_to_analytics: false
+    agent_profile:
+      name: default
+      agent_kind: acp
+      acp_server: claude-code
+      acp_model: "opus[1m]"
   # SQLite database: sandboxes, minted API keys, and from later phases the
   # conversation history. The only copy, so it is backed up.
   storage:

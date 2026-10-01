@@ -12,61 +12,68 @@ agent over [ACP][acp].
 ## Shape
 
 ```
-  openhands.msng.to ──► oauth2-proxy (Authelia OIDC) ──► :8000 entry point
+  openhands.msng.to ──► oauth2-proxy (Authelia OIDC) ──► canvas pod :8000
   (internal VIP)                                            │
-                                    ┌───────────────────────┼───────────────────┐
-                                    ▼                       ▼                   ▼
-                              static frontend         agent server        automation
-                                                        :18000              :18001
-                                                           │
-                                                           │ spawn, JSON-RPC on stdio
-                                                           ▼
-                                                   claude-agent-acp ──► Anthropic API
+                                     ┌──────────────────────┼─────────────────────┐
+                                     ▼                      ▼                     ▼
+                              static frontend      /api, /runtime ──► app server  /api/automation/v1/events
+                              (locked to the                         │   │        ──► automation :18001
+                               app server's                          │   └─► automation :18001 (with its key)
+                               cloud API)                            ▼
+                                                   Sandbox per conversation (agents.x-k8s.io)
+                                                   agent server :8000 ──► claude-agent-acp ──► Anthropic API
+                                                        │ webhooks: events, status
+                                                        └────────────► app server :8081
 ```
 
-One image, one pod, one entry point. `:8000` serves the frontend and routes
-`/api/*`, `/sockets` and `/alive` to the agent server, `/api/automation/*` to
-the automation backend, and `/vscode` to a bundled editor. The two backend
-ports and the editor port are internal to the pod; the NetworkPolicy admits
-only `:8000`, and only from oauth2-proxy.
+The frontend runs in **locked-cloud mode**: the static server is started with
+`--lock-to-cloud https://openhands.msng.to`, so every browser gets exactly one
+backend — this origin's cloud API, served by the app server — with no
+`localStorage` setup and no API key, because a cloud backend on the page's own
+origin authenticates by cookie, and that cookie is the oauth2-proxy session.
 
-**The agent runs inside this pod.** Per-session isolation is a git worktree
-under `~/workspace`, not a container: the agent server only ever builds a local
-workspace, so every session shares this pod's filesystem, shell and network.
-That is the property to keep in mind when deciding what this namespace is
-allowed to reach.
+**Each conversation runs in its own pod**, a `Sandbox` the app server creates
+from a sandbox spec: its own agent server, workspace volume, session key and
+encryption key, under the spec's ServiceAccount and NetworkPolicy. The browser
+reaches it at `/runtime/<sandbox>` through the app server. History is posted
+back to the app server by webhook as it happens, so a conversation stays
+readable after its sandbox is gone.
+
+The canvas pod's own agent server is still started, for the automation
+service's runs only; nothing routes a browser to it. The pod's entrypoint is
+`files/canvas/start.sh` rather than the image's, because the image's has no way
+to pass `--lock-to-cloud`.
 
 ## Security posture
 
 `openhands.msng.to` resolves to the internal VIP and the namespace carries
 `internal-gateway-access: "true"`, never `external-gateway-access`.
 
-The application authenticates its own API with a session key that it generates
-on first boot and then **injects into the HTML it serves**, so any browser that
-can load the page has the key. There is no user model, no login, no per-user
-authorization. oauth2-proxy is therefore not one layer of defence among
-several — it is the access control, and the NetworkPolicy is what stops
-anything else in the cluster from bypassing it by dialling the Service
-directly.
+The page carries no credential. The app server accepts a browser on the user
+header oauth2-proxy sets, and hands it each conversation's own session key; it
+also forwards the browser's automation calls with that service's key. There is
+no user model and no per-user authorization behind that, so oauth2-proxy is not
+one layer of defence among several — it is the access control, and the
+NetworkPolicies are what stop anything else in the cluster from bypassing it:
+the app server's API port admits the canvas pod alone, and a sandbox admits the
+app server alone.
 
 Three consequences worth stating plainly:
 
-- **Anyone in `openhands-admins` or `full-admin` has a shell in this pod**,
-  through the agent or through the bundled editor. Both groups are `two_factor`
-  in the `openhands` authorization policy; there is no viewer tier, because
-  there is nothing a viewer could be restricted to.
-- **The editor shares the canvas's browser origin.** It is served under a path
-  prefix rather than a port of its own, so anything running in that origin can
-  read the canvas's `localStorage`, which holds the session key. Upstream
-  [#16492](https://github.com/OpenHands/OpenHands/issues/16492).
-- **The ServiceAccount has no permissions and its token is not mounted.**
-  Nothing in this chart talks to the Kubernetes API, so a session that wants to
-  read cluster state has to be given that access deliberately.
+- **Anyone in `openhands-admins` or `full-admin` has a shell in every
+  sandbox**, through the agent. Both groups are `two_factor` in the `openhands`
+  authorization policy; there is no viewer tier, because there is nothing a
+  viewer could be restricted to.
+- **A sandbox cannot reach the app server's API**, only its webhook port, and
+  cannot reach the Kubernetes API: an agent cannot start more agents.
+- **Only the app server talks to the Kubernetes API**, and only to manage
+  sandboxes — see `templates/app-server-rbac.yaml`. Every other ServiceAccount
+  in this chart has no permissions and no mounted token.
 
-Egress is DNS, `443` on the MetalLB VIP pool (`git.msng.to`), and `443` to the
-internet with RFC1918 excluded — the model API and the package registries the
-agent's own toolchain pulls from. Everything else, including the API server and
-every other namespace, is denied.
+Sandbox egress is per spec (`sandboxSpecs`). The canvas pod's is DNS, the app
+server, `443` on the MetalLB VIP pool (`git.msng.to`), and `443` to the internet
+with RFC1918 excluded. Everything else, including the API server and every
+other namespace, is denied.
 
 ## Prerequisites
 
@@ -120,17 +127,15 @@ has to set it per-repository.
 
 ## First run
 
-Settings live in the agent server's own store on the data volume, not in this
-chart, so two things are done once through the UI and then persist:
-
-1. **Settings → Agent** — switch the agent to **ACP** and pick the **Claude
-   Code** preset. That saves `agent_kind`, `acp_command` and `acp_model`; the
-   command it fills in is rewritten to the CLI already installed in the image.
-2. Start a conversation. The working directory is under
-   `~/workspace/project/<id>`, on the workspace volume.
+Nothing to do. Settings and the agent profile are seeded from
+`appServer.defaults` into the app server's database on first boot — Claude Code
+over ACP — and from then on are owned by the Settings UI. The frontend's own
+first-run wizard is a per-browser `localStorage` flag; close it once per
+browser.
 
 Codex and Gemini CLI ship as presets alongside Claude Code, and **Custom**
-accepts the launch command of any stdio ACP server.
+accepts the launch command of any stdio ACP server; credentials for them have
+to reach the sandbox pod's environment, as `openhands-anthropic` does.
 
 ## Skills
 
@@ -280,6 +285,9 @@ volume.
 | `/api/v1/sandboxes`, `/api/v1/sandboxes/{id}/{pause,resume}` | browser, automation service | `X-Forwarded-User` from oauth2-proxy, or a minted bearer key |
 | `/api/service/users/{uid}/orgs/{oid}/api-keys` | automation service | `X-Service-API-Key` from `openhands-app-server-keys` |
 | `/runtime/{id}/**` | browser, automation service | as above, or that sandbox's own session key |
+| `/api/v1/app-conversations/**`, `/api/v1/conversation/{id}/events/**` | browser | `X-Forwarded-User` |
+| `/api/v1/settings/**`, `/api/agent-profiles/**` | browser | `X-Forwarded-User` |
+| `/api/automation/**` | browser | `X-Forwarded-User`; forwarded with the automation service's key |
 | `:8081/sandboxes/{id}/{events,conversations}` | the sandbox's agent server | that sandbox's own session key |
 
 `/runtime/{id}` strips the prefix and proxies HTTP and WebSockets to the
@@ -292,6 +300,23 @@ What the app server may do in the cluster is in
 `create` only. It cannot read the model or forge credentials — sandboxes get
 those by reference in the pod template — and it never reads back the keys it
 minted, because it keeps them in its own database.
+
+Starting a conversation is a start task the frontend polls: the app server
+creates a sandbox from the default spec, waits for it to be `RUNNING`, then
+starts the conversation on the sandbox's agent server with the stored
+`agent_settings` and the chosen ACP agent profile laid over them. Titles are set
+here from the first message — the agent server's own titling uses the agent's
+LLM, which for an ACP agent is not one litellm can call.
+
+Each sandbox's agent server posts its events and status changes to the app
+server's webhook port; events are stored per conversation and served as the
+conversation's history, so it outlives the sandbox. A conversation whose
+sandbox is gone shows as archived (`MISSING`) and reads from that copy; one
+whose sandbox is paused is resumed by the frontend when opened.
+
+The Settings UI renders itself from the agent server's settings schemas; an
+initContainer asks the sandbox image's own agent server for them at pod start,
+so they always match the version conversations run on.
 
 A reconciler compares the database to the cluster every minute: a managed
 `Sandbox` with no live row is deleted, and a row whose `Sandbox` has vanished

@@ -77,18 +77,29 @@ async def proxy_http(sandbox_id: str, path: str, request: Request):
         raise HTTPException(401, "not authenticated")
     sandboxes.touch(sandbox_id)
 
-    client: httpx.AsyncClient = state.http
+    return await forward(
+        request, f"{sandboxes.agent_url(sandbox_id)}/{path}", "sandbox"
+    )
+
+
+async def forward(
+    request: Request, url: str, what: str, extra_headers: dict[str, str] | None = None
+) -> StreamingResponse:
+    """Relay one HTTP request upstream and stream the response back, with
+    this origin's credentials stripped (see upstream_headers)."""
+    client: httpx.AsyncClient = request.app.state.http
+    headers = upstream_headers(request.headers, request.app.state.settings.user_header)
     upstream = client.build_request(
         request.method,
-        f"{sandboxes.agent_url(sandbox_id)}/{path}",
+        url,
         params=request.query_params,
-        headers=upstream_headers(request.headers, user_header),
+        headers={**headers, **(extra_headers or {})},
         content=await request.body(),
     )
     try:
         resp = await client.send(upstream, stream=True)
     except httpx.ConnectError:
-        raise HTTPException(502, "sandbox is not reachable")
+        raise HTTPException(502, f"{what} is not reachable")
     return StreamingResponse(
         resp.aiter_raw(),
         status_code=resp.status_code,

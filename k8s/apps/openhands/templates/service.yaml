@@ -13,6 +13,10 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: {{ .Values.automation.port }}
+      targetPort: automation
+      protocol: TCP
+      name: automation
     {{- if .Values.metrics.enabled }}
     - port: {{ .Values.metrics.port }}
       targetPort: metrics

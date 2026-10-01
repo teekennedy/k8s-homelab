@@ -42,6 +42,14 @@ spec:
       ports:
         - port: 6443
           protocol: TCP
+    # The canvas pod's automation service, for the browser's automation calls.
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "openhands.canvasSelectorLabels" . | nindent 14 }}
+      ports:
+        - port: automation
+          protocol: TCP
     # Sandbox agent servers, through the runtime proxy.
     - to:
         - podSelector:

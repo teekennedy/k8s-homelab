@@ -1,0 +1,96 @@
+"""The single-user account surface, the pages the frontend expects to exist
+but this deployment has nothing to put in, and the automation service.
+
+One user, one personal organization whose id equals the user id: what the
+frontend reads as "personal workspace" (`api/cloud/types.d.ts`).
+"""
+
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, Request
+
+from .auth import Principal, principal
+from .proxy import forward
+
+router = APIRouter()
+Caller = Annotated[Principal, Depends(principal)]
+
+# Fixed, so it survives a volume loss.
+USER_ID = "00000000-0000-4000-8000-000000000001"
+
+
+@router.get("/api/organizations")
+async def organizations(who: Caller) -> dict[str, Any]:
+    return {
+        "items": [{"id": USER_ID, "name": "Personal", "is_personal": True}],
+        "current_org_id": USER_ID,
+    }
+
+
+@router.get("/api/organizations/{org_id}/me")
+async def organization_me(org_id: str, who: Caller) -> dict[str, Any]:
+    return {
+        "org_id": USER_ID,
+        "user_id": USER_ID,
+        "email": None,
+        "role": "owner",
+        "status": "active",
+    }
+
+
+@router.get("/api/keys/current")
+async def current_key(who: Caller) -> dict[str, Any]:
+    return {
+        "id": who.kind,
+        "name": who.name,
+        "org_id": USER_ID,
+        "user_id": USER_ID,
+        "auth_type": "cookie" if who.kind == "user" else "api_key",
+    }
+
+
+@router.get("/api/organizations/{org_id}/profiles")
+async def llm_profiles(org_id: str, who: Caller) -> dict[str, Any]:
+    """LLM profiles. Conversations here run ACP agents, which bring their own
+    model; an OpenHands-kind agent profile falls back to agent_settings."""
+    return {"profiles": [], "active_profile": None}
+
+
+def _empty_page() -> dict[str, Any]:
+    return {"items": [], "next_page_id": None}
+
+
+# No git provider integration (the forge is not one of upstream's providers;
+# the agent clones by URL), no skill or model marketplace, and secrets reach
+# sandboxes from Kubernetes rather than a store.
+for _path in (
+    "/api/v1/git/repositories/search",
+    "/api/v1/git/installations/search",
+    "/api/v1/git/branches/search",
+    "/api/v1/git/suggested-tasks/search",
+    "/api/v1/skills/search",
+    "/api/v1/config/models/search",
+    "/api/v1/config/providers/search",
+    "/api/v1/secrets/search",
+):
+    router.add_api_route(
+        _path, _empty_page, methods=["GET"], dependencies=[Depends(principal)]
+    )
+
+
+@router.api_route(
+    "/api/automation/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    include_in_schema=False,
+)
+async def automation(path: str, request: Request, who: Caller):
+    """The automation service authenticates a browser by a cookie this
+    deployment has no issuer for, so the browser reaches it through here:
+    authenticated by oauth2-proxy, forwarded with the service's own key."""
+    s = request.app.state.settings
+    return await forward(
+        request,
+        f"{s.automation_url}/api/automation/{path}",
+        "automation service",
+        {"X-Session-API-Key": s.automation_api_key},
+    )

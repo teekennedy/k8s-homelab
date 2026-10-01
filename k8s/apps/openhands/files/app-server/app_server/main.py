@@ -10,11 +10,20 @@ import httpx
 import uvicorn
 from fastapi import FastAPI
 
-from . import proxy, routes_sandboxes, webhooks
+from . import (
+    proxy,
+    routes_account,
+    routes_conversations,
+    routes_sandboxes,
+    routes_settings,
+    webhooks,
+)
+from .conversations import ConversationService
 from .db import Database
 from .kube import Kube
 from .sandboxes import SandboxManager, load_specs
 from .settings import Settings
+from .settings_store import SettingsStore
 
 log = logging.getLogger("app_server")
 
@@ -49,7 +58,18 @@ class State:
         )
         # Streams can stay open for a whole agent turn.
         self.http = httpx.AsyncClient(timeout=httpx.Timeout(30, read=None))
-        self.event_sink = None
+        self.settings_store = SettingsStore(db, settings.settings_seed_file)
+        self.conversations = ConversationService(
+            db=db,
+            sandboxes=self.sandboxes,
+            settings=self.settings_store,
+            http=self.http,
+            public_url=settings.public_url,
+            default_spec=settings.default_spec,
+            start_timeout=settings.start_timeout,
+        )
+        # Where sandbox webhooks land.
+        self.event_sink = self.conversations
 
     def attach(self, app: FastAPI) -> FastAPI:
         for k, v in vars(self).items():
@@ -60,6 +80,9 @@ class State:
 def build_api(state: State) -> FastAPI:
     app = FastAPI(title="openhands-app-server", docs_url=None, redoc_url=None)
     app.include_router(routes_sandboxes.router)
+    app.include_router(routes_conversations.router)
+    app.include_router(routes_settings.router)
+    app.include_router(routes_account.router)
     app.include_router(proxy.router)
 
     @app.get("/healthz", include_in_schema=False)
@@ -93,6 +116,7 @@ async def serve() -> None:
         ", ".join(state.sandboxes.specs) or "none",
         settings.default_spec,
     )
+    await state.conversations.abandon_unfinished_tasks()
     servers = [
         uvicorn.Server(
             uvicorn.Config(

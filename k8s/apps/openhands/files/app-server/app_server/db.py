@@ -30,6 +30,48 @@ MIGRATIONS: list[str] = [
         created_at TEXT NOT NULL
     );
     """,
+    """
+    CREATE TABLE conversations (
+        id TEXT PRIMARY KEY,
+        sandbox_id TEXT NOT NULL,
+        title TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        -- Everything the frontend's AppConversation carries that is not
+        -- derived: request metadata, and what the agent server last reported.
+        meta TEXT NOT NULL,
+        deleted_at TEXT
+    );
+    CREATE INDEX conversations_by_updated ON conversations (updated_at);
+    CREATE TABLE start_tasks (
+        id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        detail TEXT,
+        app_conversation_id TEXT,
+        sandbox_id TEXT,
+        request TEXT NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    -- History, as the sandbox's webhooks deliver it. Events are immutable and
+    -- redelivered on retry, hence the (conversation, id) key.
+    CREATE TABLE events (
+        conversation_id TEXT NOT NULL,
+        id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        body TEXT NOT NULL,
+        PRIMARY KEY (conversation_id, id)
+    );
+    CREATE INDEX events_by_time ON events (conversation_id, timestamp, id);
+    -- Single-document stores: settings, agent profiles. One user.
+    CREATE TABLE documents (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    """,
 ]
 
 
