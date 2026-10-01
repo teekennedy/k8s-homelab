@@ -12,18 +12,12 @@ Two callers, two mechanisms:
 import hashlib
 import hmac
 import secrets
-import uuid
 from dataclasses import dataclass
 from typing import Literal
 
 from fastapi import HTTPException, Request
 
 from .db import Database, now
-
-# One user, one personal org whose id equals the user id: what the frontend
-# reads as "personal workspace". Fixed, so it survives a volume loss.
-USER_ID = "00000000-0000-4000-8000-000000000001"
-ORG_ID = USER_ID
 
 
 @dataclass(frozen=True)
@@ -37,16 +31,12 @@ def _hash(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def mint_api_key(db: Database, name: str, user_id: str, org_id: str) -> str:
+def mint_api_key(db: Database, name: str) -> str:
     key = f"ohk_{secrets.token_urlsafe(32)}"
     db.run(
-        "INSERT INTO api_keys (id, key_hash, name, user_id, org_id, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        str(uuid.uuid4()),
+        "INSERT INTO api_keys (key_hash, name, created_at) VALUES (?, ?, ?)",
         _hash(key),
         name,
-        user_id,
-        org_id,
         now(),
     )
     return key

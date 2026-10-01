@@ -33,11 +33,12 @@ async def batch_get(
 ) -> list[dict[str, Any] | None]:
     sandboxes = _sandboxes(request)
     base = _base_url(request, who)
-    out: list[dict[str, Any] | None] = []
-    for sandbox_id in id:
-        row = sandboxes.row(sandbox_id)
-        out.append(await sandboxes.info(row, base) if row else None)
-    return out
+    statuses = await sandboxes.statuses()
+    rows = [sandboxes.row(sandbox_id) for sandbox_id in id]
+    return [
+        sandboxes.info(r, statuses.get(r["id"], "MISSING"), base) if r else None
+        for r in rows
+    ]
 
 
 @router.get("/api/v1/sandboxes/search")
@@ -50,8 +51,11 @@ async def search(
     sandboxes = _sandboxes(request)
     base = _base_url(request, who)
     rows, next_page = sandboxes.page(limit, page_id)
+    statuses = await sandboxes.statuses()
     return {
-        "items": [await sandboxes.info(r, base) for r in rows],
+        "items": [
+            sandboxes.info(r, statuses.get(r["id"], "MISSING"), base) for r in rows
+        ],
         "next_page_id": next_page,
     }
 
@@ -70,7 +74,7 @@ async def create(
         row = await sandboxes.create(spec, who.name)
     except UnknownSpec:
         raise HTTPException(400, f"unknown sandbox spec {spec!r}")
-    return await sandboxes.info(row, _base_url(request, who))
+    return sandboxes.info(row, "STARTING", _base_url(request, who))
 
 
 @router.post("/api/v1/sandboxes/{sandbox_id}/pause")
@@ -103,5 +107,5 @@ async def service_mint_key(
 ) -> dict[str, str]:
     check_service_key(request, request.app.state.settings.service_key)
     name = (body or {}).get("name") or "service"
-    key = mint_api_key(request.app.state.db, name, user_id, org_id)
+    key = mint_api_key(request.app.state.db, name)
     return {"key": key, "name": name}

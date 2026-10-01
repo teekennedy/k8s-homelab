@@ -8,7 +8,6 @@ Wire format: openhands-agent-server `conversation_service.py`,
 WebhookSubscriber and ConversationWebhookSubscriber.
 """
 
-import hmac
 import logging
 from typing import Any
 
@@ -22,12 +21,8 @@ router = APIRouter()
 
 def _authenticate(request: Request, sandbox_id: str) -> None:
     sandboxes: SandboxManager = request.app.state.sandboxes
-    row = sandboxes.live_row(sandbox_id)
-    given = request.headers.get("X-Session-API-Key", "")
-    if (
-        row is None
-        or not given
-        or not hmac.compare_digest(given, row["session_api_key"])
+    if not sandboxes.check_session_key(
+        sandbox_id, request.headers.get("X-Session-API-Key")
     ):
         raise HTTPException(401, "not authenticated")
 

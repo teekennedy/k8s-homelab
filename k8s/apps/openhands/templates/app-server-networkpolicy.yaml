@@ -34,15 +34,7 @@ spec:
         - port: webhook
           protocol: TCP
   egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
+    {{- include "openhands.egressDNS" . | nindent 4 }}
     # The apiserver: host-networked, so an ipBlock on the nodes.
     - to:
         - ipBlock:
@@ -59,13 +51,4 @@ spec:
         - port: {{ .Values.service.port }}
           protocol: TCP
     # PyPI, for the dependencies installed at startup.
-    - to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
-      ports:
-        - port: 443
-          protocol: TCP
+    {{- include "openhands.egressInternet" . | nindent 4 }}

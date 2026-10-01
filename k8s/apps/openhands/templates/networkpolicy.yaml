@@ -46,51 +46,11 @@ spec:
           protocol: TCP
     {{- end }}
   egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
-    # The forge. Its name resolves to a MetalLB VIP, but traffic raised inside
-    # the cluster is DNAT'd to the ingress controller's pod before egress policy
-    # is evaluated — so the destination this rule has to name is Traefik, not
-    # the VIP. The ipBlock below stays for a genuine off-cluster LAN address.
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.traefikNamespace }}
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
-      ports:
-        # The gateway's container port, not 443: egress policy is evaluated
-        # after the Service DNAT, so by the time this rule is matched the
-        # destination is the Traefik pod on its own websecure port. Naming the
-        # port rather than hardcoding 8443 resolves it from that pod's spec.
-        - port: websecure
-          protocol: TCP
-    - to:
-        - ipBlock:
-            cidr: {{ .Values.networkPolicy.lanCidr }}
-      ports:
-        - port: 443
-          protocol: TCP
+    {{- include "openhands.egressDNS" . | nindent 4 }}
+    {{- include "openhands.egressForge" . | nindent 4 }}
     # The model API, and the package registries the ACP agent's own toolchain
     # pulls from.
-    - to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
-      ports:
-        - port: 443
-          protocol: TCP
+    {{- include "openhands.egressInternet" . | nindent 4 }}
 ---
 # oauth2-proxy itself: reachable only from the gateway.
 apiVersion: networking.k8s.io/v1

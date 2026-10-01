@@ -29,15 +29,7 @@ spec:
         - port: http
           protocol: TCP
   egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
+    {{- include "openhands.egressDNS" $root | nindent 4 }}
     - to:
         - podSelector:
             matchLabels:
@@ -46,40 +38,9 @@ spec:
         - port: webhook
           protocol: TCP
     {{- if eq $cfg.egress "lan" }}
-    # The forge. Its name resolves to a MetalLB VIP, but traffic raised inside
-    # the cluster is DNAT'd to the ingress controller's pod before egress policy
-    # is evaluated — so the destination this rule has to name is Traefik, on
-    # its own websecure container port rather than the 443 the Service
-    # publishes. The ipBlock below stays for a genuine off-cluster LAN address.
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: {{ $root.Values.traefikNamespace }}
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
-      ports:
-        - port: websecure
-          protocol: TCP
-    - to:
-        - ipBlock:
-            cidr: {{ $root.Values.networkPolicy.lanCidr }}
-      ports:
-        - port: 443
-          protocol: TCP
+    {{- include "openhands.egressForge" $root | nindent 4 }}
     {{- end }}
     {{- if ne $cfg.egress "none" }}
-    # The model API and the package registries. RFC1918 is excluded, so the
-    # rules above are the only routes to anything on this network.
-    - to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
-      ports:
-        - port: 443
-          protocol: TCP
+    {{- include "openhands.egressInternet" $root | nindent 4 }}
     {{- end }}
 {{- end }}

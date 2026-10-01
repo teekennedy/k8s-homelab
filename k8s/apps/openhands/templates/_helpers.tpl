@@ -117,3 +117,121 @@ templates/app-server.yaml.
   path: {{ printf "app_server/%s" (base $path) }}
 {{- end }}
 {{- end }}
+
+{{/*
+NetworkPolicy egress rules shared by every policy in this chart. Verified on
+this cluster's netpol controller (k3s/kube-router): a portless egress rule is
+enforced as allow-nothing once the same policy has rules that do name ports,
+so every rule here names its ports.
+*/}}
+{{- define "openhands.egressDNS" -}}
+- to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+  ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+{{- end }}
+
+{{/*
+The forge. Its name resolves to a MetalLB VIP, but traffic raised inside the
+cluster is DNAT'd to the ingress controller's pod before egress policy is
+evaluated — so the destination has to be Traefik, on its own websecure
+container port rather than the 443 the Service publishes. The ipBlock stays for
+a genuine off-cluster LAN address.
+*/}}
+{{- define "openhands.egressForge" -}}
+- to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.traefikNamespace }}
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+  ports:
+    - port: websecure
+      protocol: TCP
+- to:
+    - ipBlock:
+        cidr: {{ .Values.networkPolicy.lanCidr }}
+  ports:
+    - port: 443
+      protocol: TCP
+{{- end }}
+
+{{/*
+HTTPS to the internet: the model API and package registries. RFC1918 is
+excluded, so any rule naming the LAN is the only route to it.
+*/}}
+{{- define "openhands.egressInternet" -}}
+- to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+  ports:
+    - port: 443
+      protocol: TCP
+{{- end }}
+
+{{/*
+Forge and CI environment for anything the agent runs in: the gitconfig's
+credential helper reads FORGEJO_USERNAME/FORGEJO_TOKEN, and the
+forgejo-iterate skill reads the rest.
+*/}}
+{{- define "openhands.forgeEnv" -}}
+- name: GIT_CONFIG_GLOBAL
+  value: {{ .Values.forge.gitConfigPath | quote }}
+- name: FORGEJO_URL
+  value: {{ .Values.forge.url | quote }}
+- name: FORGEJO_OWNER
+  value: {{ .Values.forge.owner | quote }}
+- name: FORGEJO_REPO
+  value: {{ .Values.forge.repo | quote }}
+- name: FORGEJO_USERNAME
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.forge.secretName }}
+      key: username
+- name: FORGEJO_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.forge.secretName }}
+      key: token
+- name: WOODPECKER_URL
+  value: {{ .Values.ci.url | quote }}
+- name: WOODPECKER_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.ci.secretName }}
+      key: token
+      # Provisioned by a Job that may not have run yet on a cold bootstrap.
+      # Optional because only the log-reading half of the skill needs it.
+      optional: true
+{{- end }}
+
+{{/*
+Seeds skills into the agent's home. They land in two directories because two
+different readers look for them, and neither reads the other's path:
+  ~/.agents/skills   the agent server's own user-skill search path, so the
+                     skill is listed in the UI and reaches the agent context.
+  ~/.claude/skills   read natively by the Claude Code CLI an ACP session spawns.
+Copied rather than mounted: a ConfigMap mounted at either path would make that
+directory root-owned and read-only, and the agent writes its own state beside
+the skills in both. The glob skips the ConfigMap volume's own ..data and
+..<timestamp> entries; -L resolves the symlink each remaining entry actually is.
+*/}}
+{{- define "openhands.seedSkillsScript" -}}
+set -eu
+mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills"
+for src in /opt/openhands-skills/*/; do
+  [ -d "$src" ] || continue
+  cp -rLf "$src" "$HOME/.agents/skills/"
+  cp -rLf "$src" "$HOME/.claude/skills/"
+done
+{{- end }}

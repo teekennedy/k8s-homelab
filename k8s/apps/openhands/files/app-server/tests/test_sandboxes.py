@@ -1,5 +1,4 @@
 import json
-from datetime import UTC, datetime, timedelta
 
 import anyio
 import pytest
@@ -137,30 +136,21 @@ def test_search_pages(api, user):
     assert {i["id"] for i in body["items"] + rest["items"]} == ids
 
 
-def _age(state, sid: str, seconds: int) -> None:
-    old = (datetime.now(UTC) - timedelta(seconds=seconds)).isoformat()
-    state.db.run("UPDATE sandboxes SET created_at = ? WHERE id = ?", old, sid)
-    cr = state.sandboxes.kube.sandbox(sid)
-    if cr:
-        cr["metadata"]["creationTimestamp"] = old
-
-
 def test_reconcile_deletes_orphans_and_marks_vanished(api, kube, state, user):
     orphan = api.post("/api/v1/sandboxes", headers=user).json()["id"]
     vanished = api.post("/api/v1/sandboxes", headers=user).json()["id"]
-    fresh = api.post("/api/v1/sandboxes", headers=user).json()["id"]
-    for sid in (orphan, vanished):
-        _age(state, sid, 600)
+    in_flight = api.post("/api/v1/sandboxes", headers=user).json()["id"]
     state.db.run("UPDATE sandboxes SET deleted_at = ? WHERE id = ?", now(), orphan)
     del kube.objects["sandboxes"][vanished]
-    # Fresh: row exists but its Sandbox is not visible yet. Must be left alone.
-    del kube.objects["sandboxes"][fresh]
+    # Mid-create: the row is written but the Sandbox is not, so no uid yet.
+    del kube.objects["sandboxes"][in_flight]
+    state.db.run("UPDATE sandboxes SET uid = NULL WHERE id = ?", in_flight)
 
     anyio.run(state.sandboxes.reconcile)
 
     assert kube.sandbox(orphan) is None
     assert state.sandboxes.live_row(vanished) is None
-    assert state.sandboxes.live_row(fresh) is not None
+    assert state.sandboxes.live_row(in_flight) is not None
 
 
 def test_api_requires_identity(api):

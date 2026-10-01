@@ -50,19 +50,9 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
-        # Skills land in two directories because two different readers look for
-        # them, and neither reads the other's path:
-        #   ~/.agents/skills   the agent server's own user-skill search path, so
-        #                      the skill is listed in the UI and reaches the
-        #                      agent context. ~/.openhands/skills would work too
-        #                      but is on the data volume, which would outlive
-        #                      git as the source of truth.
-        #   ~/.claude/skills   read natively by the Claude Code CLI that the ACP
-        #                      session spawns.
-        # Copied in rather than mounted: a ConfigMap mounted at either path would
-        # make that directory root-owned and read-only, and the agent writes its
-        # own state beside the skills in both. The copy re-runs on every start
-        # and both directories are emptyDir, so a removed skill does not linger.
+        # See the seedSkillsScript helper for why two directories, and why a
+        # copy rather than a mount. Both directories are emptyDir, so the copy
+        # re-runs as a full refresh on every start.
         - name: seed-skills
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -70,16 +60,7 @@ spec:
             - sh
             - -c
             - |
-              set -eu
-              mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills"
-              # The glob skips the ConfigMap volume's own ..data and
-              # ..<timestamp> entries, which are not skills; -L resolves the
-              # symlink each remaining entry actually is.
-              for src in /opt/openhands-skills/*/; do
-                [ -d "$src" ] || continue
-                cp -rLf "$src" "$HOME/.agents/skills/"
-                cp -rLf "$src" "$HOME/.claude/skills/"
-              done
+              {{- include "openhands.seedSkillsScript" . | nindent 14 }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           resources:
@@ -125,38 +106,7 @@ spec:
             # --- Forge ------------------------------------------------------
             # Read by the credential helper in the mounted gitconfig, and by
             # anything else in a session that needs to call the Forgejo API.
-            - name: GIT_CONFIG_GLOBAL
-              value: {{ .Values.forge.gitConfigPath | quote }}
-            - name: FORGEJO_URL
-              value: {{ .Values.forge.url | quote }}
-            - name: FORGEJO_OWNER
-              value: {{ .Values.forge.owner | quote }}
-            - name: FORGEJO_REPO
-              value: {{ .Values.forge.repo | quote }}
-            - name: FORGEJO_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.forge.secretName }}
-                  key: username
-            - name: FORGEJO_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.forge.secretName }}
-                  key: token
-            # --- CI ---------------------------------------------------------
-            # Read by the forgejo-iterate skill to pull failing step logs and
-            # restart a flaky pipeline.
-            - name: WOODPECKER_URL
-              value: {{ .Values.ci.url | quote }}
-            - name: WOODPECKER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.ci.secretName }}
-                  key: token
-                  # Provisioned by a Job that may not have run yet on a cold
-                  # bootstrap. Optional because only the log-reading half of
-                  # the skill needs it.
-                  optional: true
+            {{- include "openhands.forgeEnv" . | nindent 12 }}
           envFrom:
             # CLAUDE_CODE_OAUTH_TOKEN and/or ANTHROPIC_API_KEY; see README.md,
             # "Prerequisites".

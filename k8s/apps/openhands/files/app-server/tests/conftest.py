@@ -53,9 +53,6 @@ class FakeKube:
     def _bucket(self, res: Resource) -> dict[str, dict[str, Any]]:
         return self.objects.setdefault(res.path.rsplit("/", 1)[-1], {})
 
-    async def get(self, res, name):
-        return self._bucket(res).get(name)
-
     async def list(self, res, label_selector):
         key, _, value = label_selector.partition("=")
         return [
@@ -75,7 +72,9 @@ class FakeKube:
         return obj
 
     async def patch(self, res, name, patch):
-        obj = self._bucket(res)[name]
+        obj = self._bucket(res).get(name)
+        if obj is None:
+            raise KubeError(404, "not found")
         for k, v in patch.get("spec", {}).items():
             obj["spec"][k] = v
         return obj
@@ -120,6 +119,10 @@ def settings(tmp_path) -> Settings:
         webhook_url="http://app-server:8081",
         service_key=SERVICE_KEY,
         user_header=USER_HEADER,
+        agent_server_port=8000,
+        http_port=8080,
+        webhook_port=8081,
+        reconcile_interval=60,
     )
 
 

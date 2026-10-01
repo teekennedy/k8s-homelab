@@ -62,8 +62,7 @@ spec:
         {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
       initContainers:
         # HOME lives on the sandbox volume so a paused sandbox resumes with
-        # the agent CLI's own state intact. Skills land in two directories
-        # for the reason given on the canvas's seed-skills container.
+        # the agent CLI's own state intact.
         - name: seed-home
           image: {{ $sp.image | quote }}
           imagePullPolicy: IfNotPresent
@@ -71,13 +70,8 @@ spec:
             - sh
             - -c
             - |
-              set -eu
-              mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills" /workspace/project
-              for src in /opt/openhands-skills/*/; do
-                [ -d "$src" ] || continue
-                cp -rLf "$src" "$HOME/.agents/skills/"
-                cp -rLf "$src" "$HOME/.claude/skills/"
-              done
+              {{- include "openhands.seedSkillsScript" $root | nindent 14 }}
+              mkdir -p /workspace/project
           env:
             - name: HOME
               value: /workspace/home
@@ -127,32 +121,7 @@ spec:
               value: "1"
             {{- end }}
             {{- if $cfg.forgeCredentials }}
-            - name: GIT_CONFIG_GLOBAL
-              value: {{ $root.Values.forge.gitConfigPath | quote }}
-            - name: FORGEJO_URL
-              value: {{ $root.Values.forge.url | quote }}
-            - name: FORGEJO_OWNER
-              value: {{ $root.Values.forge.owner | quote }}
-            - name: FORGEJO_REPO
-              value: {{ $root.Values.forge.repo | quote }}
-            - name: FORGEJO_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $root.Values.forge.secretName }}
-                  key: username
-            - name: FORGEJO_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $root.Values.forge.secretName }}
-                  key: token
-            - name: WOODPECKER_URL
-              value: {{ $root.Values.ci.url | quote }}
-            - name: WOODPECKER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $root.Values.ci.secretName }}
-                  key: token
-                  optional: true
+            {{- include "openhands.forgeEnv" $root | nindent 12 }}
             {{- end }}
           # The model credential, by reference: the app server never reads it.
           envFrom:

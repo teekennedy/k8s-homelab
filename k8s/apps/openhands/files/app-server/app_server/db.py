@@ -20,14 +20,13 @@ MIGRATIONS: list[str] = [
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
         last_active_at TEXT NOT NULL,
+        -- The Sandbox's metadata.uid, once it exists.
+        uid TEXT,
         deleted_at TEXT
     );
     CREATE TABLE api_keys (
-        id TEXT PRIMARY KEY,
-        key_hash TEXT NOT NULL UNIQUE,
+        key_hash TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        user_id TEXT NOT NULL,
-        org_id TEXT NOT NULL,
         created_at TEXT NOT NULL
     );
     """,
@@ -45,7 +44,6 @@ class Database:
         self._lock = threading.Lock()
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA foreign_keys=ON")
             self._migrate()
 
     def _migrate(self) -> None:

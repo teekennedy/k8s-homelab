@@ -5,6 +5,8 @@ per-sandbox config Secret is made a dependent of it too, so deleting the
 Sandbox is the whole cleanup.
 """
 
+import asyncio
+import hmac
 import json
 import logging
 import secrets
@@ -13,7 +15,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .db import Database, now
-from .kube import Kube, Resource
+from .kube import Kube, KubeError, Resource
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +23,9 @@ PLACEHOLDER = "__SANDBOX_ID__"
 MANAGED_BY = "openhands.msng.to/managed-by"
 MANAGED_BY_VALUE = "openhands-app-server"
 SANDBOX_ID_LABEL = "openhands.msng.to/sandbox-id"
+# On every sandbox pod, from the chart's runtimeSelectorLabels.
+RUNTIME_POD_SELECTOR = "app.kubernetes.io/component=runtime"
+TOUCH_EVERY = timedelta(minutes=1)
 
 Status = Literal["STARTING", "RUNNING", "PAUSED", "ERROR", "MISSING"]
 
@@ -91,9 +96,29 @@ class SandboxManager:
             "SELECT * FROM sandboxes WHERE id = ? AND deleted_at IS NULL", sandbox_id
         )
 
+    def check_session_key(self, sandbox_id: str, given: str | None) -> bool:
+        """Whether `given` is this live sandbox's own session key."""
+        row = self.live_row(sandbox_id)
+        return (
+            row is not None
+            and bool(given)
+            and hmac.compare_digest(given, row["session_api_key"])
+        )
+
     def touch(self, sandbox_id: str) -> None:
+        """Record activity, at most once a minute: called on every proxied
+        request, and a no-op UPDATE is cheaper than remembering when."""
+        ts = datetime.now(UTC)
         self.db.run(
-            "UPDATE sandboxes SET last_active_at = ? WHERE id = ?", now(), sandbox_id
+            "UPDATE sandboxes SET last_active_at = ? WHERE id = ? AND last_active_at < ?",
+            ts.isoformat(),
+            sandbox_id,
+            (ts - TOUCH_EVERY).isoformat(),
+        )
+
+    def _mark_deleted(self, sandbox_id: str) -> None:
+        self.db.run(
+            "UPDATE sandboxes SET deleted_at = ? WHERE id = ?", now(), sandbox_id
         )
 
     def agent_url(self, sandbox_id: str) -> str:
@@ -140,6 +165,9 @@ class SandboxManager:
             sandbox = await self.kube.create(
                 self.sandboxes, render(template, sandbox_id)
             )
+            uid = sandbox["metadata"]["uid"]
+            # From here the reconciler may treat a missing Sandbox as vanished.
+            self.db.run("UPDATE sandboxes SET uid = ? WHERE id = ?", uid, sandbox_id)
             await self.kube.create(
                 self.secrets,
                 {
@@ -158,7 +186,7 @@ class SandboxManager:
                                 "apiVersion": "agents.x-k8s.io/v1beta1",
                                 "kind": "Sandbox",
                                 "name": sandbox_id,
-                                "uid": sandbox["metadata"]["uid"],
+                                "uid": uid,
                             }
                         ],
                     },
@@ -173,26 +201,22 @@ class SandboxManager:
         except Exception:
             log.exception("creating sandbox %s failed; rolling back", sandbox_id)
             await self.kube.delete(self.sandboxes, sandbox_id)
-            self.db.run(
-                "UPDATE sandboxes SET deleted_at = ? WHERE id = ?", now(), sandbox_id
-            )
+            self._mark_deleted(sandbox_id)
             raise
         log.info("created sandbox %s (spec %s)", sandbox_id, spec_name)
         return self.row(sandbox_id)
 
-    async def status(self, sandbox_id: str) -> Status:
-        cr = await self.kube.get(self.sandboxes, sandbox_id)
-        pod = await self.kube.get(self.pods, sandbox_id) if cr else None
-        return derive_status(cr, pod)
-
     async def set_mode(self, sandbox_id: str, mode: str) -> bool:
         if not self.live_row(sandbox_id):
             return False
-        if await self.kube.get(self.sandboxes, sandbox_id) is None:
-            return False
-        await self.kube.patch(
-            self.sandboxes, sandbox_id, {"spec": {"operatingMode": mode}}
-        )
+        try:
+            await self.kube.patch(
+                self.sandboxes, sandbox_id, {"spec": {"operatingMode": mode}}
+            )
+        except KubeError as e:
+            if e.status == 404:
+                return False
+            raise
         self.touch(sandbox_id)
         log.info("sandbox %s -> %s", sandbox_id, mode)
         return True
@@ -207,20 +231,34 @@ class SandboxManager:
         if not self.live_row(sandbox_id):
             return False
         await self.kube.delete(self.sandboxes, sandbox_id)
-        self.db.run(
-            "UPDATE sandboxes SET deleted_at = ? WHERE id = ?", now(), sandbox_id
-        )
+        self._mark_deleted(sandbox_id)
         log.info("deleted sandbox %s", sandbox_id)
         return True
 
     # --- views --------------------------------------------------------------
 
-    async def info(self, row: dict[str, Any], base_url: str) -> dict[str, Any]:
+    async def statuses(self) -> dict[str, Status]:
+        """Status of every managed Sandbox in the cluster, from two list calls
+        whatever the count. Ids absent from the result are MISSING."""
+        crs, pods = await asyncio.gather(
+            self.kube.list(self.sandboxes, f"{MANAGED_BY}={MANAGED_BY_VALUE}"),
+            self.kube.list(self.pods, RUNTIME_POD_SELECTOR),
+        )
+        by_name = {p["metadata"]["name"]: p for p in pods}
+        return {
+            cr["metadata"]["name"]: derive_status(
+                cr, by_name.get(cr["metadata"]["name"])
+            )
+            for cr in crs
+        }
+
+    def info(
+        self, row: dict[str, Any], status: Status, base_url: str
+    ) -> dict[str, Any]:
         """V1SandboxInfo, as the frontend and the automation service read it."""
         sandbox_id = row["id"]
-        status: Status = (
-            "MISSING" if row["deleted_at"] else await self.status(sandbox_id)
-        )
+        if row["deleted_at"]:
+            status = "MISSING"
         alive = status in ("RUNNING", "STARTING", "PAUSED")
         return {
             "id": sandbox_id,
@@ -249,7 +287,7 @@ class SandboxManager:
 
     # --- reconciliation -----------------------------------------------------
 
-    async def reconcile(self, grace_seconds: float = 120.0) -> None:
+    async def reconcile(self) -> None:
         """Make the rows and the cluster agree.
 
         A managed Sandbox with no live row is deleted (its row was deleted, or
@@ -257,27 +295,26 @@ class SandboxManager:
         gone — deleted by hand, or by a namespace wipe — is marked deleted, so
         it reports MISSING rather than STARTING forever.
 
-        Anything younger than the grace period is left alone: a create writes
-        the row and the Sandbox moments apart, and this reads them moments
-        apart, so a fresh one can look like either case.
+        Read order makes this safe against a concurrent create, which writes
+        the row, then the Sandbox, then the row's uid. A row that had its uid
+        before the list had its Sandbox before the list too; a Sandbox in the
+        list had its row before the second read.
         """
-        cutoff = datetime.now(UTC) - timedelta(seconds=grace_seconds)
+        created = {
+            r["id"]
+            for r in self.db.all(
+                "SELECT id FROM sandboxes WHERE deleted_at IS NULL AND uid IS NOT NULL"
+            )
+        }
         crs = await self.kube.list(self.sandboxes, f"{MANAGED_BY}={MANAGED_BY_VALUE}")
-        rows = self.db.all(
-            "SELECT id, created_at FROM sandboxes WHERE deleted_at IS NULL"
-        )
         in_cluster = {cr["metadata"]["name"] for cr in crs}
-        live = {r["id"] for r in rows}
-        for cr in crs:
-            name = cr["metadata"]["name"]
-            created = datetime.fromisoformat(cr["metadata"]["creationTimestamp"])
-            if name not in live and created < cutoff:
-                log.warning("reconcile: deleting sandbox %s with no live row", name)
-                await self.kube.delete(self.sandboxes, name)
-        for r in rows:
-            created = datetime.fromisoformat(r["created_at"])
-            if r["id"] not in in_cluster and created < cutoff:
-                log.warning("reconcile: sandbox %s is gone from the cluster", r["id"])
-                self.db.run(
-                    "UPDATE sandboxes SET deleted_at = ? WHERE id = ?", now(), r["id"]
-                )
+        live = {
+            r["id"]
+            for r in self.db.all("SELECT id FROM sandboxes WHERE deleted_at IS NULL")
+        }
+        for orphan in sorted(in_cluster - live):
+            log.warning("reconcile: deleting sandbox %s with no live row", orphan)
+            await self.kube.delete(self.sandboxes, orphan)
+        for vanished in sorted(created - in_cluster):
+            log.warning("reconcile: sandbox %s is gone from the cluster", vanished)
+            self._mark_deleted(vanished)

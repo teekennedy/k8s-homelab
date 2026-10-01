@@ -6,9 +6,7 @@ conversation_url it is given, so one route serves both.
 """
 
 import asyncio
-import hmac
 import logging
-import time
 
 import httpx
 import websockets
@@ -38,9 +36,6 @@ HOP_BY_HOP = {
 # nothing that authenticates anywhere else may reach it.
 CREDENTIALS = {"cookie", "authorization"}
 
-TOUCH_EVERY = 60.0
-_last_touch: dict[str, float] = {}
-
 
 def upstream_headers(headers, user_header: str) -> dict[str, str]:
     drop = HOP_BY_HOP | CREDENTIALS | {user_header.lower()}
@@ -53,20 +48,15 @@ def upstream_headers(headers, user_header: str) -> dict[str, str]:
     }
 
 
-def _authorized(headers, query, user_header: str, session_api_key: str) -> bool:
+def _authorized(
+    sandboxes: SandboxManager, sandbox_id: str, headers, query, user_header: str
+) -> bool:
     """A browser carries the oauth2-proxy identity; the automation service
     carries the sandbox's own session key (the agent server checks it too)."""
     if headers.get(user_header):
         return True
-    given = headers.get("X-Session-API-Key") or query.get("session_api_key") or ""
-    return bool(given) and hmac.compare_digest(given, session_api_key)
-
-
-def _touch(sandboxes: SandboxManager, sandbox_id: str) -> None:
-    t = time.monotonic()
-    if t - _last_touch.get(sandbox_id, 0) > TOUCH_EVERY:
-        _last_touch[sandbox_id] = t
-        sandboxes.touch(sandbox_id)
+    given = headers.get("X-Session-API-Key") or query.get("session_api_key")
+    return sandboxes.check_session_key(sandbox_id, given)
 
 
 @router.api_route(
@@ -77,15 +67,14 @@ def _touch(sandboxes: SandboxManager, sandbox_id: str) -> None:
 async def proxy_http(sandbox_id: str, path: str, request: Request):
     state = request.app.state
     sandboxes: SandboxManager = state.sandboxes
-    row = sandboxes.live_row(sandbox_id)
-    if row is None:
+    if sandboxes.live_row(sandbox_id) is None:
         raise HTTPException(404, "unknown sandbox")
     user_header = state.settings.user_header
     if not _authorized(
-        request.headers, request.query_params, user_header, row["session_api_key"]
+        sandboxes, sandbox_id, request.headers, request.query_params, user_header
     ):
         raise HTTPException(401, "not authenticated")
-    _touch(sandboxes, sandbox_id)
+    sandboxes.touch(sandbox_id)
 
     client: httpx.AsyncClient = state.http
     upstream = client.build_request(
@@ -117,14 +106,13 @@ async def proxy_http(sandbox_id: str, path: str, request: Request):
 async def proxy_ws(ws: WebSocket, sandbox_id: str, path: str):
     state = ws.app.state
     sandboxes: SandboxManager = state.sandboxes
-    row = sandboxes.live_row(sandbox_id)
     user_header = state.settings.user_header
-    if row is None or not _authorized(
-        ws.headers, ws.query_params, user_header, row["session_api_key"]
+    if sandboxes.live_row(sandbox_id) is None or not _authorized(
+        sandboxes, sandbox_id, ws.headers, ws.query_params, user_header
     ):
         await ws.close(code=4401)
         return
-    _touch(sandboxes, sandbox_id)
+    sandboxes.touch(sandbox_id)
 
     base = sandboxes.agent_url(sandbox_id).replace("http://", "ws://", 1)
     url = f"{base}/{path}" + (f"?{ws.url.query}" if ws.url.query else "")

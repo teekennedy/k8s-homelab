@@ -21,12 +21,12 @@ metadata:
 rules:
   - apiGroups: ["agents.x-k8s.io"]
     resources: ["sandboxes"]
-    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+    verbs: ["list", "create", "patch", "delete"]
   # Status only: an agent server that exited is a Failed pod, which the
   # Sandbox's own conditions do not say.
   - apiGroups: [""]
-    resources: ["pods", "pods/log"]
-    verbs: ["get", "list"]
+    resources: ["pods"]
+    verbs: ["list"]
   # Create only. Each sandbox gets a Secret holding its minted keys, owned by
   # the Sandbox so the garbage collector deletes it. Without get, list or
   # update, this grant cannot read any Secret in the namespace — including the
