@@ -2,13 +2,16 @@ hosts:
   ups:
     hostname: rmc0628AB
     mac_address: 00:0c:15:06:28:ab
-    ip_address: unknown
+    ip_address: 10.69.110.15
     dhcp: true
     connected_via: qnap_poe
     switch_port: 7
     patch_panel_port: 7
     vlan: ups
-    notes: The IP is hardcoded in home assistant config under config/packages/ups.yaml.
+    notes: |
+      CyberPower CP1500PFCRM2U with RMCARD205 management card. DHCP reserved IP (unifi_client.ups).
+      Switch port 7 tags untagged traffic with vlan 1100.
+      The IP is hardcoded in home assistant config under config/packages/ups.yaml.
   poe-switch:
     hostname: poe-switch
     mac_address: 24:5e:be:83:d2:0d

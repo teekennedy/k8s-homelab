@@ -16,6 +16,10 @@ data "unifi_firewall_zone" "dmz" {
   name = "Dmz"
 }
 
+data "unifi_firewall_zone" "external" {
+  name = "External"
+}
+
 data "unifi_firewall_zone" "vpn" {
   name = "Vpn"
 }

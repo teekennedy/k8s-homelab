@@ -221,6 +221,7 @@
                     ./nix/modules/k3s
                     ./nix/modules/nfs-mtls
                     ./nix/modules/selfupdate
+                    ./nix/modules/ups
                     ./nix/modules/users/defaultUser.nix
                     inputs.determinate.nixosModules.default
                     inputs.nixos-facter-modules.nixosModules.facter
