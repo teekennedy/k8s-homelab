@@ -150,6 +150,7 @@ def settings(tmp_path) -> Settings:
         automation_url="http://canvas:18001",
         automation_api_key="automation-key",
         start_timeout=5,
+        secrets_key="test-secrets-key",
     )
 
 

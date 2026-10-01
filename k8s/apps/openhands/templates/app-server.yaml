@@ -48,6 +48,21 @@ metadata:
     secret-generator.v1.mittwald.de/length: "48"
 type: Opaque
 ---
+# Encrypts the conversation secrets store at rest. Its own Secret, not a field
+# added to the one above, so it exists before the first pod that reads it.
+# Losing it makes every stored conversation secret undecryptable.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-secrets-key
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+  annotations:
+    secret-generator.v1.mittwald.de/autogenerate: key
+    secret-generator.v1.mittwald.de/length: "48"
+type: Opaque
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -185,6 +200,11 @@ spec:
               value: {{ $cfg.startTimeoutSeconds | quote }}
             - name: AUTOMATION_URL
               value: {{ printf "http://%s.%s.svc.cluster.local:%v" (include "openhands.fullname" .) .Release.Namespace .Values.automation.port | quote }}
+            - name: SECRETS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-secrets-key
+                  key: key
             - name: AUTOMATION_API_KEY
               valueFrom:
                 secretKeyRef:

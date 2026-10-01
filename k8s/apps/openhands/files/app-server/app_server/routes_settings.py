@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from .auth import principal
+from .secrets_store import SecretError, SecretsStore
 from .settings_store import ProfileError, SettingsStore
 
 router = APIRouter(dependencies=[Depends(principal)])
@@ -86,3 +87,51 @@ async def rename_profile(
 @router.post("/api/agent-profiles/{profile_id}/activate")
 async def activate_profile(profile_id: str, request: Request) -> dict[str, Any]:
     return _profiles(lambda: _store(request).activate_profile(profile_id))
+
+
+def _secrets(request: Request) -> SecretsStore:
+    return request.app.state.secrets_store
+
+
+def _secret_call(call):
+    try:
+        return call()
+    except SecretError as e:
+        raise HTTPException(e.status, e.detail)
+
+
+@router.get("/api/v1/secrets/search")
+async def search_secrets(
+    request: Request, limit: int = 100, page_id: str | None = None
+) -> dict[str, Any]:
+    return _secrets(request).page(min(max(limit, 1), 100), page_id)
+
+
+@router.post("/api/v1/secrets")
+async def create_secret(
+    request: Request, body: Annotated[dict[str, Any], Body()]
+) -> dict[str, bool]:
+    _secret_call(
+        lambda: _secrets(request).create(
+            body["name"], body["value"], body.get("description")
+        )
+    )
+    return {"success": True}
+
+
+@router.put("/api/v1/secrets/{name}")
+async def update_secret(
+    name: str, request: Request, body: Annotated[dict[str, Any], Body()]
+) -> dict[str, bool]:
+    _secret_call(
+        lambda: _secrets(request).update(
+            name, body.get("name"), body.get("description")
+        )
+    )
+    return {"success": True}
+
+
+@router.delete("/api/v1/secrets/{name}")
+async def delete_secret(name: str, request: Request) -> dict[str, bool]:
+    _secret_call(lambda: _secrets(request).delete(name))
+    return {"success": True}

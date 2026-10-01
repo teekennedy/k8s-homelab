@@ -49,8 +49,22 @@ async def current_key(who: Caller) -> dict[str, Any]:
     }
 
 
+@router.post("/api/authenticate")
+async def authenticate(who: Caller) -> dict[str, bool]:
+    """The cookie-mode session check the frontend makes on load; a 401 here
+    would send the browser to a /login this deployment does not have, but
+    oauth2-proxy has already authenticated anything that reaches it."""
+    return {"success": True}
+
+
+@router.post("/api/analytics/events", status_code=204)
+async def analytics(who: Caller) -> None:
+    """Product analytics. Dropped: telemetry is off for this deployment."""
+
+
 @router.get("/api/organizations/{org_id}/profiles")
-async def llm_profiles(org_id: str, who: Caller) -> dict[str, Any]:
+@router.get("/api/v1/settings/profiles")
+async def llm_profiles(who: Caller, org_id: str | None = None) -> dict[str, Any]:
     """LLM profiles. Conversations here run ACP agents, which bring their own
     model; an OpenHands-kind agent profile falls back to agent_settings."""
     return {"profiles": [], "active_profile": None}
@@ -61,8 +75,7 @@ def _empty_page() -> dict[str, Any]:
 
 
 # No git provider integration (the forge is not one of upstream's providers;
-# the agent clones by URL), no skill or model marketplace, and secrets reach
-# sandboxes from Kubernetes rather than a store.
+# the agent clones by URL), and no skill or model marketplace.
 for _path in (
     "/api/v1/git/repositories/search",
     "/api/v1/git/installations/search",
@@ -71,7 +84,6 @@ for _path in (
     "/api/v1/skills/search",
     "/api/v1/config/models/search",
     "/api/v1/config/providers/search",
-    "/api/v1/secrets/search",
 ):
     router.add_api_route(
         _path, _empty_page, methods=["GET"], dependencies=[Depends(principal)]

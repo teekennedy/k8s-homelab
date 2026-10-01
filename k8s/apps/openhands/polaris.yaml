@@ -1,0 +1,7 @@
+exemptions:
+  # The app server's source code: it names keys and secrets because it
+  # handles them, but every value it uses comes from a Secret at runtime.
+  - controllerNames:
+      - openhands-app-server-source
+    rules:
+      - sensitiveConfigmapContent

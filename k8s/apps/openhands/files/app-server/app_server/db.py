@@ -72,6 +72,16 @@ MIGRATIONS: list[str] = [
         value TEXT NOT NULL
     );
     """,
+    """
+    -- User-added conversation secrets, encrypted with SECRETS_KEY.
+    CREATE TABLE secrets (
+        name TEXT PRIMARY KEY,
+        value BLOB NOT NULL,
+        description TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    """,
 ]
 
 

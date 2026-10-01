@@ -14,6 +14,7 @@ from . import (
     proxy,
     routes_account,
     routes_conversations,
+    routes_runtime,
     routes_sandboxes,
     routes_settings,
     webhooks,
@@ -23,6 +24,7 @@ from .db import Database
 from .kube import Kube
 from .sandboxes import SandboxManager, load_specs
 from .settings import Settings
+from .secrets_store import SecretsStore
 from .settings_store import SettingsStore
 
 log = logging.getLogger("app_server")
@@ -59,10 +61,12 @@ class State:
         # Streams can stay open for a whole agent turn.
         self.http = httpx.AsyncClient(timeout=httpx.Timeout(30, read=None))
         self.settings_store = SettingsStore(db, settings.settings_seed_file)
+        self.secrets_store = SecretsStore(db, settings.secrets_key)
         self.conversations = ConversationService(
             db=db,
             sandboxes=self.sandboxes,
             settings=self.settings_store,
+            secrets=self.secrets_store,
             http=self.http,
             public_url=settings.public_url,
             default_spec=settings.default_spec,
@@ -81,6 +85,7 @@ def build_api(state: State) -> FastAPI:
     app = FastAPI(title="openhands-app-server", docs_url=None, redoc_url=None)
     app.include_router(routes_sandboxes.router)
     app.include_router(routes_conversations.router)
+    app.include_router(routes_runtime.router)
     app.include_router(routes_settings.router)
     app.include_router(routes_account.router)
     app.include_router(proxy.router)

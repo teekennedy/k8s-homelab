@@ -45,6 +45,8 @@ class Settings:
     automation_api_key: str
     # How long a new conversation may wait for its sandbox to be RUNNING.
     start_timeout: float
+    # Encrypts the conversation secrets store at rest.
+    secrets_key: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -67,4 +69,5 @@ class Settings:
             automation_url=_env("AUTOMATION_URL").rstrip("/"),
             automation_api_key=_env("AUTOMATION_API_KEY"),
             start_timeout=float(_env("START_TIMEOUT_SECONDS")),
+            secrets_key=_env("SECRETS_KEY"),
         )

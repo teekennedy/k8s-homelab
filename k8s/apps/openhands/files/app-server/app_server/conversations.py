@@ -19,6 +19,7 @@ import httpx
 
 from .db import Database, now
 from .sandboxes import SandboxManager, Status
+from .secrets_store import SecretsStore
 from .settings_store import SettingsStore
 
 log = logging.getLogger(__name__)
@@ -71,6 +72,7 @@ class ConversationService:
         db: Database,
         sandboxes: SandboxManager,
         settings: SettingsStore,
+        secrets: SecretsStore,
         http: httpx.AsyncClient,
         public_url: str,
         default_spec: str,
@@ -79,6 +81,7 @@ class ConversationService:
         self.db = db
         self.sandboxes = sandboxes
         self.settings = settings
+        self.secrets = secrets
         self.http = http
         self.public_url = public_url
         self.default_spec = default_spec
@@ -220,6 +223,9 @@ class ConversationService:
         ):
             # Where the frontend reads the ACP provider chip from.
             body["tags"] = {"acpserver": agent_settings["acp_server"]}
+        secrets = self.secrets.for_conversation()
+        if secrets:
+            body["secrets"] = secrets
         if request.get("initial_message"):
             body["initial_message"] = {**request["initial_message"], "run": True}
         resp = await self.http.post(
@@ -375,6 +381,36 @@ class ConversationService:
         )
         self.db.run("DELETE FROM events WHERE conversation_id = ?", conv_id)
         return True
+
+    # --- the live runtime ---------------------------------------------------
+
+    async def runtime(self, conv_id: str) -> tuple[str, str] | None:
+        """(agent server URL, session key) for a conversation whose sandbox is
+        RUNNING, else None: archived and paused conversations have no runtime
+        to ask, and the frontend renders them from history."""
+        row = self.row(conv_id)
+        if row is None:
+            return None
+        sandbox = self.sandboxes.live_row(row["sandbox_id"])
+        if sandbox is None:
+            return None
+        status = (await self.sandboxes.statuses()).get(sandbox["id"], "MISSING")
+        if status != "RUNNING":
+            return None
+        return self.sandboxes.agent_url(sandbox["id"]), sandbox["session_api_key"]
+
+    def set_llm_model(self, conv_id: str, model: str) -> None:
+        row = self.row(conv_id)
+        if row is None:
+            return
+        meta = json.loads(row["meta"])
+        meta["llm_model"] = model
+        self.db.run(
+            "UPDATE conversations SET meta = ?, updated_at = ? WHERE id = ?",
+            json.dumps(meta),
+            now(),
+            conv_id,
+        )
 
     # --- events (webhook sink) ----------------------------------------------
 
