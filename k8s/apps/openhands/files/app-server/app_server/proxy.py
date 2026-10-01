@@ -6,11 +6,12 @@ conversation_url it is given, so one route serves both.
 """
 
 import asyncio
+import contextlib
 import logging
 
 import httpx
 import websockets
-from fastapi import APIRouter, HTTPException, Request, WebSocket
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
@@ -156,7 +157,6 @@ async def proxy_ws(ws: WebSocket, sandbox_id: str, path: str):
         for t in tasks:
             t.cancel()
         await upstream.close()
-        try:
+        # The client may already be gone; there is nothing left to tell it.
+        with contextlib.suppress(RuntimeError, WebSocketDisconnect):
             await ws.close()
-        except RuntimeError:
-            pass  # already closed by the client

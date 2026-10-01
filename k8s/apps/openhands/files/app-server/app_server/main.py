@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import logging
 import os
-from collections.abc import AsyncIterator
+import re
 
 import httpx
 import uvicorn
@@ -17,6 +17,19 @@ from .sandboxes import SandboxManager, load_specs
 from .settings import Settings
 
 log = logging.getLogger("app_server")
+
+# Browsers authenticate the runtime WebSocket with ?session_api_key=, and both
+# uvicorn and httpx log request URLs.
+_SECRET_PARAM = re.compile(r"(session_api_key=)[^&\s\"']+")
+
+
+class RedactSecrets(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        redacted = _SECRET_PARAM.sub(r"\1<redacted>", message)
+        if redacted != message:
+            record.msg, record.args = redacted, None
+        return True
 
 
 class State:
@@ -122,6 +135,9 @@ def main() -> None:
         level=os.environ.get("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    # On the handler, so it covers every logger that propagates to root.
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(RedactSecrets())
     asyncio.run(serve())
 
 
