@@ -1,0 +1,85 @@
+{{- $root := . -}}
+{{- $fullName := include "openhands.fullname" . -}}
+{{- range $spec, $cfg := .Values.sandboxSpecs.specs }}
+---
+# What a spec is for. Ingress is the app server's runtime proxy only; egress is
+# the spec's declared class, plus the webhook port that carries its events
+# back.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ printf "%s-runtime-%s" $fullName $spec }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" $root | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "openhands.runtimeSelectorLabels" $root | nindent 6 }}
+      openhands.msng.to/sandbox-spec: {{ $spec }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "openhands.appServerSelectorLabels" $root | nindent 14 }}
+      ports:
+        - port: http
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "openhands.appServerSelectorLabels" $root | nindent 14 }}
+      ports:
+        - port: webhook
+          protocol: TCP
+    {{- if eq $cfg.egress "lan" }}
+    # The forge. Its name resolves to a MetalLB VIP, but traffic raised inside
+    # the cluster is DNAT'd to the ingress controller's pod before egress policy
+    # is evaluated — so the destination this rule has to name is Traefik, on
+    # its own websecure container port rather than the 443 the Service
+    # publishes. The ipBlock below stays for a genuine off-cluster LAN address.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $root.Values.traefikNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - port: websecure
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: {{ $root.Values.networkPolicy.lanCidr }}
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- end }}
+    {{- if ne $cfg.egress "none" }}
+    # The model API and the package registries. RFC1918 is excluded, so the
+    # rules above are the only routes to anything on this network.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- end }}
+{{- end }}

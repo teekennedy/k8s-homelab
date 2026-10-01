@@ -1,0 +1,16 @@
+{{- $root := . -}}
+{{- $fullName := include "openhands.fullname" . -}}
+{{- range $spec, $_ := .Values.sandboxSpecs.specs }}
+---
+# The identity a sandbox on this spec runs as. No permissions and no mounted
+# token: a spec that needs cluster access gets a Role here, deliberately and
+# visibly.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ printf "%s-runtime-%s" $fullName $spec }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" $root | nindent 4 }}
+automountServiceAccountToken: false
+{{- end }}

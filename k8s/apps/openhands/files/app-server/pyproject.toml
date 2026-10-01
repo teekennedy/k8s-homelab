@@ -1,0 +1,21 @@
+[project]
+name = "openhands-app-server"
+version = "0.1.0"
+description = "Self-hosted OpenHands cloud API: one agent-sandbox pod per conversation"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.120",
+    "httpx>=0.28",
+    "uvicorn[standard]>=0.38",
+    "websockets>=15",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = ["integration: needs a live cluster and agent-sandbox controller"]
+addopts = "-m 'not integration'"

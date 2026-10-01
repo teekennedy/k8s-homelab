@@ -256,6 +256,47 @@ These are long-lived Deployments rather than `Sandbox` resources. A `Sandbox`
 earns its keep when a pod is created and destroyed per unit of work; a backend
 that has to keep a stable DNS name for the browser to reach is a Deployment.
 
+## App server
+
+`files/app-server/` is a small FastAPI service, `openhands-app-server`, that
+runs one [agent-sandbox][agent-sandbox] `Sandbox` per sandbox id and serves the
+cloud API the frontend speaks in locked-cloud mode. The source is mounted from a
+ConfigMap into the `uv` image and its locked dependencies are installed at
+start, so there is no image of our own to build.
+
+[agent-sandbox]: https://github.com/kubernetes-sigs/agent-sandbox
+
+A sandbox is instantiated from one of `sandboxSpecs.specs`, which Helm renders
+into the `openhands-sandbox-specs` ConfigMap as complete `Sandbox` manifests.
+Per sandbox, the app server mints a session key and an encryption key into a
+`<id>-config` Secret that the `Sandbox` owns; the `Sandbox` in turn owns its
+pod, its headless Service and its workspace PVC, so deleting the `Sandbox` is
+the entire cleanup. Pause and resume flip `spec.operatingMode` between
+`Running` and `Suspended`, which deletes and recreates the pod while keeping the
+volume.
+
+| Path | Caller | Authenticated by |
+| --- | --- | --- |
+| `/api/v1/sandboxes`, `/api/v1/sandboxes/{id}/{pause,resume}` | browser, automation service | `X-Forwarded-User` from oauth2-proxy, or a minted bearer key |
+| `/api/service/users/{uid}/orgs/{oid}/api-keys` | automation service | `X-Service-API-Key` from `openhands-app-server-keys` |
+| `/runtime/{id}/**` | browser, automation service | as above, or that sandbox's own session key |
+| `:8081/sandboxes/{id}/{events,conversations}` | the sandbox's agent server | that sandbox's own session key |
+
+`/runtime/{id}` strips the prefix and proxies HTTP and WebSockets to the
+sandbox's agent server. It drops `Cookie`, `Authorization` and every
+`X-Forwarded-*` header first: an agent server runs code the agent controls, and
+the oauth2-proxy cookie must not reach it.
+
+What the app server may do in the cluster is in
+`templates/app-server-rbac.yaml`. The one grant worth reading twice is Secrets:
+`create` only. It cannot read the model or forge credentials — sandboxes get
+those by reference in the pod template — and it never reads back the keys it
+minted, because it keeps them in its own database.
+
+A reconciler compares the database to the cluster every minute: a managed
+`Sandbox` with no live row is deleted, and a row whose `Sandbox` has vanished
+reports `MISSING`.
+
 ## Automations
 
 Scheduled and event-driven runs live in the automation backend. They are rows in

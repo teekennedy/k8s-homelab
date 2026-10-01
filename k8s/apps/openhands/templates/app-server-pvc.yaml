@@ -1,0 +1,22 @@
+{{- $name := printf "%s-app-server" (include "openhands.fullname" .) -}}
+{{- $cfg := .Values.appServer -}}
+---
+# The app server's SQLite database. In the Longhorn backup group: it is the
+# only copy of what it holds.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+    {{- with $cfg.storage.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ $cfg.storage.storageClass }}
+  resources:
+    requests:
+      storage: {{ $cfg.storage.size }}

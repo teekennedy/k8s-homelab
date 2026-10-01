@@ -177,6 +177,9 @@ networkPolicy:
   # MetalLB VIP pool (.100-.119) that git.msng.to resolves into; /27 at .96 is
   # the smallest CIDR-aligned block covering the full pool.
   lanCidr: "10.69.80.96/27"
+  # The node VLAN. The apiserver is host-networked on every node, so the app
+  # server reaches it by ipBlock on :6443 — a podSelector cannot match it.
+  nodeCidr: "10.69.80.0/25"
 
 nodeSelector: {}
 tolerations: []
@@ -237,6 +240,80 @@ sandboxProfiles:
   # Path prefix on the canvas hostname under which the profiles are served.
   basePath: /sandbox
   profiles:
+    # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
+    repo:
+      egress: lan
+      forgeCredentials: true
+      storage:
+        size: 20Gi
+        storageClass: longhorn
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+    # Anything whose input is not trusted. Reaches the model and nothing on the
+    # LAN — no forge token, no git credentials, no route to any homelab service.
+    isolated:
+      egress: internet
+      forgeCredentials: false
+      storage:
+        size: 10Gi
+        storageClass: longhorn
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+
+# --- App server -------------------------------------------------------------
+# Serves the cloud API the frontend speaks in locked-cloud mode, and runs one
+# Sandbox per conversation from the specs below. See README.md, "App server".
+appServer:
+  # The python-flavoured tag ships an interpreter, so a pod start only fetches
+  # the locked dependencies in files/app-server/uv.lock.
+  # renovate: datasource=docker depName=ghcr.io/astral-sh/uv
+  image: ghcr.io/astral-sh/uv:python3.13-alpine
+  port: 8080
+  # Sandbox webhooks only. A port of its own so the NetworkPolicy can admit
+  # sandbox pods to it and to nothing else on this server.
+  webhookPort: 8081
+  # Set by oauth2-proxy (pass_user_headers) on every request it forwards.
+  userHeader: X-Forwarded-User
+  # How often the reconciler compares rows to Sandboxes in the cluster.
+  reconcileIntervalSeconds: 60
+  # SQLite database: sandboxes, minted API keys, and from later phases the
+  # conversation history. The only copy, so it is backed up.
+  storage:
+    size: 5Gi
+    storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/backup: "enabled"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+# --- Sandbox specs ----------------------------------------------------------
+# Pod templates the app server instantiates, one Sandbox
+# (agents.x-k8s.io/v1beta1) per sandbox. Each spec gets its own ServiceAccount
+# and NetworkPolicy; the sandbox's own session key, encryption key and webhook
+# config are minted per sandbox into a Secret the Sandbox owns.
+sandboxSpecs:
+  # Used when a request names no spec.
+  default: repo
+  # Track the tag the canvas image is built from.
+  # renovate: datasource=docker depName=ghcr.io/openhands/agent-server
+  image: ghcr.io/openhands/agent-server:1.50.0-python
+  specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:
       egress: lan

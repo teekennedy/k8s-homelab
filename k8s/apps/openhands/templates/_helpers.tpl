@@ -83,3 +83,37 @@ edit in either place.
   path: {{ printf "%s/%s" (base (dir $path)) (base $path) }}
 {{- end }}
 {{- end }}
+
+{{/*
+Selector labels for the app server pod. See canvasSelectorLabels for why every
+workload needs a component of its own.
+*/}}
+{{- define "openhands.appServerSelectorLabels" -}}
+{{ include "openhands.selectorLabels" . }}
+app.kubernetes.io/component: app-server
+{{- end }}
+
+{{/*
+Labels on every sandbox pod the app server creates, whatever its spec. The
+per-spec NetworkPolicy adds openhands.msng.to/sandbox-spec to these.
+*/}}
+{{- define "openhands.runtimeSelectorLabels" -}}
+{{ include "openhands.selectorLabels" . }}
+app.kubernetes.io/component: runtime
+{{- end }}
+
+{{/*
+ConfigMap volume `items` for the app server's source, restoring the package
+directory that flat ConfigMap keys cannot express. Mirrors the key scheme in
+templates/app-server.yaml.
+*/}}
+{{- define "openhands.appServerSourceItems" -}}
+- key: pyproject.toml
+  path: pyproject.toml
+- key: uv.lock
+  path: uv.lock
+{{- range $path, $_ := .Files.Glob "files/app-server/app_server/*.py" }}
+- key: {{ printf "app_server.%s" (base $path) }}
+  path: {{ printf "app_server/%s" (base $path) }}
+{{- end }}
+{{- end }}

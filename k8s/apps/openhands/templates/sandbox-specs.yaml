@@ -1,0 +1,222 @@
+{{- $root := . -}}
+{{- $sp := .Values.sandboxSpecs -}}
+{{- $fullName := include "openhands.fullname" . -}}
+{{- if not (hasKey $sp.specs $sp.default) }}
+{{- fail (printf "sandboxSpecs.default %q is not one of sandboxSpecs.specs" $sp.default) }}
+{{- end }}
+---
+# One Sandbox manifest per spec, as JSON, for the app server to instantiate.
+# __SANDBOX_ID__ is replaced with the sandbox id at creation; the app server
+# also creates the "__SANDBOX_ID__-config" Secret these refer to, owned by the
+# Sandbox, holding that sandbox's session key, encryption key and agent server
+# config.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullName }}-sandbox-specs
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+data:
+  {{- range $spec, $cfg := $sp.specs }}
+  {{- if not (has $cfg.egress (list "none" "internet" "lan")) }}
+  {{- fail (printf "sandboxSpecs.specs.%s.egress must be one of none, internet, lan" $spec) }}
+  {{- end }}
+  {{- $manifest := include "openhands.sandboxManifest" (dict "root" $root "spec" $spec "cfg" $cfg) | fromYaml }}
+  {{ $spec }}.json: {{ $manifest | toJson | quote }}
+  {{- end }}
+
+{{- define "openhands.sandboxManifest" -}}
+{{- $root := .root -}}
+{{- $cfg := .cfg -}}
+{{- $sp := $root.Values.sandboxSpecs -}}
+{{- $fullName := include "openhands.fullname" $root -}}
+apiVersion: agents.x-k8s.io/v1beta1
+kind: Sandbox
+metadata:
+  namespace: {{ $root.Release.Namespace }}
+  # Deliberately not the chart's labels. ArgoCD tracks by
+  # app.kubernetes.io/instance, and a Sandbox has no owner, so carrying it would
+  # make every sandbox look like a resource missing from git — and prune it.
+  # The pod, Service, PVC and config Secret below it are owned, so they can.
+  labels:
+    app.kubernetes.io/name: {{ include "openhands.name" $root }}
+    app.kubernetes.io/component: runtime
+    openhands.msng.to/sandbox-spec: {{ .spec }}
+spec:
+  # A headless Service named after the Sandbox: the runtime proxy's target.
+  service: true
+  operatingMode: Running
+  podTemplate:
+    metadata:
+      labels:
+        {{- include "openhands.runtimeSelectorLabels" $root | nindent 8 }}
+        openhands.msng.to/sandbox-spec: {{ .spec }}
+    spec:
+      # An agent server that exits stays exited, and reports as ERROR.
+      restartPolicy: Never
+      serviceAccountName: {{ printf "%s-runtime-%s" $fullName .spec }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        # HOME lives on the sandbox volume so a paused sandbox resumes with
+        # the agent CLI's own state intact. Skills land in two directories
+        # for the reason given on the canvas's seed-skills container.
+        - name: seed-home
+          image: {{ $sp.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills" /workspace/project
+              for src in /opt/openhands-skills/*/; do
+                [ -d "$src" ] || continue
+                cp -rLf "$src" "$HOME/.agents/skills/"
+                cp -rLf "$src" "$HOME/.claude/skills/"
+              done
+          env:
+            - name: HOME
+              value: /workspace/home
+          securityContext:
+            {{- toYaml $root.Values.securityContext | nindent 12 }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: skills
+              mountPath: /opt/openhands-skills
+              readOnly: true
+      containers:
+        - name: agent-server
+          image: {{ $sp.image | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - --port
+            - {{ $root.Values.service.port | quote }}
+          env:
+            - name: HOME
+              value: /workspace/home
+            - name: OH_PERSISTENCE_DIR
+              value: /workspace/home/.openhands
+            # Webhooks, paths and the editor switch; structural, so a file
+            # rather than indexed OH_* variables.
+            - name: OPENHANDS_AGENT_SERVER_CONFIG_PATH
+              value: /etc/openhands-sandbox/config.json
+            - name: OH_SESSION_API_KEYS_0
+              valueFrom:
+                secretKeyRef:
+                  name: __SANDBOX_ID__-config
+                  key: session-api-key
+            - name: OH_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: __SANDBOX_ID__-config
+                  key: secret-key
+            {{- if $root.Values.app.telemetryDisabled }}
+            - name: DO_NOT_TRACK
+              value: "1"
+            {{- end }}
+            {{- if $cfg.forgeCredentials }}
+            - name: GIT_CONFIG_GLOBAL
+              value: {{ $root.Values.forge.gitConfigPath | quote }}
+            - name: FORGEJO_URL
+              value: {{ $root.Values.forge.url | quote }}
+            - name: FORGEJO_OWNER
+              value: {{ $root.Values.forge.owner | quote }}
+            - name: FORGEJO_REPO
+              value: {{ $root.Values.forge.repo | quote }}
+            - name: FORGEJO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.forge.secretName }}
+                  key: username
+            - name: FORGEJO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.forge.secretName }}
+                  key: token
+            - name: WOODPECKER_URL
+              value: {{ $root.Values.ci.url | quote }}
+            - name: WOODPECKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.ci.secretName }}
+                  key: token
+                  optional: true
+            {{- end }}
+          # The model credential, by reference: the app server never reads it.
+          envFrom:
+            - secretRef:
+                name: {{ $root.Values.anthropic.secretName }}
+                optional: true
+          ports:
+            - name: http
+              containerPort: {{ $root.Values.service.port }}
+              protocol: TCP
+          # Ready is what the Sandbox's Ready condition, and so RUNNING, means.
+          # No liveness probe: with restartPolicy Never a failed one would
+          # end the sandbox rather than restart it.
+          readinessProbe:
+            httpGet:
+              path: /alive
+              port: http
+            periodSeconds: 3
+          securityContext:
+            {{- toYaml $root.Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml $cfg.resources | nindent 12 }}
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: sandbox-config
+              mountPath: /etc/openhands-sandbox
+              readOnly: true
+            {{- if $cfg.forgeCredentials }}
+            - name: gitconfig
+              mountPath: {{ $root.Values.forge.gitConfigPath }}
+              subPath: gitconfig
+              readOnly: true
+            {{- end }}
+      volumes:
+        # Only the config file: the keys beside it are already env vars.
+        - name: sandbox-config
+          secret:
+            secretName: __SANDBOX_ID__-config
+            defaultMode: 0440
+            items:
+              - key: config.json
+                path: config.json
+        - name: skills
+          configMap:
+            name: {{ $fullName }}-skills
+            defaultMode: 0444
+            items:
+              {{- include "openhands.skillVolumeItems" $root | nindent 14 }}
+        {{- if $cfg.forgeCredentials }}
+        - name: gitconfig
+          configMap:
+            name: {{ $fullName }}-gitconfig
+            defaultMode: 0444
+        {{- end }}
+  # Owned by the Sandbox, so deleting it deletes the checkout too.
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: {{ $cfg.storage.storageClass }}
+        resources:
+          requests:
+            storage: {{ $cfg.storage.size }}
+{{- end }}

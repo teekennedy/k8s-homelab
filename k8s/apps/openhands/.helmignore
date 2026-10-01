@@ -15,3 +15,9 @@ files/metrics/.venv
 files/metrics/__pycache__
 files/metrics/tests/__pycache__
 files/metrics/.pytest_cache
+# Local test scaffolding for files/app-server; only the package, pyproject.toml
+# and uv.lock are templated into the ConfigMap.
+files/app-server/.venv
+files/app-server/app_server/__pycache__
+files/app-server/.pytest_cache
+files/app-server/tests
