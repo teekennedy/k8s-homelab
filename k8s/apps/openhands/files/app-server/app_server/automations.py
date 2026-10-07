@@ -8,10 +8,13 @@ does not have, so each automation here is a *custom* one
 whose entry point asks this server to start the conversation.
 
 Definitions come from a file (values.yaml `automations`) and are pushed to the
-automation service. An automation is ours if it runs our tarball; anything
-else in that service is left alone.
+automation service, along with the tarball: the service takes one from its own
+upload store or from a public https URL, and this server is neither public nor
+https. An automation is ours if it runs one of our uploads; anything else in
+that service is left alone.
 """
 
+import hashlib
 import io
 import json
 import logging
@@ -28,6 +31,8 @@ log = logging.getLogger(__name__)
 ENTRYPOINT = "python3 run.py"
 RUN_SCRIPT = Path(__file__).with_name("automation_run.py")
 PAGE = 100
+# Uploads are named for their content, so a new run script is a new upload.
+UPLOAD_PREFIX = "openhands-app-server-run-"
 
 
 def build_tarball(files: dict[str, bytes]) -> bytes:
@@ -52,9 +57,6 @@ class Automations:
         self.file = settings.automations_file
         self.api = f"{settings.automation_url}/api/automation/v1"
         self.headers = {"X-Session-API-Key": settings.automation_api_key}
-        # Fetched from inside the sandbox, which reaches this server on the
-        # webhook port only.
-        self.tarball_url = f"{settings.webhook_url}/automation/run.tar.gz"
         self.tarball = build_tarball(
             {
                 "run.py": RUN_SCRIPT.read_bytes(),
@@ -66,6 +68,8 @@ class Automations:
                 ).encode(),
             }
         )
+        digest = hashlib.sha256(self.tarball).hexdigest()[:16]
+        self.upload_name = f"{UPLOAD_PREFIX}{digest}"
 
     def definitions(self) -> dict[str, dict[str, Any]]:
         return json.loads(self.file.read_text()) or {}
@@ -91,29 +95,54 @@ class Automations:
         return "\n\n".join(parts)
 
     async def _call(self, method: str, path: str = "", **kw: Any) -> Any:
-        resp = await self.http.request(
-            method, f"{self.api}{path}", headers=self.headers, timeout=30, **kw
-        )
-        resp.raise_for_status()
+        kw.setdefault("headers", self.headers)
+        resp = await self.http.request(method, f"{self.api}{path}", timeout=30, **kw)
+        if resp.status_code >= 400:
+            # The service says which field it objected to in the body.
+            raise RuntimeError(
+                f"{method} {path or '/'} -> {resp.status_code}: {resp.text[:300]}"
+            )
         return resp.json() if resp.content else None
 
-    async def _ours(self) -> list[dict[str, Any]]:
+    async def _all(self, path: str, key: str, **params: Any) -> list[dict[str, Any]]:
         found: list[dict[str, Any]] = []
-        offset = 0
         while True:
-            page = await self._call("GET", params={"limit": PAGE, "offset": offset})
-            found += page["automations"]
-            offset += PAGE
-            if offset >= page["total"]:
-                break
-        return [a for a in found if a["tarball_path"] == self.tarball_url]
+            page = await self._call(
+                "GET", path, params={**params, "limit": PAGE, "offset": len(found)}
+            )
+            found += page[key]
+            if not page[key] or len(found) >= page["total"]:
+                return found
+
+    async def _upload(self) -> str:
+        """Put this server's tarball in the service's store; its tarball_path."""
+        created = await self._call(
+            "POST",
+            "/uploads",
+            params={"name": self.upload_name},
+            content=self.tarball,
+            headers={**self.headers, "Content-Type": "application/gzip"},
+        )
+        log.info("uploaded automation tarball %s", self.upload_name)
+        return created["tarball_path"]
 
     async def sync(self) -> None:
         """Make the automation service's copy of our automations match the
         definitions: create the missing, update the changed, delete the rest."""
         wanted = self.definitions()
+        uploads = {
+            u["tarball_path"]: u
+            for u in await self._all("/uploads", "uploads", status="COMPLETED")
+            if u["name"].startswith(UPLOAD_PREFIX)
+        }
+        current = (
+            next((p for p, u in uploads.items() if u["name"] == self.upload_name), None)
+            or await self._upload()
+        )
         seen: set[str] = set()
-        for have in await self._ours():
+        for have in await self._all("", "automations"):
+            if have["tarball_path"] != current and have["tarball_path"] not in uploads:
+                continue
             name = have["name"]
             if name not in wanted or name in seen:
                 await self._call("DELETE", f"/{have['id']}")
@@ -122,6 +151,8 @@ class Automations:
             seen.add(name)
             want = wanted[name]
             patch: dict[str, Any] = {}
+            if have["tarball_path"] != current:
+                patch["tarball_path"] = current
             if not _covers(have["trigger"], want["trigger"]):
                 patch["trigger"] = want["trigger"]
             if want.get("timeout") and have["timeout"] != want["timeout"]:
@@ -138,7 +169,7 @@ class Automations:
             body = {
                 "name": name,
                 "trigger": want["trigger"],
-                "tarball_path": self.tarball_url,
+                "tarball_path": current,
                 "entrypoint": ENTRYPOINT,
             }
             if want.get("timeout"):
@@ -147,3 +178,6 @@ class Automations:
             if want.get("enabled") is False:
                 await self._call("PATCH", f"/{created['id']}", json={"enabled": False})
             log.info("automation %s created", name)
+        for path, upload in uploads.items():
+            if path != current:
+                await self._call("DELETE", f"/uploads/{upload['id']}")

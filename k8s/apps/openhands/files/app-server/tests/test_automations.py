@@ -7,7 +7,7 @@ import pytest
 
 from tests.test_conversations import CONV_ID, FakeAgentServer
 
-TARBALL_URL = "http://app-server:8081/automation/run.tar.gz"
+TARBALL_URL = "oh-internal://uploads/00000000-0000-4000-8000-00000000000a"
 NIGHTLY = {
     "trigger": {"type": "cron", "schedule": "0 6 * * *"},
     "prompt": "Triage open issues.\n",
@@ -22,6 +22,7 @@ class FakeAutomationService:
         self.rows: dict[str, dict] = {}
         self.calls: list[httpx.Request] = []
         self.made = 0
+        self.uploads: dict[str, dict] = {}
 
     def add(self, name: str, **fields) -> dict:
         row = {
@@ -41,6 +42,8 @@ class FakeAutomationService:
         self.calls.append(request)
         assert request.headers["X-Session-API-Key"] == "automation-key"
         tail = request.url.path.removeprefix("/api/automation/v1").strip("/")
+        if tail.startswith("uploads"):
+            return self.upload(request, tail.removeprefix("uploads").strip("/"))
         body = json.loads(request.content) if request.content else None
         if request.method == "GET":
             rows = list(self.rows.values())
@@ -54,6 +57,23 @@ class FakeAutomationService:
             return httpx.Response(200, json=self.rows[tail])
         del self.rows[tail]
         return httpx.Response(204)
+
+    def upload(self, request: httpx.Request, upload_id: str) -> httpx.Response:
+        if request.method == "GET":
+            rows = list(self.uploads.values())
+            return httpx.Response(200, json={"uploads": rows, "total": len(rows)})
+        if request.method == "DELETE":
+            del self.uploads[upload_id]
+            return httpx.Response(204)
+        assert request.headers["Content-Type"] == "application/gzip"
+        return httpx.Response(
+            201, json=self.add_upload(request.url.params["name"], TARBALL_URL)
+        )
+
+    def add_upload(self, name: str, path: str) -> dict:
+        row = {"id": f"up-{len(self.uploads)}", "name": name, "tarball_path": path}
+        self.uploads[row["id"]] = row
+        return row
 
     def writes(self) -> list[str]:
         return [r.method for r in self.calls if r.method != "GET"]
@@ -77,15 +97,25 @@ def _define(state, **definitions) -> None:
 @pytest.mark.anyio
 async def test_sync_creates_updates_and_deletes_only_its_own(state, service):
     foreign = service.add("made in the UI", tarball_path="oh-internal://uploads/x")
-    stale = service.add("removed from values")
+    old = service.add_upload("openhands-app-server-run-old", "oh-internal://old")
+    stale = service.add("removed from values", tarball_path=old["tarball_path"])
+    kept = service.add("nightly", tarball_path=old["tarball_path"])
     _define(state, nightly=NIGHTLY)
 
+    await state.automations.sync()
+    # A new run script is a new upload; ours move to it, the old one goes.
+    assert [u["name"] for u in service.uploads.values()] == [
+        state.automations.upload_name
+    ]
+    assert kept["tarball_path"] == TARBALL_URL
+    assert stale["id"] not in service.rows and foreign["id"] in service.rows
+
+    del service.rows[kept["id"]]
     await state.automations.sync()
     created = next(r for r in service.rows.values() if r["name"] == "nightly")
     assert created["entrypoint"] == "python3 run.py"
     assert created["tarball_path"] == TARBALL_URL
     assert created["trigger"] == NIGHTLY["trigger"] and created["timeout"] == 900
-    assert stale["id"] not in service.rows and foreign["id"] in service.rows
 
     # The service's defaults (timezone) are not a difference.
     created["trigger"]["timezone"] = "UTC"
@@ -108,16 +138,15 @@ async def test_sync_creates_updates_and_deletes_only_its_own(state, service):
 
 @pytest.mark.anyio
 async def test_sync_leaves_a_disabled_automation_disabled(state, service):
+    service.add_upload(state.automations.upload_name, TARBALL_URL)
     service.add("nightly", enabled=False)
     _define(state, nightly=NIGHTLY)
     await state.automations.sync()
     assert service.writes() == []
 
 
-def test_tarball_is_served_to_sandboxes_and_runs_standalone(hooks):
-    r = hooks.get("/automation/run.tar.gz")
-    assert r.status_code == 200
-    with tarfile.open(fileobj=io.BytesIO(r.content)) as tar:
+def test_tarball_runs_standalone(state):
+    with tarfile.open(fileobj=io.BytesIO(state.automations.tarball)) as tar:
         assert sorted(tar.getnames()) == ["run.json", "run.py"]
         config = json.load(tar.extractfile("run.json"))
         script = tar.extractfile("run.py").read().decode()

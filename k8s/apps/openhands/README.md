@@ -361,8 +361,9 @@ session key of its own — and leaves nothing behind but its transcript.
 
 What runs in that sandbox is ours. The automation service's own run scripts
 build an agent from an LLM API key, and the only model credential here is the
-Claude Code login, so every automation is a *custom* one pointing at the same
-small tarball the app server serves (`app_server/automation_run.py`). Its entry
+Claude Code login, so every automation is a *custom* one running the same
+small tarball (`app_server/automation_run.py`), which the app server uploads to
+the automation service's own store. Its entry
 point asks the app server to start the run's conversation, which is therefore
 the same ACP agent, with the same credentials and secrets, as one started from
 the UI — and is listed beside them, titled with the automation's name. It then
@@ -371,7 +372,7 @@ waits for the conversation to stop and reports the outcome.
 ```
   automation service ──► app server: POST /api/v1/sandboxes        (a sandbox for the run)
           │
-          └─► sandbox: fetch run.tar.gz from the app server, run `python3 run.py`
+          └─► sandbox: unpack the uploaded tarball, run `python3 run.py`
                  │
                  ├─► app server :8081  …/automation/conversations   (start; prompt from values)
                  ├─► own agent server  poll until the conversation stops
@@ -382,7 +383,8 @@ waits for the conversation to stop and reports the outcome.
 The app server pushes the definitions to the automation service once a minute:
 it creates what is missing, updates a changed trigger or timeout, and deletes
 an automation that was removed from `values.yaml`. It recognises its own by the
-tarball they run and leaves any other automation alone.
+tarball they run and leaves any other automation alone; a new version of the
+run script is a new upload, and the automations are moved onto it.
 
 - **Automations created in the UI do not work.** The "new automation" form
   creates the upstream kind, which fails for want of an LLM API key.

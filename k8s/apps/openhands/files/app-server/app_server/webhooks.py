@@ -8,8 +8,8 @@ Wire format: openhands-agent-server `conversation_service.py`,
 WebhookSubscriber and ConversationWebhookSubscriber.
 
 It is also the only port a sandbox can reach, so it is where an automation
-run's entry point (`automation_run.py`) fetches itself, asks for its
-conversation and reports the outcome.
+run's entry point (`automation_run.py`) asks for its conversation and reports
+the outcome.
 """
 
 import logging
@@ -59,14 +59,6 @@ async def conversations(
     if sink is not None:
         await sink.conversation(sandbox_id, body)
     return {"success": True}
-
-
-@router.get("/automation/run.tar.gz")
-async def automation_tarball(request: Request) -> Response:
-    """What every automation defined here runs. Nothing in it is secret."""
-    return Response(
-        request.app.state.automations.tarball, media_type="application/gzip"
-    )
 
 
 @router.post("/sandboxes/{sandbox_id}/automation/conversations")
