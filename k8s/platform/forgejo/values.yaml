@@ -374,3 +374,17 @@ forgejo-resources:
           secretName: archon-webhook
           secretNamespace: archon
           secretKey: webhook-secret
+        # OpenHands automations (k8s/apps/openhands, "Event triggers"). The
+        # path ends in the automation service's organization id and the event
+        # source's name. `gitea`-typed: the source verifies X-Gitea-Signature.
+        #
+        # Comments only, because the source keys events on the payload's
+        # `action` alone, which cannot tell one event type from another.
+        - url: https://openhands.msng.to/api/automation/v1/events/00000000-0000-4000-8000-000000000001/forgejo
+          type: gitea
+          events:
+            - issue_comment
+            - pull_request_comment
+          secretName: openhands-forge-webhook
+          secretNamespace: openhands
+          secretKey: webhook-secret

@@ -57,6 +57,8 @@ class Automations:
         self.file = settings.automations_file
         self.api = f"{settings.automation_url}/api/automation/v1"
         self.headers = {"X-Session-API-Key": settings.automation_api_key}
+        self.source = settings.forge_webhook_source
+        self.secret_file = settings.forge_webhook_secret_file
         self.tarball = build_tarball(
             {
                 "run.py": RUN_SCRIPT.read_bytes(),
@@ -126,9 +128,51 @@ class Automations:
         log.info("uploaded automation tarball %s", self.upload_name)
         return created["tarball_path"]
 
+    async def _sync_source(self) -> None:
+        """Register the forge as an event source (`automation/webhook_router.py`),
+        verified with the secret the forge's own webhook signs with.
+
+        The service never gives a secret back, so the source's name carries a
+        digest of it, and a rotated secret is a delete and a recreate."""
+        if not self.source or not self.secret_file.exists():
+            return
+        secret = self.secret_file.read_text().strip()
+        if not secret:
+            # The forge has not been given its webhook yet.
+            return
+        name = f"{self.source} ({hashlib.sha256(secret.encode()).hexdigest()[:12]})"
+        have = next(
+            (
+                w
+                for w in await self._all("/webhooks", "webhooks")
+                if w["source"] == self.source
+            ),
+            None,
+        )
+        if have and have["name"] == name:
+            return
+        if have:
+            await self._call("DELETE", f"/webhooks/{have['id']}")
+        await self._call(
+            "POST",
+            "/webhooks",
+            json={
+                "name": name,
+                "source": self.source,
+                # Forgejo's `gitea` payload format: a hex HMAC-SHA256 of the
+                # body in X-Gitea-Signature, and the event's action in `action`.
+                "signature_header": "X-Gitea-Signature",
+                "signature_scheme": "hmac_sha256_hex",
+                "event_key_expr": "action",
+                "webhook_secret": secret,
+            },
+        )
+        log.info("event source %s registered", self.source)
+
     async def sync(self) -> None:
         """Make the automation service's copy of our automations match the
         definitions: create the missing, update the changed, delete the rest."""
+        await self._sync_source()
         wanted = self.definitions()
         uploads = {
             u["tarball_path"]: u

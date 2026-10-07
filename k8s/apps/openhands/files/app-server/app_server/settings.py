@@ -45,6 +45,10 @@ class Settings:
     automation_api_key: str
     # Automation definitions, from values.yaml.
     automations_file: Path
+    # The forge as an event source for automations: the source's name, empty
+    # for none, and the file holding the secret the forge signs deliveries with.
+    forge_webhook_source: str
+    forge_webhook_secret_file: Path
     # How long a new conversation may wait for its sandbox to be RUNNING.
     start_timeout: float
     # Encrypts the conversation secrets store at rest.
@@ -71,6 +75,8 @@ class Settings:
             automation_url=_env("AUTOMATION_URL").rstrip("/"),
             automation_api_key=_env("AUTOMATION_API_KEY"),
             automations_file=Path(_env("AUTOMATIONS_FILE")),
+            forge_webhook_source=os.environ.get("FORGE_WEBHOOK_SOURCE", ""),
+            forge_webhook_secret_file=Path(_env("FORGE_WEBHOOK_FILE")),
             start_timeout=float(_env("START_TIMEOUT_SECONDS")),
             secrets_key=_env("SECRETS_KEY"),
         )

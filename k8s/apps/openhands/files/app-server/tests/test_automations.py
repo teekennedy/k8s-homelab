@@ -23,6 +23,7 @@ class FakeAutomationService:
         self.calls: list[httpx.Request] = []
         self.made = 0
         self.uploads: dict[str, dict] = {}
+        self.sources: list[dict] = []
 
     def add(self, name: str, **fields) -> dict:
         row = {
@@ -42,6 +43,8 @@ class FakeAutomationService:
         self.calls.append(request)
         assert request.headers["X-Session-API-Key"] == "automation-key"
         tail = request.url.path.removeprefix("/api/automation/v1").strip("/")
+        if tail.startswith("webhooks"):
+            return self.webhook(request, tail.removeprefix("webhooks").strip("/"))
         if tail.startswith("uploads"):
             return self.upload(request, tail.removeprefix("uploads").strip("/"))
         body = json.loads(request.content) if request.content else None
@@ -57,6 +60,18 @@ class FakeAutomationService:
             return httpx.Response(200, json=self.rows[tail])
         del self.rows[tail]
         return httpx.Response(204)
+
+    def webhook(self, request: httpx.Request, webhook_id: str) -> httpx.Response:
+        if request.method == "GET":
+            return httpx.Response(
+                200, json={"webhooks": self.sources, "total": len(self.sources)}
+            )
+        if request.method == "DELETE":
+            self.sources = [s for s in self.sources if s["id"] != webhook_id]
+            return httpx.Response(204)
+        self.made += 1
+        self.sources.append({"id": f"wh-{self.made}", **json.loads(request.content)})
+        return httpx.Response(201, json=self.sources[-1])
 
     def upload(self, request: httpx.Request, upload_id: str) -> httpx.Response:
         if request.method == "GET":
@@ -251,3 +266,26 @@ def test_run_script_waits_for_the_conversation_to_stop(monkeypatch):
     clock = iter(range(0, 10_000, 100))
     monkeypatch.setattr(automation_run.time, "monotonic", lambda: next(clock))
     assert outcome(*["idle"] * 5).startswith("conversation never started")
+
+
+@pytest.mark.anyio
+async def test_forge_is_registered_as_an_event_source_once_it_has_a_secret(
+    state, service
+):
+    await state.automations.sync()
+    assert service.sources == []
+
+    state.settings.forge_webhook_secret_file.write_text("first-secret\n")
+    await state.automations.sync()
+    await state.automations.sync()
+    (source,) = service.sources
+    assert source["source"] == "forgejo" and source["webhook_secret"] == "first-secret"
+    assert source["signature_header"] == "X-Gitea-Signature"
+    assert "first-secret" not in source["name"]
+
+    state.settings.forge_webhook_secret_file.write_text("rotated-secret")
+    await state.automations.sync()
+    (rotated,) = service.sources
+    assert (
+        rotated["webhook_secret"] == "rotated-secret" and rotated["id"] != source["id"]
+    )

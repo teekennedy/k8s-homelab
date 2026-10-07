@@ -152,6 +152,8 @@ def settings(tmp_path) -> Settings:
         automation_url="http://canvas:18001",
         automation_api_key="automation-key",
         automations_file=automations,
+        forge_webhook_source="forgejo",
+        forge_webhook_secret_file=tmp_path / "webhook-secret",
         start_timeout=5,
         secrets_key="test-secrets-key",
     )

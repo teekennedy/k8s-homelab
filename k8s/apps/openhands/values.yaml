@@ -60,6 +60,13 @@ forge:
   # `openhands` entry under forgejo-resources.users there). Keys: username,
   # password, token.
   secretName: openhands-forgejo-user
+  # The forge as an event source for automations (README.md, "Event
+  # triggers"). `source` is what an automation's trigger names; empty turns it
+  # off. The Secret is filled by the forgejo-resources Job, which registers
+  # the webhook that signs with it; key: webhook-secret.
+  webhook:
+    source: forgejo
+    secretName: openhands-forge-webhook
   # Where the credential helper in templates/configmap-gitconfig.yaml is
   # mounted. GIT_CONFIG_GLOBAL points every git invocation in the pod at it.
   gitConfigPath: /etc/openhands/gitconfig
@@ -392,6 +399,24 @@ sandboxSpecs:
 automations:
   # Exists to be dispatched by hand when checking that runs still work; the
   # schedule is once a year so that it costs nothing left alone.
+  # A comment that mentions the agent, on an issue or a pull request. The
+  # agent's own comments are excluded, or it would answer itself.
+  forge-mention:
+    trigger:
+      type: event
+      source: forgejo
+      "on": created
+      filter: "icontains(comment.body, '@openhands') && sender.login != 'openhands'"
+    prompt: |
+      Someone mentioned you in a comment on the forge. The event payload below
+      has the comment, and the issue or pull request it was made on.
+
+      Read the whole thread through the Forgejo API before acting, then do what
+      the comment asks. If it asks for a code change, make it on a branch and
+      open or update a pull request, following the forgejo-iterate skill.
+      Finish by replying on the same thread with what you did, or with what
+      stopped you. Do not mention yourself in the reply.
+    timeout: 1800
   smoke:
     trigger: {type: cron, schedule: "0 0 1 1 *"}
     prompt: |

@@ -398,33 +398,27 @@ run script is a new upload, and the automations are moved onto it.
 
 ### Event triggers
 
-Cron triggers work out of the box. Event triggers need a webhook source
-registered first, because the deployment ships no built-in forge providers:
-`GET /api/automation/v1/capabilities` reports `triggerKinds: ["cron"]` until one
-exists.
+An event trigger names a webhook *source* registered in the automation
+service. The forge is one, set up without anyone handling a secret:
 
-To wire up Forgejo, then use `trigger: {type: event, source: forgejo, on: <key>}`:
+1. This chart ships an empty Secret, `openhands-forge-webhook`.
+2. The `forgejo-resources` Job (`k8s/platform/forgejo`, the
+   `repositories[].webhooks` entry for this URL) generates the shared secret
+   into it and registers a `gitea`-typed webhook on `ops/k8s-homelab` that
+   delivers to
+   `/api/automation/v1/events/<organization id>/forgejo`.
+3. The app server reads the Secret and registers the source `forgejo` with the
+   same secret: hex HMAC-SHA256 of the raw body in `X-Gitea-Signature`, which
+   is exactly what that webhook type sends. A rotated secret is picked up on
+   the next sync.
 
-1. Register a custom webhook source in the automation service — **Automations →
-   Webhooks** in the UI, or `POST /api/automation/v1/webhooks`:
-
-   | Field | Value |
-   | --- | --- |
-   | `source` | `forgejo` |
-   | `signature_header` | `X-Gitea-Signature` |
-   | `signature_scheme` | `hmac_sha256_hex` |
-   | `event_key_expr` | `action` |
-
-   Forgejo signs the raw body with hex HMAC-SHA256 under that header, which is
-   exactly what `hmac_sha256_hex` verifies. The response carries the generated
-   secret and the delivery URL **once**.
-
-2. Add a webhook on `ops/k8s-homelab` in Forgejo pointing at that URL, type
-   `gitea`, with that secret, restricted to the events you want to act on.
-
-3. `event_key_expr: action` means the event key is the payload's `action`
-   (`created`, `opened`, `closed`), so restrict the Forgejo webhook to one event
-   type rather than relying on the key to tell them apart.
+An automation then triggers on it with
+`trigger: {type: event, source: forgejo, on: <key>, filter: <JMESPath>}`.
+The event key is the payload's `action` (`created`, `opened`, `closed`) and
+nothing else, so it cannot tell a comment from an issue: the webhook is
+subscribed to comment events only, and anything finer goes in `filter`, which
+is evaluated against the whole payload. `forge-mention` in `values.yaml` is
+the working example.
 
 `oauth2-proxy` already skips authentication for `POST` on the event path — a
 webhook carries no Authelia session. The HMAC is what authenticates a delivery;
@@ -432,10 +426,11 @@ the path answers 404 for a source nobody has registered.
 
 > A comment-triggered automation on a **public** repo means anyone with a
 > Forgejo account can start a run. The HMAC proves the delivery came from
-> Forgejo, not that the commenter is allowed to spend model budget. There is no
-> author filter on a Forgejo webhook and no allowlist in the automation service,
-> so the only place to enforce one is the automation's own prompt — which is a
-> soft control. Prefer a schedule, or an event the bot account alone can raise.
+> Forgejo, not that the commenter is allowed to spend model budget. A Forgejo
+> webhook cannot filter on author, so the place to enforce one is the trigger's
+> `filter` (`sender.login == '…'`); `forge-mention` only excludes the agent's
+> own account, which is enough while the forge requires sign-in and every
+> account on it is trusted.
 
 ## Metrics
 
