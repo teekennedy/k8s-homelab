@@ -1,0 +1,30 @@
+# Longhorn 1.12 renders its own restrictive NetworkPolicy for longhorn-manager
+# (networkPolicies.restrictInternalTraffic, on by default), which only admits
+# Longhorn's own components on TCP/9500 -- the port the longhorn-backend
+# ServiceMonitor scrapes for metrics. That policy isn't ours to edit (it comes
+# from the charts.longhorn.io dependency, not this chart's templates), so this
+# is an additive allow rule rather than a replacement: NetworkPolicies for the
+# same pods are OR'd together, so this opens the one port Prometheus needs
+# without touching Longhorn's own lockdown.
+#
+# See https://longhorn.io/docs/1.12.1/monitoring/prometheus-and-grafana-setup/
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-to-longhorn-manager
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: longhorn-manager
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring-system
+      ports:
+        - protocol: TCP
+          port: 9500

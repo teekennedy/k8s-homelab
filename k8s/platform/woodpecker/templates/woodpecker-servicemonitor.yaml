@@ -12,7 +12,12 @@ spec:
       app.kubernetes.io/name: server
   endpoints:
     - port: http
-      path: /api/metrics/prometheus
+      # Woodpecker 3.18 serves Prometheus metrics at /metrics, not
+      # /api/metrics/prometheus (server/api/metrics/prometheus.go's route is
+      # gone); the old path 404s through to the SPA's catch-all handler,
+      # which answers 200 text/html and makes Prometheus mark the target down
+      # with "unsupported Content-Type".
+      path: /metrics
       interval: 30s
       authorization:
         credentials:
