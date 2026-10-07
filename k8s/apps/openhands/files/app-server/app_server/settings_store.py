@@ -222,7 +222,28 @@ class SettingsStore:
             "agent_settings_applied": False,
         }
 
+    def ensure_profiles(self, names: list[str]) -> None:
+        """Make sure a profile of each name exists, copied from the seeded one.
+        Run at every start, so a profile deleted in the UI comes back."""
+        seeded = self._seed.get("agent_profile")
+        if not seeded:
+            return
+        doc = self._profiles()
+        missing = [n for n in names if n not in doc["profiles"]]
+        for name in missing:
+            doc["profiles"][name] = self._new_profile(name, seeded, None)
+        if missing:
+            self._put(PROFILES_KEY, doc)
+
     # --- launch -------------------------------------------------------------
+
+    def profile_name(self, profile_id: str | None) -> str | None:
+        """Name of the named (or active) profile, if it exists."""
+        doc = self._profiles()
+        wanted = profile_id or doc["active"]
+        return next(
+            (p["name"] for p in doc["profiles"].values() if p["id"] == wanted), None
+        )
 
     def resolve_agent(self, profile_id: str | None) -> dict[str, Any]:
         """agent_settings for a new conversation: the stored settings, with

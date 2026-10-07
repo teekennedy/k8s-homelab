@@ -111,6 +111,47 @@ def test_named_profile_overrides_the_active_one(api, user, agent):
     assert agent.body()["agent_settings"]["acp_model"] == "sonnet"
 
 
+def _profile_id(api, user, name: str) -> str:
+    profiles = api.get("/api/agent-profiles", headers=user).json()["profiles"]
+    return next(p["id"] for p in profiles if p["name"] == name)
+
+
+def _spec_of(kube, task: dict) -> str:
+    labels = kube.sandbox(task["sandbox_id"])["metadata"]["labels"]
+    return labels["openhands.msng.to/sandbox-spec"]
+
+
+@pytest.mark.parametrize(
+    "profile, spec",
+    [
+        ("default", "repo"),
+        ("isolated", "isolated"),
+        ("isolated-sonnet", "isolated"),
+        # Not a spec name followed by a dash, so not that spec.
+        ("isolatedish", "repo"),
+    ],
+)
+def test_the_agent_profile_chooses_the_sandbox_spec(
+    api, user, kube, agent, profile, spec
+):
+    api.post(
+        f"/api/agent-profiles/{profile}",
+        headers=user,
+        json={"agent_kind": "acp", "acp_server": "claude-code"},
+    )
+    task = _start(api, user, agent_profile_id=_profile_id(api, user, profile))
+    assert task["status"] == "READY", task["detail"]
+    assert _spec_of(kube, task) == spec
+
+
+def test_no_profile_means_the_active_profiles_spec(api, user, kube, agent):
+    api.post(
+        f"/api/agent-profiles/{_profile_id(api, user, 'isolated')}/activate",
+        headers=user,
+    )
+    assert _spec_of(kube, _start(api, user)) == "isolated"
+
+
 def test_refused_start_reports_error_and_removes_the_sandbox(api, user, kube, agent):
     agent.status = 422
     task = _start(api, user)

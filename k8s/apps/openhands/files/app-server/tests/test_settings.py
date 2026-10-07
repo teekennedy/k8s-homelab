@@ -60,7 +60,9 @@ def test_schemas_come_from_the_dumped_files(api, user):
 
 def test_agent_profiles_lifecycle(api, user):
     listing = api.get("/api/agent-profiles", headers=user).json()
-    (default,) = listing["profiles"]
+    # The seeded profile, and one for the spec that is not the default.
+    default, isolated = listing["profiles"]
+    assert isolated["name"] == "isolated"
     assert default["name"] == "default" and default["agent_kind"] == "acp"
     assert listing["active_agent_profile_id"] == default["id"]
     # Seeded once: the id is stable across reads.
@@ -104,7 +106,7 @@ def test_agent_profiles_lifecycle(api, user):
     api.delete("/api/agent-profiles/o2", headers=user)
     listing = api.get("/api/agent-profiles", headers=user).json()
     assert listing["active_agent_profile_id"] is None
-    assert [p["name"] for p in listing["profiles"]] == ["default"]
+    assert [p["name"] for p in listing["profiles"]] == ["default", "isolated"]
 
 
 def test_account_stubs(api, user):

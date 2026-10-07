@@ -62,6 +62,11 @@ class State:
         # Streams can stay open for a whole agent turn.
         self.http = httpx.AsyncClient(timeout=httpx.Timeout(30, read=None))
         self.settings_store = SettingsStore(db, settings.settings_seed_file)
+        # The profile picker is how a conversation chooses a spec, so every
+        # spec but the default needs a profile named after it.
+        self.settings_store.ensure_profiles(
+            [s for s in self.sandboxes.specs if s != settings.default_spec]
+        )
         self.secrets_store = SecretsStore(db, settings.secrets_key)
         self.conversations = ConversationService(
             db=db,

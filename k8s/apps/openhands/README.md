@@ -71,7 +71,7 @@ Three consequences worth stating plainly:
   sandboxes — see `templates/app-server-rbac.yaml`. Every other ServiceAccount
   in this chart has no permissions and no mounted token.
 
-Sandbox egress is per spec (`sandboxSpecs`). The canvas pod's is DNS, the app
+Sandbox egress is per spec (see "Sandbox specs"). The canvas pod's is DNS, the app
 server, `443` on the MetalLB VIP pool (`git.msng.to`), and `443` to the internet
 with RFC1918 excluded. Everything else, including the API server and every
 other namespace, is denied.
@@ -142,7 +142,7 @@ to reach the sandbox pod's environment, as `openhands-anthropic` does.
 
 `files/skills/` holds Agent Skills that the chart seeds into the agent's home on
 every pod start, so git is the source of truth and a change takes effect on the
-next rollout. Both the canvas and every sandbox profile get the same set.
+next rollout. The canvas pod and every sandbox get the same set.
 
 They go to **two** directories, because two different readers look for them and
 neither reads the other's path:
@@ -199,68 +199,38 @@ Default off: whether a `claude setup-token` OAuth token counts as an eligible
 subscription login is unverified. The pod exits with "You must be logged in to
 use Remote Control" if it does not.
 
-## Sandbox profiles
+## Sandbox specs
 
-Additional agent servers, each in its own pod with its own ServiceAccount,
-NetworkPolicy, resource limits and credentials. Choosing a backend in the UI is
-what chooses the isolation.
+A sandbox spec is the isolation a conversation runs under: a ServiceAccount, a
+NetworkPolicy, resource limits, a volume size and which credentials are in the
+pod. They are `sandboxSpecs.specs` in `values.yaml`.
 
-| Profile | Reaches | Forge credentials |
+| Spec | Reaches | Forge credentials |
 | --- | --- | --- |
-| `repo` | the model API and `git.msng.to` | yes |
+| `repo` (default) | the model API and `git.msng.to` | yes |
 | `isolated` | the model API only — nothing on the LAN | no |
 
-Each profile is served at `https://openhands.msng.to/sandbox/<name>`: a more
-specific path on the canvas's own hostname, which Gateway API gives precedence
-over the `/` route. Sharing the origin means one Authelia session covers
-everything and there is no CORS to configure. Traefik authenticates the path
-with a `forwardAuth` subrequest against the same oauth2-proxy, then strips the
-prefix before the agent server sees the request — the agent server has no
-concept of being served under one.
+**The agent profile picker chooses the spec.** A conversation runs on the spec
+its agent profile is named after — `isolated`, or `isolated-<anything>` — and
+on `sandboxSpecs.default` for a profile named anything else. The app server
+keeps a profile named after every spec but the default, copied from
+`appServer.defaults.agent_profile`, so `isolated` is in the picker without
+anyone creating it; deleting it in the UI lasts until the app server restarts.
+A second agent on the same spec is a profile called, say, `isolated-sonnet`.
 
-### Registering a profile in the UI
+Two things follow from matching on the name:
 
-**The backend list is browser state, not server state.** It lives in
-`localStorage` under `openhands-backends`, so nothing in this chart can
-pre-register a profile and every browser and device has to be told once. Until
-then the switcher shows only the built-in `Local` entry — id `default-local`,
-pointing at this origin with the session key injected into the page — which is
-the canvas pod itself, not a profile.
+- **Renaming a profile can change its isolation.** `isolated` renamed to
+  `scratch` runs on the default spec, with forge credentials, from the next
+  conversation on. A running conversation keeps the sandbox it has.
+- A conversation started with no profile uses the active one, so activating
+  `isolated` makes it the spec for new conversations.
 
-Open the backend switcher, choose **Add a backend**, and give it:
-
-| Field | Value |
-| --- | --- |
-| Name | `repo` (anything; it is the label in the switcher) |
-| Host | `https://openhands.msng.to/sandbox/repo` |
-| API key | the profile's `session-api-key`, below |
+Which spec a sandbox got is its `openhands.msng.to/sandbox-spec` label:
 
 ```sh
-kubectl -n openhands get secret openhands-sandbox-repo \
-  -o jsonpath='{.data.session-api-key}' | base64 -d
+kubectl -n openhands get sandbox -L openhands.msng.to/sandbox-spec
 ```
-
-Repeat for `isolated`. The session key is a second lock behind the Authelia
-gate: reaching the path at all already requires a session, because Traefik runs
-the `forwardAuth` subrequest before it proxies.
-
-### Why profiles and not per-session pods
-
-The plan this replaced assumed the isolation boundary could be per session. It
-cannot: the agent server builds a `LocalWorkspace` and isolates a session with a
-git worktree, and there is no configuration hook for a remote one. The SDK does
-ship an `AgentSandboxWorkspace` that runs a session in a Kubernetes pod, but it
-is a *client-side* class — something a Python program that drives an agent server
-uses, not something an agent server can be pointed at.
-
-So the pod boundary is the only isolation boundary available, and it has to be
-something a session can be pointed at up front. A profile is that: sessions on
-the same profile share its pod, sessions on different profiles share nothing —
-not a ServiceAccount, not a volume, not a network path, not a forge token.
-
-These are long-lived Deployments rather than `Sandbox` resources. A `Sandbox`
-earns its keep when a pod is created and destroyed per unit of work; a backend
-that has to keep a stable DNS name for the browser to reach is a Deployment.
 
 ## App server
 
@@ -304,7 +274,8 @@ those by reference in the pod template — and it never reads back the keys it
 minted, because it keeps them in its own database.
 
 Starting a conversation is a start task the frontend polls: the app server
-creates a sandbox from the default spec, waits for it to be `RUNNING`, then
+creates a sandbox from the spec the agent profile names (see "Sandbox
+specs"), waits for it to be `RUNNING`, then
 starts the conversation on the sandbox's agent server with the stored
 `agent_settings` and the chosen ACP agent profile laid over them. Titles are set
 here from the first message — the agent server's own titling uses the agent's

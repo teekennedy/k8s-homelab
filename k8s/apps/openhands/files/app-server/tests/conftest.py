@@ -126,6 +126,8 @@ def settings(tmp_path) -> Settings:
     specs = tmp_path / "specs"
     specs.mkdir()
     (specs / "repo.json").write_text(json.dumps(SPEC))
+    isolated = json.loads(json.dumps(SPEC).replace('"repo"', '"isolated"'))
+    (specs / "isolated.json").write_text(json.dumps(isolated))
     schemas = tmp_path / "schemas"
     schemas.mkdir()
     (schemas / "agent-schema.json").write_text('{"model_name": "AgentSettings"}')

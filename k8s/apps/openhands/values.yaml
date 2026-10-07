@@ -232,57 +232,6 @@ metrics:
       cpu: 200m
       memory: 128Mi
 
-# --- Sandbox profiles -------------------------------------------------------
-# Additional agent servers, each in its own pod with its own ServiceAccount,
-# NetworkPolicy, resource limits and credentials. Registered in the UI under
-# Manage backends; picking a backend is what picks the isolation.
-#
-# A profile is a long-lived backend, not a per-session pod: the agent server
-# isolates a session with a git worktree and has no hook for a remote workspace,
-# so the pod boundary is the only isolation boundary available and it has to be
-# something a session can be *pointed at*. Sessions on the same profile share
-# its pod; sessions on different profiles share nothing.
-#
-# Reached at https://openhands.msng.to/sandbox/<name> — same origin as the
-# canvas, so no CORS and one Authelia session covers everything.
-sandboxProfiles:
-  # The agent server on its own, without the canvas frontend or the automation
-  # backend. Track the tag the canvas image is built from.
-  # renovate: datasource=docker depName=ghcr.io/openhands/agent-server
-  image: ghcr.io/openhands/agent-server:1.53.0-python
-  # Path prefix on the canvas hostname under which the profiles are served.
-  basePath: /sandbox
-  profiles:
-    # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
-    repo:
-      egress: lan
-      forgeCredentials: true
-      storage:
-        size: 20Gi
-        storageClass: longhorn
-      resources:
-        requests:
-          cpu: 250m
-          memory: 512Mi
-        limits:
-          cpu: "2"
-          memory: 4Gi
-    # Anything whose input is not trusted. Reaches the model and nothing on the
-    # LAN — no forge token, no git credentials, no route to any homelab service.
-    isolated:
-      egress: internet
-      forgeCredentials: false
-      storage:
-        size: 10Gi
-        storageClass: longhorn
-      resources:
-        requests:
-          cpu: 250m
-          memory: 512Mi
-        limits:
-          cpu: "2"
-          memory: 4Gi
-
 # --- App server -------------------------------------------------------------
 # Serves the cloud API the frontend speaks in locked-cloud mode, and runs one
 # Sandbox per conversation from the specs below. See README.md, "App server".
@@ -341,8 +290,14 @@ appServer:
 # (agents.x-k8s.io/v1beta1) per sandbox. Each spec gets its own ServiceAccount
 # and NetworkPolicy; the sandbox's own session key, encryption key and webhook
 # config are minted per sandbox into a Secret the Sandbox owns.
+#
+# A conversation runs on the spec its agent profile is named after: a profile
+# called `isolated`, or `isolated-<anything>`, gets the `isolated` spec. The
+# app server keeps a profile of that name in the picker for every spec but the
+# default. See README.md, "Sandbox specs".
 sandboxSpecs:
-  # Used when a request names no spec.
+  # Every other agent profile, every automation run, and a request that names
+  # no spec.
   default: repo
   # Track the tag the canvas image is built from.
   # renovate: datasource=docker depName=ghcr.io/openhands/agent-server
@@ -437,17 +392,6 @@ oauth2ProxyInstance:
   # oidcClientSecrets.clients value must point at <namespace>/<this name>.
   secretName: openhands-oauth2-proxy-secrets
   labelsTemplate: openhands.labels
-  middleware:
-    # The canvas itself does not need these — this instance owns the hostname
-    # and proxies it directly. The sandbox profiles do: they are routed by
-    # Traefik on a more specific path of the same hostname, so they get their
-    # authentication from a forwardAuth subrequest against this same instance,
-    # sharing its cookie and its Authelia session.
-    enabled: true
-    # Must equal oauth2-proxy.fullnameOverride.
-    serviceName: openhands-auth
-    authResponseHeaders:
-      - X-Auth-Request-User
 
 oauth2-proxy:
   fullnameOverride: openhands-auth
@@ -471,9 +415,6 @@ oauth2-proxy:
       scope = "openid profile email groups"
       real_client_ip_header = "X-Real-Ip"
       skip_provider_button = true
-      # Emits X-Auth-Request-User on the auth subrequest, which is the header
-      # the sandbox profiles' forwardAuth middleware copies through.
-      set_xauthrequest = true
       allowed_groups = ["openhands-admins", "full-admin"]
       # The one hole in the SSO gate: a forge webhook carries no Authelia
       # session. Scoped to POST on the event-ingestion path, where an HMAC over

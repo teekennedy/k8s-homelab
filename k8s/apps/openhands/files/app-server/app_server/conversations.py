@@ -88,6 +88,20 @@ class ConversationService:
         self.start_timeout = start_timeout
         self._running: set[asyncio.Task] = set()
 
+    # --- sandbox spec -------------------------------------------------------
+
+    def spec_for(self, profile_id: str | None) -> str:
+        """The sandbox spec a conversation on this agent profile runs in: the
+        spec the profile is named after — `isolated`, or `isolated-<anything>`
+        — and the default spec for every other profile."""
+        name = self.settings.profile_name(profile_id) or ""
+        matches = [
+            spec
+            for spec in self.sandboxes.specs
+            if name == spec or name.startswith(f"{spec}-")
+        ]
+        return max(matches, key=len, default=self.default_spec)
+
     # --- start tasks --------------------------------------------------------
 
     def _set_task(self, task_id: str, **fields: Any) -> None:
@@ -176,11 +190,10 @@ class ConversationService:
     ) -> None:
         sandbox_id = None
         try:
-            agent_settings = self.settings.resolve_agent(
-                request.get("agent_profile_id")
-            )
+            profile_id = request.get("agent_profile_id")
+            agent_settings = self.settings.resolve_agent(profile_id)
             self._set_task(task_id, status="WAITING_FOR_SANDBOX")
-            sandbox = await self.sandboxes.create(self.default_spec, created_by)
+            sandbox = await self.sandboxes.create(self.spec_for(profile_id), created_by)
             sandbox_id = sandbox["id"]
             self._set_task(task_id, sandbox_id=sandbox_id)
             await self._wait_running(sandbox_id)
