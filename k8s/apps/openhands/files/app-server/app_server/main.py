@@ -19,6 +19,7 @@ from . import (
     routes_settings,
     webhooks,
 )
+from .automations import Automations
 from .conversations import ConversationService
 from .db import Database
 from .kube import Kube
@@ -72,6 +73,7 @@ class State:
             default_spec=settings.default_spec,
             start_timeout=settings.start_timeout,
         )
+        self.automations = Automations(self.http, settings)
         # Where sandbox webhooks land.
         self.event_sink = self.conversations
 
@@ -109,6 +111,11 @@ async def reconcile_forever(state: State) -> None:
             await state.sandboxes.reconcile()
         except Exception:
             log.exception("reconcile failed")
+        try:
+            await state.automations.sync()
+        except Exception as e:
+            # The automation service is in another pod and may not be up yet.
+            log.warning("automation sync failed: %s", e)
         await asyncio.sleep(state.settings.reconcile_interval)
 
 

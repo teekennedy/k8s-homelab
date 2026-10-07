@@ -372,13 +372,31 @@ sandboxSpecs:
           memory: 4Gi
 
 # --- Automations ------------------------------------------------------------
-# Scheduled and event-driven runs. The automations themselves are rows in the
-# automation database on the data volume, created through the UI — there is no
-# declarative form for them, and nothing here creates one.
+# Scheduled and event-driven runs, each in a sandbox of its own that is deleted
+# when the run ends. Keyed by name; the app server keeps the automation service
+# in step with this map, so removing an entry deletes the automation. See
+# README.md, "Automations".
 #
-# What this chart owns is the one piece that cannot be configured from inside
-# the application: the hole in the SSO gate that lets a forge webhook reach the
-# event endpoint. See README.md, "Automations".
+#   nightly-triage:
+#     # A cron trigger, or an event trigger on a registered webhook source:
+#     #   {type: event, source: forgejo, on: created}
+#     trigger: {type: cron, schedule: "0 6 * * *", timezone: America/Denver}
+#     # The first message of the run's conversation.
+#     prompt: |
+#       List the open issues on ops/k8s-homelab and label the unlabelled ones.
+#     # Seconds a run may take; the automation service's default is 10 minutes.
+#     timeout: 1800
+#     # false switches it off. An automation the service disabled after
+#     # repeated failures is re-enabled from the UI, not from here.
+#     enabled: true
+automations:
+  # Exists to be dispatched by hand when checking that runs still work; the
+  # schedule is once a year so that it costs nothing left alone.
+  smoke:
+    trigger: {type: cron, schedule: "0 0 1 1 *"}
+    prompt: |
+      Create /workspace/project/smoke.txt containing the output of `date -u`,
+      then reply DONE.
 
 # --- SSO front door ---------------------------------------------------------
 # A dedicated oauth2-proxy instance in reverse-proxy mode: it owns

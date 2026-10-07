@@ -39,10 +39,12 @@ class Settings:
     schemas_dir: Path
     # First-boot settings and agent profile, from values.yaml.
     settings_seed_file: Path
-    # The automation service in the canvas pod, and the key it accepts while
-    # it runs in local mode.
+    # The automation service in the canvas pod, and the key this server
+    # presents to it.
     automation_url: str
     automation_api_key: str
+    # Automation definitions, from values.yaml.
+    automations_file: Path
     # How long a new conversation may wait for its sandbox to be RUNNING.
     start_timeout: float
     # Encrypts the conversation secrets store at rest.
@@ -68,6 +70,7 @@ class Settings:
             settings_seed_file=Path(_env("SETTINGS_SEED_FILE")),
             automation_url=_env("AUTOMATION_URL").rstrip("/"),
             automation_api_key=_env("AUTOMATION_API_KEY"),
+            automations_file=Path(_env("AUTOMATIONS_FILE")),
             start_timeout=float(_env("START_TIMEOUT_SECONDS")),
             secrets_key=_env("SECRETS_KEY"),
         )

@@ -49,6 +49,20 @@ async def current_key(who: Caller) -> dict[str, Any]:
     }
 
 
+@router.get("/api/v1/users/me")
+async def users_me(who: Caller) -> dict[str, Any]:
+    """Who a credential belongs to, as the automation service asks before
+    serving any request (`automation/auth.py`, _UsersMe). The ids become the
+    owner of every automation and run."""
+    return {
+        "id": USER_ID,
+        "org_id": USER_ID,
+        "email": None,
+        "role": "owner",
+        "permissions": ["view_automations", "manage_automations"],
+    }
+
+
 @router.post("/api/authenticate")
 async def authenticate(who: Caller) -> dict[str, bool]:
     """The cookie-mode session check the frontend makes on load; a 401 here
@@ -98,7 +112,8 @@ for _path in (
 async def automation(path: str, request: Request, who: Caller):
     """The automation service authenticates a browser by a cookie this
     deployment has no issuer for, so the browser reaches it through here:
-    authenticated by oauth2-proxy, forwarded with the service's own key."""
+    authenticated by oauth2-proxy, forwarded with the service's own key,
+    which it then checks against /api/v1/users/me."""
     s = request.app.state.settings
     return await forward(
         request,

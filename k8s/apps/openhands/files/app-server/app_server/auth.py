@@ -6,7 +6,10 @@ Two callers, two mechanisms:
   session and sets the user header. Requiring it here is defence in depth; the
   NetworkPolicy is what stops anything else dialling this port.
 - The automation service, with a bearer key it minted through the service
-  endpoint (X-Service-API-Key). Keys are stored hashed.
+  endpoint (X-Service-API-Key), stored hashed, or with its own key: it checks
+  every caller against /api/v1/users/me by presenting the caller's
+  credential, and for a browser that credential is the key this server
+  forwarded the request with.
 """
 
 import hashlib
@@ -54,6 +57,9 @@ def principal(request: Request) -> Principal:
     user_header: str = request.app.state.settings.user_header
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
+        own = request.app.state.settings.automation_api_key
+        if hmac.compare_digest(auth[len("Bearer ") :].encode(), own.encode()):
+            return Principal("service", "automation")
         row = db.one(
             "SELECT name FROM api_keys WHERE key_hash = ?",
             _hash(auth[len("Bearer ") :]),

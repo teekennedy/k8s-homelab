@@ -198,6 +198,20 @@ class ConversationService:
             if sandbox_id:
                 await self.sandboxes.delete(sandbox_id)
 
+    async def start_in(
+        self, sandbox_id: str, request: dict[str, Any], created_by: str
+    ) -> str:
+        """Start a conversation in a sandbox that already exists and that
+        something else owns: an automation run's."""
+        sandbox = self.sandboxes.live_row(sandbox_id)
+        if sandbox is None:
+            raise LookupError(sandbox_id)
+        agent_settings = self.settings.resolve_agent(request.get("agent_profile_id"))
+        info = await self._start_on_sandbox(sandbox, request, agent_settings)
+        self._insert_conversation(info, sandbox_id, request, agent_settings, created_by)
+        log.info("conversation %s started on %s", info["id"], sandbox_id)
+        return conversation_id(info["id"])
+
     async def _start_on_sandbox(
         self,
         sandbox: dict[str, Any],

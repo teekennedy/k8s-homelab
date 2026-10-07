@@ -6,8 +6,8 @@
 # the session key baked into the page.
 #
 #   :8000   static frontend, locked to the app server's cloud API
-#   :18000  agent server — only the automation service talks to it
-#   :18001  automation service
+#   :18000  agent server — read by the metrics sidecar, runs nothing
+#   :18001  automation service, in cloud mode against the app server
 set -uo pipefail
 
 log() { printf '[canvas] %s\n' "$*"; }
@@ -18,6 +18,7 @@ log() { printf '[canvas] %s\n' "$*"; }
 : "${APP_SERVER_URL:?must be set}"
 : "${LOCK_TO_CLOUD:?must be set}"
 : "${LOCAL_BACKEND_API_KEY:?must be set}"
+: "${APP_SERVER_SERVICE_KEY:?must be set}"
 
 PORT="${PORT:-8000}"
 AGENT_SERVER_PORT=18000
@@ -41,15 +42,14 @@ fi
 OH_SECRET_KEY="$(cat "$SECRET_KEY_FILE")"
 export OH_SECRET_KEY
 
-# One key for the agent server and the automation service, from a Secret the
-# app server also reads. Written where the metrics sidecar reads it.
+# One key for the agent server and for the app server's calls to the
+# automation service, from a Secret the app server also reads. Written where
+# the metrics sidecar reads it.
 KEY="$LOCAL_BACKEND_API_KEY"
 printf '%s' "$KEY" >"${STATE_DIR}/api-key.txt"
 chmod 600 "${STATE_DIR}/api-key.txt"
 export OH_SESSION_API_KEYS_0="$KEY"
 export OPENHANDS_AUTOMATION_API_KEY="$KEY"
-export AUTOMATION_LOCAL_API_KEY="$KEY"
-export AUTOMATION_AGENT_SERVER_API_KEY="$KEY"
 export AUTOMATION_KV_SECRET="$KEY"
 export OPENHANDS_REMOTE_WS_READY_REQUIRED=false
 
@@ -57,9 +57,11 @@ if [ "${VITE_DO_NOT_TRACK:-}" = "1" ]; then
   export DO_NOT_TRACK=1
 fi
 
-# Setting this is what puts the automation service in local mode.
-export AGENT_SERVER_URL="http://127.0.0.1:${AGENT_SERVER_PORT}"
-export AUTOMATION_AGENT_SERVER_URL="$AGENT_SERVER_URL"
+# Cloud mode, which is what leaving AUTOMATION_AGENT_SERVER_URL unset selects:
+# every run gets a sandbox of its own from the app server, and every caller is
+# checked against the app server's /api/v1/users/me.
+export AUTOMATION_OPENHANDS_API_BASE_URL="$APP_SERVER_URL"
+export AUTOMATION_SERVICE_KEY="$APP_SERVER_SERVICE_KEY"
 # Persisted conversations may name the legacy canvas_ui_tool module.
 export OH_EXTRA_PYTHON_PATH=/opt/agent-canvas/tools
 # Nothing routes to the editor any more.

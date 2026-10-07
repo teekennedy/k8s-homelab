@@ -39,8 +39,9 @@ reaches it at `/runtime/<sandbox>` through the app server. History is posted
 back to the app server by webhook as it happens, so a conversation stays
 readable after its sandbox is gone.
 
-The canvas pod's own agent server is still started, for the automation
-service's runs only; nothing routes a browser to it. The pod's entrypoint is
+The canvas pod's own agent server is still started, but only the metrics
+sidecar reads it: nothing routes a browser to it and no automation runs on it.
+The pod's entrypoint is
 `files/canvas/start.sh` rather than the image's, because the image's has no way
 to pass `--lock-to-cloud`.
 
@@ -340,16 +341,67 @@ reports `MISSING`.
 
 ## Automations
 
-Scheduled and event-driven runs live in the automation backend. They are rows in
-the database on the data volume, created through the UI — this chart creates
-none of them, and there is no declarative form for one.
+Scheduled and event-driven runs are defined in `values.yaml` under
+`automations`, by name: a trigger, a prompt, and optionally a timeout.
+
+```yaml
+automations:
+  nightly-triage:
+    trigger: {type: cron, schedule: "0 6 * * *", timezone: America/Denver}
+    prompt: |
+      List the open issues on ops/k8s-homelab and label the unlabelled ones.
+    timeout: 1800
+```
+
+The upstream automation service does the scheduling, the webhook matching and
+the run history, in **cloud mode** against the app server: for each run it asks
+the app server for a sandbox, starts the run in it, and deletes it when the run
+reports back. So a run gets what a conversation gets — a pod, a workspace and a
+session key of its own — and leaves nothing behind but its transcript.
+
+What runs in that sandbox is ours. The automation service's own run scripts
+build an agent from an LLM API key, and the only model credential here is the
+Claude Code login, so every automation is a *custom* one pointing at the same
+small tarball the app server serves (`app_server/automation_run.py`). Its entry
+point asks the app server to start the run's conversation, which is therefore
+the same ACP agent, with the same credentials and secrets, as one started from
+the UI — and is listed beside them, titled with the automation's name. It then
+waits for the conversation to stop and reports the outcome.
+
+```
+  automation service ──► app server: POST /api/v1/sandboxes        (a sandbox for the run)
+          │
+          └─► sandbox: fetch run.tar.gz from the app server, run `python3 run.py`
+                 │
+                 ├─► app server :8081  …/automation/conversations   (start; prompt from values)
+                 ├─► own agent server  poll until the conversation stops
+                 └─► app server :8081  …/automation/runs/<id>/complete ──► automation service
+                                                                            └─► deletes the sandbox
+```
+
+The app server pushes the definitions to the automation service once a minute:
+it creates what is missing, updates a changed trigger or timeout, and deletes
+an automation that was removed from `values.yaml`. It recognises its own by the
+tarball they run and leaves any other automation alone.
+
+- **Automations created in the UI do not work.** The "new automation" form
+  creates the upstream kind, which fails for want of an LLM API key.
+- **Every run uses the default sandbox spec.** The automation service asks for
+  a sandbox without naming one.
+- **`enabled: false` switches an automation off; nothing here switches one
+  on.** The service disables an automation that keeps failing, and re-enabling
+  it is a decision, made in the UI.
+- A run that outlives its timeout (10 minutes unless set, 30 at most) is failed
+  by the automation service and its sandbox deleted.
+
+### Event triggers
 
 Cron triggers work out of the box. Event triggers need a webhook source
 registered first, because the deployment ships no built-in forge providers:
 `GET /api/automation/v1/capabilities` reports `triggerKinds: ["cron"]` until one
 exists.
 
-To wire up Forgejo:
+To wire up Forgejo, then use `trigger: {type: event, source: forgejo, on: <key>}`:
 
 1. Register a custom webhook source in the automation service — **Automations →
    Webhooks** in the UI, or `POST /api/automation/v1/webhooks`:

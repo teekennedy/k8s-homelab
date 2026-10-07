@@ -129,6 +129,8 @@ def settings(tmp_path) -> Settings:
     schemas = tmp_path / "schemas"
     schemas.mkdir()
     (schemas / "agent-schema.json").write_text('{"model_name": "AgentSettings"}')
+    automations = tmp_path / "automations.json"
+    automations.write_text("{}")
     seed = tmp_path / "seed.json"
     seed.write_text(json.dumps(SEED))
     return Settings(
@@ -149,6 +151,7 @@ def settings(tmp_path) -> Settings:
         settings_seed_file=seed,
         automation_url="http://canvas:18001",
         automation_api_key="automation-key",
+        automations_file=automations,
         start_timeout=5,
         secrets_key="test-secrets-key",
     )

@@ -116,6 +116,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "openhands.fullname" . }}-canvas-keys
                   key: session-api-key
+            # What the automation service mints its per-run API keys with.
+            - name: APP_SERVER_SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openhands.fullname" . }}-app-server-keys
+                  key: service-api-key
             # Goes into automation callback URLs and is injected into runs, so
             # it has to be the URL a browser uses, not the Service name.
             - name: AUTOMATION_BASE_URL
