@@ -453,6 +453,30 @@ class ConversationService:
                 ],
             )
 
+    async def drain(self, sandbox_id: str, conv_id: str) -> None:
+        """Read a conversation's events and status straight from its sandbox.
+        Webhooks arrive in delayed batches, so a sandbox deleted the moment
+        its conversation stops would take the end of the transcript with it."""
+        sandbox = self.sandboxes.live_row(sandbox_id)
+        if sandbox is None:
+            return
+        base = f"{self.sandboxes.agent_url(sandbox_id)}/api/conversations/{conv_id}"
+        headers = {"X-Session-API-Key": sandbox["session_api_key"]}
+        params: dict[str, Any] = {"limit": 100, "sort_order": "TIMESTAMP"}
+        while True:
+            resp = await self.http.get(
+                f"{base}/events/search", params=params, headers=headers, timeout=30
+            )
+            resp.raise_for_status()
+            page = resp.json()
+            await self.events(sandbox_id, conv_id, page["items"])
+            if not page.get("next_page_id"):
+                break
+            params["page_id"] = page["next_page_id"]
+        resp = await self.http.get(base, headers=headers, timeout=30)
+        resp.raise_for_status()
+        await self.conversation(sandbox_id, resp.json())
+
     async def conversation(self, sandbox_id: str, info: dict[str, Any]) -> None:
         conv_id = conversation_id(info["id"])
         row = self.row(conv_id)

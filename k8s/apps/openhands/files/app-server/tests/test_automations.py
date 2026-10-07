@@ -182,19 +182,41 @@ def test_a_run_starts_its_conversation_in_its_own_sandbox(api, hooks, state, use
     assert conv["title"] == "nightly" and conv["sandbox_id"] == sandbox["id"]
 
 
-def test_completion_is_relayed_with_the_services_key(api, hooks, service, user):
+def test_completion_is_relayed_after_the_transcript_is_complete(
+    api, hooks, state, service, user
+):
     hooks.app.state.http = service_client(service)
+    _define(state, nightly=NIGHTLY)
     sandbox = api.post("/api/v1/sandboxes", headers=user).json()
+    key = {"X-Session-API-Key": sandbox["session_api_key"]}
+    last = {"id": "e9", "timestamp": "2026-01-01T00:00:09", "kind": "ActionEvent"}
+
+    def agent(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            return FakeAgentServer()(request)
+        if request.url.path.endswith("/events/search"):
+            return httpx.Response(200, json={"items": [last], "next_page_id": None})
+        return httpx.Response(200, json={"id": CONV_ID, "execution_status": "finished"})
+
+    state.conversations.http = httpx.AsyncClient(transport=httpx.MockTransport(agent))
+    hooks.post(
+        f"/sandboxes/{sandbox['id']}/automation/conversations",
+        json={"automation": "nightly"},
+        headers=key,
+    )
     run = "0cd7e625-a5f0-4164-a27c-d77ca5999e90"
     path = f"/sandboxes/{sandbox['id']}/automation/runs/{run}/complete"
     body = {"status": "COMPLETED", "conversation_id": CONV_ID}
 
     assert hooks.post(path, json=body).status_code == 401
-    r = hooks.post(
-        path, json=body, headers={"X-Session-API-Key": sandbox["session_api_key"]}
-    )
+    r = hooks.post(path, json=body, headers=key)
     assert r.status_code == 200 and r.json() == {"relayed": body}
     assert service.calls[-1].url.path == f"/api/automation/v1/runs/{run}/complete"
+    # The sandbox is about to be deleted; what it had not yet posted is kept.
+    events = api.get(f"/api/v1/conversation/{CONV_ID}/events/search", headers=user)
+    assert [e["id"] for e in events.json()["items"]] == ["e9"]
+    conv = api.get("/api/v1/app-conversations", params={"ids": CONV_ID}, headers=user)
+    assert conv.json()[0]["execution_status"] == "finished"
 
 
 def test_users_me_answers_the_automation_services_auth_check(api, user, service_auth):

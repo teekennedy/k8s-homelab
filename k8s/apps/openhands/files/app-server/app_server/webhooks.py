@@ -96,9 +96,15 @@ async def automation_complete(
 ) -> Response:
     """Relay a run's completion callback (`automation/router.py`,
     complete_run): the automation service's own URL for it is the public one,
-    behind a login a sandbox does not have."""
+    behind a login a sandbox does not have. The service deletes the sandbox
+    on receiving it, so the transcript is completed first."""
     _authenticate(request, sandbox_id)
     state = request.app.state
+    if body.get("conversation_id"):
+        try:
+            await state.conversations.drain(sandbox_id, body["conversation_id"])
+        except Exception:
+            log.exception("could not read the last events of %s", sandbox_id)
     resp = await state.http.post(
         f"{state.settings.automation_url}/api/automation/v1/runs/{run_id}/complete",
         json=body,
