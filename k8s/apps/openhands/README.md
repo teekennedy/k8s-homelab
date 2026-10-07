@@ -432,6 +432,24 @@ single volume ever stops being enough.
 - **No LLM profiles.** Conversations run ACP agents, which bring their own
   model; switching model is the ACP model switch, and an OpenHands-kind agent
   profile launches from `agent_settings`.
+- **The Files tab does not follow an ACP agent's edits.** The frontend
+  refreshes its file queries on `FileEditorObservation`-style events only; an
+  ACP agent's edit arrives as an `ACPToolCallEvent` (`tool_kind: "edit"`), so
+  an open file and the file list keep their old contents. The tab's refresh
+  button reloads the open file but not the list, whose query key
+  (`workspace-files-cloud`) is not the one it invalidates. Switching to
+  another tab and back reloads both once the list is 30 s old. Same on
+  canvas `1.25.0`.
+- **The Terminal tab stays empty for ACP agents**, for the same reason: it
+  is fed from `TerminalObservation` events, and an ACP shell call is an
+  `ACPToolCallEvent` (`tool_kind: "execute"`).
+- **No commit list in the Changes tab.** The frontend sends runtime calls it
+  has no first-class endpoint for (`/api/git/commits`, bash event search,
+  confirmation responses) through `POST /api/cloud-proxy`, which the app
+  server does not implement. Uncommitted changes and their diffs work.
+- **Settings has no link to Secrets.** The page is at
+  `/canvas/settings/secrets`; the sidebar's "All Cloud Settings" link points
+  at a hosted settings UI this deployment does not have.
 - **`readOnlyRootFilesystem` is false**, and not fixable by mounting more
   volumes: running shell commands anywhere on the filesystem is what the agent
   is for.
