@@ -131,12 +131,7 @@ forgejo:
         SHOW_REGISTRATION_BUTTON: false
         ENABLE_PASSWORD_SIGNIN_FORM: true
         # Force users to log in to view any page or to use the API.
-        #
-        # Deliberately false for the migration: it lets ArgoCD clone
-        # ops/k8s-homelab (public) anonymously, so the repoURL cutover does not
-        # depend on argocd-repo-k8s-homelab being correct yet. Flip to true once
-        # that credential is confirmed working — see README, "Cutover runbook".
-        REQUIRE_SIGNIN_VIEW: false
+        REQUIRE_SIGNIN_VIEW: true
       service.explore:
         DISABLE_USERS_PAGE: true
       actions:
