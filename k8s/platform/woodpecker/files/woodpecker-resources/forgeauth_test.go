@@ -96,6 +96,12 @@ func newForge(t *testing.T, login, password string) *forge {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		// Forgejo's GrantApplicationOAuth: anything but granted=true is a
+		// denial, reported to the client as an OAuth error.
+		if r.FormValue("granted") != "true" {
+			http.Redirect(w, r, f.woodpeckerURL()+"/authorize?error=access_denied", http.StatusSeeOther)
+			return
+		}
 		f.grantSubmitted = true
 		f.granted = true
 		http.Redirect(w, r, f.woodpeckerURL()+"/authorize?code=CODE-1&state=STATE-1", http.StatusSeeOther)

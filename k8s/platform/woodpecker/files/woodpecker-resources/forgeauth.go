@@ -129,6 +129,11 @@ func (a *forgeAuth) authorizeWoodpecker(ctx context.Context) error {
 	// has already set the session cookie, so there is nothing to submit.
 	if grant, err := hiddenInputs(page, "/login/oauth/grant"); err == nil {
 		log.Print("Forgejo has not granted the Woodpecker OAuth app for this account yet; submitting the grant")
+		// The decision is the value of the submit button pressed, not a
+		// hidden field, and Forgejo reads its absence as "cancel": it
+		// redirects back with error=access_denied, which Woodpecker turns
+		// into a silent redirect to its login page.
+		grant.Set("granted", "true")
 		if _, err := a.postForm(ctx, a.forgejoURL+"/login/oauth/grant", grant); err != nil {
 			return fmt.Errorf("submit forgejo oauth grant: %w", err)
 		}
