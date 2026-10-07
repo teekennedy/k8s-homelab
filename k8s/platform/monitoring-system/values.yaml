@@ -59,11 +59,7 @@ kube-prometheus-stack:
         isDefault: false
         editable: false
         jsonData:
-          # VictoriaMetrics now stores ~5m-aggregated data (see
-          # k8s/platform/victoria-metrics values.yaml/files/stream-aggr-config.yml),
-          # not raw scrapes -- this is a lower bound on the query step Grafana
-          # will use, so it must match the actual sample interval or panels
-          # end up stepping finer than the data and rendering mostly gaps.
+          # Matches VictoriaMetrics' 5m stream-aggregation interval.
           timeInterval: 5m
     # Plaintext client secret for the Authelia OIDC client (see
     # k8s/platform/auth-system, oidcClientSecrets.clients.grafana and

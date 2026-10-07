@@ -103,14 +103,7 @@ in {
     #
     #   syncthing       8384:8384   synced folder trees
     #   copyparty       3923:3923   the private root volume
-    #   victoriametrics 65534:65534 vmbackup CronJob's incremental backup destination
-    #                               (same "nobody" UID the vmsingle StatefulSet itself
-    #                               runs as; see k8s/platform/victoria-metrics/values.yaml)
-    #
-    # victoriametrics/ is also picked up by the nas-backups-weekly restic job (see
-    # nix/hosts/borg-2/nas-backups.nix), which snapshots everything under
-    # /storage/nas/backups offsite -- that's where day-over-day/week-over-week
-    # history comes from, since vmbackup itself only keeps one rolling incremental copy.
+    #   victoriametrics 65534:65534 vmbackup destination
     systemd.tmpfiles.rules = lib.mkIf cfg.serverMode [
       "d /storage/nas/k8s 0755 root root -"
       "d /storage/nas/backups/syncthing 0755 8384 8384 -"

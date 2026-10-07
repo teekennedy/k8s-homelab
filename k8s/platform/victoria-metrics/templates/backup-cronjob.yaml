@@ -1,34 +1,6 @@
 ---
-# Daily vmbackup run, writing directly to the NFS-backed destination PVC
-# defined in backup-pv.yaml. vmbackup (community edition, see
-# https://docs.victoriametrics.com/victoriametrics/vmbackup/) needs direct
-# filesystem access to the same data VictoriaMetrics itself reads/writes --
-# it reads TSDB part files off disk, it doesn't fetch them over HTTP -- so
-# this Job mounts the *same* PVC the vmsingle StatefulSet uses, read-only,
-# and is pinned onto whatever node vmsingle is currently running on via
-# podAffinity so that PVC (ReadWriteOnce, Longhorn) can be attached to both
-# pods at once. This is the pattern VictoriaMetrics' own docs recommend for
-# Kubernetes: "it is recommended to use sidecar containers for running
-# vmbackup on the same pod" -- a same-node CronJob is the closest fit
-# available here, since the community vmbackup image has no shell to run a
-# long-lived sidecar loop in (it's a from-scratch image with only the
-# compiled binary).
-#
-# "server-volume-victoria-metrics-server-0" is the PVC Kubernetes derives
-# for ordinal 0 of the victoria-metrics-server StatefulSet's
-# "server-volume" volumeClaimTemplate (see values.yaml fullnameOverride and
-# the victoria-metrics-single chart's pvc naming) -- confirmed via
-# `helm template`.
-#
-# -dst is always .../latest: vmbackup's own backup format is incremental
-# against whatever already exists at -dst (unchanged TSDB parts aren't
-# re-uploaded), so there's no benefit to a fresh dated directory per run,
-# and no shell/date computation is needed in a container that doesn't have
-# one. Day-over-day/week-over-week history comes from the nas-backups-weekly
-# restic job (nix/hosts/borg-2/nas-backups.nix), which already snapshots
-# everything under /storage/nas/backups -- including this directory --
-# offsite with --keep-weekly/--keep-monthly retention. See
-# docs/victoria-metrics.md for the full restore procedure.
+# vmbackup reads TSDB files directly, so this mounts vmsingle's RWO PVC and
+# must be scheduled on the same node (podAffinity).
 apiVersion: batch/v1
 kind: CronJob
 metadata:

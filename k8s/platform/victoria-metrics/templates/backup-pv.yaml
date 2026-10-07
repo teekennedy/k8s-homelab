@@ -1,13 +1,5 @@
 ---
-# Static PV backed by /storage/nas/backups/victoriametrics on borg-2 via
-# mTLS-protected NFS, following the same pattern as syncthing/copyparty
-# (k8s/apps/syncthing/templates/pv.yaml) and s3proxy
-# (k8s/foundation/s3-proxy/templates/pv-pvc.yaml). The directory is
-# pre-created by the nfs-mtls module's tmpfiles rules, owned by UID/GID
-# 65534 to match the vmbackup CronJob's securityContext below.
-#
-# Retain reclaim policy: this is a backup destination, so the data must
-# survive a PVC/release deletion.
+# NAS-backed static PV for vmbackup.
 apiVersion: v1
 kind: PersistentVolume
 metadata:

@@ -19,7 +19,7 @@ in {
   ];
 
   # Offsite backup of all NAS backup data (longhorn snapshots, postgres base backups,
-  # victoriametrics vmbackup snapshots) to S3.
+  # victoriametrics) to S3.
   services.restic.backups.nas-backups-weekly = {
     initialize = true;
     passwordFile = config.sops.secrets.restic_repo_password.path;
