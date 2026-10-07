@@ -399,14 +399,14 @@ sandboxSpecs:
 automations:
   # Exists to be dispatched by hand when checking that runs still work; the
   # schedule is once a year so that it costs nothing left alone.
-  # A comment that mentions the agent, on an issue or a pull request. The
-  # agent's own comments are excluded, or it would answer itself.
+  # A comment that mentions the agent, on an issue or a pull request, from the
+  # one account allowed to spend model budget this way.
   forge-mention:
     trigger:
       type: event
       source: forgejo
       "on": created
-      filter: "icontains(comment.body, '@openhands') && sender.login != 'openhands'"
+      filter: "icontains(comment.body, '@openhands') && sender.login == 'tkennedy'"
     prompt: |
       Someone mentioned you in a comment on the forge. The event payload below
       has the comment, and the issue or pull request it was made on.

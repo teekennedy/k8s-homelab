@@ -428,9 +428,7 @@ the path answers 404 for a source nobody has registered.
 > Forgejo account can start a run. The HMAC proves the delivery came from
 > Forgejo, not that the commenter is allowed to spend model budget. A Forgejo
 > webhook cannot filter on author, so the place to enforce one is the trigger's
-> `filter` (`sender.login == '…'`); `forge-mention` only excludes the agent's
-> own account, which is enough while the forge requires sign-in and every
-> account on it is trusted.
+> `filter`, as `forge-mention` does with `sender.login == '…'`.
 
 ## Metrics
 
