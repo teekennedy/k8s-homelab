@@ -390,6 +390,16 @@
       "sourceUrl": "https://codeberg.org/forgejo/forgejo"
     },
     {
+      "description": "Track smallstep/step-cli changelog from GitHub releases",
+      "matchDatasources": [
+        "docker"
+      ],
+      "sourceUrl": "https://github.com/smallstep/cli",
+      "matchPackageNames": [
+        "smallstep/step-cli"
+      ]
+    },
+    {
       "description": "Prefer releases from OpenTofu",
       "matchDatasources": ["terraform-provider", "terraform-module"],
       "registryUrls": ["https://registry.opentofu.org"]
