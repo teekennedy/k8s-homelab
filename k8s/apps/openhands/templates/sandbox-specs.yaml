@@ -72,18 +72,36 @@ spec:
             - |
               {{- include "openhands.seedSkillsScript" $root | nindent 14 }}
               mkdir -p /workspace/project
+              {{- with $sp.claudeAdapterVersion }}
+              # Into a scratch prefix first, so an interrupted install never
+              # leaves half an adapter on PATH.
+              want={{ . | quote }}
+              acp="$HOME/.acp"
+              if [ "$(cat "$acp/.version" 2>/dev/null)" != "$want" ]; then
+                rm -rf "$acp" "$acp.new"
+                if npm install --global --prefix "$acp.new" --no-fund --no-audit \
+                  --loglevel=error "@agentclientprotocol/claude-agent-acp@$want"; then
+                  echo "$want" > "$acp.new/.version"
+                  mv "$acp.new" "$acp"
+                else
+                  echo "claude-agent-acp@$want did not install; using the image's" >&2
+                  rm -rf "$acp.new"
+                fi
+              fi
+              {{- end }}
           env:
             - name: HOME
               value: /workspace/home
           securityContext:
             {{- toYaml $root.Values.securityContext | nindent 12 }}
+          # Sized for the adapter's npm install; seeding skills needs little.
           resources:
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 64Mi
             limits:
-              cpu: 200m
-              memory: 128Mi
+              cpu: "1"
+              memory: 1Gi
           volumeMounts:
             - name: workspace
               mountPath: /workspace
@@ -102,6 +120,16 @@ spec:
               value: /workspace/home
             - name: OH_PERSISTENCE_DIR
               value: /workspace/home/.openhands
+            {{- if $sp.claudeAdapterVersion }}
+            # The agent server finds the adapter by name; the directory is
+            # absent when the install failed, leaving the image's in reach.
+            - name: PATH
+              value: /workspace/home/.acp/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            {{- end }}
+            {{- range $name, $value := $sp.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
             # Webhooks, paths and the editor switch; structural, so a file
             # rather than indexed OH_* variables.
             - name: OPENHANDS_AGENT_SERVER_CONFIG_PATH

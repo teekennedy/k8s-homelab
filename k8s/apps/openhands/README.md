@@ -232,6 +232,25 @@ Which spec a sandbox got is its `openhands.msng.to/sandbox-spec` label:
 kubectl -n openhands get sandbox -L openhands.msng.to/sandbox-spec
 ```
 
+### Models
+
+The model picker's entries are fixed in the frontend, and all but one are
+aliases — `opus[1m]`, `sonnet`, `haiku` — that the Claude Code CLI in the
+sandbox resolves. Two settings under `sandboxSpecs` decide what they mean:
+
+- `env` sets `ANTHROPIC_DEFAULT_OPUS_MODEL` and
+  `ANTHROPIC_DEFAULT_SONNET_MODEL`, so "Claude Opus (1M)" and "Claude Sonnet"
+  are the models named there rather than whatever was newest when the CLI was
+  built. The labels do not change; a new model is a new value here.
+- `claudeAdapterVersion` installs that version of the Claude Code ACP adapter,
+  which carries the CLI, onto the sandbox volume at start and puts it ahead of
+  the image's on `PATH`. The CLI refuses a model newer than itself, so this is
+  what has to move when a model outruns the image. It costs about twenty
+  seconds on a sandbox's first start (not on resume) and 300 MB of its volume.
+  If npm cannot be reached the sandbox starts on the image's adapter, and a
+  model that one is too old for fails in the conversation with the CLI's own
+  "version … or newer is required".
+
 ## App server
 
 `files/app-server/` is a small FastAPI service, `openhands-app-server`, that
