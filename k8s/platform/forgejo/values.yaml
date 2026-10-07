@@ -207,7 +207,7 @@ forgejo-resources:
     # Identity the borg hosts fetch ops/k8s-homelab as (nix/modules/selfupdate).
     # The hosts read the token from sops, not from this Secret, so the Secret
     # is only where the token is copied from when it is first created or
-    # rotated — see docs/nixos-cd.md, "Repo source".
+    # rotated — see docs/nixos-cd.md, "One-time setup".
     #
     # In no team: the repo is public, so being signed in is all it takes to
     # read it.

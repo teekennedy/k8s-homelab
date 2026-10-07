@@ -168,6 +168,24 @@ database.
    is only read when a repo is activated. There is no `woodpecker-cli` flag for
    it; the API equivalent is `cancel_previous_pipeline_events` on
    `PATCH /api/repos/{id}`.
+5. Give the hosts a token to fetch from the forge with. Sync `forgejo` first:
+   `forgejo-resources` creates the `nixos-selfupdate` account and mints its
+   `read:repository` token into a Kubernetes Secret. Copy that into sops and
+   deploy it:
+
+   ```bash
+   token=$(kubectl -n forgejo get secret nixos-selfupdate-forgejo-user \
+     -o jsonpath='{.data.token}' | base64 -d)
+   printf 'selfupdate_forgejo_token: %s\n' "$token" \
+     > nix/modules/selfupdate/secrets.enc.yaml
+   sops encrypt --in-place nix/modules/selfupdate/secrets.enc.yaml
+   git add nix/modules/selfupdate/secrets.enc.yaml
+   ```
+
+   `forgejo-resources` never rotates the token by itself, so this only needs
+   repeating if the token is recreated. Until `secrets.enc.yaml` exists the
+   module configures no credential and every fetch falls back to the GitHub
+   mirror.
 
 ## Operating it
 
@@ -275,22 +293,9 @@ four ways this goes wrong, and Alertmanager routes them to Discord by default:
   what lets a host update itself when the cluster is down.
 
   The forge requires sign-in (`REQUIRE_SIGNIN_VIEW`), so hosts fetch from it as
-  the `nixos-selfupdate` Forgejo account, using a `read:repository` token kept
-  in `nix/modules/selfupdate/secrets.enc.yaml`. `forgejo-resources` mints the
-  token into a Kubernetes Secret once and never rotates it by itself, so
-  copying it into sops is a one-time step (repeat it if the token is ever
-  recreated):
-
-  ```sh
-  token=$(kubectl -n forgejo get secret nixos-selfupdate-forgejo-user \
-    -o jsonpath='{.data.token}' | base64 -d)
-  printf 'selfupdate_forgejo_token: %s\n' "$token" \
-    > nix/modules/selfupdate/secrets.enc.yaml
-  sops encrypt --in-place nix/modules/selfupdate/secrets.enc.yaml
-  ```
-
-  Until that file exists, or if the token is rejected, the forge fetch fails
-  and hosts fall back to the mirror, which is readable anonymously.
+  the `nixos-selfupdate` Forgejo account (see one-time setup above). If that
+  token is missing or rejected, the forge fetch fails and hosts fall back to
+  the mirror, which is readable anonymously.
 
 ## Files
 
