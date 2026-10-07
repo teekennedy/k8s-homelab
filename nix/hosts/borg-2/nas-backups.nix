@@ -18,7 +18,8 @@ in {
     "d ${nasBackupDir}/postgres 0750 s3proxy s3proxy -"
   ];
 
-  # Offsite backup of all NAS backup data (longhorn snapshots, postgres base backups) to S3.
+  # Offsite backup of all NAS backup data (longhorn snapshots, postgres base backups,
+  # victoriametrics vmbackup snapshots) to S3.
   services.restic.backups.nas-backups-weekly = {
     initialize = true;
     passwordFile = config.sops.secrets.restic_repo_password.path;

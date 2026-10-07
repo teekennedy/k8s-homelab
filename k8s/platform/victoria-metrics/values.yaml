@@ -5,18 +5,42 @@ victoria-metrics-single:
     image:
       image: victoriametrics/victoria-metrics
       tag: "v1.153.0"
-    retentionPeriod: "12"  # 12 months
+    # Long-term horizon now that everything ingested is pre-aggregated to ~5m
+    # resolution (see extraArgs.streamAggr.config below) -- there's no raw
+    # full-resolution data here to outgrow the volume the way there would be
+    # without aggregation. 4y sits in the middle of the ~3-5y range this store
+    # is meant to cover.
+    retentionPeriod: "4y"
+    # Bumped from the pre-aggregation baseline (200m/512Mi, limit 1000m/2Gi):
+    # stream aggregation keeps per-series state in memory for every rule it
+    # matches, and 4y of retention (vs. the previous 12mo) means a larger
+    # index working set during merges. Not based on observed usage yet --
+    # watch actual consumption after rollout and adjust.
     resources:
       requests:
-        cpu: 200m
-        memory: 512Mi
+        cpu: 300m
+        memory: 768Mi
       limits:
         cpu: 1000m
-        memory: 2Gi
+        memory: 3Gi
     persistentVolume:
       enabled: true
       storageClass: longhorn
       size: 150Gi
+      # NOT applied, left as discovered -- see docs/victoria-metrics.md
+      # "Known issue" section: this chart templates PVC labels from
+      # `extraLabels`, not `labels`, so the keys below have always been a
+      # no-op and this volume was never actually in Longhorn's "backup"
+      # recurring-job group. Worth fixing to `extraLabels` with group
+      # "ephemeral" instead (now that vmbackup below replaces Longhorn's
+      # block-level backup-daily job as the real backup path -- see
+      # templates/backup-cronjob.yaml), but `volumeClaimTemplates` is
+      # immutable on an existing StatefulSet, so that fix needs to ship as
+      # its own change: recreate the StatefulSet with `kubectl delete
+      # --cascade=orphan` (preserving the PVC) before the next helm upgrade,
+      # or patch the live PVC's labels directly out-of-band. Bundling that
+      # into this PR risks breaking the whole release on a field Kubernetes
+      # will reject.
       labels:
         recurring-job.longhorn.io/source: "enabled"
         recurring-job-group.longhorn.io/backup: "enabled"
@@ -29,3 +53,72 @@ victoria-metrics-single:
       runAsUser: 65534
       runAsGroup: 65534
       allowPrivilegeEscalation: false
+
+    # Stream aggregation (community-edition feature) downsamples every
+    # incoming sample to ~5m resolution before it's written to disk -- see
+    # files/stream-aggr-config.yml for the per-metric-type rules and
+    # docs/victoria-metrics.md for the full rationale and how to verify it.
+    # There's no native `streamAggr` values key in this chart, so the config
+    # is mounted by hand via extraVolumes/extraVolumeMounts below.
+    extraArgs:
+      envflag.enable: true
+      envflag.prefix: VM_
+      loggerFormat: json
+      streamAggr.config: /etc/vm/stream-aggr/config.yml
+      # Belt-and-suspenders: the match rules in stream-aggr-config.yml are a
+      # complete partition of every possible metric name, so nothing should
+      # ever fall through unmatched -- but if a future rule edit leaves a gap,
+      # dropInput means that metric goes missing (visible as "no data" in
+      # Grafana) instead of silently reverting to full-resolution raw storage
+      # forever, which is the exact cost problem this change exists to fix.
+      streamAggr.dropInput: true
+
+    extraVolumes:
+      - name: stream-aggr-config
+        configMap:
+          name: victoria-metrics-stream-aggr-config
+    extraVolumeMounts:
+      - name: stream-aggr-config
+        mountPath: /etc/vm/stream-aggr
+
+    # Drop self-monitoring metrics (Go runtime + process stats) that every
+    # Go-based component in the cluster exports, before they're even
+    # considered for aggregation or storage. These are only useful for live
+    # troubleshooting (GC pressure, FD leaks, RSS growth) -- Prometheus's own
+    # 7d raw retention already covers that; a multi-year history of them has
+    # not been useful here and isn't worth the series count. Everything else
+    # (kube-state-metrics, node-exporter, cAdvisor, app metrics) is unaffected.
+    relabel:
+      enabled: true
+      config:
+        - action: drop
+          source_labels: [__name__]
+          regex: "(go|process)_.*"
+
+# Daily vmbackup CronJob -- see templates/backup-cronjob.yaml and
+# docs/victoria-metrics.md.
+backup:
+  # 3:15am, after Longhorn's own 2:30am recurring-job window
+  # (k8s/foundation/longhorn-system/values.yaml) so the two don't contend
+  # for node I/O.
+  schedule: "15 3 * * *"
+  # Worst case is a full non-incremental upload of the entire retained
+  # dataset (e.g. first run, or after a gap); daily incremental runs should
+  # finish in minutes.
+  activeDeadlineSeconds: 7200
+  image:
+    # Keep in sync with victoria-metrics-single.server.image.tag above --
+    # vmbackup's on-disk format is tied to the VictoriaMetrics version that
+    # wrote the data.
+    tag: "v1.153.0"
+  nfs:
+    server: borg-2.msng.to
+    path: /backups/victoriametrics
+    capacity: 100Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi

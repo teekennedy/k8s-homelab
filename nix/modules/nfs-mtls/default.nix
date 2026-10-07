@@ -101,14 +101,23 @@ in {
     # to read/write. In both cases only bulk data lives on NFS; the SQLite state
     # (syncthing's DB, copyparty's index/thumbnail cache) is on Longhorn instead.
     #
-    #   syncthing  8384:8384  synced folder trees
-    #   copyparty  3923:3923  the private root volume
+    #   syncthing       8384:8384   synced folder trees
+    #   copyparty       3923:3923   the private root volume
+    #   victoriametrics 65534:65534 vmbackup CronJob's incremental backup destination
+    #                               (same "nobody" UID the vmsingle StatefulSet itself
+    #                               runs as; see k8s/platform/victoria-metrics/values.yaml)
+    #
+    # victoriametrics/ is also picked up by the nas-backups-weekly restic job (see
+    # nix/hosts/borg-2/nas-backups.nix), which snapshots everything under
+    # /storage/nas/backups offsite -- that's where day-over-day/week-over-week
+    # history comes from, since vmbackup itself only keeps one rolling incremental copy.
     systemd.tmpfiles.rules = lib.mkIf cfg.serverMode [
       "d /storage/nas/k8s 0755 root root -"
       "d /storage/nas/backups/syncthing 0755 8384 8384 -"
       "d /storage/nas/backups/syncthing/data 0755 8384 8384 -"
       "d /storage/nas/backups/copyparty 0755 3923 3923 -"
       "d /storage/nas/backups/copyparty/data 0755 3923 3923 -"
+      "d /storage/nas/backups/victoriametrics 0750 65534 65534 -"
     ];
   };
 }

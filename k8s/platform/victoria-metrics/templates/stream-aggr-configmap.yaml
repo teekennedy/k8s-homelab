@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: victoria-metrics-stream-aggr-config
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yml: |
+{{ .Files.Get "files/stream-aggr-config.yml" | indent 4 }}

@@ -1,0 +1,94 @@
+---
+# Daily vmbackup run, writing directly to the NFS-backed destination PVC
+# defined in backup-pv.yaml. vmbackup (community edition, see
+# https://docs.victoriametrics.com/victoriametrics/vmbackup/) needs direct
+# filesystem access to the same data VictoriaMetrics itself reads/writes --
+# it reads TSDB part files off disk, it doesn't fetch them over HTTP -- so
+# this Job mounts the *same* PVC the vmsingle StatefulSet uses, read-only,
+# and is pinned onto whatever node vmsingle is currently running on via
+# podAffinity so that PVC (ReadWriteOnce, Longhorn) can be attached to both
+# pods at once. This is the pattern VictoriaMetrics' own docs recommend for
+# Kubernetes: "it is recommended to use sidecar containers for running
+# vmbackup on the same pod" -- a same-node CronJob is the closest fit
+# available here, since the community vmbackup image has no shell to run a
+# long-lived sidecar loop in (it's a from-scratch image with only the
+# compiled binary).
+#
+# "server-volume-victoria-metrics-server-0" is the PVC Kubernetes derives
+# for ordinal 0 of the victoria-metrics-server StatefulSet's
+# "server-volume" volumeClaimTemplate (see values.yaml fullnameOverride and
+# the victoria-metrics-single chart's pvc naming) -- confirmed via
+# `helm template`.
+#
+# -dst is always .../latest: vmbackup's own backup format is incremental
+# against whatever already exists at -dst (unchanged TSDB parts aren't
+# re-uploaded), so there's no benefit to a fresh dated directory per run,
+# and no shell/date computation is needed in a container that doesn't have
+# one. Day-over-day/week-over-week history comes from the nas-backups-weekly
+# restic job (nix/hosts/borg-2/nas-backups.nix), which already snapshots
+# everything under /storage/nas/backups -- including this directory --
+# offsite with --keep-weekly/--keep-monthly retention. See
+# docs/victoria-metrics.md for the full restore procedure.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: victoria-metrics-backup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: victoria-metrics-backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: {{ .Values.backup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: victoria-metrics-backup
+        spec:
+          restartPolicy: OnFailure
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/instance: victoria-metrics
+                      app.kubernetes.io/name: victoria-metrics-single
+                  topologyKey: kubernetes.io/hostname
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+          containers:
+            - name: vmbackup
+              image: "victoriametrics/vmbackup:{{ .Values.backup.image.tag }}"
+              args:
+                - -storageDataPath=/storage
+                - -snapshot.createURL=http://victoria-metrics-server.{{ .Release.Namespace }}.svc:8428/snapshot/create
+                - -snapshot.deleteURL=http://victoria-metrics-server.{{ .Release.Namespace }}.svc:8428/snapshot/delete
+                - -dst=fs:///backup-dest/latest
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: vm-data
+                  mountPath: /storage
+                  readOnly: true
+                - name: backup-dest
+                  mountPath: /backup-dest
+              resources: {{ toYaml .Values.backup.resources | nindent 16 }}
+          volumes:
+            - name: vm-data
+              persistentVolumeClaim:
+                claimName: server-volume-victoria-metrics-server-0
+            - name: backup-dest
+              persistentVolumeClaim:
+                claimName: victoria-metrics-backups

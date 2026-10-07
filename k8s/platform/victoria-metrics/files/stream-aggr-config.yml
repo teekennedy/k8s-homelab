@@ -1,0 +1,51 @@
+# VictoriaMetrics stream aggregation rules (community-edition feature, see
+# https://docs.victoriametrics.com/stream-aggregation/). Applied by the
+# vmsingle server itself to every sample it receives from Prometheus'
+# remote_write, before anything is written to disk.
+#
+# Prometheus keeps ~7d of full-resolution data (see
+# k8s/platform/monitoring-system/values.yaml, prometheus.prometheusSpec).
+# VictoriaMetrics is the long-term store and has no need for that
+# resolution, so every rule below downsamples to one point per 5m. No rule
+# sets `by`/`without`, so aggregation stays per-series (grouped by the full
+# original label set) -- this changes sample *resolution* only, never which
+# series exist or their label cardinality.
+#
+# The four `match` regexes below are a complete partition of every possible
+# metric name (every name either ends in _total, _bucket, _sum, _count, or
+# none of those), so every incoming series is matched by exactly one rule.
+# Combined with -streamAggr.dropInput=true (see values.yaml extraArgs),
+# this guarantees VictoriaMetrics never keeps a second, full-resolution copy
+# of anything Prometheus already stores -- any future metric that somehow
+# doesn't match one of these regexes is dropped rather than silently falling
+# back to raw-resolution storage.
+
+# Counters (Prometheus/OpenMetrics client convention: *_total). `total` is
+# the output designed for long-term counter storage: it tracks resets the
+# same way the original counter did, so rate()/increase() against the
+# aggregated series behave the same as they would against the raw series.
+- match: '{__name__=~".+_total"}'
+  interval: 5m
+  outputs: [total]
+
+# Histogram bucket counters. *_bucket is always a counter, whether it comes
+# from a classic Prometheus histogram or a native/OpenMetrics one, so it
+# gets the same treatment as *_total above.
+- match: '{__name__=~".+_bucket"}'
+  interval: 5m
+  outputs: [total]
+
+# The _sum/_count companions of histograms and summaries. Also counters.
+- match: '{__name__=~".+_(sum|count)"}'
+  interval: 5m
+  outputs: [total]
+
+# Everything else: gauges, and summary quantile series (which are
+# client-computed snapshots, not true counters or gauges, but behave like
+# gauges for aggregation purposes). `avg` is the right default for
+# dashboards; `min`/`max` ride alongside so a brief spike (latency, memory,
+# queue depth) that happened between two 5m samples isn't averaged away once
+# a dashboard looks further back than Prometheus's 7d raw window.
+- match: '{__name__!~".+_(total|bucket|sum|count)"}'
+  interval: 5m
+  outputs: [avg, min, max]
