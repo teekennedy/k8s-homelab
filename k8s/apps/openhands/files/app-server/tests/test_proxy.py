@@ -75,3 +75,67 @@ def test_webhook_requires_the_sandboxes_own_key(api, hooks, user):
     assert hooks.post(path, json=[], headers=wrong).status_code == 401
     right = {"X-Session-API-Key": a["session_api_key"]}
     assert hooks.post(path, json=[], headers=right).status_code == 200
+
+
+def _envelope(sid: str, **kw):
+    return {"host": f"https://openhands.example/runtime/{sid}", **kw}
+
+
+def test_cloud_proxy_relays_to_the_named_sandbox(api, state, user):
+    info = api.post("/api/v1/sandboxes", headers=user).json()
+    sid = info["id"]
+    seen = []
+    api.app.state.http = _stub_upstream(state, seen).http
+
+    r = api.post(
+        "/api/cloud-proxy",
+        headers={**user, "Cookie": "_oauth2_proxy=secret"},
+        json=_envelope(
+            sid,
+            method="post",
+            path="/api/git/commits?path=%2Fworkspace&limit=50",
+            headers={
+                "X-Session-API-Key": info["session_api_key"],
+                "X-Org-Id": "org",
+                "Authorization": "Bearer cloud",
+            },
+            body={"a": 1},
+        ),
+    )
+    assert r.status_code == 200 and r.text == "/api/git/commits"
+    req = seen[0]
+    assert req.method == "POST"
+    assert str(req.url) == (
+        f"http://{sid}.openhands.svc.cluster.local:8000"
+        "/api/git/commits?path=%2Fworkspace&limit=50"
+    )
+    assert req.content == b'{"a":1}'
+    assert req.headers["x-session-api-key"] == info["session_api_key"]
+    for dropped in ("cookie", "authorization", "x-org-id", "x-forwarded-user"):
+        assert dropped not in req.headers
+
+
+def test_cloud_proxy_refuses_anything_but_a_live_sandbox(api, state, user):
+    sid = api.post("/api/v1/sandboxes", headers=user).json()["id"]
+    seen = []
+    api.app.state.http = _stub_upstream(state, seen).http
+
+    def post(body, headers=user):
+        return api.post("/api/cloud-proxy", headers=headers, json=body).status_code
+
+    assert post(_envelope(sid, path="/alive"), headers={}) == 401
+    for host in (
+        "https://example.com",
+        "http://kubernetes.default.svc",
+        f"https://openhands.example.evil/runtime/{sid}",
+        f"https://openhands.example/runtime/{sid}/../sbx-other",
+        f"https://openhands.example/runtime/{sid}@evil",
+        "https://openhands.example/runtime/sbx-nope",
+        "https://openhands.example/runtime/",
+    ):
+        assert post({"host": host, "path": "/alive"}) == 403, host
+    assert post(_envelope(sid, path="@evil.example/alive")) == 422
+    assert post(_envelope(sid, path="/alive", method="CONNECT")) == 422
+    api.delete(f"/api/v1/sandboxes/{sid}", headers=user)
+    assert post(_envelope(sid, path="/alive")) == 403
+    assert seen == []

@@ -3,18 +3,33 @@
 The agent server has no notion of a path prefix, so the prefix is stripped.
 The frontend derives both the HTTP base and the WebSocket URL from the
 conversation_url it is given, so one route serves both.
+
+POST /api/cloud-proxy is the same thing in an envelope: the frontend's cloud
+client sends every runtime call it has no app-API endpoint for through it
+(typescript client, `CloudClient.requestThroughProxy`).
 """
 
 import asyncio
 import contextlib
 import logging
+from typing import Any
 
 import httpx
 import websockets
-from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
 
+from .auth import principal
 from .sandboxes import SandboxManager
 
 log = logging.getLogger(__name__)
@@ -36,6 +51,7 @@ HOP_BY_HOP = {
 # Credentials for *this* origin. An agent server is code the agent controls, so
 # nothing that authenticates anywhere else may reach it.
 CREDENTIALS = {"cookie", "authorization"}
+PROXY_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 
 
 def upstream_headers(headers, user_header: str) -> dict[str, str]:
@@ -111,6 +127,60 @@ async def forward(
             if k.lower() not in HOP_BY_HOP - {"content-length"}
         },
         background=BackgroundTask(resp.aclose),
+    )
+
+
+class CloudProxyRequest(BaseModel):
+    """The agent server's own envelope (`cloud_proxy_router.py`)."""
+
+    host: str
+    method: str = "GET"
+    path: str
+    headers: dict[str, str] = Field(default_factory=dict)
+    body: Any = None
+    timeout_seconds: float = Field(default=15.0, ge=1.0, le=60.0)
+
+
+@router.post(
+    "/api/cloud-proxy", include_in_schema=False, dependencies=[Depends(principal)]
+)
+async def cloud_proxy(req: CloudProxyRequest, request: Request) -> Response:
+    state = request.app.state
+    sandboxes: SandboxManager = state.sandboxes
+    # The only host this relays to is a sandbox this server minted, named the
+    # way the frontend was told to reach it. Anything else would make it an
+    # open relay into the cluster.
+    prefix = f"{state.settings.public_url}/runtime/"
+    sandbox_id = req.host.rstrip("/").removeprefix(prefix)
+    if not req.host.startswith(prefix) or sandboxes.live_row(sandbox_id) is None:
+        raise HTTPException(403, "cloud proxy host not allowed")
+    method = req.method.upper()
+    if method not in PROXY_METHODS or not req.path.startswith("/"):
+        raise HTTPException(422, "invalid method or path")
+    sandboxes.touch(sandbox_id)
+
+    # Of the envelope's headers only the session key means anything to an
+    # agent server; the rest were addressed to a cloud host.
+    headers = {k: v for k, v in req.headers.items() if k.lower() == "x-session-api-key"}
+    body = (
+        {"content": req.body.encode()}
+        if isinstance(req.body, str)
+        else {"json": req.body} if req.body is not None else {}
+    )
+    try:
+        resp = await state.http.request(
+            method,
+            f"{sandboxes.agent_url(sandbox_id)}{req.path}",
+            headers=headers,
+            timeout=req.timeout_seconds,
+            **body,
+        )
+    except httpx.RequestError:
+        raise HTTPException(502, "sandbox is not reachable")
+    return Response(
+        resp.content,
+        status_code=resp.status_code,
+        media_type=resp.headers.get("content-type", "application/octet-stream"),
     )
 
 

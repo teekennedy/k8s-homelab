@@ -443,10 +443,6 @@ single volume ever stops being enough.
 - **The Terminal tab stays empty for ACP agents**, for the same reason: it
   is fed from `TerminalObservation` events, and an ACP shell call is an
   `ACPToolCallEvent` (`tool_kind: "execute"`).
-- **No commit list in the Changes tab.** The frontend sends runtime calls it
-  has no first-class endpoint for (`/api/git/commits`, bash event search,
-  confirmation responses) through `POST /api/cloud-proxy`, which the app
-  server does not implement. Uncommitted changes and their diffs work.
 - **Settings has no link to Secrets.** The page is at
   `/canvas/settings/secrets`; the sidebar's "All Cloud Settings" link points
   at a hosted settings UI this deployment does not have.
