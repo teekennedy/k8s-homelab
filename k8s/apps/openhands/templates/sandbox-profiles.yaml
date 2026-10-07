@@ -280,7 +280,9 @@ metadata:
     {{- include "openhands.labels" $root | nindent 4 }}
 spec:
   parentRefs:
-    - name: {{ (index $root.Values "oauth2-proxy").gatewayApi.gatewayRef.name }}
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ (index $root.Values "oauth2-proxy").gatewayApi.gatewayRef.name }}
       namespace: {{ (index $root.Values "oauth2-proxy").gatewayApi.gatewayRef.namespace }}
       sectionName: {{ (index $root.Values "oauth2-proxy").gatewayApi.gatewayRef.sectionName }}
   hostnames:
@@ -309,8 +311,11 @@ spec:
             kind: Middleware
             name: {{ $name }}-stripprefix
       backendRefs:
-        - name: {{ $name }}
+        - group: ''
+          kind: Service
+          name: {{ $name }}
           port: {{ $root.Values.service.port }}
+          weight: 1
 ---
 # What the profile is actually for. Ingress is the gateway only; egress is the
 # profile's declared class and nothing else.
