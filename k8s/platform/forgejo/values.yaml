@@ -204,6 +204,22 @@ forgejo-resources:
             secretName: argocd-repo-k8s-homelab
             secretNamespace: argocd
             url: https://git.msng.to/ops/k8s-homelab
+    # Identity the borg hosts fetch ops/k8s-homelab as (nix/modules/selfupdate).
+    # The hosts read the token from sops, not from this Secret, so the Secret
+    # is only where the token is copied from when it is first created or
+    # rotated — see docs/nixos-cd.md, "Repo source".
+    #
+    # In no team: the repo is public, so being signed in is all it takes to
+    # read it.
+    - name: nixos-selfupdate
+      fullName: NixOS Self-Update
+      email: nixos-selfupdate@msng.to
+      secretName: nixos-selfupdate-forgejo-user
+      secretNamespace: forgejo
+      accessTokens:
+        - name: nixos-selfupdate
+          scopes:
+            - read:repository
     # Identity the Archon agent pushes and opens PRs as (k8s/apps/archon). It is
     # deliberately a bot account and not tkennedy: every branch and PR the
     # sandboxed model produces has to be attributable to the automation at a

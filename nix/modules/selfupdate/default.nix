@@ -19,10 +19,17 @@
   branch = "main";
   attribute = config.networking.hostName;
 
+  # The forge rejects anonymous clones, so fetches from it authenticate as
+  # this account. Until ./secrets.enc.yaml exists there is no token and the
+  # forge fetch fails over to the public mirror below.
+  forgeUrl = "https://git.msng.to";
+  forgeUser = "nixos-selfupdate";
+  hasForgeToken = builtins.pathExists ./secrets.enc.yaml;
+
   # Tried in order. The forge runs on this very cluster, so the public mirror is
   # what lets a host still update itself while the cluster is down.
   flakeUrls = [
-    "https://git.msng.to/ops/k8s-homelab.git"
+    "${forgeUrl}/ops/k8s-homelab.git"
     "https://github.com/teekennedy/k8s-homelab.git"
   ];
 
@@ -97,22 +104,28 @@
     # busybox grep has no such flag and the unit's PATH is not guaranteed to put
     # GNU grep first.
     runtimeInputs = [pkgs.git pkgs.coreutils pkgs.gnugrep];
-    runtimeEnv = {
-      REPO_DIR = repoDir;
-      LAST_REV_FILE = lastRevFile;
-      BUILT_REV_FILE = builtRevFile;
-      BUILT_SYSTEM_LINK = builtSystemLink;
-      TARGET_REV_FILE = buildTargetFile;
-      RUN_LOG = buildLog;
-      BRANCH = branch;
-      ATTRIBUTE = attribute;
-      FLAKE_URLS = lib.concatStringsSep " " flakeUrls;
-      NIX_LOG_JSON = nixLogJson;
-      NIX_TIMINGS = nixTimings;
-      BUILD_METRICS_FILE = buildMetricsFile;
-      TEXTFILE_DIR = textfileDir;
-      METRICS_CMD = lib.getExe buildMetricsScript;
-    };
+    runtimeEnv =
+      {
+        REPO_DIR = repoDir;
+        LAST_REV_FILE = lastRevFile;
+        BUILT_REV_FILE = builtRevFile;
+        BUILT_SYSTEM_LINK = builtSystemLink;
+        TARGET_REV_FILE = buildTargetFile;
+        RUN_LOG = buildLog;
+        BRANCH = branch;
+        ATTRIBUTE = attribute;
+        FLAKE_URLS = lib.concatStringsSep " " flakeUrls;
+        NIX_LOG_JSON = nixLogJson;
+        NIX_TIMINGS = nixTimings;
+        BUILD_METRICS_FILE = buildMetricsFile;
+        TEXTFILE_DIR = textfileDir;
+        METRICS_CMD = lib.getExe buildMetricsScript;
+      }
+      // lib.optionalAttrs hasForgeToken {
+        FORGE_URL = forgeUrl;
+        FORGE_USER = forgeUser;
+        FORGE_TOKEN_FILE = config.sops.secrets.selfupdate_forgejo_token.path;
+      };
     text = builtins.readFile ./build.sh;
   };
 
@@ -227,6 +240,12 @@ in {
 
   config = lib.mkIf cfg.enable (lib.mkMerge [
     {
+      # Readable by root only, which is who the build unit runs as.
+      sops.secrets.selfupdate_forgejo_token = lib.mkIf hasForgeToken {
+        sopsFile = ./secrets.enc.yaml;
+        mode = "0400";
+      };
+
       # Builds this host's NixOS configuration from git and leaves the result as
       # a GC-rooted symlink; it does not touch the system profile. Separate from
       # staging (see docs/nixos-cd.md for why) so staging is never held up

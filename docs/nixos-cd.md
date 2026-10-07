@@ -272,14 +272,32 @@ four ways this goes wrong, and Alertmanager routes them to Discord by default:
   date; it exists to roll out anything the host timer staged with no pipeline.
 - **Repo source.** Hosts fetch from `git.msng.to` first and fall back to the
   public GitHub mirror. The forge runs on this same cluster, so the mirror is
-  what lets a host update itself when the cluster is down. Both are readable
-  anonymously, so no repo credentials live on the hosts.
+  what lets a host update itself when the cluster is down.
+
+  The forge requires sign-in (`REQUIRE_SIGNIN_VIEW`), so hosts fetch from it as
+  the `nixos-selfupdate` Forgejo account, using a `read:repository` token kept
+  in `nix/modules/selfupdate/secrets.enc.yaml`. `forgejo-resources` mints the
+  token into a Kubernetes Secret once and never rotates it by itself, so
+  copying it into sops is a one-time step (repeat it if the token is ever
+  recreated):
+
+  ```sh
+  token=$(kubectl -n forgejo get secret nixos-selfupdate-forgejo-user \
+    -o jsonpath='{.data.token}' | base64 -d)
+  printf 'selfupdate_forgejo_token: %s\n' "$token" \
+    > nix/modules/selfupdate/secrets.enc.yaml
+  sops encrypt --in-place nix/modules/selfupdate/secrets.enc.yaml
+  ```
+
+  Until that file exists, or if the token is rejected, the forge fetch fails
+  and hosts fall back to the mirror, which is readable anonymously.
 
 ## Files
 
 | what | where |
 |---|---|
 | host module, scripts | `nix/modules/selfupdate/` |
+| forge fetch account | `forgejo-resources.users` in `k8s/platform/forgejo/values.yaml` |
 | build metrics parser | `nix/modules/selfupdate/build-metrics/` |
 | peer substituters | `nix/modules/builders/` |
 | SSH CA + issuer | `k8s/foundation/cert-system/templates/deploybot-ssh-ca.yaml` |

@@ -24,12 +24,22 @@ fetch() {
     git init --quiet --bare "$REPO_DIR"
   fi
 
+  # The forge refuses anonymous clones. The helper is scoped to the forge's
+  # URL, so git never offers the token to the public mirror, and it reads the
+  # file at fetch time, so the token never appears in this process's argv.
+  local -a auth=()
+  if [ -r "${FORGE_TOKEN_FILE:-}" ]; then
+    auth=(-c "credential.$FORGE_URL.helper=!f() { echo \"username=$FORGE_USER\"; echo \"password=\$(cat \"$FORGE_TOKEN_FILE\")\"; }; f")
+  fi
+
   # Remotes are tried in order. The forge runs on this very cluster, so the
   # public mirror is what lets a host still update itself when the cluster is
   # down -- which is exactly when you would want it to.
   for url in "${urls[@]}"; do
     echo "fetching $BRANCH from $url"
-    git -C "$REPO_DIR" fetch --quiet --prune "$url" "+refs/heads/$BRANCH:refs/heads/$BRANCH" && return 0
+    # GIT_TERMINAL_PROMPT=0 so a rejected or missing credential fails over to
+    # the next remote instead of waiting on a prompt nobody will answer.
+    GIT_TERMINAL_PROMPT=0 git "${auth[@]}" -C "$REPO_DIR" fetch --quiet --prune "$url" "+refs/heads/$BRANCH:refs/heads/$BRANCH" && return 0
     echo "warning: fetch from $url failed"
   done
 
