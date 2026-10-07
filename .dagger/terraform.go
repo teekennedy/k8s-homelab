@@ -53,7 +53,7 @@ func (m *Homelab) terraformContainer(container *dagger.Container) *dagger.Contai
 
 // initTerraformModule runs tofu init against the module given by modPath and
 // returns a Changeset of files modified, as well as the initialized container.
-func (m *Homelab) initTerraformModule(ctx context.Context, source *dagger.Directory, container *dagger.Container, modPath string) (*dagger.Changeset, *dagger.Container, error) {
+func (m *Homelab) initTerraformModule(ctx context.Context, source *dagger.Directory, container *dagger.Container, modPath string) (*dagger.Container, error) {
 	modWorkdir := "/src/" + modPath
 
 	updated, err := container.
@@ -64,29 +64,67 @@ func (m *Homelab) initTerraformModule(ctx context.Context, source *dagger.Direct
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, nil, fmt.Errorf("terraform module %s: init failed:\n%s", modPath, execErr.Stderr)
+			return nil, fmt.Errorf("terraform module %s: init failed:\n%s", modPath, execErr.Stderr)
 		}
-		return nil, nil, fmt.Errorf("terraform module %s: init failed: %w", modPath, err)
+		return nil, fmt.Errorf("terraform module %s: init failed: %w", modPath, err)
+	}
+
+	return updated, nil
+}
+
+// lockTerraformModule runs tofu providers lock against the module given by
+// modPath for the given platforms, and returns a Changeset of files modified.
+func (m *Homelab) lockTerraformModule(ctx context.Context, source *dagger.Directory, container *dagger.Container, modPath string, platforms []string) (*dagger.Changeset, error) {
+	// module must be initialized first
+	initializedContainer, err := m.initTerraformModule(ctx, source, container, modPath)
+	if err != nil {
+		return nil, err
+	}
+	modWorkdir := "/src/" + modPath
+
+	args := []string{"tofu", "providers", "lock"}
+	for _, platform := range platforms {
+		args = append(args, "-platform="+platform)
+	}
+
+	updated, err := initializedContainer.
+		WithExec(args).
+		Sync(ctx)
+	if err != nil {
+		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			return nil, fmt.Errorf("terraform module %s: providers lock failed:\n%s", modPath, execErr.Stderr)
+		}
+		return nil, fmt.Errorf("terraform module %s: providers lock failed: %w", modPath, err)
 	}
 
 	before := dag.Directory().WithDirectory(modPath, source.Directory(modPath))
 	after := dag.Directory().WithDirectory(modPath, updated.Directory(modWorkdir)).WithoutDirectory(modPath + "/.terraform")
 
-	return after.Changes(before), updated, nil
+	return after.Changes(before), nil
 }
 
-// InitTerraform runs tofu init for all Terraform/OpenTofu modules.
+// LockTerraform runs tofu providers lock for all Terraform/OpenTofu modules.
 //
-// Returns a changeset. Use `dagger generate init-terraform --auto-apply` to apply
-// lockfile changes produced by provider initialization.
+// Unlike `tofu init`, `tofu providers lock` computes provider hashes for the
+// given platforms deterministically, regardless of the platform it runs on.
+// This keeps .terraform.lock.hcl stable across different machines, which
+// `tofu init` cannot guarantee since it only records hashes for the host
+// platform it happens to run on.
+//
+// Returns a changeset. Use `dagger generate lock-terraform --auto-apply` to apply
+// lockfile changes produced by provider locking.
 // +generate
-func (m *Homelab) InitTerraform(
+func (m *Homelab) LockTerraform(
 	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"]
 	source *dagger.Directory,
 	// +optional
 	container *dagger.Container,
+	// platforms to compute provider hashes for.
+	// +optional
+	// +default=["linux_arm64", "linux_amd64", "darwin_arm64"]
+	platforms []string,
 ) (*dagger.Changeset, error) {
 	modulePaths := discoverTerraformModulePaths(ctx, source)
 	if len(modulePaths) == 0 {
@@ -100,7 +138,7 @@ func (m *Homelab) InitTerraform(
 	var wg sync.WaitGroup
 	for i, modPath := range modulePaths {
 		wg.Go(func() {
-			changesets[i], _, errs[i] = m.initTerraformModule(ctx, source, container, modPath)
+			changesets[i], errs[i] = m.lockTerraformModule(ctx, source, container, modPath, platforms)
 		})
 	}
 	wg.Wait()
@@ -149,7 +187,7 @@ func (m *Homelab) validateTerraformModule(ctx context.Context, source *dagger.Di
 
 	modWorkdir := "/src/" + modPath
 
-	_, initializedContainer, err := m.initTerraformModule(ctx, source, container, modPath)
+	initializedContainer, err := m.initTerraformModule(ctx, source, container, modPath)
 	if err != nil {
 		return nil, err
 	}

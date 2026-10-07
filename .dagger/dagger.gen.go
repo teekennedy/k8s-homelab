@@ -737,27 +737,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).HelmCharts(&parent, ctx, source), nil
-		case "InitTerraform":
-			var parent Homelab
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			var container *dagger.Container
-			if inputArgs["container"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
-				}
-			}
-			return (*Homelab).InitTerraform(&parent, ctx, source, container)
 		case "LintGo":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -828,6 +807,34 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).LintYaml(&parent, ctx, source, paths, container)
+		case "LockTerraform":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var source *dagger.Directory
+			if inputArgs["source"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
+				}
+			}
+			var container *dagger.Container
+			if inputArgs["container"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
+				}
+			}
+			var platforms []string
+			if inputArgs["platforms"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["platforms"]), &platforms)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg platforms", err))
+				}
+			}
+			return (*Homelab).LockTerraform(&parent, ctx, source, container, platforms)
 		case "PythonProjects":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
