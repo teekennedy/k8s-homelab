@@ -78,7 +78,7 @@ def _authorized(
 
 @router.api_route(
     "/runtime/{sandbox_id}/{path:path}",
-    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+    methods=[*sorted(PROXY_METHODS), "HEAD", "OPTIONS"],
     include_in_schema=False,
 )
 async def proxy_http(sandbox_id: str, path: str, request: Request):
@@ -141,18 +141,25 @@ class CloudProxyRequest(BaseModel):
     timeout_seconds: float = Field(default=15.0, ge=1.0, le=60.0)
 
 
+def _sandbox_in(host: str, public_url: str) -> str | None:
+    """The sandbox id in a `{public_url}/runtime/<id>` base URL, the form the
+    frontend is handed in conversation_url; None for any other host."""
+    prefix = f"{public_url}/runtime/"
+    if not host.startswith(prefix):
+        return None
+    return host[len(prefix) :].rstrip("/")
+
+
 @router.post(
     "/api/cloud-proxy", include_in_schema=False, dependencies=[Depends(principal)]
 )
 async def cloud_proxy(req: CloudProxyRequest, request: Request) -> Response:
     state = request.app.state
     sandboxes: SandboxManager = state.sandboxes
-    # The only host this relays to is a sandbox this server minted, named the
-    # way the frontend was told to reach it. Anything else would make it an
-    # open relay into the cluster.
-    prefix = f"{state.settings.public_url}/runtime/"
-    sandbox_id = req.host.rstrip("/").removeprefix(prefix)
-    if not req.host.startswith(prefix) or sandboxes.live_row(sandbox_id) is None:
+    # The only host this relays to is a sandbox this server minted. Anything
+    # else would make it an open relay into the cluster.
+    sandbox_id = _sandbox_in(req.host, state.settings.public_url)
+    if sandbox_id is None or sandboxes.live_row(sandbox_id) is None:
         raise HTTPException(403, "cloud proxy host not allowed")
     method = req.method.upper()
     if method not in PROXY_METHODS or not req.path.startswith("/"):
@@ -162,11 +169,11 @@ async def cloud_proxy(req: CloudProxyRequest, request: Request) -> Response:
     # Of the envelope's headers only the session key means anything to an
     # agent server; the rest were addressed to a cloud host.
     headers = {k: v for k, v in req.headers.items() if k.lower() == "x-session-api-key"}
-    body = (
-        {"content": req.body.encode()}
-        if isinstance(req.body, str)
-        else {"json": req.body} if req.body is not None else {}
-    )
+    body: dict[str, Any] = {}
+    if isinstance(req.body, str):
+        body["content"] = req.body
+    elif req.body is not None:
+        body["json"] = req.body
     try:
         resp = await state.http.request(
             method,
