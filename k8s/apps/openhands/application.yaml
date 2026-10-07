@@ -80,3 +80,4 @@ spec:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
       - RespectIgnoreDifferences=true
+      - ServerSideApply=true
