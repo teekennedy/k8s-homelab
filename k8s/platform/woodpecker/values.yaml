@@ -17,6 +17,10 @@ woodpecker:
       # can self-register on first login while WOODPECKER_OPEN is false. Every
       # other account is pre-created through the admin API by that job.
       WOODPECKER_ADMIN: "tkennedy,woodpecker-resources"
+      # Woodpecker only hands the clone step a netrc for repos the forge
+      # reports as private. ops/k8s-homelab is public, but Forgejo runs with
+      # REQUIRE_SIGNIN_VIEW, so an anonymous clone of it is rejected anyway.
+      WOODPECKER_AUTHENTICATE_PUBLIC_REPOS: "true"
       # A running pipeline pod blocks kured (see the WoodpeckerPipelineRunning
       # gate in k8s/foundation/kured), so a wedged pipeline would hold node
       # reboots off indefinitely. These bound that.
