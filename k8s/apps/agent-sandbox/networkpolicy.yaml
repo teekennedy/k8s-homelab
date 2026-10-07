@@ -29,7 +29,12 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
-    # kube API server ClusterIP. Matches k8s/apps/redteam/values.yaml kubeApiCidr.
+    # The kube API server, by the node VLAN and its real port: egress is
+    # matched after the Service DNAT, so a rule on the `kubernetes` ClusterIP
+    # (10.43.0.1:443) never matches and every new connection is refused.
     - to:
         - ipBlock:
-            cidr: 10.43.0.1/32
+            cidr: 10.69.80.0/25
+      ports:
+        - port: 6443
+          protocol: TCP
