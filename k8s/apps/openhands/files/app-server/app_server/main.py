@@ -22,6 +22,7 @@ from . import (
 from .automations import Automations
 from .conversations import ConversationService
 from .db import Database
+from .forge import Forge
 from .kube import Kube
 from .sandboxes import SandboxManager, load_specs
 from .settings import Settings
@@ -68,11 +69,13 @@ class State:
             [s for s in self.sandboxes.specs if s != settings.default_spec]
         )
         self.secrets_store = SecretsStore(db, settings.secrets_key)
+        self.forge = Forge(self.http, settings.forge_url, settings.forge_token)
         self.conversations = ConversationService(
             db=db,
             sandboxes=self.sandboxes,
             settings=self.settings_store,
             secrets=self.secrets_store,
+            forge=self.forge,
             http=self.http,
             public_url=settings.public_url,
             default_spec=settings.default_spec,

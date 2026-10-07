@@ -49,6 +49,10 @@ class Settings:
     # for none, and the file holding the secret the forge signs deliveries with.
     forge_webhook_source: str
     forge_webhook_secret_file: Path
+    # The forge the repository picker searches, and the token of the account
+    # sandboxes clone as. Either may be empty: no picker.
+    forge_url: str
+    forge_token: str
     # How long a new conversation may wait for its sandbox to be RUNNING.
     start_timeout: float
     # Encrypts the conversation secrets store at rest.
@@ -77,6 +81,8 @@ class Settings:
             automations_file=Path(_env("AUTOMATIONS_FILE")),
             forge_webhook_source=os.environ.get("FORGE_WEBHOOK_SOURCE", ""),
             forge_webhook_secret_file=Path(_env("FORGE_WEBHOOK_FILE")),
+            forge_url=os.environ.get("FORGE_URL", ""),
+            forge_token=os.environ.get("FORGE_TOKEN", ""),
             start_timeout=float(_env("START_TIMEOUT_SECONDS")),
             secrets_key=_env("SECRETS_KEY"),
         )

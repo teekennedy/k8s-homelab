@@ -17,18 +17,24 @@ def _store(request: Request) -> SettingsStore:
     return request.app.state.settings_store
 
 
+def _view(request: Request) -> dict[str, Any]:
+    return {
+        **_store(request).settings_view(),
+        "provider_tokens_set": request.app.state.forge.providers(),
+    }
+
+
 @router.get("/api/v1/settings")
 async def get_settings(request: Request) -> dict[str, Any]:
-    return _store(request).settings_view()
+    return _view(request)
 
 
 @router.post("/api/v1/settings")
 async def save_settings(
     request: Request, body: Annotated[dict[str, Any], Body()]
 ) -> dict[str, Any]:
-    store = _store(request)
-    store.save_settings(body)
-    return store.settings_view()
+    _store(request).save_settings(body)
+    return _view(request)
 
 
 def _schema(request: Request, name: str) -> Response:

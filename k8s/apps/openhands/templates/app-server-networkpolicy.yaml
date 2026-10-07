@@ -58,5 +58,7 @@ spec:
       ports:
         - port: {{ .Values.service.port }}
           protocol: TCP
+    # The forge's API, for the repository picker.
+    {{- include "openhands.egressForge" . | nindent 4 }}
     # PyPI, for the dependencies installed at startup.
     {{- include "openhands.egressInternet" . | nindent 4 }}

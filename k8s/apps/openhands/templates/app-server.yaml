@@ -231,6 +231,16 @@ spec:
               value: {{ .Values.forge.webhook.source | quote }}
             - name: FORGE_WEBHOOK_FILE
               value: /etc/openhands-app-server/forge-webhook/webhook-secret
+            # The repository picker searches the forge as the account
+            # sandboxes clone with. Optional: without it there is no picker.
+            - name: FORGE_URL
+              value: {{ .Values.forge.url | quote }}
+            - name: FORGE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.forge.secretName }}
+                  key: token
+                  optional: true
             - name: SECRETS_KEY
               valueFrom:
                 secretKeyRef:

@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 
 from .db import Database, now
+from .forge import Forge
 from .sandboxes import SandboxManager, Status
 from .secrets_store import SecretsStore
 from .settings_store import SettingsStore
@@ -26,6 +27,8 @@ log = logging.getLogger(__name__)
 
 WORKING_DIR = "/workspace/project"
 TERMINAL = ("READY", "ERROR")
+# Seconds a new conversation's repository may take to clone.
+CLONE_TIMEOUT = 300
 CONVERSATION_SORTS = {
     "CREATED_AT": "created_at ASC",
     "CREATED_AT_DESC": "created_at DESC",
@@ -73,6 +76,7 @@ class ConversationService:
         sandboxes: SandboxManager,
         settings: SettingsStore,
         secrets: SecretsStore,
+        forge: Forge,
         http: httpx.AsyncClient,
         public_url: str,
         default_spec: str,
@@ -82,6 +86,7 @@ class ConversationService:
         self.sandboxes = sandboxes
         self.settings = settings
         self.secrets = secrets
+        self.forge = forge
         self.http = http
         self.public_url = public_url
         self.default_spec = default_spec
@@ -198,6 +203,9 @@ class ConversationService:
             self._set_task(task_id, sandbox_id=sandbox_id)
             await self._wait_running(sandbox_id)
 
+            if request.get("selected_repository"):
+                self._set_task(task_id, status="PREPARING_REPOSITORY")
+                await self._clone(sandbox, request)
             self._set_task(task_id, status="STARTING_CONVERSATION")
             info = await self._start_on_sandbox(sandbox, request, agent_settings)
             self._insert_conversation(
@@ -210,6 +218,31 @@ class ConversationService:
             self._set_task(task_id, status="ERROR", detail=str(e)[:1000])
             if sandbox_id:
                 await self.sandboxes.delete(sandbox_id)
+
+    async def _clone(self, sandbox: dict[str, Any], request: dict[str, Any]) -> None:
+        """Check the chosen repository out as the conversation's working
+        directory, with the sandbox's own git credentials."""
+        repository = request["selected_repository"]
+        resp = await self.http.post(
+            f"{self.sandboxes.agent_url(sandbox['id'])}/api/bash/execute_bash_command",
+            json={
+                "command": self.forge.clone_command(
+                    repository, request.get("selected_branch")
+                ),
+                "cwd": WORKING_DIR,
+                "timeout": CLONE_TIMEOUT,
+            },
+            headers={"X-Session-API-Key": sandbox["session_api_key"]},
+            timeout=CLONE_TIMEOUT + 30,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        if result.get("exit_code") != 0:
+            output = (result.get("stderr") or result.get("stdout") or "").strip()
+            raise RuntimeError(
+                f"could not clone {repository} into the sandbox"
+                f" (spec {sandbox['spec']}): {output[-500:] or 'no output'}"
+            )
 
     async def start_in(
         self, sandbox_id: str, request: dict[str, Any], created_by: str
@@ -329,7 +362,9 @@ class ConversationService:
             "created_by_user_id": row["created_by"],
             "selected_repository": meta.get("selected_repository"),
             "selected_branch": meta.get("selected_branch"),
-            "git_provider": meta.get("git_provider"),
+            # Never null where there is a forge: the frontend words its git
+            # actions for GitHub when a conversation names no provider.
+            "git_provider": meta.get("git_provider") or self.forge.provider,
             "title": row["title"],
             "trigger": meta.get("trigger"),
             "pr_number": [],

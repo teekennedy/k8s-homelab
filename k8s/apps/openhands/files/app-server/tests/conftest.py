@@ -156,6 +156,8 @@ def settings(tmp_path) -> Settings:
         automations_file=automations,
         forge_webhook_source="forgejo",
         forge_webhook_secret_file=tmp_path / "webhook-secret",
+        forge_url="https://forge.example",
+        forge_token="forge-token",
         start_timeout=5,
         secrets_key="test-secrets-key",
     )

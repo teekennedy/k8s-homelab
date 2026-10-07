@@ -1,5 +1,6 @@
-"""The single-user account surface, the pages the frontend expects to exist
-but this deployment has nothing to put in, and the automation service.
+"""The single-user account surface, the forge's repositories, the pages the
+frontend expects to exist but this deployment has nothing to put in, and the
+automation service.
 
 One user, one personal organization whose id equals the user id: what the
 frontend reads as "personal workspace" (`api/cloud/types.d.ts`).
@@ -7,9 +8,10 @@ frontend reads as "personal workspace" (`api/cloud/types.d.ts`).
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .auth import Principal, principal
+from .forge import ForgeError
 from .proxy import forward
 
 router = APIRouter()
@@ -88,12 +90,41 @@ def _empty_page() -> dict[str, Any]:
     return {"items": [], "next_page_id": None}
 
 
-# No git provider integration (the forge is not one of upstream's providers;
-# the agent clones by URL), and no skill or model marketplace.
+@router.get("/api/v1/git/repositories/search")
+async def repositories(
+    request: Request,
+    who: Caller,
+    query: str | None = None,
+    limit: Annotated[int, Query(ge=1)] = 100,
+    page_id: str | None = None,
+) -> dict[str, Any]:
+    """Repositories on the forge, whatever `provider` the frontend names: its
+    picker falls back to `github` when it has not read the provider list."""
+    try:
+        return await request.app.state.forge.repositories(query, limit, page_id)
+    except ForgeError as e:
+        raise HTTPException(502, str(e))
+
+
+@router.get("/api/v1/git/branches/search")
+async def branches(
+    request: Request,
+    who: Caller,
+    repository: str,
+    query: str | None = None,
+    limit: Annotated[int, Query(ge=1)] = 30,
+    page_id: str | None = None,
+) -> dict[str, Any]:
+    try:
+        return await request.app.state.forge.branches(repository, query, limit, page_id)
+    except ForgeError as e:
+        raise HTTPException(502, str(e))
+
+
+# No app installations or suggested tasks on the forge, and no skill or model
+# marketplace.
 for _path in (
-    "/api/v1/git/repositories/search",
     "/api/v1/git/installations/search",
-    "/api/v1/git/branches/search",
     "/api/v1/git/suggested-tasks/search",
     "/api/v1/skills/search",
     "/api/v1/config/models/search",

@@ -258,6 +258,7 @@ volume.
 | `/runtime/{id}/**` | browser, automation service | as above, or that sandbox's own session key |
 | `/api/v1/app-conversations/**`, `/api/v1/conversation/{id}/events/**` | browser | `X-Forwarded-User` |
 | `/api/v1/settings/**`, `/api/agent-profiles/**`, `/api/v1/secrets/**` | browser | `X-Forwarded-User` |
+| `/api/v1/git/{repositories,branches}/search` | browser | `X-Forwarded-User`; answered from the forge's API |
 | `/api/v1/app-conversations/{id}/{files,file,download,skills,git/*,switch_acp_model}` | browser | `X-Forwarded-User`; answered by the conversation's own agent server |
 | `/api/automation/**` | browser | `X-Forwarded-User`; forwarded with the automation service's key |
 | `:8081/sandboxes/{id}/{events,conversations}` | the sandbox's agent server | that sandbox's own session key |
@@ -269,9 +270,10 @@ the oauth2-proxy cookie must not reach it.
 
 What the app server may do in the cluster is in
 `templates/app-server-rbac.yaml`. The one grant worth reading twice is Secrets:
-`create` only. It cannot read the model or forge credentials — sandboxes get
-those by reference in the pod template — and it never reads back the keys it
-minted, because it keeps them in its own database.
+`create` only. It never reads back the keys it minted, because it keeps them in
+its own database, and it cannot read the model credential — sandboxes get that
+by reference in the pod template. The forge token is the exception: it is in
+the app server's own environment, for the repository picker below.
 
 Starting a conversation is a start task the frontend polls: the app server
 creates a sandbox from the spec the agent profile names (see "Sandbox
@@ -280,6 +282,25 @@ starts the conversation on the sandbox's agent server with the stored
 `agent_settings` and the chosen ACP agent profile laid over them. Titles are set
 here from the first message — the agent server's own titling uses the agent's
 LLM, which for an ACP agent is not one litellm can call.
+
+**Open Repository** and **Connect Repo** search the forge. The settings the
+app server returns name one git provider, `forgejo`, with the forge's host;
+that is what enables the picker. `/api/v1/git/repositories/search` and
+`/api/v1/git/branches/search` then answer from `forge.url` alone, whatever
+`provider` the request names — the frontend falls back to `github` when it has
+not read the provider list — as the `openhands` forge account, so the picker
+offers exactly what a sandbox can clone. A conversation started on a
+repository has it fetched into `/workspace/project` and the chosen branch
+checked out, by the sandbox's own git credentials, before the agent starts; **Connect Repo** in
+a running conversation instead asks the agent to clone it. Both need a spec
+that reaches the forge: on `isolated` the start fails with git's error.
+
+**Git actions** (Pull, Push, Create PR, Create New Branch) are not API calls:
+each puts a canned request to the agent in the chat box, which the agent
+carries out with the sandbox's git credentials and `FORGEJO_TOKEN`. The only
+part the app server plays is the wording — every conversation reports
+`git_provider: forgejo`, repository chosen or not, because the frontend
+otherwise writes "push to GitHub".
 
 Each sandbox's agent server posts its events and status changes to the app
 server's webhook port; events are stored per conversation and served as the
@@ -299,7 +320,7 @@ each new conversation, and the agent sees it under its name — so a secret name
 like an environment variable is how a credential reaches an agent without being
 in the pod spec. Infrastructure credentials (`openhands-anthropic`, the forge
 token) do not go through it: sandbox specs reference those Secrets directly, so
-neither the app server nor a browser ever handles them. Losing the key Secret
+no browser ever handles them. Losing the key Secret
 makes stored secrets undecryptable; they are re-entered, not restored.
 
 The Settings UI renders itself from the agent server's settings schemas; an

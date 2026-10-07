@@ -16,8 +16,15 @@ class FakeAgentServer:
     def __init__(self, status: int = 201):
         self.status = status
         self.requests: list[httpx.Request] = []
+        self.commands: list[str] = []
+        self.clone_exit = 0
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/bash/execute_bash_command":
+            self.commands.append(json.loads(request.content)["command"])
+            return httpx.Response(
+                200, json={"exit_code": self.clone_exit, "stderr": "fatal: nope"}
+            )
         self.requests.append(request)
         if self.status >= 300:
             return httpx.Response(self.status, text="nope")
@@ -97,6 +104,8 @@ def test_start_runs_the_conversation_in_its_own_sandbox(api, user, kube, agent):
     assert conv["session_api_key"]
     assert conv["agent_kind"] == "acp" and conv["acp_server"] == "claude-code"
     assert conv["llm_model"] == "opus[1m]"
+    # No repository chosen, but git actions should still name the forge.
+    assert conv["selected_repository"] is None and conv["git_provider"] == "forgejo"
 
 
 def test_named_profile_overrides_the_active_one(api, user, agent):
@@ -150,6 +159,33 @@ def test_no_profile_means_the_active_profiles_spec(api, user, kube, agent):
         headers=user,
     )
     assert _spec_of(kube, _start(api, user)) == "isolated"
+
+
+REPO = {
+    "selected_repository": "ops/k8s-homelab",
+    "selected_branch": "main",
+    "git_provider": "forgejo",
+}
+
+
+def test_a_selected_repository_is_cloned_before_the_conversation(api, user, agent):
+    task = _start(api, user, **REPO)
+    assert task["status"] == "READY", task["detail"]
+    (command,) = agent.commands
+    assert "https://forge.example/ops/k8s-homelab.git" in command
+    assert "git checkout -q -B main --track origin/main" in command
+    conv = api.get(f"/api/v1/app-conversations/{CONV_ID}", headers=user).json()
+    assert conv["selected_repository"] == "ops/k8s-homelab"
+    assert conv["selected_branch"] == "main" and conv["git_provider"] == "forgejo"
+
+
+def test_a_failed_clone_fails_the_start_and_removes_the_sandbox(api, user, kube, agent):
+    agent.clone_exit = 128
+    task = _start(api, user, **REPO)
+    assert task["status"] == "ERROR"
+    assert "ops/k8s-homelab" in task["detail"] and "fatal: nope" in task["detail"]
+    assert not agent.requests
+    assert kube.sandbox(task["sandbox_id"]) is None
 
 
 def test_refused_start_reports_error_and_removes_the_sandbox(api, user, kube, agent):

@@ -116,7 +116,7 @@ def test_account_stubs(api, user):
     me = api.get(f"/api/organizations/{org['id']}/me", headers=user).json()
     assert me["org_id"] == me["user_id"] == org["id"]
     assert api.get("/api/keys/current", headers=user).json()["org_id"] == org["id"]
-    page = api.get("/api/v1/git/repositories/search", headers=user).json()
+    page = api.get("/api/v1/git/installations/search", headers=user).json()
     assert page == {"items": [], "next_page_id": None}
     assert api.get("/api/organizations", headers={}).status_code == 401
 
