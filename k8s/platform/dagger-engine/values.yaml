@@ -25,6 +25,20 @@ dagger-helm:
       requests:
         cpu: "4"
         memory: 8Gi
+    # Mount files/dagger-entrypoint.sh over the image's entrypoint; the script
+    # explains why. Helm values cannot compute a checksum of the script, so the
+    # annotation that restarts the pod when it changes is added by helmfile
+    # (values.yaml.gotmpl). Rendered with plain Helm, a change to the script
+    # needs `kubectl rollout restart` to take effect.
+    volumes:
+      - name: entrypoint
+        configMap:
+          name: dagger-engine-entrypoint
+          defaultMode: 0755
+    volumeMounts:
+      - name: entrypoint
+        mountPath: /usr/local/bin/dagger-entrypoint.sh
+        subPath: dagger-entrypoint.sh
     # use local-path PVC instead of host path for data volume
     hostPath:
       dataVolume:

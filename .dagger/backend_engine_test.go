@@ -148,11 +148,6 @@ const (
 	shimImage  = "alpine:3.22"
 	stampsPath = "/stamps"
 
-	// markerFromMount names the module by the one .go file at the root of what
-	// is mounted at /src — how GoModule.Test and GoModule.Lint scope each
-	// module, and what unitByScopedGoModule reads on the fake side.
-	markerFromMount = `$(basename "$(ls /src/*.go 2>/dev/null | head -1)")`
-
 	// countLines prints "<marker>=<runs>" for every marker recorded so far.
 	countLines = `cd ` + stampsPath +
 		` && for f in *; do [ -e "$f" ] || continue; echo "$f=$(wc -l < "$f" | tr -d ' ')"; done`

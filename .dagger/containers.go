@@ -65,6 +65,7 @@ func withToolchainCaches(c *dagger.Container) *dagger.Container {
 		helmCacheHome  = "/cache/helm"
 		helmConfigHome = "/config/helm"
 		helmDataHome   = "/data/helm"
+		helmfileCache  = "/cache/helmfile"
 	)
 
 	return c.
@@ -84,5 +85,7 @@ func withToolchainCaches(c *dagger.Container) *dagger.Container {
 		WithEnvVariable("HELM_CONFIG_HOME", helmConfigHome).
 		WithMountedCache(helmConfigHome, dag.CacheVolume("homelab-helm-config")).
 		WithEnvVariable("HELM_DATA_HOME", helmDataHome).
-		WithMountedCache(helmDataHome, dag.CacheVolume("homelab-helm-data"))
+		WithMountedCache(helmDataHome, dag.CacheVolume("homelab-helm-data")).
+		WithEnvVariable("HELMFILE_CACHE_HOME", helmfileCache).
+		WithMountedCache(helmfileCache, dag.CacheVolume("homelab-helmfile"))
 }

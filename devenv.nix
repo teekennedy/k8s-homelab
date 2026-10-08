@@ -64,6 +64,7 @@ in {
         gnugrep
         gnutar
         gzip
+        helmfile-wrapped
         kubeconform
         kubernetes-helm
         kubernetes-polaris
@@ -91,7 +92,6 @@ in {
         # shells out to git, and having it there costs ~160MB once perl,
         # gettext and the man pages come along.
         git
-        helmfile-wrapped
         k9s
         kind
         kubecolor

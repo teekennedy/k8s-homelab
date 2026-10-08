@@ -38,6 +38,7 @@ The combination means:
 | `golang.go` | GoModule struct, per-module Test/Lint, aggregate TestGo/LintGo |
 | `python.go` | PythonProject struct, per-project Test/Format, aggregate TestPython/FormatPython |
 | `helm.go` | HelmChart struct, per-chart Validate/Build, aggregate ValidateHelm/BuildHelm |
+| `helmfile.go` | Per-release helmfile Template/Validate, aggregate BuildHelmfile/ValidateHelmfile/LintHelmfile |
 | `kubernetes.go` | Per-chart Polaris/Kubeconform, aggregate ValidatePolaris/ValidateKubeconform |
 | `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
 | `containers.go` | Container image constants and helpers |
@@ -135,7 +136,8 @@ if container == nil {
 ```
 
 That is `FormatNix`, `LintYaml`, `ValidateWoodpecker`, `FormatCue`, `FixCue`,
-`TrimCue`, `ExportCue`, `TestGo`, `LintGo`, `TestPython`, `FormatPython`, `ValidateHelm`, `BuildHelm`, `ValidatePolaris`,
+`TrimCue`, `ExportCue`, `TestGo`, `LintGo`, `TestPython`, `FormatPython`, `ValidateHelm`, `BuildHelm`,
+`BuildHelmfile`, `ValidateHelmfile`, `LintHelmfile`, `ValidatePolaris`,
 `ValidateKubeconform`, `ValidateTerraform`, `FormatTerraform` and
 `VerifyCacheGranularity`. The exceptions are the three that build with Nix
 rather than the devenv shell — `ValidateNix`, `BuildCli` and
@@ -205,12 +207,19 @@ doesn't (e.g. `LintCue` also runs `cue vet`).
   - Fix: `dagger call format-cue --auto-apply`
 - `LintYaml(source, paths)` - YAML linting
   - Filters: `**/*.yaml`, `**/*.yml`, `.yamllint.yaml`
+- `LintHelmfile(source, environments)` - Helmfile state validation (`helmfile build`), plus a
+  cross-check that every chart has a release, every release has a chart, and every release is
+  listed in the environment's `apps`
+  - Filters: `helmfile.yaml.gotmpl`, `config/gen/*/env.json`, `k8s/**/Chart.yaml`
 
 #### Validate Checks
 - `ValidateNix(source)` - Nix flake check
   - Filters: `flake.nix`, `flake.lock`, `nix/**/*`
 - `ValidateHelm(source, paths)` - Helm chart validation (delegates to HelmChart.Validate)
   - Filters: `k8s/**/*`
+- `ValidateHelmfile(source, environments, paths)` - `helmfile lint` per release, with the values
+  helmfile deploys it with
+  - Filters: `helmfile.yaml.gotmpl`, `config/gen/*/env.json`, `k8s/**/*`
 - `ValidateTerraform(source, paths)` - Terraform/OpenTofu validation (delegates to TerraformModule.Validate)
   - Filters: `terraform/**/*`
 - `ValidateWoodpecker(source, paths)` - Woodpecker CI pipeline validation
@@ -221,6 +230,15 @@ doesn't (e.g. `LintCue` also runs `cue vet`).
   - Filters: `cmd/lab/**/*`
 - `BuildHelm(source, paths)` - Render Helm templates (delegates to HelmChart.Build)
   - Filters: `k8s/**/*`
+
+- `BuildHelmfile(source, environments, paths)` - `helmfile template` per release
+  - Filters: `helmfile.yaml.gotmpl`, `config/gen/*/env.json`, `k8s/**/*`
+
+The helmfile checks take `environments` (default `["production"]`) and run once per
+environment. Each release renders from a tree holding only `helmfile.yaml.gotmpl`, that
+environment's `env.json`, its own chart and `k8s/charts`, so results cache per chart and per
+environment. A release's render is the only exec that touches the network; `ValidateHelmfile`
+lints on top of it with `--skip-deps`.
 
 #### Test Checks
 - `TestGo(source, paths)` - Run Go tests (delegates to GoModule.Test)
@@ -317,6 +335,7 @@ Each module type scopes its source differently based on project characteristics:
 | GoModule | Per-module directory | Go modules are self-contained |
 | PythonProject | Per-project directory | Python projects are self-contained |
 | HelmChart | Per-chart directory | Charts are self-contained (deps fetched from registries) |
+| helmfile release | Chart directory + `helmfile.yaml.gotmpl` + one environment's `env.json` | Helmfile reads the state file and environment values for every release |
 | TerraformModule | Full `terraform/` directory | Modules reference siblings via relative paths |
 
 ### Cache Behavior Examples

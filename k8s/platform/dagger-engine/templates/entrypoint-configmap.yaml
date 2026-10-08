@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dagger-engine-entrypoint
+  namespace: {{ .Release.Namespace }}
+data:
+  dagger-entrypoint.sh: |
+{{ .Files.Get "files/dagger-entrypoint.sh" | indent 4 }}

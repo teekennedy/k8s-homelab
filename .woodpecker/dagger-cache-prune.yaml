@@ -9,12 +9,11 @@ steps:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"
       # Don't prompt for dagger cloud sign up
       DAGGER_NO_NAG: "1"
-      DAGGER_VERSION: "0.21.8"
     backend_options:
       kubernetes:
         serviceAccountName: dagger-pipeline
     commands:
       # kubectl is needed for dagger cli to communicate with the runner host
-      - apk add --no-cache curl kubectl
-      - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
+      - apk add --no-cache curl kubectl jq
+      - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin DAGGER_VERSION="$(jq -re .engineVersion dagger.json)" sh
       - timeout 25m dagger core engine local-cache prune

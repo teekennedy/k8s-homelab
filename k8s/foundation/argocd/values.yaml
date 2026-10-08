@@ -113,7 +113,21 @@ argo-cd:
                   i=$((i + 1))
                 done
                 cd "${up:-.}"
-                exec helmfile --environment "${ARGOCD_ENV_HELMFILE_ENVIRONMENT:-production}" --selector "name=$ARGOCD_APP_NAME" template
+                # Render what ArgoCD's native Helm support would: CRDs
+                # included (left out, they would be pruned), and against the
+                # destination cluster's Kubernetes version and API versions
+                # rather than Helm's built-in defaults, so charts that gate
+                # resources on .Capabilities see the real cluster. ArgoCD
+                # passes both to every plugin; API versions are
+                # comma-separated, which --api-versions accepts as is.
+                set -- --include-crds
+                if [ -n "${KUBE_VERSION:-}" ]; then
+                  set -- "$@" --kube-version "$KUBE_VERSION"
+                fi
+                if [ -n "${KUBE_API_VERSIONS:-}" ]; then
+                  set -- "$@" --template-args "--api-versions $KUBE_API_VERSIONS"
+                fi
+                exec helmfile --environment "${ARGOCD_ENV_HELMFILE_ENVIRONMENT:-production}" --selector "name=$ARGOCD_APP_NAME" template "$@"
   server:
     ingress:
       enabled: false

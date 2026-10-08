@@ -35,6 +35,9 @@ spec:
     path: k8s/apps/freshrss
     repoURL: https://git.msng.to/ops/k8s-homelab
     targetRevision: main
+    # Render with `helmfile template` instead of ArgoCD's native Helm support.
+    plugin:
+      name: helmfile
   syncPolicy:
     # Opts the namespace into public exposure; without it the HTTPRoute is not
     # admitted by the gateway.

@@ -21,6 +21,9 @@ spec:
     path: k8s/apps/redteam
     repoURL: https://git.msng.to/ops/k8s-homelab
     targetRevision: main
+    # Render with `helmfile template` instead of ArgoCD's native Helm support.
+    plugin:
+      name: helmfile
   syncPolicy:
     automated:
       prune: true

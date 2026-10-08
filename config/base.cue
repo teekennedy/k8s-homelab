@@ -51,6 +51,7 @@ _productionApps: {
 			"homepage":  true
 			"jellyfin":  true
 			"joplin":    true
+			"openhands": true
 			"redteam":   true
 			"spoolman":  true
 			"syncthing": true
@@ -101,6 +102,7 @@ _stagingApps: {
 			"homepage":  true
 			"jellyfin":  false
 			"joplin":    false
+			"openhands": false
 			"redteam":   false
 			"spoolman":  false
 			"syncthing": false

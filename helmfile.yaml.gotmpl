@@ -9,11 +9,58 @@ environments:
     values:
       - config/gen/ephemeral/env.json
 ---
+# Chart dependency repositories. Every release is a local chart, and helmfile
+# builds a local chart's dependencies with `helm dependency build`, which
+# refuses any HTTP(S) repository that isn't registered with helm first. OCI
+# and file:// dependencies need no entry. Names are arbitrary: helm matches
+# a dependency to its repository by URL.
+repositories:
+  - name: argo
+    url: https://argoproj.github.io/argo-helm
+  - name: authelia
+    url: https://charts.authelia.com
+  - name: bjw-s
+    url: https://bjw-s-labs.github.io/helm-charts
+  - name: cnpg
+    url: https://cloudnative-pg.github.io/charts
+  - name: crowdsec
+    url: https://crowdsecurity.github.io/helm-charts
+  - name: csi-driver-nfs
+    url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+  - name: csi-driver-smb
+    url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
+  - name: external-dns
+    url: https://kubernetes-sigs.github.io/external-dns
+  - name: grafana
+    url: https://grafana.github.io/helm-charts
+  - name: intel
+    url: https://intel.github.io/helm-charts/
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: kubereboot
+    url: https://kubereboot.github.io/charts
+  - name: longhorn
+    url: https://charts.longhorn.io
+  - name: metallb
+    url: https://metallb.github.io/metallb
+  - name: mittwald
+    url: https://helm.mittwald.de
+  - name: node-feature-discovery
+    url: https://kubernetes-sigs.github.io/node-feature-discovery/charts
+  - name: oauth2-proxy
+    url: https://oauth2-proxy.github.io/manifests
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+  - name: traefik
+    url: https://traefik.github.io/charts
+  - name: victoria-metrics
+    url: https://victoriametrics.github.io/helm-charts/
+
 templates:
   foundation:
     chart: 'k8s/foundation/{{`{{ .Release.Name }}`}}'
     namespace: '{{`{{ .Release.Name }}`}}'
-    installedTemplate:  '{{`{{ .Values | get (print "apps.foundation." .Release.Name) false }}`}}'
+    installedTemplate: '{{`{{ .Values | get (print "apps.foundation." .Release.Name) false }}`}}'
     labels:
       tier: foundation
     # Only the foundation template has an optional per-environment overlay
@@ -136,6 +183,10 @@ releases:
   - name: dagger-engine
     inherit:
       - template: platform
+    # Replaces the template's values list to add the helmfile-templated file.
+    values:
+      - k8s/platform/dagger-engine/values.yaml
+      - k8s/platform/dagger-engine/values.yaml.gotmpl
 
   - name: crowdsec
     inherit:
@@ -223,6 +274,14 @@ releases:
       - cnpg-system/cnpg-system
       - s3-proxy/s3-proxy
       - auth-system/auth-system
+
+  - name: openhands
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - secret-system/secret-system
+      - forgejo/forgejo
 
   - name: redteam
     inherit:

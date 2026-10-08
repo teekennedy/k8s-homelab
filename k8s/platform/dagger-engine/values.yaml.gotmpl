@@ -1,0 +1,6 @@
+# Values only helmfile can compute; plain Helm ignores this file.
+dagger-helm:
+  engine:
+    annotations:
+      # Restart the engine when its entrypoint script changes.
+      checksum/entrypoint: {{ readFile "files/dagger-entrypoint.sh" | sha256sum }}
