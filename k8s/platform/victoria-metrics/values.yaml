@@ -16,7 +16,12 @@ victoria-metrics-single:
     persistentVolume:
       enabled: true
       storageClass: longhorn
-      size: 150Gi
+      # ~147Gi of pre-aggregation raw samples (Feb-Oct 2026) can't be
+      # downsampled retroactively and stays until it ages out of retention in
+      # 2030, so the volume has to hold it alongside 4y of 5m data. See
+      # "Capacity" in README.md. Changing this needs the orphan-delete
+      # migration under "Resizing the volume".
+      size: 500Gi
       extraLabels:
         recurring-job.longhorn.io/source: "enabled"
         recurring-job-group.longhorn.io/ephemeral: "enabled"
@@ -35,6 +40,11 @@ victoria-metrics-single:
     extraArgs:
       streamAggr.config: /etc/vm/stream-aggr/config.yml
       streamAggr.dropInput: true
+      # Refuse writes while there's still room to merge. Below ~20% free
+      # VictoriaMetrics can't run optimal background merges, and the default
+      # 100MB guard lets the volume reach that state and then fill completely.
+      # Only safe once the volume is larger than this; see README.md.
+      storage.minFreeDiskSpaceBytes: 20GB
 
     extraVolumes:
       - name: stream-aggr-config
@@ -43,6 +53,12 @@ victoria-metrics-single:
     extraVolumeMounts:
       - name: stream-aggr-config
         mountPath: /etc/vm/stream-aggr
+
+    # Required by the disk alerts in templates/prometheus-alert-rules.yaml --
+    # without this nothing scrapes vmsingle's own vm_* metrics. The operator
+    # labels the targets job=<service name>, i.e. job="victoria-metrics-server".
+    serviceMonitor:
+      enabled: true
 
     # Go runtime/process metrics are only useful short-term; Prometheus keeps them.
     relabel:

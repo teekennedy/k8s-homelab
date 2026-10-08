@@ -2,7 +2,7 @@ apiVersion: v2
 name: victoria-metrics
 description: VictoriaMetrics long-term storage for Prometheus metrics
 type: application
-version: 0.1.17
+version: 0.1.18
 appVersion: 1.153.0
 dependencies:
   - name: victoria-metrics-single

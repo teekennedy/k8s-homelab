@@ -10,13 +10,33 @@ spec:
     - name: victoriametrics
       interval: 30s
       rules:
+        # Actual filesystem utilisation, so it also accounts for space pinned
+        # by vmbackup snapshots, which vm_data_size_bytes doesn't report. Both
+        # metrics carry a `path` label that the sums collapse.
         - alert: VictoriaMetricsHighDiskUsage
           expr: |
-            (vm_data_size_bytes{job="victoria-metrics-single-server"} /
-             vm_available_disk_space_bytes{job="victoria-metrics-single-server"}) > 0.85
-          for: 5m
+            (
+              sum(vm_total_disk_space_bytes{job="victoria-metrics-server"}) by (job, instance) -
+              sum(vm_free_disk_space_bytes{job="victoria-metrics-server"}) by (job, instance)
+            ) /
+            sum(vm_total_disk_space_bytes{job="victoria-metrics-server"}) by (job, instance) > 0.8
+          for: 30m
           labels:
             severity: warning
           annotations:
             summary: "VictoriaMetrics disk usage is high"
-            description: {{ "VictoriaMetrics is using {{ $value | humanizePercentage }} of available disk space. Consider reducing retentionPeriod." | quote }}
+            description: {{ "VictoriaMetrics is using {{ $value | humanizePercentage }} of its volume. Below 20% free it can no longer run optimal background merges, which degrades ingestion and queries. Grow the volume or reduce retentionPeriod." | quote }}
+
+        # -storage.minFreeDiskSpaceBytes has been reached and vmsingle has
+        # stopped accepting writes, so Prometheus' remote_write is now
+        # buffering and will start dropping samples.
+        - alert: VictoriaMetricsReadOnly
+          expr: |
+            sum(vm_free_disk_space_bytes{job="victoria-metrics-server"}) by (job, instance) <=
+            sum(vm_free_disk_space_limit_bytes{job="victoria-metrics-server"}) by (job, instance)
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "VictoriaMetrics is read-only"
+            description: {{ "VictoriaMetrics has less free disk space than -storage.minFreeDiskSpaceBytes and has stopped accepting writes. Long-term metrics are not being stored." | quote }}
