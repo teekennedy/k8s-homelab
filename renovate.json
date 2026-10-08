@@ -296,6 +296,27 @@
       "commitMessageAction": "nixos host lock file maintenance"
     },
     {
+      "description": "Renovate has no devenv lock file maintenance, so refresh devenv.lock whenever the root flake.lock is maintained (weekly, per lockFileMaintenance.schedule). `update-devenv` is deliberately not a +generate function (it fetches whatever is latest, so it isn't reproducible), hence `dagger call` rather than `dagger generate`. The change lands in the same PR and commit as the flake.lock update. Skipped in weeks where flake.lock itself has nothing to update.",
+      "matchManagers": [
+        "nix"
+      ],
+      "matchFileNames": [
+        "flake.lock"
+      ],
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "postUpgradeTasks": {
+        "commands": [
+          "dagger call update-devenv -y"
+        ],
+        "fileFilters": [
+          "devenv.lock"
+        ],
+        "executionMode": "branch"
+      }
+    },
+    {
       "description": "Don't apply minimumReleaseAge to jellyfin image+appVersion so they stay grouped",
       "minimumReleaseAge": "0 days",
       "matchPackageNames": [

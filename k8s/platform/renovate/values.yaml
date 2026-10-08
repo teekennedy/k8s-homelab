@@ -97,7 +97,7 @@ renovate:
         "gitAuthor": "Renovate Bot <bot@renovateapp.com>",
         "autodiscover": true,
         "httpCacheTtlDays": 7,
-        "allowedCommands": ["^dagger (develop|generate)( [^;&|]*)?$"],
+        "allowedCommands": ["^dagger (develop|generate)( [^;&|]*)?$", "^dagger call update-devenv -y$"],
         "detectHostRulesFromEnv": true,
         "customEnvVariables": {
           "_EXPERIMENTAL_DAGGER_RUNNER_HOST": "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine",
