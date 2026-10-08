@@ -250,7 +250,7 @@ docker buildx build --platform linux/amd64 \
   -t ghcr.io/teekennedy/openhands-sandbox:<tag> --push files/sandbox
 ```
 
-then set `sandboxSpecs.image` to `<tag>`. The token needs `write:packages`, and
+then set `sandboxSpecs.image` to `<tag>`. Keep `claudeAdapterVersion` equal to the Dockerfile's `CLAUDE_ADAPTER_VERSION`; the chart only uses it as a label. The token needs `write:packages`, and
 the package must be readable by the cluster (public, or an imagePullSecret).
 
 ### Models
@@ -261,12 +261,11 @@ sandbox resolves to the newest model it knows. The CLI also refuses a model
 newer than itself. So which models a sandbox runs is a matter of which CLI it
 has, and nothing here names a model.
 
-`sandboxSpecs.claudeAdapterVersion` installs that version of the Claude Code
-ACP adapter, which carries the CLI, onto the sandbox volume at start and puts
-it ahead of the image's on `PATH`. Bumping it is how a new model arrives. It
-costs about thirty seconds on a sandbox's first start (not on resume) and
-300 MB of its volume. If npm cannot be reached the sandbox starts on the
-image's older adapter, and the aliases mean what that one's CLI knows.
+The Claude Code ACP adapter, which carries the CLI, is baked into the sandbox
+image (`CLAUDE_ADAPTER_VERSION` in `files/sandbox/Dockerfile`), so a sandbox
+starts without installing anything. Bumping it is how a new model arrives:
+change that ARG and `sandboxSpecs.claudeAdapterVersion` together, then rebuild
+and push the image as under "Sandbox image".
 
 Two things about the Claude Code agent are declared in `values.yaml`, under
 `appServer.acpServers.claude-code`, rather than left to the Settings UI:

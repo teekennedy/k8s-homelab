@@ -233,10 +233,10 @@ appServer:
   acpServers:
     claude-code:
       # What a conversation launches, whatever command a profile carries.
-      # Resolved on the sandbox's PATH, which sandboxSpecs.claudeAdapterVersion
-      # heads. The agent profile form shows the frontend's own command for
-      # the preset instead, an npx run of that same version; any other text
-      # there would make the form call the profile "Custom".
+      # Resolved on the sandbox image's PATH. The agent profile form shows
+      # the frontend's own command for the preset instead, an npx run of that
+      # same version; any other text there would make the form call the
+      # profile "Custom".
       command: [claude-agent-acp]
       # The model new conversations start on: one of the model picker's ids
       # (default, opus[1m], sonnet, haiku) or a full model id. Written to the
@@ -311,15 +311,16 @@ sandboxSpecs:
   # no spec.
   default: repo
   # Built from files/sandbox/Dockerfile, which pins the upstream agent-server
-  # tag (Renovate bumps that, not this) and adds kubectl and the dagger CLI.
+  # tag (Renovate bumps that, not this) and adds kubectl, the dagger CLI and the Claude
+  # Code adapter.
   # Rebuild, push and bump this tag together.
-  image: ghcr.io/teekennedy/openhands-sandbox:1.53.0-python-1
-  # The Claude Code ACP adapter, installed over the image's own at sandbox
-  # start. It carries the Claude Code CLI, which decides what the model
-  # picker's aliases ("Claude Opus (1M)", "Claude Sonnet") resolve to and
-  # refuses a model newer than itself — so bumping this is how a new model
-  # arrives. A failed install falls back to the image's adapter. Empty: use
-  # the image's.
+  image: ghcr.io/teekennedy/openhands-sandbox:1.53.0-python-2
+  # The Claude Code ACP adapter version baked into the image (the Dockerfile's
+  # CLAUDE_ADAPTER_VERSION, which must equal this). It carries the Claude Code
+  # CLI, which decides what the model picker's aliases ("Claude Opus (1M)",
+  # "Claude Sonnet") resolve to and refuses a model newer than itself — so
+  # bumping both, rebuilding and pushing the image is how a new model arrives.
+  # Here it only labels the agent profile form's command (see README.md).
   # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
   claudeAdapterVersion: "0.87.0"
   specs:
