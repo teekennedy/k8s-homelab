@@ -18,6 +18,8 @@ class FakeAgentServer:
         self.requests: list[httpx.Request] = []
         self.commands: list[str] = []
         self.clone_exit = 0
+        # What GET /api/conversations/<id> reports.
+        self.info: dict = {"execution_status": "running"}
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/bash/execute_bash_command":
@@ -25,6 +27,8 @@ class FakeAgentServer:
             return httpx.Response(
                 200, json={"exit_code": self.clone_exit, "stderr": "fatal: nope"}
             )
+        if request.method == "GET":
+            return httpx.Response(200, json={"id": CONV_ID, **self.info})
         self.requests.append(request)
         if self.status >= 300:
             return httpx.Response(self.status, text="nope")
@@ -311,6 +315,29 @@ def test_conversation_webhook_updates_status(api, hooks, user, agent):
     )
     conv = api.get(f"/api/v1/app-conversations/{CONV_ID}", headers=user).json()
     assert conv["execution_status"] == "finished" and conv["metrics"] == {"x": 1}
+
+
+def test_refresh_reads_status_and_usage_from_running_sandboxes(
+    api, user, state, kube, agent
+):
+    task = _start(api, user)
+    stats = {"usage_to_metrics": {"acp-managed": {"accumulated_cost": 0.5}}}
+    agent.info = {"execution_status": "finished", "stats": stats}
+
+    anyio.run(state.conversations.refresh)
+    row = state.conversations.row(CONV_ID)
+    meta = json.loads(row["meta"])
+    assert meta["execution_status"] == "finished" and meta["stats"] == stats
+
+    # Nothing new: the conversation is not counted as updated again.
+    anyio.run(state.conversations.refresh)
+    assert state.conversations.row(CONV_ID)["updated_at"] == row["updated_at"]
+
+    # A suspended sandbox has no server to ask.
+    agent.info = {"execution_status": "running"}
+    anyio.run(state.sandboxes.pause, task["sandbox_id"])
+    anyio.run(state.conversations.refresh)
+    assert state.conversations.row(CONV_ID)["updated_at"] == row["updated_at"]
 
 
 def test_search_count_patch_delete(api, hooks, user, kube, agent):

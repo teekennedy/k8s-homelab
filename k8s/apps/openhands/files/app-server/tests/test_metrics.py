@@ -26,7 +26,7 @@ def test_metrics_report_usage_per_conversation_and_sandboxes(
 ):
     sandbox_id = _start(api, user, title='Say "hi"')["sandbox_id"]
     key = state.sandboxes.row(sandbox_id)["session_api_key"]
-    # Usage arrives with the agent server's conversation webhook.
+    # Usage is part of the agent server's conversation record.
     r = hooks.post(
         f"/sandboxes/{sandbox_id}/conversations",
         headers={"X-Session-API-Key": key},

@@ -485,8 +485,9 @@ is what `automationOrphanMinutes` is for.
 
 The app server serves Prometheus text on `:9102/metrics`, scraped by the
 existing kube-prometheus-stack through a ServiceMonitor. The figures are what
-each sandbox's agent server reports for its conversation, delivered by webhook
-and kept with the conversation, so they outlive the sandbox.
+each sandbox's agent server reports for its conversation, read from every
+running sandbox once a reconcile cycle and kept with the conversation, so they
+outlive the sandbox and trail a turn by up to a minute.
 
 | Metric | Labels |
 | --- | --- |

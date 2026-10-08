@@ -557,15 +557,45 @@ class ConversationService:
         resp.raise_for_status()
         await self.conversation(sandbox_id, resp.json())
 
+    async def refresh(self) -> None:
+        """Read status and usage from every running sandbox. The agent
+        server's conversation webhook fires when a conversation is created,
+        paused or deleted, not when a turn ends."""
+        statuses = await self.sandboxes.statuses()
+        for row in self.db.all(
+            "SELECT id, sandbox_id FROM conversations WHERE deleted_at IS NULL"
+        ):
+            sandbox_id = row["sandbox_id"]
+            sandbox = self.sandboxes.live_row(sandbox_id)
+            if sandbox is None or statuses.get(sandbox_id) != "RUNNING":
+                continue
+            try:
+                resp = await self.http.get(
+                    f"{self.sandboxes.agent_url(sandbox_id)}"
+                    f"/api/conversations/{row['id']}",
+                    headers={"X-Session-API-Key": sandbox["session_api_key"]},
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                await self.conversation(sandbox_id, resp.json())
+            except httpx.HTTPError as e:
+                # Typically a pod that is Ready before its server listens.
+                log.info("refresh of %s on %s failed: %s", row["id"], sandbox_id, e)
+
     async def conversation(self, sandbox_id: str, info: dict[str, Any]) -> None:
         conv_id = conversation_id(info["id"])
         row = self.row(conv_id)
         if row is None or row["sandbox_id"] != sandbox_id:
             return
         meta = json.loads(row["meta"])
-        for key in ("execution_status", "metrics", "stats", "tags"):
-            if key in info:
-                meta[key] = info[key]
+        changed = {
+            key: info[key]
+            for key in ("execution_status", "metrics", "stats", "tags")
+            if key in info and meta.get(key) != info[key]
+        }
+        if not changed:
+            return
+        meta.update(changed)
         self.db.run(
             "UPDATE conversations SET meta = ?, updated_at = ? WHERE id = ?",
             json.dumps(meta),

@@ -134,6 +134,7 @@ async def reconcile_forever(state: State) -> None:
     while True:
         try:
             await state.sandboxes.reconcile()
+            await state.conversations.refresh()
             await state.sandboxes.collect(*state.conversations.sandbox_use())
         except Exception:
             log.exception("reconcile failed")
