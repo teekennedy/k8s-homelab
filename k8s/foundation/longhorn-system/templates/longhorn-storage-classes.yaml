@@ -26,6 +26,19 @@ allowVolumeExpansion: true
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 ---
+# A storage class for temporary data. single replica, delete on release
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: longhorn-tmp
+  namespace: {{ .Release.Namespace }}
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  numberOfReplicas: "1"
+reclaimPolicy: Delete
+---
 # A single replica storage class with strict-local data locality
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
