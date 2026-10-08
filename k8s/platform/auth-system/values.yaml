@@ -10,7 +10,7 @@ valkey:
 oidcJwks:
   # Images used by templates/authelia-oidc-jwks.yaml. Deliberately in
   # values.yaml (not the template) so that renovate can pick them up.
-  stepCliImage: smallstep/step-cli:0.30.6
+  stepCliImage: smallstep/step-cli:0.31.0
   kubectlImage: alpine/kubectl:1.37.0
 
 # Maps each Authelia OIDC client to the Secret holding its plaintext client
