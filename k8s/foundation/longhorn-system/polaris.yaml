@@ -9,6 +9,13 @@ exemptions:
     rules:
       - privilegeEscalationAllowed
       - runAsRootAllowed
+  # The global manager Deployment ships without a securityContext and the chart
+  # exposes no knob to add one, so it inherits the image default of root.
+  - controllerNames:
+      - longhorn-global-manager
+    rules:
+      - privilegeEscalationAllowed
+      - runAsRootAllowed
   - controllerNames:
       - longhorn-manager
     rules:
