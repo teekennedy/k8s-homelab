@@ -153,7 +153,9 @@ argo-cd:
           - /var/run/argocd/argocd-cmp-server
         securityContext:
           runAsNonRoot: true
-          runAsUser: 1000
+          # Must match the repo-server's UID (999): the plugin socket is created
+          # 0755 by this container, and the repo-server needs write access to dial it.
+          runAsUser: 999
           allowPrivilegeEscalation: false
           capabilities:
             drop:
