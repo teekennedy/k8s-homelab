@@ -250,7 +250,7 @@ docker buildx build --platform linux/amd64 \
   -t ghcr.io/teekennedy/openhands-sandbox:<tag> --push files/sandbox
 ```
 
-then set `sandboxSpecs.image` to `<tag>`. Keep `claudeAdapterVersion` equal to the Dockerfile's `CLAUDE_ADAPTER_VERSION`; the chart only uses it as a label. The token needs `write:packages`, and
+then set `sandboxSpecs.image` to `<tag>`. The token needs `write:packages`, and
 the package must be readable by the cluster (public, or an imagePullSecret).
 
 ### Models
@@ -264,8 +264,7 @@ has, and nothing here names a model.
 The Claude Code ACP adapter, which carries the CLI, is baked into the sandbox
 image (`CLAUDE_ADAPTER_VERSION` in `files/sandbox/Dockerfile`), so a sandbox
 starts without installing anything. Bumping it is how a new model arrives:
-change that ARG and `sandboxSpecs.claudeAdapterVersion` together, then rebuild
-and push the image as under "Sandbox image".
+change that ARG, then rebuild and push the image as under "Sandbox image".
 
 Two things about the Claude Code agent are declared in `values.yaml`, under
 `appServer.acpServers.claude-code`, rather than left to the Settings UI:
@@ -273,15 +272,12 @@ Two things about the Claude Code agent are declared in `values.yaml`, under
 - `command` is what a conversation launches: `claude-agent-acp`, found on the
   sandbox's `PATH`, whatever a profile carries. The agent profile form shows
   something else for it — the frontend's built-in command for the preset,
-  `npx … claude-agent-acp@<version>` — because that exact text is how the
-  form knows the profile is Claude Code and not "Custom". So that it at least
-  names the right version, the canvas pod serves a copy of the frontend with
-  `claudeAdapterVersion` written into that command
-  (`files/canvas/patch_frontend.py`). The copy's assets are renamed with the
-  version, because they are served as immutable and a browser would otherwise
-  keep the old ones. If a canvas release changes how the command is written,
-  the pod logs that it found nothing to rewrite and serves the frontend as
-  shipped.
+  `npx … claude-agent-acp@<version>`, pinned to the adapter version that
+  canvas release was built against — because that exact text is how the form
+  knows the profile is Claude Code and not "Custom". **That text is wrong**:
+  the adapter a sandbox runs is the one baked into the sandbox image
+  (`CLAUDE_ADAPTER_VERSION` in `files/sandbox/Dockerfile`), and nothing runs
+  the command shown.
 - `model` is the model new conversations start on. Changing it rewrites the
   stored settings and every Claude Code profile once; after that the model
   picker's choice stands until the value here changes again.

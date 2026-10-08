@@ -31,7 +31,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
-        checksum/start: {{ printf "%s%s" (.Files.Get "files/canvas/start.sh") (.Files.Get "files/canvas/patch_frontend.py") | sha256sum }}
+        checksum/start: {{ .Files.Get "files/canvas/start.sh" | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -72,12 +72,6 @@ spec:
             # ask for an API key.
             - name: LOCK_TO_CLOUD
               value: {{ .Values.app.baseURL | quote }}
-            {{- with .Values.sandboxSpecs.claudeAdapterVersion }}
-            # Written into the frontend's built-in Claude Code command, so the
-            # agent profile form shows the version sandboxes run.
-            - name: CLAUDE_ADAPTER_VERSION
-              value: {{ . | quote }}
-            {{- end }}
             - name: LOCAL_BACKEND_API_KEY
               valueFrom:
                 secretKeyRef:

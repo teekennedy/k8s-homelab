@@ -315,14 +315,6 @@ sandboxSpecs:
   # Code adapter.
   # Rebuild, push and bump this tag together.
   image: ghcr.io/teekennedy/openhands-sandbox:1.53.0-python-2
-  # The Claude Code ACP adapter version baked into the image (the Dockerfile's
-  # CLAUDE_ADAPTER_VERSION, which must equal this). It carries the Claude Code
-  # CLI, which decides what the model picker's aliases ("Claude Opus (1M)",
-  # "Claude Sonnet") resolve to and refuses a model newer than itself — so
-  # bumping both, rebuilding and pushing the image is how a new model arrives.
-  # Here it only labels the agent profile form's command (see README.md).
-  # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
-  claudeAdapterVersion: "0.87.0"
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:

@@ -80,15 +80,7 @@ log "Starting automation service on :${AUTOMATION_PORT}"
 uvicorn openhands.automation.app:app --host 0.0.0.0 --port "$AUTOMATION_PORT" &
 PIDS+=($!)
 
-# The agent profile form shows the frontend's built-in Claude Code command,
-# which pins the adapter version it was built against. Serve a copy that names
-# the version sandboxes run instead; see patch_frontend.py.
 FRONTEND_DIR=/opt/agent-canvas/frontend
-if [ -n "${CLAUDE_ADAPTER_VERSION:-}" ]; then
-  FRONTEND_DIR="$(python3 /etc/openhands-canvas/patch_frontend.py \
-    "$FRONTEND_DIR" /tmp/frontend "$CLAUDE_ADAPTER_VERSION")" || FRONTEND_DIR=/opt/agent-canvas/frontend
-  log "Serving the frontend from ${FRONTEND_DIR}"
-fi
 
 # The app server serves /api, /runtime, and — authenticated — the automation
 # API, plus the login page the frontend falls back to when its session check
