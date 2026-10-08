@@ -54,3 +54,9 @@ creation_rules:
           - *oxygen_age
         pgp:
           - *user_tkennedy
+  - path_regex: config/kubeconfig/.*\.enc\.ya?ml
+    key_groups:
+      - age:
+          - *oxygen_age
+        pgp:
+          - *user_tkennedy
