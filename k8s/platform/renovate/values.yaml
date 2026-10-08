@@ -160,3 +160,9 @@ renovate:
           name: renovate-gpg-key
           key: GPG_PRIVATE_KEY
           optional: true
+
+# The shared Dagger engine the post-upgrade tasks exec into;
+# templates/dagger-rbac.yaml grants access to this one pod.
+daggerEngine:
+  namespace: dagger-engine
+  pod: dagger-engine-dagger-helm-engine-0

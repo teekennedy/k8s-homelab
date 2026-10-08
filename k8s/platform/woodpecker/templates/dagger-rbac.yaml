@@ -5,24 +5,28 @@ metadata:
   name: dagger-pipeline
   namespace: {{ .Release.Namespace }}
 ---
+# `dagger` reaches the engine over `kube-pod://`, which is `kubectl exec`: get
+# and exec on the one engine pod, nothing else.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: dagger-pipeline-exec
-  namespace: dagger-engine
+  namespace: {{ .Values.daggerEngine.namespace }}
 rules:
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["get", "list"]
+    resourceNames: [{{ .Values.daggerEngine.pod | quote }}]
+    verbs: ["get"]
   - apiGroups: [""]
     resources: ["pods/exec"]
+    resourceNames: [{{ .Values.daggerEngine.pod | quote }}]
     verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: dagger-pipeline-exec-binding
-  namespace: dagger-engine
+  namespace: {{ .Values.daggerEngine.namespace }}
 subjects:
   - kind: ServiceAccount
     name: dagger-pipeline

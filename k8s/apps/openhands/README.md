@@ -213,7 +213,7 @@ pod. They are `sandboxSpecs.specs` in `values.yaml`.
 | `isolated` | the model API only — nothing on the LAN | no |
 
 A spec with `daggerEngine: true` gets a mounted ServiceAccount token, a Role
-granting `pods/exec` in the `dagger-engine` namespace, and egress to the API
+granting `get` and `pods/exec` on the engine pod alone, and egress to the API
 server on 6443. That is what Dagger's `kube-pod://` runner transport needs, as
 for Woodpecker's `dagger-pipeline`. The sandbox image must supply `kubectl` and
 the `dagger` CLI, which the sandbox image provides, and sets
