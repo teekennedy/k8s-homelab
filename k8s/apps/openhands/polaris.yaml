@@ -5,3 +5,13 @@ exemptions:
       - openhands-app-server-source
     rules:
       - sensitiveConfigmapContent
+  # The repo sandbox spec runs Dagger on the shared engine over `kube-pod://`,
+  # which is `kubectl exec`. Mirrors the woodpecker dagger-pipeline grant.
+  - controllerNames:
+      - openhands-runtime-repo-dagger-exec
+    rules:
+      - rolePodExecAttach
+  - controllerNames:
+      - openhands-runtime-repo-dagger-exec
+    rules:
+      - rolebindingRolePodExecAttach

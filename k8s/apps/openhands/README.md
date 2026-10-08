@@ -206,8 +206,14 @@ pod. They are `sandboxSpecs.specs` in `values.yaml`.
 
 | Spec | Reaches | Forge credentials |
 | --- | --- | --- |
-| `repo` (default) | the model API and `git.msng.to` | yes |
+| `repo` (default) | the model API, `git.msng.to`, the API server and the Dagger engine | yes |
 | `isolated` | the model API only — nothing on the LAN | no |
+
+A spec with `daggerEngine: true` gets a mounted ServiceAccount token, a Role
+granting `pods/exec` in the `dagger-engine` namespace, and egress to the API
+server on 6443. That is what Dagger's `kube-pod://` runner transport needs, as
+for Woodpecker's `dagger-pipeline`. The sandbox image must supply `kubectl` and
+the `dagger` CLI, and set `_EXPERIMENTAL_DAGGER_RUNNER_HOST`.
 
 **The agent profile picker chooses the spec.** A conversation runs on the spec
 its agent profile is named after — `isolated`, or `isolated-<anything>` — and

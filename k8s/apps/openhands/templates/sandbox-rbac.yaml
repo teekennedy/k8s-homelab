@@ -1,6 +1,6 @@
 {{- $root := . -}}
 {{- $fullName := include "openhands.fullname" . -}}
-{{- range $spec, $_ := .Values.sandboxSpecs.specs }}
+{{- range $spec, $cfg := .Values.sandboxSpecs.specs }}
 ---
 # The identity a sandbox on this spec runs as. No permissions and no mounted
 # token: a spec that needs cluster access gets a Role here, deliberately and
@@ -12,5 +12,36 @@ metadata:
   namespace: {{ $root.Release.Namespace }}
   labels:
     {{- include "openhands.labels" $root | nindent 4 }}
-automountServiceAccountToken: false
+automountServiceAccountToken: {{ default false $cfg.daggerEngine }}
+{{- if $cfg.daggerEngine }}
+---
+# Reach the shared Dagger engine over `kube-pod://`, which is `kubectl exec`.
+# Mirrors the dagger-pipeline grant in the woodpecker chart.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-runtime-%s-dagger-exec" $fullName $spec }}
+  namespace: {{ $root.Values.daggerEngineNamespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-runtime-%s-dagger-exec" $fullName $spec }}
+  namespace: {{ $root.Values.daggerEngineNamespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ printf "%s-runtime-%s" $fullName $spec }}
+    namespace: {{ $root.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ printf "%s-runtime-%s-dagger-exec" $fullName $spec }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
 {{- end }}

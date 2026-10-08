@@ -40,6 +40,16 @@ spec:
     {{- if eq $cfg.egress "lan" }}
     {{- include "openhands.egressForge" $root | nindent 4 }}
     {{- end }}
+    {{- if $cfg.daggerEngine }}
+    # Dagger's kube-pod:// transport is `kubectl exec` through the apiserver,
+    # which is host-networked, so only an ipBlock on the nodes can match it.
+    - to:
+        - ipBlock:
+            cidr: {{ $root.Values.networkPolicy.nodeCidr }}
+      ports:
+        - port: 6443
+          protocol: TCP
+    {{- end }}
     {{- if ne $cfg.egress "none" }}
     {{- include "openhands.egressInternet" $root | nindent 4 }}
     {{- end }}
