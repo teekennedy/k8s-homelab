@@ -426,7 +426,9 @@ oauth2-proxy:
       email_domains = ["*"]
       reverse_proxy = true
       code_challenge_method = "S256"
-      scope = "openid profile email groups"
+      # offline_access is what gets a refresh token: without one the session
+      # ends with the ID token, an hour in, whatever cookie_expire says.
+      scope = "openid profile email groups offline_access"
       real_client_ip_header = "X-Real-Ip"
       skip_provider_button = true
       allowed_groups = ["openhands-admins", "full-admin"]

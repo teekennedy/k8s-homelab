@@ -63,6 +63,28 @@ def test_secrets_reach_new_conversations(api, user, runtime):
     }
 
 
+def test_login_returns_to_the_page_that_lost_its_session(api, user):
+    def location(path, **params):
+        r = api.get(path, headers=user, params=params, follow_redirects=False)
+        assert r.status_code == 302
+        return r.headers["location"]
+
+    back = "/canvas/conversations/abc?backend=locked-cloud&org=1"
+    assert location("/canvas/login", returnTo=back) == back
+    assert location("/login", returnTo=back) == back
+    assert location("/canvas/login") == "/canvas/"
+    for elsewhere in (
+        "https://example.com/",
+        "//example.com/",
+        "/\\example.com/",
+        "canvas",
+        "/canvas/login?returnTo=%2Fcanvas%2Flogin",
+        "/login/",
+    ):
+        assert location("/canvas/login", returnTo=elsewhere) == "/canvas/"
+    assert api.get("/canvas/login", follow_redirects=False).status_code == 401
+
+
 def test_session_stubs(api, user):
     assert api.post("/api/authenticate", headers=user).status_code == 200
     assert api.post("/api/authenticate").status_code == 401

@@ -91,7 +91,8 @@ if [ -n "${CLAUDE_ADAPTER_VERSION:-}" ]; then
 fi
 
 # The app server serves /api, /runtime, and — authenticated — the automation
-# API. A forge webhook carries no session, so its delivery path goes straight
+# API, plus the login page the frontend falls back to when its session check
+# fails, which is not a route the frontend itself has. A forge webhook carries no session, so its delivery path goes straight
 # to the automation service, which checks the HMAC itself.
 log "Starting frontend on :${PORT}, locked to ${LOCK_TO_CLOUD}"
 node /opt/agent-canvas/static-server.mjs \
@@ -102,6 +103,8 @@ node /opt/agent-canvas/static-server.mjs \
   --lock-to-cloud "$LOCK_TO_CLOUD" \
   --route "/api/automation/v1/events=http://127.0.0.1:${AUTOMATION_PORT}" \
   --route "/api=${APP_SERVER_URL}" \
+  --route "/login=${APP_SERVER_URL}" \
+  --route "/canvas/login=${APP_SERVER_URL}" \
   --route "/runtime=${APP_SERVER_URL}" &
 STATIC_PID=$!
 PIDS+=("$STATIC_PID")

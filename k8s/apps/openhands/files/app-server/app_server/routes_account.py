@@ -9,6 +9,7 @@ frontend reads as "personal workspace" (`api/cloud/types.d.ts`).
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import RedirectResponse
 
 from .auth import Principal, principal
 from .forge import ForgeError
@@ -67,10 +68,30 @@ async def users_me(who: Caller) -> dict[str, Any]:
 
 @router.post("/api/authenticate")
 async def authenticate(who: Caller) -> dict[str, bool]:
-    """The cookie-mode session check the frontend makes on load; a 401 here
-    would send the browser to a /login this deployment does not have, but
-    oauth2-proxy has already authenticated anything that reaches it."""
+    """The cookie-mode session check the frontend makes on load. oauth2-proxy
+    has authenticated anything that reaches it; once its session has lapsed it
+    answers this XHR 401 itself, and the frontend navigates to `login`."""
     return {"success": True}
+
+
+HOME = "/canvas/"
+
+
+@router.get("/login")
+@router.get("/canvas/login")
+async def login(
+    who: Caller, return_to: Annotated[str, Query(alias="returnTo")] = HOME
+) -> RedirectResponse:
+    """Where the frontend sends a browser whose session check failed, expecting
+    a sign-in page. The sign-in has already happened by the time a request gets
+    here — oauth2-proxy did it on the way in — so all that is left is to go
+    back. Only to a path on this origin: `returnTo` is whatever the link says.
+    """
+    local = return_to.startswith("/") and not return_to.startswith(("//", "/\\"))
+    path = return_to.partition("?")[0].rstrip("/")
+    if not local or path in ("/login", "/canvas/login"):
+        return_to = HOME
+    return RedirectResponse(return_to, status_code=302)
 
 
 @router.post("/api/analytics/events", status_code=204)

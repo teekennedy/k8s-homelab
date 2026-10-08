@@ -308,6 +308,13 @@ authelia:
         enforce_pkce: public_clients_only
         hmac_secret:
           path: identity_providers.oidc.hmac.key
+        lifespans:
+          custom:
+            # oauth2-proxy only refreshes when a request arrives, so the
+            # refresh token has to outlive an idle browser tab: as long as
+            # the proxy's cookie_expire, not the default 90 minutes.
+            openhands:
+              refresh_token: 7 days
         authorization_policies:
           # Archon (k8s/apps/archon). Anyone who gets a session here can run
           # agentic workflows that cost real money. There is no one_factor rung
@@ -404,11 +411,15 @@ authelia:
           # OpenHands, fronted by oauth2-proxy in reverse-proxy mode.
           - client_id: openhands
             client_name: OpenHands
+            # Only nominally: a request for offline_access always gets the
+            # consent screen, whatever the mode, and that consent cannot be
+            # remembered.
             consent_mode: implicit
             client_secret:
               path: /secrets/authelia-oidc-client-secrets/openhands
             token_endpoint_auth_method: client_secret_post
             authorization_policy: openhands
+            lifespan: openhands
             require_pkce: true
             pkce_challenge_method: S256
             scopes:
@@ -418,8 +429,12 @@ authelia:
               # Groups is required for oauth2-proxy to manage access to
               # specific endpoints.
               - groups
+              # A refresh token, so oauth2-proxy can renew its session past
+              # the ID token's hour instead of signing the browser in again.
+              - offline_access
             grant_types:
               - authorization_code
+              - refresh_token
             response_types:
               - code
             redirect_uris:

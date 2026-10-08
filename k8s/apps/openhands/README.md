@@ -294,7 +294,15 @@ volume.
 | `/api/v1/git/{repositories,branches}/search` | browser | `X-Forwarded-User`; answered from the forge's API |
 | `/api/v1/app-conversations/{id}/{files,file,download,skills,git/*,switch_acp_model}` | browser | `X-Forwarded-User`; answered by the conversation's own agent server |
 | `/api/automation/**` | browser | `X-Forwarded-User`; forwarded with the automation service's key |
+| `/login`, `/canvas/login` | browser | `X-Forwarded-User`; redirects to `returnTo`, see below |
 | `:8081/sandboxes/{id}/{events,conversations}` | the sandbox's agent server | that sandbox's own session key |
+
+`/login` is where the frontend sends the browser when its session check gets a
+401, which is what oauth2-proxy answers an XHR once its session has lapsed.
+The frontend has no such route of its own, so the static server routes it
+here. That navigation is what makes oauth2-proxy sign the browser in again, so
+by the time the request arrives there is nothing left to do but redirect to
+`returnTo`, if it is a path on this origin.
 
 `/runtime/{id}` strips the prefix and proxies HTTP and WebSockets to the
 sandbox's agent server. It drops `Cookie`, `Authorization` and every
