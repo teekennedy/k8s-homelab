@@ -310,9 +310,10 @@ sandboxSpecs:
   # Every other agent profile, every automation run, and a request that names
   # no spec.
   default: repo
-  # Track the tag the canvas image is built from.
-  # renovate: datasource=docker depName=ghcr.io/openhands/agent-server
-  image: ghcr.io/openhands/agent-server:1.53.0-python
+  # Built from files/sandbox/Dockerfile, which pins the upstream agent-server
+  # tag (Renovate bumps that, not this) and adds kubectl and the dagger CLI.
+  # Rebuild, push and bump this tag together.
+  image: ghcr.io/teekennedy/openhands-sandbox:1.53.0-python-1
   # The Claude Code ACP adapter, installed over the image's own at sandbox
   # start. It carries the Claude Code CLI, which decides what the model
   # picker's aliases ("Claude Opus (1M)", "Claude Sonnet") resolve to and

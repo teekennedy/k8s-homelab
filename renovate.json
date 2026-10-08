@@ -12,6 +12,16 @@
   "prHourlyLimit": 12,
   "customManagers": [
     {
+      "description": "Track tool versions pinned in Dockerfile ARGs under a renovate comment",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "k8s/**/Dockerfile"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\nARG\\s+\\w+=(?<currentValue>\\S+)"
+      ]
+    },
+    {
       "description": "Track Docker images in Dagger Go module",
       "customType": "regex",
       "managerFilePatterns": [

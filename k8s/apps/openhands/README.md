@@ -213,7 +213,8 @@ A spec with `daggerEngine: true` gets a mounted ServiceAccount token, a Role
 granting `pods/exec` in the `dagger-engine` namespace, and egress to the API
 server on 6443. That is what Dagger's `kube-pod://` runner transport needs, as
 for Woodpecker's `dagger-pipeline`. The sandbox image must supply `kubectl` and
-the `dagger` CLI, and set `_EXPERIMENTAL_DAGGER_RUNNER_HOST`.
+the `dagger` CLI, which the sandbox image provides, and sets
+`_EXPERIMENTAL_DAGGER_RUNNER_HOST` for it.
 
 **The agent profile picker chooses the spec.** A conversation runs on the spec
 its agent profile is named after — `isolated`, or `isolated-<anything>` — and
@@ -236,6 +237,21 @@ Which spec a sandbox got is its `openhands.msng.to/sandbox-spec` label:
 ```sh
 kubectl -n openhands get sandbox -L openhands.msng.to/sandbox-spec
 ```
+
+### Sandbox image
+
+`files/sandbox/Dockerfile` is the upstream agent server with `kubectl` and the
+`dagger` CLI added; the CLI version must match the engine's. To publish a new
+one (after bumping the `FROM` tag or either CLI version):
+
+```sh
+echo "$GHCR_TOKEN" | docker login ghcr.io -u teekennedy --password-stdin
+docker buildx build --platform linux/amd64 \
+  -t ghcr.io/teekennedy/openhands-sandbox:<tag> --push files/sandbox
+```
+
+then set `sandboxSpecs.image` to `<tag>`. The token needs `write:packages`, and
+the package must be readable by the cluster (public, or an imagePullSecret).
 
 ### Models
 
