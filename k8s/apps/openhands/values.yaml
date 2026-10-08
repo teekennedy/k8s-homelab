@@ -322,8 +322,8 @@ sandboxSpecs:
       egress: lan
       forgeCredentials: true
       storage:
-        size: 20Gi
-        storageClass: longhorn
+        size: 5Gi
+        storageClass: longhorn-tmp
       resources:
         requests:
           cpu: 250m
@@ -337,8 +337,8 @@ sandboxSpecs:
       egress: internet
       forgeCredentials: false
       storage:
-        size: 10Gi
-        storageClass: longhorn
+        size: 5Gi
+        storageClass: longhorn-tmp
       resources:
         requests:
           cpu: 250m

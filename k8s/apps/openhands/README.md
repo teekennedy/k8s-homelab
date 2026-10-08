@@ -530,13 +530,14 @@ sandboxes and conversations by status, and a usage table per conversation.
 | --- | --- | --- |
 | `openhands-app-server` | the app server's database: conversations and their transcripts, settings, agent profiles, the encrypted secret store | yes |
 | `openhands-data` | `~/.openhands` in the canvas pod: the automation service's database and uploads | yes |
-| `workspace-<sandbox>` | one sandbox's checkout and agent state; deleted with the sandbox | no |
+| `workspace-<sandbox>` | one sandbox's checkout and agent state; deleted with the sandbox | no (`longhorn-tmp`: one replica, volume deleted with the PVC) |
 
 All ReadWriteOnce Longhorn volumes, which is why both the app server and the
 canvas pod are single replicas. The two backed-up volumes are in the Longhorn
-recurring backup group. Sandbox volumes are not: a checkout is a branch that is
-on the forge, or it is work in progress that the limits above will eventually
-delete.
+recurring backup group. Sandbox volumes are not, and use `longhorn-tmp` so that
+the volume goes with the Sandbox rather than lingering as a `Released` PV: a
+checkout is a branch that is on the forge, or it is work in progress that the
+limits above will eventually delete.
 
 The secret store's key is not on a volume but in the
 `openhands-app-server-secrets-key` Secret; without it the store cannot be read.
