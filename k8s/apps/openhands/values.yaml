@@ -188,6 +188,8 @@ networkPolicy:
 
 # Namespace of the shared Dagger engine, for specs with `daggerEngine: true`.
 daggerEngineNamespace: dagger-engine
+# The engine StatefulSet's pod; the runner host in the sandbox env names it.
+daggerEnginePod: dagger-engine-dagger-helm-engine-0
 
 nodeSelector: {}
 tolerations: []

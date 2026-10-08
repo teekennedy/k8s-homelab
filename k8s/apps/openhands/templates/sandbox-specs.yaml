@@ -147,6 +147,14 @@ spec:
             {{- if $cfg.forgeCredentials }}
             {{- include "openhands.forgeEnv" $root | nindent 12 }}
             {{- end }}
+            {{- if $cfg.daggerEngine }}
+            # `kube-pod://` is `kubectl exec` through the apiserver, using the
+            # mounted ServiceAccount token.
+            - name: _EXPERIMENTAL_DAGGER_RUNNER_HOST
+              value: {{ printf "kube-pod://%s?namespace=%s&container=dagger-engine" $root.Values.daggerEnginePod $root.Values.daggerEngineNamespace | quote }}
+            - name: DAGGER_NO_NAG
+              value: "1"
+            {{- end }}
           # The model credential, by reference: the app server never reads it.
           envFrom:
             - secretRef:
