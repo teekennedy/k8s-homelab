@@ -18,10 +18,11 @@ victoria-metrics-single:
       storageClass: longhorn
       # ~147Gi of pre-aggregation raw samples (Feb-Oct 2026) can't be
       # downsampled retroactively and stays until it ages out of retention in
-      # 2030, so the volume has to hold it alongside 4y of 5m data. See
+      # 2030, so the volume has to hold it alongside 4y of 5m data. Capped by
+      # what Longhorn will schedule rather than by the estimate -- see
       # "Capacity" in README.md. Changing this needs the orphan-delete
       # migration under "Resizing the volume".
-      size: 500Gi
+      size: 400Gi
       extraLabels:
         recurring-job.longhorn.io/source: "enabled"
         recurring-job-group.longhorn.io/ephemeral: "enabled"

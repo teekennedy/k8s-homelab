@@ -14,7 +14,9 @@
   interval: 5m
   outputs: [total]
 
-# Gauges: min/max keep short spikes visible after averaging.
+# Gauges: avg only. Adding min/max would store three series per input gauge,
+# which roughly doubles the long-term footprint for spike detail that
+# Prometheus' 7d raw window already covers.
 - match: '{__name__!~".+_(total|bucket|sum|count)"}'
   interval: 5m
-  outputs: [avg, min, max]
+  outputs: [avg]
