@@ -2,11 +2,10 @@
 # Canvas pod entrypoint, in place of the image's /opt/agent-canvas/entrypoint.sh,
 # which has no way to pass --lock-to-cloud to the static server. Ported from
 # that script (agent-canvas 1.20.0); what it did that no longer applies here is
-# left out rather than disabled: the editor route, the public-mode server, and
-# the session key baked into the page.
+# left out rather than disabled: the bundled agent server, the editor route,
+# the public-mode server, and the session key baked into the page.
 #
 #   :8000   static frontend, locked to the app server's cloud API
-#   :18000  agent server — read by the metrics sidecar, runs nothing
 #   :18001  automation service, in cloud mode against the app server
 set -uo pipefail
 
@@ -21,7 +20,6 @@ log() { printf '[canvas] %s\n' "$*"; }
 : "${APP_SERVER_SERVICE_KEY:?must be set}"
 
 PORT="${PORT:-8000}"
-AGENT_SERVER_PORT=18000
 AUTOMATION_PORT=18001
 
 OPENHANDS_DIR="${HOME}/.openhands"
@@ -42,12 +40,9 @@ fi
 OH_SECRET_KEY="$(cat "$SECRET_KEY_FILE")"
 export OH_SECRET_KEY
 
-# One key for the agent server and for the app server's calls to the
-# automation service, from a Secret the app server also reads. Written where
-# the metrics sidecar reads it.
+# The key the automation service accepts from the app server, from a Secret
+# the app server also reads.
 KEY="$LOCAL_BACKEND_API_KEY"
-printf '%s' "$KEY" >"${STATE_DIR}/api-key.txt"
-chmod 600 "${STATE_DIR}/api-key.txt"
 export OH_SESSION_API_KEYS_0="$KEY"
 export OPENHANDS_AUTOMATION_API_KEY="$KEY"
 export AUTOMATION_KV_SECRET="$KEY"
@@ -74,10 +69,6 @@ cleanup() {
   exit 0
 }
 trap cleanup SIGINT SIGTERM
-
-log "Starting agent server on :${AGENT_SERVER_PORT}"
-openhands-agent-server --port "$AGENT_SERVER_PORT" --import-modules canvas_ui_tool &
-PIDS+=($!)
 
 export FILE_STORE=local
 export LOCAL_STORAGE_PATH="${OPENHANDS_DIR}/storage"

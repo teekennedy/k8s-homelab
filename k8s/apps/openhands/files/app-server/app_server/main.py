@@ -1,4 +1,5 @@
-"""Entry point: the API on one port, the sandbox webhook receiver on another."""
+"""Entry point: the API on one port, the sandbox webhook receiver on another,
+metrics on a third."""
 
 import asyncio
 import contextlib
@@ -11,6 +12,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from . import (
+    metrics,
     proxy,
     routes_account,
     routes_conversations,
@@ -24,7 +26,7 @@ from .conversations import ConversationService
 from .db import Database
 from .forge import Forge
 from .kube import Kube
-from .sandboxes import SandboxManager, load_specs
+from .sandboxes import Limits, SandboxManager, load_specs
 from .settings import Settings
 from .secrets_store import SecretsStore
 from .settings_store import SettingsStore
@@ -59,6 +61,13 @@ class State:
             specs=load_specs(settings.specs_dir),
             webhook_url=settings.webhook_url,
             agent_server_port=settings.agent_server_port,
+            limits=Limits(
+                max_running=settings.max_running_sandboxes,
+                idle_suspend=settings.idle_suspend_seconds,
+                suspended_delete=settings.suspended_delete_seconds,
+                service_orphan=settings.service_orphan_seconds,
+                service_max=settings.service_max_seconds,
+            ),
         )
         # Streams can stay open for a whole agent turn.
         self.http = httpx.AsyncClient(timeout=httpx.Timeout(30, read=None))
@@ -81,6 +90,7 @@ class State:
             public_url=settings.public_url,
             default_spec=settings.default_spec,
             start_timeout=settings.start_timeout,
+            max_events=settings.max_events,
         )
         self.automations = Automations(self.http, settings)
         # Where sandbox webhooks land.
@@ -114,10 +124,17 @@ def build_webhooks(state: State) -> FastAPI:
     return state.attach(app)
 
 
+def build_metrics(state: State) -> FastAPI:
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    app.include_router(metrics.router)
+    return state.attach(app)
+
+
 async def reconcile_forever(state: State) -> None:
     while True:
         try:
             await state.sandboxes.reconcile()
+            await state.sandboxes.collect(*state.conversations.sandbox_use())
         except Exception:
             log.exception("reconcile failed")
         try:
@@ -157,10 +174,22 @@ async def serve() -> None:
             )
         ),
     ]
+    if settings.metrics_port:
+        servers.append(
+            uvicorn.Server(
+                uvicorn.Config(
+                    build_metrics(state),
+                    host="0.0.0.0",
+                    port=settings.metrics_port,
+                    log_config=None,
+                    access_log=False,
+                )
+            )
+        )
     reconciler = asyncio.create_task(reconcile_forever(state))
     try:
-        # Only one of the two receives the signal; whichever stops first takes
-        # the other down with it.
+        # Only one of them receives the signal; whichever stops first takes
+        # the others down with it.
         tasks = [asyncio.create_task(s.serve()) for s in servers]
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for s in servers:

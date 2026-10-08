@@ -267,6 +267,22 @@ spec:
               value: {{ .Values.service.port | quote }}
             - name: RECONCILE_INTERVAL_SECONDS
               value: {{ $cfg.reconcileIntervalSeconds | quote }}
+            {{- if .Values.metrics.enabled }}
+            - name: METRICS_PORT
+              value: {{ .Values.metrics.port | quote }}
+            {{- end }}
+            - name: MAX_RUNNING_SANDBOXES
+              value: {{ $cfg.limits.maxRunningSandboxes | quote }}
+            - name: IDLE_SUSPEND_SECONDS
+              value: {{ mul $cfg.limits.idleSuspendMinutes 60 | quote }}
+            - name: SUSPENDED_DELETE_SECONDS
+              value: {{ mul $cfg.limits.deleteSuspendedAfterDays 86400 | quote }}
+            - name: SERVICE_ORPHAN_SECONDS
+              value: {{ mul $cfg.limits.automationOrphanMinutes 60 | quote }}
+            - name: SERVICE_MAX_SECONDS
+              value: {{ mul $cfg.limits.automationMaxMinutes 60 | quote }}
+            - name: MAX_EVENTS_PER_CONVERSATION
+              value: {{ $cfg.limits.maxEventsPerConversation | quote }}
             # uv keeps its state under HOME and unpacks wheels through a temp
             # directory; the root filesystem is read-only, so both point at the
             # emptyDir.
@@ -283,6 +299,11 @@ spec:
             - name: webhook
               containerPort: {{ $cfg.webhookPort }}
               protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -383,5 +404,35 @@ spec:
       port: {{ $cfg.webhookPort }}
       targetPort: webhook
       protocol: TCP
+    {{- if .Values.metrics.enabled }}
+    - name: metrics
+      port: {{ .Values.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+    {{- end }}
   selector:
     {{- include "openhands.appServerSelectorLabels" . | nindent 4 }}
+{{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/monitoring.coreos.com/servicemonitor_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "openhands.appServerSelectorLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+{{- end }}

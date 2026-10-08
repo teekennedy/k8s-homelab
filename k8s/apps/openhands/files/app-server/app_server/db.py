@@ -82,6 +82,13 @@ MIGRATIONS: list[str] = [
         updated_at TEXT NOT NULL
     );
     """,
+    """
+    -- Who asked for the sandbox: a browser ('user') or a service caller such
+    -- as an automation run ('service'). They are collected differently.
+    ALTER TABLE sandboxes ADD COLUMN owner_kind TEXT NOT NULL DEFAULT 'user';
+    -- When it was last suspended, while it still is.
+    ALTER TABLE sandboxes ADD COLUMN suspended_at TEXT;
+    """,
 ]
 
 

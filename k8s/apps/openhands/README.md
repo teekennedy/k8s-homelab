@@ -39,9 +39,8 @@ reaches it at `/runtime/<sandbox>` through the app server. History is posted
 back to the app server by webhook as it happens, so a conversation stays
 readable after its sandbox is gone.
 
-The canvas pod's own agent server is still started, but only the metrics
-sidecar reads it: nothing routes a browser to it and no automation runs on it.
-The pod's entrypoint is
+The canvas pod runs the static frontend and the automation service, and no
+agent: sandboxes are the agent servers. Its entrypoint is
 `files/canvas/start.sh` rather than the image's, because the image's has no way
 to pass `--lock-to-cloud`.
 
@@ -364,7 +363,7 @@ so they always match the version conversations run on.
 
 A reconciler compares the database to the cluster every minute: a managed
 `Sandbox` with no live row is deleted, and a row whose `Sandbox` has vanished
-reports `MISSING`.
+reports `MISSING`. It then applies the limits below.
 
 ## Automations
 
@@ -457,47 +456,125 @@ the path answers 404 for a source nobody has registered.
 > webhook cannot filter on author, so the place to enforce one is the trigger's
 > `filter`, as `forge-mention` does with `sender.login == '…'`.
 
+## Limits
+
+The app server's reconciler applies `appServer.limits` once a minute.
+
+| Limit | Default | What happens |
+| --- | --- | --- |
+| `maxRunningSandboxes` | 8 | A new conversation fails with the reason; an automation run is skipped, not failed. Suspended sandboxes do not count. |
+| `idleSuspendMinutes` | 60 | A conversation's sandbox is suspended: the pod goes, the volume stays. |
+| `deleteSuspendedAfterDays` | 7 | A sandbox still suspended is deleted **with its volume**. |
+| `automationOrphanMinutes` | 10 | An automation run's sandbox that never got a conversation is deleted. |
+| `automationMaxMinutes` | 120 | An automation run's sandbox is deleted, whatever it is doing. |
+| `maxEventsPerConversation` | 20000 | The oldest events of a transcript are dropped. |
+
+Idle means no request or stream traffic through `/runtime/<sandbox>`, no event
+from its agent, and no agent turn in progress — a long task keeps its sandbox
+up with nobody watching. A suspended sandbox comes back with its checkout, its
+agent's session and the conversation intact, and nothing is reinstalled.
+
+Deletion after `deleteSuspendedAfterDays` is the one limit that loses work: a
+branch that was never pushed goes with the volume. The transcript does not; the
+conversation becomes an archived one.
+
+A run that fails while its sandbox is still starting never releases it, which
+is what `automationOrphanMinutes` is for.
+
 ## Metrics
 
-`files/metrics/` is a sidecar that walks the conversation list and renders
-per-model token and cost figures as Prometheus text on `:9102`, scraped by the
-existing kube-prometheus-stack through a ServiceMonitor. The agent server
-records the figures but exposes no `/metrics` endpoint of its own, and no
-upstream usage dashboard exists.
+The app server serves Prometheus text on `:9102/metrics`, scraped by the
+existing kube-prometheus-stack through a ServiceMonitor. The figures are what
+each sandbox's agent server reports for its conversation, delivered by webhook
+and kept with the conversation, so they outlive the sandbox.
 
-It is a sidecar rather than its own Deployment because the session key it
-authenticates with is generated onto the data volume on first boot — reading it
-there is what keeps that key single-owned rather than copied into a Secret with
-two owners. The volume is mounted read-only.
+| Metric | Labels |
+| --- | --- |
+| `openhands_conversation_cost_usd` | `conversation`, `title`, `trigger`, `model` |
+| `openhands_conversation_tokens` | the same, and `kind` |
+| `openhands_usage_cost_usd` | `model` |
+| `openhands_usage_tokens` | `model`, `kind` |
+| `openhands_conversations` | `status` |
+| `openhands_conversations_total` | — |
+| `openhands_sandboxes` | `spec`, `status` |
 
-Series and their caveats are in `files/metrics/README.md`. The short version:
-they are **gauges**, recomputed from the conversations that still exist, so
-deleting a conversation makes the numbers go down.
+`kind` is `prompt`, `completion`, `cache_read`, `cache_write` or `reasoning`.
+`model` is what the agent was asked for — an alias such as `sonnet` for a
+Claude Code conversation — and the cost is the agent's own estimate, which for
+a subscription login is not what is billed.
 
-The NetworkPolicy admits the monitoring namespace to the exporter's port and
-nothing else — the scraper cannot reach the entry point, and oauth2-proxy
-cannot reach the exporter.
+**Every series is a gauge**, including the ones that read like totals. They are
+recomputed from the conversations that still exist, so deleting one makes the
+numbers go down, which a counter may not do. Chart them with `max_over_time`,
+not `rate`. A conversation whose sandbox was gone before usage was recorded
+here has none.
+
+The NetworkPolicy admits the monitoring namespace to that port and nothing
+else: the scraper cannot reach the API.
 
 ## Storage
 
-Two ReadWriteOnce Longhorn volumes, which is why this is a single replica:
-
-| Volume | Mount | Backed up |
+| Volume | Holds | Backed up |
 | --- | --- | --- |
-| `openhands-data` | `~/.openhands` | yes |
-| `openhands-workspace` | `~/workspace` | no |
+| `openhands-app-server` | the app server's database: conversations and their transcripts, settings, agent profiles, the encrypted secret store | yes |
+| `openhands-data` | `~/.openhands` in the canvas pod: the automation service's database and uploads | yes |
+| `openhands-workspace` | `~/workspace` in the canvas pod; nothing writes to it any more | no |
+| `workspace-<sandbox>` | one sandbox's checkout and agent state; deleted with the sandbox | no |
 
-`~/.openhands` holds settings, session history, the automation SQLite database,
-and the **encryption key for the secret store, generated on first boot**. Losing
-that volume does not just lose history — it makes every secret saved through the
-UI undecryptable. It is in the Longhorn recurring backup group for that reason.
+All ReadWriteOnce Longhorn volumes, which is why both the app server and the
+canvas pod are single replicas. The two backed-up volumes are in the Longhorn
+recurring backup group. Sandbox volumes are not: a checkout is a branch that is
+on the forge, or it is work in progress that the limits above will eventually
+delete.
 
-`~/workspace` is per-session checkouts of branches that are on the server
-anyway, so it is not backed up.
+The secret store's key is not on a volume but in the
+`openhands-app-server-secrets-key` Secret; without it the store cannot be read.
 
-The automation backend can be pointed at an external Postgres with
-`AUTOMATION_DB_URL` (`postgresql+asyncpg://…`) if the SQLite database on a
-single volume ever stops being enough.
+The automation service can be pointed at an external Postgres with
+`AUTOMATION_DB_URL` (`postgresql+asyncpg://…`) if SQLite on one volume ever
+stops being enough.
+
+## Runbook
+
+Find a conversation's sandbox, from the conversation id in the page's URL:
+
+```sh
+kubectl -n openhands exec deploy/openhands-app-server -c app-server -- python3 -c "
+import sqlite3; print(sqlite3.connect('/data/app.db').execute(
+  'select sandbox_id from conversations where id = ?', ('<conversation id>',)).fetchone())"
+```
+
+Every sandbox, with its spec and whether it is suspended:
+
+```sh
+kubectl -n openhands get sandbox -o custom-columns='NAME:.metadata.name,SPEC:.metadata.labels.openhands\.msng\.to/sandbox-spec,MODE:.spec.operatingMode,CREATED:.metadata.creationTimestamp'
+```
+
+A sandbox's logs — the pod is named after the sandbox:
+
+```sh
+kubectl -n openhands logs <sandbox> -c agent-server      # the agent server
+kubectl -n openhands logs <sandbox> -c seed-home         # skills and the adapter install
+kubectl -n openhands logs deploy/openhands-app-server | grep <sandbox>
+```
+
+Delete a wedged sandbox. Deleting the conversation in the UI is the normal
+way; this is for when that does not work. The `Sandbox` owns its pod, Service,
+volume and Secret, and the app server notices within a minute and shows the
+conversation as archived:
+
+```sh
+kubectl -n openhands delete sandbox <sandbox>
+```
+
+A pod that will not go because its node is down needs the usual force-delete
+and, for the volume, the stale VolumeAttachment removed.
+
+Why a sandbox was suspended or deleted:
+
+```sh
+kubectl -n openhands logs deploy/openhands-app-server | grep 'collect:'
+```
 
 ## Known rough edges
 

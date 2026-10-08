@@ -57,6 +57,17 @@ class Settings:
     start_timeout: float
     # Encrypts the conversation secrets store at rest.
     secrets_key: str
+    # Prometheus metrics, on a port the NetworkPolicy opens to the scraper
+    # alone. 0: not served.
+    metrics_port: int = 0
+    # Sandbox limits; see sandboxes.Limits. 0 switches one off.
+    max_running_sandboxes: int = 0
+    idle_suspend_seconds: float = 0
+    suspended_delete_seconds: float = 0
+    service_orphan_seconds: float = 0
+    service_max_seconds: float = 0
+    # Events kept per conversation; the oldest go first.
+    max_events: int = 0
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -85,4 +96,13 @@ class Settings:
             forge_token=os.environ.get("FORGE_TOKEN", ""),
             start_timeout=float(_env("START_TIMEOUT_SECONDS")),
             secrets_key=_env("SECRETS_KEY"),
+            metrics_port=int(os.environ.get("METRICS_PORT", "0")),
+            max_running_sandboxes=int(os.environ.get("MAX_RUNNING_SANDBOXES", "0")),
+            idle_suspend_seconds=float(os.environ.get("IDLE_SUSPEND_SECONDS", "0")),
+            suspended_delete_seconds=float(
+                os.environ.get("SUSPENDED_DELETE_SECONDS", "0")
+            ),
+            service_orphan_seconds=float(os.environ.get("SERVICE_ORPHAN_SECONDS", "0")),
+            service_max_seconds=float(os.environ.get("SERVICE_MAX_SECONDS", "0")),
+            max_events=int(os.environ.get("MAX_EVENTS_PER_CONVERSATION", "0")),
         )

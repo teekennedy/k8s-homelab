@@ -10,6 +10,7 @@ import hmac
 import json
 import logging
 import secrets
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
@@ -32,6 +33,28 @@ Status = Literal["STARTING", "RUNNING", "PAUSED", "ERROR", "MISSING"]
 
 class UnknownSpec(ValueError):
     pass
+
+
+class AtCapacity(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class Limits:
+    """What the collector enforces, in seconds; 0 switches a limit off."""
+
+    # Sandboxes that may be running at once. Suspended ones do not count.
+    max_running: int = 0
+    # A browser's sandbox with no activity and no running agent is suspended:
+    # the pod goes, the volume stays, and opening the conversation resumes it.
+    idle_suspend: float = 0
+    # A sandbox left suspended this long is deleted, volume and all.
+    suspended_delete: float = 0
+    # A service caller's sandbox that never got a conversation: a run that
+    # failed while the sandbox was still starting never releases it.
+    service_orphan: float = 0
+    # A service caller's sandbox, however busy: no run lasts this long.
+    service_max: float = 0
 
 
 def load_specs(specs_dir: Path) -> dict[str, dict[str, Any]]:
@@ -75,6 +98,7 @@ class SandboxManager:
         specs: dict[str, dict[str, Any]],
         webhook_url: str,
         agent_server_port: int,
+        limits: Limits = Limits(),
     ):
         self.db = db
         self.kube = kube
@@ -82,6 +106,7 @@ class SandboxManager:
         self.specs = specs
         self.webhook_url = webhook_url
         self.port = agent_server_port
+        self.limits = limits
         self.sandboxes = Resource("agents.x-k8s.io", "v1beta1", "sandboxes", namespace)
         self.secrets = Resource("", "v1", "secrets", namespace)
         self.pods = Resource("", "v1", "pods", namespace)
@@ -143,23 +168,35 @@ class SandboxManager:
             "enable_vscode": False,
         }
 
-    async def create(self, spec_name: str, created_by: str) -> dict[str, Any]:
+    async def create(
+        self, spec_name: str, created_by: str, owner_kind: str = "user"
+    ) -> dict[str, Any]:
         template = self.specs.get(spec_name)
         if template is None:
             raise UnknownSpec(spec_name)
+        running = self.db.one(
+            "SELECT COUNT(*) AS n FROM sandboxes"
+            " WHERE deleted_at IS NULL AND suspended_at IS NULL"
+        )["n"]
+        if self.limits.max_running and running >= self.limits.max_running:
+            raise AtCapacity(
+                f"{running} sandboxes are running, which is the limit; stop or"
+                " delete a conversation, or wait for one to be suspended"
+            )
         sandbox_id = f"sbx-{secrets.token_hex(6)}"
         session_api_key = secrets.token_urlsafe(32)
         ts = now()
         # The row first: the reconciler deletes any managed Sandbox without one.
         self.db.run(
             "INSERT INTO sandboxes (id, spec, session_api_key, created_by, created_at,"
-            " last_active_at) VALUES (?, ?, ?, ?, ?, ?)",
+            " last_active_at, owner_kind) VALUES (?, ?, ?, ?, ?, ?, ?)",
             sandbox_id,
             spec_name,
             session_api_key,
             created_by,
             ts,
             ts,
+            owner_kind,
         )
         try:
             sandbox = await self.kube.create(
@@ -217,7 +254,12 @@ class SandboxManager:
             if e.status == 404:
                 return False
             raise
-        self.touch(sandbox_id)
+        self.db.run(
+            "UPDATE sandboxes SET suspended_at = ?, last_active_at = ? WHERE id = ?",
+            now() if mode == "Suspended" else None,
+            now(),
+            sandbox_id,
+        )
         log.info("sandbox %s -> %s", sandbox_id, mode)
         return True
 
@@ -318,3 +360,40 @@ class SandboxManager:
         for vanished in sorted(created - in_cluster):
             log.warning("reconcile: sandbox %s is gone from the cluster", vanished)
             self._mark_deleted(vanished)
+
+    # --- collection ---------------------------------------------------------
+
+    async def collect(self, busy: set[str], claimed: set[str]) -> None:
+        """Apply the limits. `busy` are sandboxes whose agent is working or
+        whose conversation is still starting; `claimed` are those that have a
+        conversation at all."""
+        limits = self.limits
+        at = datetime.now(UTC)
+
+        def older(ts: str | None, seconds: float) -> bool:
+            return bool(seconds and ts) and (
+                at - datetime.fromisoformat(ts) > timedelta(seconds=seconds)
+            )
+
+        for row in self.db.all("SELECT * FROM sandboxes WHERE deleted_at IS NULL"):
+            sandbox_id = row["id"]
+            if row["owner_kind"] == "service":
+                orphan = sandbox_id not in claimed | busy and older(
+                    row["created_at"], limits.service_orphan
+                )
+                if orphan or older(row["created_at"], limits.service_max):
+                    log.warning(
+                        "collect: deleting service sandbox %s (%s)",
+                        sandbox_id,
+                        "no conversation" if orphan else "too old",
+                    )
+                    await self.delete(sandbox_id)
+            elif row["suspended_at"]:
+                if older(row["suspended_at"], limits.suspended_delete):
+                    log.warning("collect: deleting suspended sandbox %s", sandbox_id)
+                    await self.delete(sandbox_id)
+            elif sandbox_id not in busy and older(
+                row["last_active_at"], limits.idle_suspend
+            ):
+                log.info("collect: suspending idle sandbox %s", sandbox_id)
+                await self.pause(sandbox_id)

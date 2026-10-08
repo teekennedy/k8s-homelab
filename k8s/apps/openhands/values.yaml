@@ -201,36 +201,17 @@ podAnnotations: {}
 podLabels: {}
 
 # --- Metrics ----------------------------------------------------------------
-# Sidecar exporting per-model token and cost figures. It exists because the
-# agent server records them but exposes no /metrics endpoint, and no upstream
-# usage dashboard exists.
-#
-# A sidecar rather than its own Deployment: the session key it authenticates
-# with is generated onto the data volume on first boot, so reading it there is
-# what keeps that key single-owned instead of copied into a Secret.
+# Served by the app server on a port of its own: token and cost figures per
+# conversation and per model, and sandbox counts. See README.md, "Metrics".
 metrics:
   enabled: true
-  # Stdlib only — files/metrics/server.py imports nothing off the standard
-  # library, so a bare python image is the whole runtime.
-  # renovate: datasource=docker depName=python
-  image: python:3.14-alpine
   port: 9102
-  # A scrape walks the whole conversation history, so it is not free. Scrapes
-  # inside this window are served from the previous render.
-  minScrapeIntervalSeconds: 25
   serviceMonitor:
     enabled: true
     interval: 60s
     # kube-prometheus-stack in monitoring-system discovers by this label.
     labels:
       release: monitoring-system
-  resources:
-    requests:
-      cpu: 10m
-      memory: 32Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
 
 # --- App server -------------------------------------------------------------
 # Serves the cloud API the frontend speaks in locked-cloud mode, and runs one
@@ -282,8 +263,28 @@ appServer:
       name: default
       agent_kind: acp
       acp_server: claude-code
-  # SQLite database: sandboxes, minted API keys, and from later phases the
-  # conversation history. The only copy, so it is backed up.
+  # What the app server enforces on sandboxes, once a reconcile interval. 0
+  # switches a limit off. See README.md, "Limits".
+  limits:
+    # Sandboxes running at once; suspended ones do not count. A conversation
+    # started past it fails with the reason, and an automation run is skipped.
+    maxRunningSandboxes: 8
+    # A conversation's sandbox with no activity and no working agent is
+    # suspended: the pod goes, the volume stays, opening it again resumes it.
+    idleSuspendMinutes: 60
+    # A sandbox left suspended this long is deleted WITH ITS VOLUME — any
+    # work in it that was never pushed goes too. The transcript stays.
+    deleteSuspendedAfterDays: 7
+    # An automation run's sandbox that never got a conversation: the run
+    # failed while the sandbox was starting, and nothing else will delete it.
+    automationOrphanMinutes: 10
+    # An automation run's sandbox, whatever it is doing. Longer than any
+    # run's timeout (30 minutes at most).
+    automationMaxMinutes: 120
+    # Events kept per conversation; the oldest are dropped first.
+    maxEventsPerConversation: 20000
+  # SQLite database: sandboxes, minted API keys, settings and the conversation
+  # history. The only copy, so it is backed up.
   storage:
     size: 5Gi
     storageClass: longhorn

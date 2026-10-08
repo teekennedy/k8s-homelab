@@ -8,9 +8,10 @@ service's CloudSandboxBackend (`openhands/automation/backends/cloud.py`).
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
 from .auth import Principal, check_service_key, mint_api_key, principal
-from .sandboxes import SandboxManager, UnknownSpec
+from .sandboxes import AtCapacity, SandboxManager, UnknownSpec
 
 router = APIRouter()
 Caller = Annotated[Principal, Depends(principal)]
@@ -65,15 +66,19 @@ async def create(
     request: Request,
     who: Caller,
     body: Annotated[dict[str, Any] | None, Body()] = None,
-) -> dict[str, Any]:
+):
     sandboxes = _sandboxes(request)
     spec = (body or {}).get(
         "sandbox_spec_id"
     ) or request.app.state.settings.default_spec
     try:
-        row = await sandboxes.create(spec, who.name)
+        row = await sandboxes.create(spec, who.name, who.kind)
     except UnknownSpec:
         raise HTTPException(400, f"unknown sandbox spec {spec!r}")
+    except AtCapacity as e:
+        # What the automation service reads to mark a run skipped, not failed
+        # (`backends/cloud.py`).
+        return JSONResponse({"message": str(e), "detail": str(e)}, status_code=429)
     return sandboxes.info(row, "STARTING", _base_url(request, who))
 
 

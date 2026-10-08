@@ -1,8 +1,9 @@
 ---
 # The app server holds the sandbox lifecycle and the only route into any
-# sandbox, so its ingress is exactly its two callers: the canvas pod (the
-# browser's API calls and the automation service, on the API port) and sandbox
-# pods (their webhooks, on a port of their own). A sandbox therefore cannot
+# sandbox, so its ingress is exactly its callers: the canvas pod (the
+# browser's API calls and the automation service, on the API port), sandbox
+# pods (their webhooks, on a port of their own) and the metrics scraper (on a
+# third). A sandbox therefore cannot
 # reach the API, and so cannot create sandboxes.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -33,6 +34,16 @@ spec:
       ports:
         - port: webhook
           protocol: TCP
+    {{- if .Values.metrics.enabled }}
+    # The metrics port, and only it, for the scraper.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.monitoringNamespace }}
+      ports:
+        - port: metrics
+          protocol: TCP
+    {{- end }}
   egress:
     {{- include "openhands.egressDNS" . | nindent 4 }}
     # The apiserver: host-networked, so an ipBlock on the nodes.

@@ -23,8 +23,7 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # The entry point, from oauth2-proxy. The agent server in this pod is not
-    # exposed at all.
+    # The entry point, from oauth2-proxy.
     - from:
         - podSelector:
             matchLabels:
@@ -42,17 +41,6 @@ spec:
       ports:
         - port: automation
           protocol: TCP
-    {{- if .Values.metrics.enabled }}
-    # The metrics sidecar's port, and only it: the scraper cannot reach the
-    # entry point and oauth2-proxy cannot reach the exporter.
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.monitoringNamespace }}
-      ports:
-        - port: metrics
-          protocol: TCP
-    {{- end }}
   egress:
     {{- include "openhands.egressDNS" . | nindent 4 }}
     # The app server: every /api and /runtime call the frontend makes.

@@ -81,6 +81,7 @@ class ConversationService:
         public_url: str,
         default_spec: str,
         start_timeout: float,
+        max_events: int = 0,
     ):
         self.db = db
         self.sandboxes = sandboxes
@@ -91,6 +92,7 @@ class ConversationService:
         self.public_url = public_url
         self.default_spec = default_spec
         self.start_timeout = start_timeout
+        self.max_events = max_events
         self._running: set[asyncio.Task] = set()
 
     # --- sandbox spec -------------------------------------------------------
@@ -324,6 +326,7 @@ class ConversationService:
             ),
             "tags": info.get("tags") or {},
             "metrics": info.get("metrics"),
+            "stats": info.get("stats"),
             "execution_status": info.get("execution_status"),
             "public": False,
         }
@@ -444,6 +447,26 @@ class ConversationService:
         self.db.run("DELETE FROM events WHERE conversation_id = ?", conv_id)
         return True
 
+    def sandbox_use(self) -> tuple[set[str], set[str]]:
+        """(busy, claimed) sandbox ids, for the collector: those whose agent
+        is running or whose conversation is still starting, and those that
+        have a conversation at all."""
+        busy = {
+            r["sandbox_id"]
+            for r in self.db.all(
+                "SELECT sandbox_id FROM start_tasks"
+                " WHERE status NOT IN ('READY', 'ERROR') AND sandbox_id IS NOT NULL"
+            )
+        }
+        claimed = set()
+        for row in self.db.all(
+            "SELECT sandbox_id, meta FROM conversations WHERE deleted_at IS NULL"
+        ):
+            claimed.add(row["sandbox_id"])
+            if json.loads(row["meta"]).get("execution_status") == "running":
+                busy.add(row["sandbox_id"])
+        return busy, claimed
+
     # --- the live runtime ---------------------------------------------------
 
     async def runtime(self, conv_id: str) -> tuple[str, str] | None:
@@ -500,6 +523,15 @@ class ConversationService:
                     if e.get("id") and e.get("timestamp")
                 ],
             )
+            if self.max_events:
+                c.execute(
+                    "DELETE FROM events WHERE conversation_id = ? AND id IN ("
+                    "SELECT id FROM events WHERE conversation_id = ?"
+                    " ORDER BY timestamp DESC, id DESC LIMIT -1 OFFSET ?)",
+                    (conv_id, conv_id, self.max_events),
+                )
+        # A working agent is activity, whether or not a browser is watching.
+        self.sandboxes.touch(sandbox_id)
 
     async def drain(self, sandbox_id: str, conv_id: str) -> None:
         """Read a conversation's events and status straight from its sandbox.
@@ -531,7 +563,7 @@ class ConversationService:
         if row is None or row["sandbox_id"] != sandbox_id:
             return
         meta = json.loads(row["meta"])
-        for key in ("execution_status", "metrics", "tags"):
+        for key in ("execution_status", "metrics", "stats", "tags"):
             if key in info:
                 meta[key] = info[key]
         self.db.run(

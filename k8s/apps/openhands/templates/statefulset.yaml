@@ -39,9 +39,6 @@ spec:
         # files/skills/ only takes effect on a fresh pod.
         checksum/skills: {{ include (print $.Template.BasePath "/configmap-skills.yaml") . | sha256sum }}
         checksum/start: {{ printf "%s%s" (.Files.Get "files/canvas/start.sh") (.Files.Get "files/canvas/patch_frontend.py") | sha256sum }}
-        {{- if .Values.metrics.enabled }}
-        checksum/metrics: {{ include (print $.Template.BasePath "/configmap-metrics.yaml") . | sha256sum }}
-        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -192,61 +189,6 @@ spec:
             - name: start
               mountPath: /etc/openhands-canvas
               readOnly: true
-        {{- if .Values.metrics.enabled }}
-        # Reads the conversation list over loopback and renders it as Prometheus
-        # text. In this pod, not its own Deployment, because the session key it
-        # authenticates with lives on the data volume.
-        - name: metrics
-          image: {{ .Values.metrics.image }}
-          imagePullPolicy: IfNotPresent
-          command:
-            - python
-            - /app/server.py
-          securityContext:
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          env:
-            - name: PYTHONDONTWRITEBYTECODE
-              value: "1"
-            - name: LOG_LEVEL
-              value: info
-            - name: METRICS_PORT
-              value: {{ .Values.metrics.port | quote }}
-            - name: AGENT_SERVER_URL
-              value: "http://127.0.0.1:18000"
-            - name: SESSION_API_KEY_FILE
-              value: {{ printf "%s/agent-canvas/api-key.txt" .Values.persistence.data.mountPath | quote }}
-            - name: MIN_SCRAPE_INTERVAL_SECONDS
-              value: {{ .Values.metrics.minScrapeIntervalSeconds | quote }}
-          ports:
-            - name: metrics
-              containerPort: {{ .Values.metrics.port }}
-              protocol: TCP
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: metrics
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: metrics
-            periodSeconds: 30
-            failureThreshold: 3
-          resources:
-            {{- toYaml .Values.metrics.resources | nindent 12 }}
-          volumeMounts:
-            # Read-only: the sidecar only ever reads the session key.
-            - name: data
-              mountPath: {{ .Values.persistence.data.mountPath }}
-              readOnly: true
-            - name: metrics-src
-              mountPath: /app
-              readOnly: true
-        {{- end }}
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -258,12 +200,6 @@ spec:
           emptyDir: {}
         - name: claude-home
           emptyDir: {}
-        {{- if .Values.metrics.enabled }}
-        - name: metrics-src
-          configMap:
-            name: {{ include "openhands.fullname" . }}-metrics
-            defaultMode: 0444
-        {{- end }}
         - name: skills
           configMap:
             name: {{ include "openhands.fullname" . }}-skills

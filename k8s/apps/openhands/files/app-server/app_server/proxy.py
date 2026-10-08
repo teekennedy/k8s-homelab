@@ -230,6 +230,8 @@ async def proxy_ws(ws: WebSocket, sandbox_id: str, path: str):
 
     async def upstream_to_client():
         async for msg in upstream:
+            # A stream that is carrying events is a sandbox in use.
+            sandboxes.touch(sandbox_id)
             if isinstance(msg, bytes):
                 await ws.send_bytes(msg)
             else:
