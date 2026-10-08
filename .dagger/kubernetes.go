@@ -2,26 +2,19 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"path"
 	"strings"
 
 	"dagger/homelab/internal/dagger"
-
-	"golang.org/x/sync/errgroup"
 )
 
-// Polaris runs Fairwinds Polaris audit on this chart's rendered manifests.
+// Polaris runs Fairwinds Polaris audit on this release's rendered manifests.
 // Exits non-zero when any danger-level checks fail.
 // If the chart directory contains a polaris.yaml, it is used as the Polaris config
 // (supports per-chart exemptions for expected RBAC or privilege requirements).
-func (hc *HelmChart) Polaris(ctx context.Context, container *dagger.Container) (string, error) {
-	if err := hc.usable(container); err != nil {
-		return "", err
-	}
-
-	manifest := hc.renderedManifest(ctx, container)
-	audit := hc.polarisContainer(ctx, container, manifest)
+func (r *helmfileRelease) Polaris(ctx context.Context, toolchain *dagger.Container) error {
+	audit := r.polarisContainer(ctx, toolchain)
 
 	args := []string{
 		"polaris", "audit",
@@ -33,51 +26,36 @@ func (hc *HelmChart) Polaris(ctx context.Context, container *dagger.Container) (
 		"--merge-config",
 	}
 
-	out, err := audit.WithExec(args).Stdout(ctx)
-	if err != nil {
-		var execErr *dagger.ExecError
-		if errors.As(err, &execErr) {
-			return "", fmt.Errorf("polaris failed for %s: %w\n%s%s", hc.Path, err, execErr.Stdout, execErr.Stderr)
-		}
-		return "", fmt.Errorf("polaris failed for %s: %w\n%s", hc.Path, err, out)
+	if _, err := audit.WithExec(args).Sync(ctx); err != nil {
+		return fmt.Errorf("polaris failed for %s (%s): %w", r.Path, r.Environment, withExecOutput(err))
 	}
-
-	return fmt.Sprintf("Polaris passed for %s", hc.Path), nil
+	return nil
 }
 
-// polarisContainer returns a polaris container with the rendered manifest mounted at
-// /rendered.yaml and a merged polaris config at /polaris.yaml. The config always disables
+// polarisContainer returns the render container with a merged polaris config at /polaris.yaml. The config always disables
 // missingNetworkPolicy and linuxHardening, which crash polaris 10.x with a nil pointer
 // when pod templates have no labels/annotations (polaris bug in their Go template renderer).
 // Per-chart exemptions from polaris.yaml are appended when present.
-func (hc *HelmChart) polarisContainer(ctx context.Context, toolchain *dagger.Container, manifest *dagger.File) *dagger.Container {
+func (r *helmfileRelease) polarisContainer(ctx context.Context, toolchain *dagger.Container) *dagger.Container {
 	cfg := "checks:\n  missingNetworkPolicy: ignore\n  linuxHardening: ignore\n"
 
-	if chartCfg, err := hc.Source.File("polaris.yaml").Contents(ctx); err == nil && chartCfg != "" {
+	if chartCfg, err := r.Source.File(path.Join(r.Path, "polaris.yaml")).Contents(ctx); err == nil && chartCfg != "" {
 		cfg += chartCfg
 	}
 
-	return toolchain.
-		WithFile("/rendered.yaml", manifest).
-		WithNewFile("/polaris.yaml", cfg)
+	return r.rendered(toolchain).WithNewFile("/polaris.yaml", cfg)
 }
 
-// Kubeconform validates this chart's rendered manifests against JSON schemas in strict mode.
+// Kubeconform validates this release's rendered manifests against JSON schemas in strict mode.
 // Uses the datreeio CRDs-catalog (baked into the container layer) to validate custom resources
 // in addition to built-in Kubernetes schemas. Unknown schemas not in the catalog are skipped.
 //
 // If the chart directory contains a kubeconform.yaml, its skipKinds list is filtered out of the
 // manifest before validation. Use this for kinds whose catalog schema is known to be stale.
-func (hc *HelmChart) Kubeconform(ctx context.Context, container *dagger.Container) (string, error) {
-	if err := hc.usable(container); err != nil {
-		return "", err
-	}
-
-	manifest := hc.renderedManifest(ctx, container)
-
+func (r *helmfileRelease) Kubeconform(ctx context.Context, toolchain *dagger.Container) error {
 	// Parse per-chart skip list
 	var skipKinds []string
-	if cfg, err := hc.Source.File("kubeconform.yaml").Contents(ctx); err == nil && cfg != "" {
+	if cfg, err := r.Source.File(path.Join(r.Path, "kubeconform.yaml")).Contents(ctx); err == nil && cfg != "" {
 		skipKinds = parseKubeconformSkipKinds(cfg)
 	}
 
@@ -94,19 +72,12 @@ func (hc *HelmChart) Kubeconform(ctx context.Context, container *dagger.Containe
 	}
 	args = append(args, "/rendered.yaml")
 
-	out, err := hc.kubeconformContainerWithSchemas(container).
-		WithFile("/rendered.yaml", manifest).
-		WithExec(args).
-		Stdout(ctx)
-	if err != nil {
-		var execErr *dagger.ExecError
-		if errors.As(err, &execErr) {
-			return "", fmt.Errorf("kubeconform failed for %s: %w\n%s%s", hc.Path, err, execErr.Stdout, execErr.Stderr)
-		}
-		return "", fmt.Errorf("kubeconform failed for %s: %w\n%s", hc.Path, err, out)
+	// The schemas are layered on the render container so the render itself,
+	// which is shared with the other checks, stays a cache hit.
+	if _, err := withCRDSchemas(r.rendered(toolchain)).WithExec(args).Sync(ctx); err != nil {
+		return fmt.Errorf("kubeconform failed for %s (%s): %w", r.Path, r.Environment, withExecOutput(err))
 	}
-
-	return fmt.Sprintf("Kubeconform passed for %s", hc.Path), nil
+	return nil
 }
 
 // parseKubeconformSkipKinds parses the skipKinds list out of a kubeconform.yaml's
@@ -136,9 +107,8 @@ func parseKubeconformSkipKinds(cfg string) []string {
 // that have no built-in Kubernetes schema.
 const crdsCatalogURL = "https://github.com/datreeio/CRDs-catalog/archive/refs/heads/main.tar.gz"
 
-// kubeconformContainerWithSchemas returns the ci container with the datreeio CRDs-catalog
-// unpacked at /schemas.
-func (hc *HelmChart) kubeconformContainerWithSchemas(toolchain *dagger.Container) *dagger.Container {
+// withCRDSchemas returns the container with the datreeio CRDs-catalog unpacked at /schemas.
+func withCRDSchemas(toolchain *dagger.Container) *dagger.Container {
 	catalog := dag.HTTP(crdsCatalogURL)
 
 	return toolchain.
@@ -147,92 +117,62 @@ func (hc *HelmChart) kubeconformContainerWithSchemas(toolchain *dagger.Container
 		WithExec([]string{"tar", "-xz", "--strip-components=1", "-C", "/schemas", "-f", "/tmp/crds-catalog.tar.gz"})
 }
 
-// ValidatePolaris runs Polaris audit across all Helm charts.
+// ValidatePolaris runs Polaris audit across all Helm charts, once per
+// environment, on the manifests helmfile renders.
 // When paths are provided, only matching charts are validated.
 // +check
 func (m *Homelab) ValidatePolaris(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
+	// Helmfile environments to render with.
+	// +optional
+	// +default=["production"]
+	environments []string,
 	// +optional
 	paths []string,
 	// +optional
 	container *dagger.Container,
 ) (string, error) {
-	helmChartPaths := discoverHelmChartPaths(ctx, source)
-	if len(paths) > 0 {
-		helmChartPaths = matchChartPaths(paths, helmChartPaths)
+	n, err := m.forEachHelmfileRelease(ctx, source, environments, paths, container, "polaris validation",
+		func(ctx context.Context, r *helmfileRelease, c *dagger.Container) error {
+			return r.Polaris(ctx, c)
+		})
+	if err != nil {
+		return "", err
 	}
-	if len(helmChartPaths) == 0 {
+	if n == 0 {
 		return "Polaris validation skipped (no matching charts)", nil
 	}
-	if container == nil {
-		container = m.ciContainer()
-	}
-
-	var clusterValues *dagger.File
-	cv := source.File("config/gen/cluster-values.yaml")
-	if _, err := cv.Sync(ctx); err == nil {
-		clusterValues = cv
-	}
-
-	g := new(errgroup.Group)
-	for _, chartPath := range helmChartPaths {
-		hc := newHelmChart(source, chartPath, clusterValues)
-		g.Go(func() error {
-			_, err := hc.Polaris(ctx, container)
-			return err
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return "", fmt.Errorf("polaris validation failed: %w", err)
-	}
-
-	return fmt.Sprintf("Polaris validation passed (%d charts)", len(helmChartPaths)), nil
+	return fmt.Sprintf("Polaris validation passed (%d releases)", n), nil
 }
 
-// ValidateKubeconform runs kubeconform in strict mode across all Helm charts.
+// ValidateKubeconform runs kubeconform in strict mode across all Helm charts,
+// once per environment, on the manifests helmfile renders.
 // When paths are provided, only matching charts are validated.
 // +check
 func (m *Homelab) ValidateKubeconform(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!k8s/**/*", "!config/gen/cluster-values.yaml", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
+	// Helmfile environments to render with.
+	// +optional
+	// +default=["production"]
+	environments []string,
 	// +optional
 	paths []string,
 	// +optional
 	container *dagger.Container,
 ) (string, error) {
-	helmChartPaths := discoverHelmChartPaths(ctx, source)
-	if len(paths) > 0 {
-		helmChartPaths = matchChartPaths(paths, helmChartPaths)
+	n, err := m.forEachHelmfileRelease(ctx, source, environments, paths, container, "kubeconform validation",
+		func(ctx context.Context, r *helmfileRelease, c *dagger.Container) error {
+			return r.Kubeconform(ctx, c)
+		})
+	if err != nil {
+		return "", err
 	}
-	if len(helmChartPaths) == 0 {
+	if n == 0 {
 		return "Kubeconform validation skipped (no matching charts)", nil
 	}
-	if container == nil {
-		container = m.ciContainer()
-	}
-
-	var clusterValues *dagger.File
-	cv := source.File("config/gen/cluster-values.yaml")
-	if _, err := cv.Sync(ctx); err == nil {
-		clusterValues = cv
-	}
-
-	g := new(errgroup.Group)
-	for _, chartPath := range helmChartPaths {
-		hc := newHelmChart(source, chartPath, clusterValues)
-		g.Go(func() error {
-			_, err := hc.Kubeconform(ctx, container)
-			return err
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return "", fmt.Errorf("kubeconform validation failed: %w", err)
-	}
-
-	return fmt.Sprintf("Kubeconform validation passed (%d charts)", len(helmChartPaths)), nil
+	return fmt.Sprintf("Kubeconform validation passed (%d releases)", n), nil
 }

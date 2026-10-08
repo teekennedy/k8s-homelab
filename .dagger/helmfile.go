@@ -219,8 +219,8 @@ func (m *Homelab) BuildHelmfile(ctx context.Context,
 }
 
 // ValidateHelmfile runs `helmfile lint` on every chart, once per environment.
-// Unlike ValidateHelm it lints each chart with the values helmfile would deploy
-// it with. When paths are provided, only charts matching the paths are linted.
+// It lints each chart with the values helmfile would deploy it with.
+// When paths are provided, only charts matching the paths are linted.
 // +check
 func (m *Homelab) ValidateHelmfile(ctx context.Context,
 	// +defaultPath="/"

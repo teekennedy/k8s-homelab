@@ -14,8 +14,8 @@ See `../docs/ci-architecture.md` for details.
 ### Per-Project Module Pattern
 
 Language-specific checks are organized into **per-project module structs** that
-maximize cache granularity. Each struct (GoModule, PythonProject, HelmChart,
-TerraformModule) carries a scoped source directory containing only its project's
+maximize cache granularity. Each struct (GoModule, PythonProject,
+TerraformModule, helmfileRelease) carries a scoped source directory containing only its project's
 files. This enables two levels of caching:
 
 - **Layer 2 (Dagger function call cache)**: `dagger check test-go` caches the
@@ -37,13 +37,12 @@ The combination means:
 | `main.go` | Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions |
 | `golang.go` | GoModule struct, per-module Test/Lint, aggregate TestGo/LintGo |
 | `python.go` | PythonProject struct, per-project Test/Format, aggregate TestPython/FormatPython |
-| `helm.go` | HelmChart struct, per-chart Validate/Build, aggregate ValidateHelm/BuildHelm |
-| `helmfile.go` | Per-release helmfile Template/Validate, aggregate BuildHelmfile/ValidateHelmfile/LintHelmfile |
-| `kubernetes.go` | Per-chart Polaris/Kubeconform, aggregate ValidatePolaris/ValidateKubeconform |
+| `helm.go` | Chart discovery and path matching shared by the helmfile checks |
+| `helmfile.go` | Per-release helmfile Template/Validate and the shared render, aggregate BuildHelmfile/ValidateHelmfile/LintHelmfile |
+| `kubernetes.go` | Per-release Polaris/Kubeconform on the helmfile render, aggregate ValidatePolaris/ValidateKubeconform |
 | `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
 | `containers.go` | Container image constants and helpers |
 | `paths.go` | Path filtering utilities |
-| `tests.go` | Integration tests |
 
 ## Setup
 
@@ -95,12 +94,11 @@ dagger check 'validate*'
 
 # Run a specific check
 dagger check lint-cue
-dagger check build-helm
+dagger check build-helmfile
 
 # List discovered projects
 dagger call go-modules                # Show all Go modules
 dagger call python-projects           # Show all Python projects
-dagger call helm-charts               # Show all Helm charts
 dagger call terraform-modules         # Show all Terraform modules
 
 # Auto-apply formatting fixes (use format-*/fix-* functions, not check)
@@ -136,7 +134,7 @@ if container == nil {
 ```
 
 That is `FormatNix`, `LintYaml`, `ValidateWoodpecker`, `FormatCue`, `FixCue`,
-`TrimCue`, `ExportCue`, `TestGo`, `LintGo`, `TestPython`, `FormatPython`, `ValidateHelm`, `BuildHelm`,
+`TrimCue`, `ExportCue`, `TestGo`, `LintGo`, `TestPython`, `FormatPython`,
 `BuildHelmfile`, `ValidateHelmfile`, `LintHelmfile`, `ValidatePolaris`,
 `ValidateKubeconform`, `ValidateTerraform`, `FormatTerraform` and
 `VerifyCacheGranularity`. The exceptions are the three that build with Nix
@@ -155,7 +153,7 @@ Three things this buys:
   choosing, which is the prerequisite for covering it in `cache_test.go`.
 
 It also replaced a `+private DevenvSource *dagger.Directory` field that had been
-copied onto `HelmChart`, `PythonProject` and `TerraformModule` so each could
+copied onto `PythonProject` and `TerraformModule` so each could
 rebuild the container for itself.
 
 `Cli` and `BuildCliGo` still build their own `ciContainer()`; they are plain
@@ -180,10 +178,9 @@ Discovered automatically from `pyproject.toml` files.
 - `Lint(container)` - Run `black --check` for this project
 - `Format(container)` - Format with `black`, returning the formatted directory
 
-#### HelmChart
-Discovered automatically from `Chart.yaml` files under `k8s/`.
-- `Validate(container)` - Run `helm lint` for this chart
-- `Build(container)` - Run `helm template` for this chart
+#### helmfileRelease
+One chart in one helmfile environment; charts are discovered from `Chart.yaml` files under `k8s/`.
+- `Template(container)` / `Validate(container)` - `helmfile template` / `helmfile lint`
 - `Polaris(container)` / `Kubeconform(container)` - Audit the rendered manifests
 
 #### TerraformModule
@@ -215,8 +212,6 @@ doesn't (e.g. `LintCue` also runs `cue vet`).
 #### Validate Checks
 - `ValidateNix(source)` - Nix flake check
   - Filters: `flake.nix`, `flake.lock`, `nix/**/*`
-- `ValidateHelm(source, paths)` - Helm chart validation (delegates to HelmChart.Validate)
-  - Filters: `k8s/**/*`
 - `ValidateHelmfile(source, environments, paths)` - `helmfile lint` per release, with the values
   helmfile deploys it with
   - Filters: `helmfile.yaml.gotmpl`, `config/gen/*/env.json`, `k8s/**/*`
@@ -228,9 +223,6 @@ doesn't (e.g. `LintCue` also runs `cue vet`).
 #### Build Checks
 - `BuildCli(source)` - Build lab CLI (using Nix)
   - Filters: `cmd/lab/**/*`
-- `BuildHelm(source, paths)` - Render Helm templates (delegates to HelmChart.Build)
-  - Filters: `k8s/**/*`
-
 - `BuildHelmfile(source, environments, paths)` - `helmfile template` per release
   - Filters: `helmfile.yaml.gotmpl`, `config/gen/*/env.json`, `k8s/**/*`
 
@@ -238,7 +230,8 @@ The helmfile checks take `environments` (default `["production"]`) and run once 
 environment. Each release renders from a tree holding only `helmfile.yaml.gotmpl`, that
 environment's `env.json`, its own chart and `k8s/charts`, so results cache per chart and per
 environment. A release's render is the only exec that touches the network; `ValidateHelmfile`
-lints on top of it with `--skip-deps`.
+lints on top of it with `--skip-deps`. `ValidatePolaris` and `ValidateKubeconform` audit the same
+render, so it is shared by all four checks.
 
 #### Test Checks
 - `TestGo(source, paths)` - Run Go tests (delegates to GoModule.Test)
@@ -334,7 +327,6 @@ Each module type scopes its source differently based on project characteristics:
 |---|---|---|
 | GoModule | Per-module directory | Go modules are self-contained |
 | PythonProject | Per-project directory | Python projects are self-contained |
-| HelmChart | Per-chart directory | Charts are self-contained (deps fetched from registries) |
 | helmfile release | Chart directory + `helmfile.yaml.gotmpl` + one environment's `env.json` | Helmfile reads the state file and environment values for every release |
 | TerraformModule | Full `terraform/` directory | Modules reference siblings via relative paths |
 
@@ -568,11 +560,12 @@ Terraform errors with `|| true`.
 - `main.go` - Main module: Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions
 - `golang.go` - GoModule struct and Go-specific functions
 - `python.go` - PythonProject struct and Python-specific functions
-- `helm.go` - HelmChart struct and Helm-specific functions
+- `helm.go` - Chart discovery and path matching
+- `helmfile.go` - helmfileRelease struct and helmfile functions
+- `kubernetes.go` - Polaris and Kubeconform on rendered releases
 - `terraform.go` - TerraformModule struct and Terraform-specific functions
 - `containers.go` - Container image constants and helpers
 - `paths.go` - Path filtering utilities
-- `tests.go` - Integration tests
 - `go.mod` - Go module dependencies (Dagger SDK)
 - `internal/` - Auto-generated Dagger SDK (gitignored)
 - `dagger.gen.go` - Auto-generated type definitions (gitignored)
