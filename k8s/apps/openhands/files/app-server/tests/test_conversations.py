@@ -94,6 +94,7 @@ def test_start_runs_the_conversation_in_its_own_sandbox(api, user, kube, agent):
         # Declared for the server, not stored in the profile.
         "acp_command": ["claude-agent-acp"],
         "acp_args": [],
+        "acp_session_mode": "bypassPermissions",
     }
     assert sent["autotitle"] is False
     assert sent["max_iterations"] == 77

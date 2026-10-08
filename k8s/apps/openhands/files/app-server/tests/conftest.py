@@ -118,7 +118,12 @@ SEED = {
         "acp_server": "claude-code",
         "acp_model": "opus[1m]",
     },
-    "acp_servers": {"claude-code": {"command": ["claude-agent-acp"]}},
+    "acp_servers": {
+        "claude-code": {
+            "command": ["claude-agent-acp"],
+            "session_mode": "bypassPermissions",
+        }
+    },
 }
 
 

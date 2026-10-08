@@ -61,8 +61,9 @@ class SettingsStore:
     def __init__(self, db: Database, seed_file: Path | None):
         self.db = db
         self._seed = json.loads(seed_file.read_text()) if seed_file else {}
-        # Per ACP server: the `command` conversations launch and the default
-        # `model`, both declared in values.yaml rather than owned by the UI.
+        # Per ACP server: the `command` and `session_mode` conversations
+        # launch with and the default `model`, all declared in values.yaml
+        # rather than owned by the UI.
         self._servers: dict[str, dict[str, Any]] = self._seed.get("acp_servers") or {}
 
     def _command(self, agent: dict[str, Any]) -> list[str] | None:
@@ -90,7 +91,14 @@ class SettingsStore:
 
     def _with_command(self, agent: dict[str, Any]) -> dict[str, Any]:
         command = self._command(agent)
-        return {**agent, "acp_command": command, "acp_args": []} if command else agent
+        if command:
+            agent = {**agent, "acp_command": command, "acp_args": []}
+        mode = (self._servers.get(agent.get("acp_server") or "") or {}).get(
+            "session_mode"
+        )
+        if mode and agent.get("agent_kind") == "acp":
+            agent = {**agent, "acp_session_mode": mode}
+        return agent
 
     def _get(self, key: str, default: dict[str, Any]) -> dict[str, Any]:
         row = self.db.one("SELECT value FROM documents WHERE key = ?", key)

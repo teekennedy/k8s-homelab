@@ -238,6 +238,10 @@ appServer:
       # same version; any other text there would make the form call the
       # profile "Custom".
       command: [claude-agent-acp]
+      # The permission mode every conversation starts in, whatever a profile
+      # carries. `bypassPermissions` never asks before a tool call; the
+      # sandbox's NetworkPolicy and ServiceAccount are the boundary instead.
+      session_mode: bypassPermissions
       # The model new conversations start on: one of the model picker's ids
       # (default, opus[1m], sonnet, haiku) or a full model id. Written to the
       # stored settings and every profile of this server whenever this value

@@ -269,7 +269,7 @@ image (`CLAUDE_ADAPTER_VERSION` in `files/sandbox/Dockerfile`), so a sandbox
 starts without installing anything. Bumping it is how a new model arrives:
 change that ARG, then rebuild and push the image as under "Sandbox image".
 
-Two things about the Claude Code agent are declared in `values.yaml`, under
+Three things about the Claude Code agent are declared in `values.yaml`, under
 `appServer.acpServers.claude-code`, rather than left to the Settings UI:
 
 - `command` is what a conversation launches: `claude-agent-acp`, found on the
@@ -281,6 +281,14 @@ Two things about the Claude Code agent are declared in `values.yaml`, under
   the adapter a sandbox runs is the one baked into the sandbox image
   (`CLAUDE_ADAPTER_VERSION` in `files/sandbox/Dockerfile`), and nothing runs
   the command shown.
+- `session_mode` is the permission mode a conversation launches in:
+  `bypassPermissions`, the ACP counterpart of `--dangerously-skip-permissions`,
+  whatever a profile carries. Nothing is stored, so the Settings UI cannot
+  turn prompts back on. No one is watching a sandbox for an approval prompt
+  (an automation run has no one at all), and a call that waits for one just
+  stalls the agent. The sandbox is the boundary instead — its NetworkPolicy,
+  its ServiceAccount, and a volume that dies with it. Remove the key to go
+  back to prompting.
 - `model` is the model new conversations start on. Changing it rewrites the
   stored settings and every Claude Code profile once; after that the model
   picker's choice stands until the value here changes again.

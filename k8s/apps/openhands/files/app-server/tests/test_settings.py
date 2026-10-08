@@ -248,3 +248,18 @@ def test_the_form_saving_the_declared_command_keeps_the_server(api, user, state)
     )
     agent = state.settings_store.settings()["agent_settings"]
     assert agent["acp_server"] == "claude-code" and "acp_command" not in agent
+
+
+def test_the_declared_session_mode_overrides_a_profile(api, user, state):
+    api.post(
+        "/api/agent-profiles/default",
+        headers=user,
+        json={
+            "agent_kind": "acp",
+            "acp_server": "claude-code",
+            "acp_session_mode": "default",
+        },
+    )
+    assert state.settings_store.resolve_agent(None)["acp_session_mode"] == (
+        "bypassPermissions"
+    )
