@@ -46,7 +46,7 @@ spec:
       kind: Secret
       name: openhands-app-server-secrets-key
       namespace: openhands
-    # The canvas pod's agent server / automation key, likewise.
+    # The automation service's key, likewise.
     - jsonPointers:
         - /data
       kind: Secret

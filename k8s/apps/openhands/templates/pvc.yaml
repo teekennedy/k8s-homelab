@@ -1,6 +1,5 @@
 ---
-# ~/.openhands — settings, the encrypted secret store, conversation history and
-# the automation database.
+# ~/.openhands — the automation service's database and uploads.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -18,19 +17,3 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.data.size }}
----
-# ~/workspace — per-session checkouts, rebuildable, so not in the backup group.
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "openhands.fullname" . }}-workspace
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "openhands.labels" . | nindent 4 }}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: {{ .Values.persistence.workspace.storageClass }}
-  resources:
-    requests:
-      storage: {{ .Values.persistence.workspace.size }}

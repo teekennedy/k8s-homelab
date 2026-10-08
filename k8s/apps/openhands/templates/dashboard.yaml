@@ -1,0 +1,13 @@
+# Picked up by Grafana's dashboard sidecar, which watches every namespace for
+# this label.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openhands.fullname" . }}-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  openhands.json: |-
+    {{- .Files.Get "files/dashboards/openhands.json" | nindent 4 }}

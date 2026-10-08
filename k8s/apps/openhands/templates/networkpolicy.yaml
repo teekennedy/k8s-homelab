@@ -1,8 +1,7 @@
 ---
-# The application has no authentication of its own worth the name — the session
-# key it mints is injected into the page it serves — so the only thing between
-# a pod in this cluster and a shell on the agent's filesystem is this policy
-# plus oauth2-proxy. See README.md, "Security posture".
+# The frontend has no authentication of its own, so the only thing between a
+# pod in this cluster and the UI is this policy plus oauth2-proxy. See
+# README.md, "Security posture".
 #
 # Egress is deliberately narrow and deliberately not "all ports": verified on
 # this cluster's netpol controller (k3s/kube-router) that a portless egress
@@ -51,10 +50,6 @@ spec:
       ports:
         - port: http
           protocol: TCP
-    {{- include "openhands.egressForge" . | nindent 4 }}
-    # The model API, and the package registries the ACP agent's own toolchain
-    # pulls from.
-    {{- include "openhands.egressInternet" . | nindent 4 }}
 ---
 # oauth2-proxy itself: reachable only from the gateway.
 apiVersion: networking.k8s.io/v1

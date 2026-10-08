@@ -10,12 +10,12 @@ spec:
   # ordinal name, but a StatefulSet requires the field.
   serviceName: {{ include "openhands.fullname" . }}
   replicas: {{ .Values.replicaCount }}
-  # Single writer: both volumes are ReadWriteOnce, and the agent server's
-  # session state assumes one process owns them. A StatefulSet rollout
-  # terminates the old pod before creating its replacement, which is what makes
-  # that safe; the claims are separate objects rather than volumeClaimTemplates
-  # so they can carry backup labels and be resized without the immutability
-  # rules on a StatefulSet's claim templates.
+  # Single writer: the data volume is ReadWriteOnce and holds the automation
+  # service's SQLite database. A StatefulSet rollout terminates the old pod
+  # before creating its replacement, which is what makes that safe; the claim
+  # is a separate object rather than a volumeClaimTemplate so it can carry
+  # backup labels and be resized without the immutability rules on a
+  # StatefulSet's claim templates.
   podManagementPolicy: OrderedReady
   updateStrategy:
     type: RollingUpdate
@@ -31,13 +31,6 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
-        # GIT_CONFIG_GLOBAL is read once per git process, but the mounted file
-        # is what supplies the credential helper — roll the pod when it changes
-        # so a session started before the edit isn't left with the old one.
-        checksum/gitconfig: {{ include (print $.Template.BasePath "/configmap-gitconfig.yaml") . | sha256sum }}
-        # Skills are copied into the agent's home at pod start, so a change to
-        # files/skills/ only takes effect on a fresh pod.
-        checksum/skills: {{ include (print $.Template.BasePath "/configmap-skills.yaml") . | sha256sum }}
         checksum/start: {{ printf "%s%s" (.Files.Get "files/canvas/start.sh") (.Files.Get "files/canvas/patch_frontend.py") | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -47,35 +40,6 @@ spec:
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      initContainers:
-        # See the seedSkillsScript helper for why two directories, and why a
-        # copy rather than a mount. Both directories are emptyDir, so the copy
-        # re-runs as a full refresh on every start.
-        - name: seed-skills
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - sh
-            - -c
-            - |
-              {{- include "openhands.seedSkillsScript" . | nindent 14 }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
-          volumeMounts:
-            - name: agents-home
-              mountPath: /home/openhands/.agents
-            - name: claude-home
-              mountPath: /home/openhands/.claude
-            - name: skills
-              mountPath: /opt/openhands-skills
-              readOnly: true
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -137,16 +101,6 @@ spec:
             - name: AGENT_CANVAS_DISABLE_TELEMETRY
               value: "1"
             {{- end }}
-            # --- Forge ------------------------------------------------------
-            # Read by the credential helper in the mounted gitconfig, and by
-            # anything else in a session that needs to call the Forgejo API.
-            {{- include "openhands.forgeEnv" . | nindent 12 }}
-          envFrom:
-            # CLAUDE_CODE_OAUTH_TOKEN and/or ANTHROPIC_API_KEY; see README.md,
-            # "Prerequisites".
-            - secretRef:
-                name: {{ .Values.anthropic.secretName }}
-                optional: true
           # The static frontend: what a browser loads first, and what the pod
           # lives and dies with (see start.sh).
           startupProbe:
@@ -172,20 +126,6 @@ spec:
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.data.mountPath }}
-            - name: workspace
-              mountPath: {{ .Values.persistence.workspace.mountPath }}
-            # The agent's own config directories: skills seeded above, plus
-            # whatever state it writes beside them. Deliberately not persisted —
-            # the skills come from git on every start and the rest is
-            # rebuildable.
-            - name: agents-home
-              mountPath: /home/openhands/.agents
-            - name: claude-home
-              mountPath: /home/openhands/.claude
-            - name: gitconfig
-              mountPath: {{ .Values.forge.gitConfigPath }}
-              subPath: gitconfig
-              readOnly: true
             - name: start
               mountPath: /etc/openhands-canvas
               readOnly: true
@@ -193,23 +133,6 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "openhands.fullname" . }}-data
-        - name: workspace
-          persistentVolumeClaim:
-            claimName: {{ include "openhands.fullname" . }}-workspace
-        - name: agents-home
-          emptyDir: {}
-        - name: claude-home
-          emptyDir: {}
-        - name: skills
-          configMap:
-            name: {{ include "openhands.fullname" . }}-skills
-            defaultMode: 0444
-            items:
-              {{- include "openhands.skillVolumeItems" . | nindent 14 }}
-        - name: gitconfig
-          configMap:
-            name: {{ include "openhands.fullname" . }}-gitconfig
-            defaultMode: 0444
         - name: start
           configMap:
             name: {{ include "openhands.fullname" . }}-canvas-start

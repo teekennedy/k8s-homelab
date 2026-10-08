@@ -70,10 +70,9 @@ Three consequences worth stating plainly:
   sandboxes — see `templates/app-server-rbac.yaml`. Every other ServiceAccount
   in this chart has no permissions and no mounted token.
 
-Sandbox egress is per spec (see "Sandbox specs"). The canvas pod's is DNS, the app
-server, `443` on the MetalLB VIP pool (`git.msng.to`), and `443` to the internet
-with RFC1918 excluded. Everything else, including the API server and every
-other namespace, is denied.
+Sandbox egress is per spec (see "Sandbox specs"). The canvas pod's is DNS and the
+app server. Everything else, including the API server, the forge, the internet
+and every other namespace, is denied.
 
 ## Prerequisites
 
@@ -142,7 +141,7 @@ to reach the sandbox pod's environment, as `openhands-anthropic` does.
 
 `files/skills/` holds Agent Skills that the chart seeds into the agent's home on
 every pod start, so git is the source of truth and a change takes effect on the
-next rollout. The canvas pod and every sandbox get the same set.
+next rollout. Every sandbox gets the same set.
 
 They go to **two** directories, because two different readers look for them and
 neither reads the other's path:
@@ -513,13 +512,16 @@ here has none.
 The NetworkPolicy admits the monitoring namespace to that port and nothing
 else: the scraper cannot reach the API.
 
+`files/dashboards/openhands.json` is the Grafana dashboard ("OpenHands"),
+shipped as a ConfigMap the Grafana sidecar loads: spend and tokens over time,
+sandboxes and conversations by status, and a usage table per conversation.
+
 ## Storage
 
 | Volume | Holds | Backed up |
 | --- | --- | --- |
 | `openhands-app-server` | the app server's database: conversations and their transcripts, settings, agent profiles, the encrypted secret store | yes |
 | `openhands-data` | `~/.openhands` in the canvas pod: the automation service's database and uploads | yes |
-| `openhands-workspace` | `~/workspace` in the canvas pod; nothing writes to it any more | no |
 | `workspace-<sandbox>` | one sandbox's checkout and agent state; deleted with the sandbox | no |
 
 All ReadWriteOnce Longhorn volumes, which is why both the app server and the

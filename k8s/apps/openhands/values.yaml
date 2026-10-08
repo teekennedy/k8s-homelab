@@ -158,10 +158,8 @@ resources:
     memory: 8Gi
 
 persistence:
-  # ~/.openhands — settings, the encrypted secret store, conversation history,
-  # event stores, and the automation SQLite database. Enrolled in the Longhorn
-  # recurring backup group: it is the only copy of a session's history, and the
-  # key that decrypts the secret store is generated onto it on first boot.
+  # ~/.openhands — the automation service's SQLite database and uploaded run
+  # tarballs. Enrolled in the Longhorn recurring backup group.
   data:
     mountPath: /home/openhands/.openhands
     size: 20Gi
@@ -169,12 +167,6 @@ persistence:
     labels:
       recurring-job.longhorn.io/source: "enabled"
       recurring-job-group.longhorn.io/backup: "enabled"
-  # ~/workspace — per-session working directories. Clones of branches that are
-  # on the server anyway, so not backed up.
-  workspace:
-    mountPath: /home/openhands/workspace
-    size: 20Gi
-    storageClass: longhorn
 
 serviceAccount:
   create: true
