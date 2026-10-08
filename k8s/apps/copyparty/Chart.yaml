@@ -3,14 +3,14 @@ name: copyparty
 description: copyparty web file manager (Dropbox replacement), public at files.msng.to behind Authelia SSO.
 type: application
 # Bump on any change to the chart templates/values.
-version: 0.1.2
+version: 0.1.3
 # Tracks the copyparty/iv image tag deployed by this chart.
 appVersion: "1.20.19"
 dependencies:
   # Dedicated oauth2-proxy instance used as a Traefik forwardAuth middleware.
   # See values.yaml for why the shared platform instances can't be reused.
   - name: oauth2-proxy
-    version: 10.7.0
+    version: 10.7.1
     repository: https://oauth2-proxy.github.io/manifests
   # Shared glue for that instance: the mittwald/reflector Secret and the
   # forwardAuth + errors middleware pair. Library chart, renders nothing itself.
