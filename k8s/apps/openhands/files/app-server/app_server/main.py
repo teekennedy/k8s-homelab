@@ -68,6 +68,7 @@ class State:
         self.settings_store.ensure_profiles(
             [s for s in self.sandboxes.specs if s != settings.default_spec]
         )
+        self.settings_store.apply_declared_models()
         self.secrets_store = SecretsStore(db, settings.secrets_key)
         self.forge = Forge(self.http, settings.forge_url, settings.forge_token)
         self.conversations = ConversationService(

@@ -130,7 +130,8 @@ has to set it per-repository.
 
 Nothing to do. Settings and the agent profile are seeded from
 `appServer.defaults` into the app server's database on first boot — Claude Code
-over ACP — and from then on are owned by the Settings UI. The frontend's own
+over ACP — and from then on are owned by the Settings UI, except for the
+launch command and default model (see "Models"). The frontend's own
 first-run wizard is a per-browser `localStorage` flag; close it once per
 browser.
 
@@ -236,20 +237,26 @@ kubectl -n openhands get sandbox -L openhands.msng.to/sandbox-spec
 
 The model picker's entries are fixed in the frontend, and all but one are
 aliases — `opus[1m]`, `sonnet`, `haiku` — that the Claude Code CLI in the
-sandbox resolves. Two settings under `sandboxSpecs` decide what they mean:
+sandbox resolves to the newest model it knows. The CLI also refuses a model
+newer than itself. So which models a sandbox runs is a matter of which CLI it
+has, and nothing here names a model.
 
-- `env` sets `ANTHROPIC_DEFAULT_OPUS_MODEL` and
-  `ANTHROPIC_DEFAULT_SONNET_MODEL`, so "Claude Opus (1M)" and "Claude Sonnet"
-  are the models named there rather than whatever was newest when the CLI was
-  built. The labels do not change; a new model is a new value here.
-- `claudeAdapterVersion` installs that version of the Claude Code ACP adapter,
-  which carries the CLI, onto the sandbox volume at start and puts it ahead of
-  the image's on `PATH`. The CLI refuses a model newer than itself, so this is
-  what has to move when a model outruns the image. It costs about twenty
-  seconds on a sandbox's first start (not on resume) and 300 MB of its volume.
-  If npm cannot be reached the sandbox starts on the image's adapter, and a
-  model that one is too old for fails in the conversation with the CLI's own
-  "version … or newer is required".
+`sandboxSpecs.claudeAdapterVersion` installs that version of the Claude Code
+ACP adapter, which carries the CLI, onto the sandbox volume at start and puts
+it ahead of the image's on `PATH`. Bumping it is how a new model arrives. It
+costs about thirty seconds on a sandbox's first start (not on resume) and
+300 MB of its volume. If npm cannot be reached the sandbox starts on the
+image's older adapter, and the aliases mean what that one's CLI knows.
+
+Two things about the Claude Code agent are declared in `values.yaml`, under
+`appServer.acpServers.claude-code`, rather than left to the Settings UI:
+
+- `command` is what a conversation launches, and what the agent profile form
+  shows as its command: `claude-agent-acp`, found on the sandbox's `PATH`. A
+  command typed into the form is not saved.
+- `model` is the model new conversations start on. Changing it rewrites the
+  stored settings and every Claude Code profile once; after that the model
+  picker's choice stands until the value here changes again.
 
 ## App server
 

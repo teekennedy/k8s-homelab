@@ -126,10 +126,6 @@ spec:
             - name: PATH
               value: /workspace/home/.acp/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
             {{- end }}
-            {{- range $name, $value := $sp.env }}
-            - name: {{ $name }}
-              value: {{ $value | quote }}
-            {{- end }}
             # Webhooks, paths and the editor switch; structural, so a file
             # rather than indexed OH_* variables.
             - name: OPENHANDS_AGENT_SERVER_CONFIG_PATH

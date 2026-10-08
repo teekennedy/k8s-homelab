@@ -17,6 +17,8 @@ from .db import Database
 
 SETTINGS_KEY = "settings"
 PROFILES_KEY = "agent_profiles"
+# The declared model last applied per ACP server; see apply_declared_models.
+APPLIED_MODELS_KEY = "applied_models"
 
 # Fields an ACP profile carries over onto agent_settings at launch.
 ACP_PROFILE_FIELDS = (
@@ -58,6 +60,20 @@ class SettingsStore:
     def __init__(self, db: Database, seed_file: Path | None):
         self.db = db
         self._seed = json.loads(seed_file.read_text()) if seed_file else {}
+        # Per ACP server: the `command` conversations launch and the default
+        # `model`, both declared in values.yaml rather than owned by the UI.
+        self._servers: dict[str, dict[str, Any]] = self._seed.get("acp_servers") or {}
+
+    def _command(self, agent: dict[str, Any]) -> list[str] | None:
+        """The declared launch command for an ACP agent's server, if it has
+        one. Where it does, nothing stored is used or shown in its place."""
+        if agent.get("agent_kind") != "acp":
+            return None
+        return (self._servers.get(agent.get("acp_server") or "") or {}).get("command")
+
+    def _with_command(self, agent: dict[str, Any]) -> dict[str, Any]:
+        command = self._command(agent)
+        return {**agent, "acp_command": command, "acp_args": []} if command else agent
 
     def _get(self, key: str, default: dict[str, Any]) -> dict[str, Any]:
         row = self.db.one("SELECT value FROM documents WHERE key = ?", key)
@@ -87,7 +103,7 @@ class SettingsStore:
         """GET /api/v1/settings. Credentials are reported as set, never
         returned."""
         doc = self.settings()
-        agent = copy.deepcopy(doc["agent_settings"])
+        agent = self._with_command(copy.deepcopy(doc["agent_settings"]))
         llm = agent.get("llm") or {}
         api_key_set = bool(llm.get("api_key"))
         if "api_key" in llm:
@@ -110,6 +126,10 @@ class SettingsStore:
         if isinstance(llm_diff, dict) and llm_diff.get("api_key") is None:
             llm_diff.pop("api_key", None)
         doc["agent_settings"] = deep_merge(doc["agent_settings"], agent_diff)
+        if self._command(doc["agent_settings"]):
+            # The form sends back the declared command it was shown.
+            doc["agent_settings"].pop("acp_command", None)
+            doc["agent_settings"].pop("acp_args", None)
         doc["conversation_settings"] = deep_merge(
             doc["conversation_settings"], body.get("conversation_settings_diff") or {}
         )
@@ -179,12 +199,15 @@ class SettingsStore:
         profile = self._profiles()["profiles"].get(name)
         if profile is None:
             raise ProfileError(404, f"agent profile {name!r} not found")
-        return {"name": name, "profile": profile}
+        return {"name": name, "profile": self._with_command(profile)}
 
     def save_profile(self, name: str, body: dict[str, Any]) -> dict[str, str]:
         doc = self._profiles()
         existing = doc["profiles"].get(name)
-        doc["profiles"][name] = self._new_profile(name, body, existing)
+        profile = self._new_profile(name, body, existing)
+        if self._command(profile):
+            profile["acp_command"] = profile["acp_args"] = None
+        doc["profiles"][name] = profile
         self._put(PROFILES_KEY, doc)
         return {"name": name, "message": "saved"}
 
@@ -235,6 +258,32 @@ class SettingsStore:
         if missing:
             self._put(PROFILES_KEY, doc)
 
+    def apply_declared_models(self) -> None:
+        """Set the declared default model on the stored settings and on every
+        profile of that ACP server — once per declared value. Until the value
+        in values.yaml changes again, the model picker's choice stands."""
+        applied = self._get(APPLIED_MODELS_KEY, {})
+        changed = {
+            server: cfg["model"]
+            for server, cfg in self._servers.items()
+            if cfg.get("model") and applied.get(server) != cfg["model"]
+        }
+        if not changed:
+            return
+        settings = self.settings()
+        agent = settings["agent_settings"]
+        if agent.get("agent_kind") == "acp" and agent.get("acp_server") in changed:
+            agent["acp_model"] = changed[agent["acp_server"]]
+            self._put(SETTINGS_KEY, settings)
+        doc = self._profiles()
+        for profile in doc["profiles"].values():
+            model = changed.get(profile.get("acp_server") or "")
+            if profile["agent_kind"] == "acp" and model:
+                profile["acp_model"] = model
+                profile["revision"] += 1
+        self._put(PROFILES_KEY, doc)
+        self._put(APPLIED_MODELS_KEY, {**applied, **changed})
+
     # --- launch -------------------------------------------------------------
 
     def profile_name(self, profile_id: str | None) -> str | None:
@@ -262,4 +311,4 @@ class SettingsStore:
             for field in ACP_PROFILE_FIELDS:
                 if profile.get(field) is not None:
                     agent[field] = profile[field]
-        return agent
+        return self._with_command(agent)

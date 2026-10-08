@@ -22,8 +22,9 @@ data:
     {{- $.Files.Get $path | nindent 4 }}
   {{- end }}
 ---
-# First-boot settings and agent profile (appServer.defaults). Read only while
-# the database has none of its own.
+# First-boot settings and agent profile (appServer.defaults), read only while
+# the database has none of its own, and what is declared per ACP server
+# (appServer.acpServers), read at every start.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -32,7 +33,7 @@ metadata:
   labels:
     {{- include "openhands.labels" . | nindent 4 }}
 data:
-  defaults.json: {{ $cfg.defaults | toJson | quote }}
+  defaults.json: {{ merge (dict "acp_servers" $cfg.acpServers) $cfg.defaults | toJson | quote }}
 ---
 # Automation definitions (values.yaml, automations), which the app server
 # pushes to the automation service and reads each run's prompt from.
@@ -115,7 +116,7 @@ spec:
         # restarts the pod.
         checksum/source: {{ printf "%s%s%s" (.Files.Get "files/app-server/pyproject.toml") (.Files.Get "files/app-server/uv.lock") (.Files.Glob "files/app-server/app_server/*.py").AsConfig | sha256sum }}
         checksum/specs: {{ include (print $.Template.BasePath "/sandbox-specs.yaml") . | sha256sum }}
-        checksum/defaults: {{ $cfg.defaults | toJson | sha256sum }}
+        checksum/defaults: {{ merge (dict "acp_servers" $cfg.acpServers) $cfg.defaults | toJson | sha256sum }}
     spec:
       serviceAccountName: {{ $name }}
       # The one workload in this chart that talks to the Kubernetes API; see

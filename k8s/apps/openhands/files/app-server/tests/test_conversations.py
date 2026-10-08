@@ -87,6 +87,9 @@ def test_start_runs_the_conversation_in_its_own_sandbox(api, user, kube, agent):
         "acp_server": "claude-code",
         "acp_model": "opus[1m]",
         "acp_prompt_timeout": 1800.0,
+        # Declared for the server, not stored in the profile.
+        "acp_command": ["claude-agent-acp"],
+        "acp_args": [],
     }
     assert sent["autotitle"] is False
     assert sent["max_iterations"] == 77

@@ -250,6 +250,19 @@ appServer:
   reconcileIntervalSeconds: 60
   # How long a new conversation may wait for its sandbox to report RUNNING.
   startTimeoutSeconds: 300
+  # What is declared here rather than owned by the Settings UI, per ACP server
+  # (the agent profile form's "agent" choice).
+  acpServers:
+    claude-code:
+      # What a conversation launches, and what the agent profile form shows
+      # as its command; a command saved from the form is ignored. Resolved on
+      # the sandbox's PATH, which sandboxSpecs.claudeAdapterVersion heads.
+      command: [claude-agent-acp]
+      # The model new conversations start on: one of the model picker's ids
+      # (default, opus[1m], sonnet, haiku) or a full model id. Written to the
+      # stored settings and every profile of this server whenever this value
+      # changes; until it changes again, the model picker's choice stands.
+      model: sonnet
   # First-boot settings and agent profile, so a browser on a new device needs
   # no setup. Written to the database once; the Settings UI owns them after
   # that. Shapes: GET /api/v1/settings and POST /api/agent-profiles/{name}.
@@ -257,7 +270,6 @@ appServer:
     agent_settings:
       agent_kind: acp
       acp_server: claude-code
-      acp_model: "opus[1m]"
     conversation_settings:
       max_iterations: 500
       confirmation_mode: false
@@ -268,7 +280,6 @@ appServer:
       name: default
       agent_kind: acp
       acp_server: claude-code
-      acp_model: "opus[1m]"
   # SQLite database: sandboxes, minted API keys, and from later phases the
   # conversation history. The only copy, so it is backed up.
   storage:
@@ -303,18 +314,13 @@ sandboxSpecs:
   # renovate: datasource=docker depName=ghcr.io/openhands/agent-server
   image: ghcr.io/openhands/agent-server:1.53.0-python
   # The Claude Code ACP adapter, installed over the image's own at sandbox
-  # start. It carries the Claude Code CLI, and a model newer than that CLI is
-  # refused: Opus 5.5 needs 2.1.280, the image's adapter brings 2.1.220. A
-  # failed install falls back to the image's adapter. Empty: use the image's.
+  # start. It carries the Claude Code CLI, which decides what the model
+  # picker's aliases ("Claude Opus (1M)", "Claude Sonnet") resolve to and
+  # refuses a model newer than itself — so bumping this is how a new model
+  # arrives. A failed install falls back to the image's adapter. Empty: use
+  # the image's.
   # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
   claudeAdapterVersion: "0.87.0"
-  # Environment of every sandbox's agent server, and so of the agent. The two
-  # here are what the model picker's "Claude Opus (1M)" and "Claude Sonnet"
-  # mean: its entries are aliases, which Claude Code otherwise resolves to
-  # whatever was newest when that CLI was built.
-  env:
-    ANTHROPIC_DEFAULT_OPUS_MODEL: claude-opus-5-5
-    ANTHROPIC_DEFAULT_SONNET_MODEL: claude-sonnet-5-5
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:

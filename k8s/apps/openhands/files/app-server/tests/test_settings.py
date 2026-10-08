@@ -1,9 +1,20 @@
+import json
+
 import httpx
+
+from app_server.db import Database
+from app_server.settings_store import SettingsStore
+
+DECLARED_COMMAND = {"acp_command": ["claude-agent-acp"], "acp_args": []}
 
 
 def test_settings_are_seeded_then_merged(api, user):
     got = api.get("/api/v1/settings", headers=user).json()
-    assert got["agent_settings"] == {"agent_kind": "acp", "acp_server": "claude-code"}
+    assert got["agent_settings"] == {
+        "agent_kind": "acp",
+        "acp_server": "claude-code",
+        **DECLARED_COMMAND,
+    }
     assert got["conversation_settings"] == {"max_iterations": 77}
     assert got["language"] == "en"
 
@@ -23,6 +34,7 @@ def test_settings_are_seeded_then_merged(api, user):
         "acp_server": "claude-code",
         "acp_model": "sonnet",
         "llm": {"model": "m"},
+        **DECLARED_COMMAND,
     }
     assert got["conversation_settings"] == {
         "max_iterations": 77,
@@ -139,3 +151,76 @@ def test_automation_is_reached_with_the_service_key(api, user, state):
     assert req.headers["X-Session-API-Key"] == "automation-key"
     assert "cookie" not in req.headers
     assert api.get("/api/automation/v1").status_code == 401
+
+
+def test_the_declared_command_is_shown_and_never_stored(api, user, state):
+    npx = ["npx", "-y", "@agentclientprotocol/claude-agent-acp@0.63.0"]
+    api.post(
+        "/api/agent-profiles/default",
+        headers=user,
+        json={"agent_kind": "acp", "acp_server": "claude-code", "acp_command": npx},
+    )
+    shown = api.get("/api/agent-profiles/default", headers=user).json()["profile"]
+    assert shown["acp_command"] == ["claude-agent-acp"] and shown["acp_args"] == []
+    stored = state.settings_store._profiles()["profiles"]["default"]
+    assert stored["acp_command"] is None
+
+    api.post(
+        "/api/v1/settings",
+        headers=user,
+        json={"agent_settings_diff": {"acp_command": npx}},
+    )
+    assert "acp_command" not in state.settings_store.settings()["agent_settings"]
+    assert state.settings_store.resolve_agent(None)["acp_command"] == [
+        "claude-agent-acp"
+    ]
+
+
+def test_a_server_with_no_declared_command_keeps_its_own(api, user, state):
+    body = {"agent_kind": "acp", "acp_server": "custom", "acp_command": ["my-acp"]}
+    api.post("/api/agent-profiles/mine", headers=user, json=body)
+    mine = api.get("/api/agent-profiles/mine", headers=user).json()["profile"]
+    assert mine["acp_command"] == ["my-acp"]
+    assert state.settings_store.resolve_agent(mine["id"])["acp_command"] == ["my-acp"]
+
+
+def _store(tmp_path, db, model: str) -> SettingsStore:
+    seed = {
+        "agent_settings": {"agent_kind": "acp", "acp_server": "claude-code"},
+        "agent_profile": {
+            "name": "default",
+            "agent_kind": "acp",
+            "acp_server": "claude-code",
+        },
+        "acp_servers": {"claude-code": {"model": model}},
+    }
+    path = tmp_path / "declared.json"
+    path.write_text(json.dumps(seed))
+    store = SettingsStore(db, path)
+    store.apply_declared_models()
+    return store
+
+
+def test_the_declared_model_is_applied_once_per_value(tmp_path):
+    db = Database(tmp_path / "declared.db")
+    store = _store(tmp_path, db, "opus[1m]")
+    store.save_profile(
+        "codex", {"agent_kind": "acp", "acp_server": "codex", "acp_model": "gpt"}
+    )
+    assert store.get_profile("default")["profile"]["acp_model"] == "opus[1m]"
+    assert store.settings()["agent_settings"]["acp_model"] == "opus[1m]"
+
+    # The picker's choice outlives a restart on the same declared value...
+    store.save_profile(
+        "default",
+        {"agent_kind": "acp", "acp_server": "claude-code", "acp_model": "haiku"},
+    )
+    store = _store(tmp_path, db, "opus[1m]")
+    assert store.get_profile("default")["profile"]["acp_model"] == "haiku"
+
+    # ...and gives way when the declared value changes.
+    store = _store(tmp_path, db, "sonnet")
+    assert store.get_profile("default")["profile"]["acp_model"] == "sonnet"
+    assert store.settings()["agent_settings"]["acp_model"] == "sonnet"
+    assert store.get_profile("codex")["profile"]["acp_model"] == "gpt"
+    db.close()
