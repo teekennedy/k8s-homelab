@@ -4,7 +4,7 @@ when:
 
 steps:
   - name: ci
-    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     environment:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"
       # Don't prompt for dagger cloud sign up
@@ -27,7 +27,7 @@ steps:
   # `status: [success, failure]` makes this run whatever the `ci` step did — a
   # red build is the case the workflow most needs to hear about.
   - name: notify-archon
-    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     when:
       - status: [success, failure]
     environment:
