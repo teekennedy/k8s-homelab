@@ -1,0 +1,14 @@
+[project]
+name = "openhands-canvas-start"
+version = "0.1.0"
+description = "Startup helpers for the OpenHands canvas pod"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

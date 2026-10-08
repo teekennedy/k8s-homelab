@@ -21,3 +21,8 @@ files/app-server/.venv
 files/app-server/app_server/__pycache__
 files/app-server/.pytest_cache
 files/app-server/tests
+# Likewise for files/canvas: only start.sh and patch_frontend.py are templated.
+files/canvas/.venv
+files/canvas/__pycache__
+files/canvas/.pytest_cache
+files/canvas/tests

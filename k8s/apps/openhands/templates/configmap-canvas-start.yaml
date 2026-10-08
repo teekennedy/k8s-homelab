@@ -10,6 +10,8 @@ metadata:
 data:
   start.sh: |-
     {{- .Files.Get "files/canvas/start.sh" | nindent 4 }}
+  patch_frontend.py: |-
+    {{- .Files.Get "files/canvas/patch_frontend.py" | nindent 4 }}
 ---
 # The key the canvas pod's agent server and automation service accept. The app
 # server holds it too, to reach the automation service for the browser.

@@ -251,9 +251,18 @@ image's older adapter, and the aliases mean what that one's CLI knows.
 Two things about the Claude Code agent are declared in `values.yaml`, under
 `appServer.acpServers.claude-code`, rather than left to the Settings UI:
 
-- `command` is what a conversation launches, and what the agent profile form
-  shows as its command: `claude-agent-acp`, found on the sandbox's `PATH`. A
-  command typed into the form is not saved.
+- `command` is what a conversation launches: `claude-agent-acp`, found on the
+  sandbox's `PATH`, whatever a profile carries. The agent profile form shows
+  something else for it — the frontend's built-in command for the preset,
+  `npx … claude-agent-acp@<version>` — because that exact text is how the
+  form knows the profile is Claude Code and not "Custom". So that it at least
+  names the right version, the canvas pod serves a copy of the frontend with
+  `claudeAdapterVersion` written into that command
+  (`files/canvas/patch_frontend.py`). The copy's assets are renamed with the
+  version, because they are served as immutable and a browser would otherwise
+  keep the old ones. If a canvas release changes how the command is written,
+  the pod logs that it found nothing to rewrite and serves the frontend as
+  shipped.
 - `model` is the model new conversations start on. Changing it rewrites the
   stored settings and every Claude Code profile once; after that the model
   picker's choice stands until the value here changes again.

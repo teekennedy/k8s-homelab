@@ -254,9 +254,11 @@ appServer:
   # (the agent profile form's "agent" choice).
   acpServers:
     claude-code:
-      # What a conversation launches, and what the agent profile form shows
-      # as its command; a command saved from the form is ignored. Resolved on
-      # the sandbox's PATH, which sandboxSpecs.claudeAdapterVersion heads.
+      # What a conversation launches, whatever command a profile carries.
+      # Resolved on the sandbox's PATH, which sandboxSpecs.claudeAdapterVersion
+      # heads. The agent profile form shows the frontend's own command for
+      # the preset instead, an npx run of that same version; any other text
+      # there would make the form call the profile "Custom".
       command: [claude-agent-acp]
       # The model new conversations start on: one of the model picker's ids
       # (default, opus[1m], sonnet, haiku) or a full model id. Written to the
@@ -459,11 +461,28 @@ oauth2-proxy:
 
   ingress:
     enabled: false
+  # group, kind and weight are what the API server defaults them to. Spelled
+  # out, rules included, because server-side apply otherwise reports the
+  # defaulted fields as drift.
   gatewayApi:
     enabled: true
     gatewayRef:
+      group: gateway.networking.k8s.io
+      kind: Gateway
       name: traefik-gateway
       namespace: kube-system
       sectionName: websecure
     hostnames:
       - openhands.msng.to
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - group: ""
+            kind: Service
+            # oauth2-proxy.fullnameOverride and service.portNumber.
+            name: openhands-auth
+            port: 80
+            weight: 1

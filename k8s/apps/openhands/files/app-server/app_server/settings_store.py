@@ -9,6 +9,7 @@ them; POST sends `*_diff` objects plus preferences) and the agent server's own
 
 import copy
 import json
+import shlex
 import uuid
 from pathlib import Path
 from typing import Any
@@ -66,10 +67,26 @@ class SettingsStore:
 
     def _command(self, agent: dict[str, Any]) -> list[str] | None:
         """The declared launch command for an ACP agent's server, if it has
-        one. Where it does, nothing stored is used or shown in its place."""
+        one. Where it does, nothing stored is used in its place, and nothing
+        is stored: the form then shows the preset's own command, which is the
+        only text it recognises the preset by."""
         if agent.get("agent_kind") != "acp":
             return None
         return (self._servers.get(agent.get("acp_server") or "") or {}).get("command")
+
+    def _declared_server(self, agent: dict[str, Any]) -> None:
+        """Put an agent back on the ACP server whose declared command it
+        carries. The form names its preset from the command text alone, so
+        it shows a declared command as "Custom" and saves it as that server,
+        which would cost the profile its model list and its declared
+        settings."""
+        command = agent.get("acp_command")
+        if isinstance(command, str):
+            command = shlex.split(command)
+        command = [*(command or []), *(agent.get("acp_args") or [])]
+        for server, cfg in self._servers.items():
+            if command and command == cfg.get("command"):
+                agent["acp_server"] = server
 
     def _with_command(self, agent: dict[str, Any]) -> dict[str, Any]:
         command = self._command(agent)
@@ -103,7 +120,7 @@ class SettingsStore:
         """GET /api/v1/settings. Credentials are reported as set, never
         returned."""
         doc = self.settings()
-        agent = self._with_command(copy.deepcopy(doc["agent_settings"]))
+        agent = copy.deepcopy(doc["agent_settings"])
         llm = agent.get("llm") or {}
         api_key_set = bool(llm.get("api_key"))
         if "api_key" in llm:
@@ -126,6 +143,7 @@ class SettingsStore:
         if isinstance(llm_diff, dict) and llm_diff.get("api_key") is None:
             llm_diff.pop("api_key", None)
         doc["agent_settings"] = deep_merge(doc["agent_settings"], agent_diff)
+        self._declared_server(doc["agent_settings"])
         if self._command(doc["agent_settings"]):
             # The form sends back the declared command it was shown.
             doc["agent_settings"].pop("acp_command", None)
@@ -199,12 +217,13 @@ class SettingsStore:
         profile = self._profiles()["profiles"].get(name)
         if profile is None:
             raise ProfileError(404, f"agent profile {name!r} not found")
-        return {"name": name, "profile": self._with_command(profile)}
+        return {"name": name, "profile": profile}
 
     def save_profile(self, name: str, body: dict[str, Any]) -> dict[str, str]:
         doc = self._profiles()
         existing = doc["profiles"].get(name)
         profile = self._new_profile(name, body, existing)
+        self._declared_server(profile)
         if self._command(profile):
             profile["acp_command"] = profile["acp_args"] = None
         doc["profiles"][name] = profile

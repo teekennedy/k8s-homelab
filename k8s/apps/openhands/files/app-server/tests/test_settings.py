@@ -5,16 +5,10 @@ import httpx
 from app_server.db import Database
 from app_server.settings_store import SettingsStore
 
-DECLARED_COMMAND = {"acp_command": ["claude-agent-acp"], "acp_args": []}
-
 
 def test_settings_are_seeded_then_merged(api, user):
     got = api.get("/api/v1/settings", headers=user).json()
-    assert got["agent_settings"] == {
-        "agent_kind": "acp",
-        "acp_server": "claude-code",
-        **DECLARED_COMMAND,
-    }
+    assert got["agent_settings"] == {"agent_kind": "acp", "acp_server": "claude-code"}
     assert got["conversation_settings"] == {"max_iterations": 77}
     assert got["language"] == "en"
 
@@ -34,7 +28,6 @@ def test_settings_are_seeded_then_merged(api, user):
         "acp_server": "claude-code",
         "acp_model": "sonnet",
         "llm": {"model": "m"},
-        **DECLARED_COMMAND,
     }
     assert got["conversation_settings"] == {
         "max_iterations": 77,
@@ -153,17 +146,16 @@ def test_automation_is_reached_with_the_service_key(api, user, state):
     assert api.get("/api/automation/v1").status_code == 401
 
 
-def test_the_declared_command_is_shown_and_never_stored(api, user, state):
+def test_the_declared_command_is_launched_and_never_stored(api, user, state):
     npx = ["npx", "-y", "@agentclientprotocol/claude-agent-acp@0.63.0"]
     api.post(
         "/api/agent-profiles/default",
         headers=user,
         json={"agent_kind": "acp", "acp_server": "claude-code", "acp_command": npx},
     )
+    # Null is what makes the form show the preset's own command.
     shown = api.get("/api/agent-profiles/default", headers=user).json()["profile"]
-    assert shown["acp_command"] == ["claude-agent-acp"] and shown["acp_args"] == []
-    stored = state.settings_store._profiles()["profiles"]["default"]
-    assert stored["acp_command"] is None
+    assert shown["acp_command"] is None and shown["acp_args"] is None
 
     api.post(
         "/api/v1/settings",
@@ -224,3 +216,35 @@ def test_the_declared_model_is_applied_once_per_value(tmp_path):
     assert store.settings()["agent_settings"]["acp_model"] == "sonnet"
     assert store.get_profile("codex")["profile"]["acp_model"] == "gpt"
     db.close()
+
+
+def test_the_form_saving_the_declared_command_keeps_the_server(api, user, state):
+    # What the profile form sends back for a command it does not recognise
+    # as a preset's own.
+    api.post(
+        "/api/agent-profiles/default",
+        headers=user,
+        json={
+            "agent_kind": "acp",
+            "acp_server": "custom",
+            "acp_command": ["claude-agent-acp"],
+            "acp_args": [],
+            "acp_model": "haiku",
+        },
+    )
+    stored = state.settings_store._profiles()["profiles"]["default"]
+    assert stored["acp_server"] == "claude-code" and stored["acp_command"] is None
+    assert stored["acp_model"] == "haiku"
+
+    api.post(
+        "/api/v1/settings",
+        headers=user,
+        json={
+            "agent_settings_diff": {
+                "acp_server": "custom",
+                "acp_command": "claude-agent-acp",
+            }
+        },
+    )
+    agent = state.settings_store.settings()["agent_settings"]
+    assert agent["acp_server"] == "claude-code" and "acp_command" not in agent
