@@ -172,7 +172,6 @@ forgejo-resources:
             - write:repository
             - read:user
             - write:issue
-            - read:organization
             - read:misc
     - name: homepage
       fullName: Homepage
@@ -226,7 +225,7 @@ forgejo-resources:
     # the token's scopes are the blast radius.
     #
     # No read:misc — unlike renovate, nothing here reads server metadata. No
-    # admin. The `Bots` team membership below is what gives it push access to
+    # admin. The `Agents` team membership below is what gives it push access to
     # ops/k8s-homelab; it has no standing access to anything else.
     - name: openhands
       fullName: OpenHands
@@ -301,6 +300,15 @@ forgejo-resources:
           permission: write
           members:
             - renovate
+        # The OpenHands agent runs with no human watching its tool calls, so it
+        # gets its own team scoped to exactly the repo it works on, rather than
+        # sharing Bots, which covers every repo in the org. Create-only: a team
+        # that already exists keeps its settings.
+        - name: Agents
+          permission: write
+          repositories:
+            - k8s-homelab
+          members:
             - openhands
         # Separate from Bots because of the permission: `admin` is what
         # Woodpecker's repo activation requires, and nothing else here needs it.

@@ -31,6 +31,13 @@ type Team struct {
 	Name       string
 	Permission string
 	Members    []string
+	// Repositories are the org's repos the team is granted, by name. Empty
+	// means every repo in the org, including ones created later.
+	Repositories []string
+}
+
+func (t Team) includesAllRepositories() bool {
+	return len(t.Repositories) == 0
 }
 
 type Organization struct {
@@ -689,6 +696,8 @@ func main() {
 	syncOrganizations(client, config.Organizations)
 	syncUsers(ctx, k8sClient, client, forgejoHost, config.Users)
 	syncRepositories(ctx, client, k8sClient, config.Repositories)
+	// After the repos exist, so a team can be granted one created this run.
+	syncTeamRepositories(client, config.Organizations)
 	syncRunners(ctx, k8sClient, forgejoHost, forgejoUser, forgejoPassword, config.Runners)
 	syncOAuth2Apps(ctx, client, k8sClient, config.OAuth2Apps)
 }
@@ -766,7 +775,7 @@ func syncOrgTeam(client *gitea.Client, orgName string, team Team) {
 		forgejoTeam, _, err = client.CreateTeam(orgName, gitea.CreateTeamOption{
 			Name:                    team.Name,
 			Permission:              perm,
-			IncludesAllRepositories: true,
+			IncludesAllRepositories: team.includesAllRepositories(),
 			Units: []gitea.RepoUnitType{
 				gitea.RepoUnitCode,
 				gitea.RepoUnitIssues,
@@ -782,6 +791,36 @@ func syncOrgTeam(client *gitea.Client, orgName string, team Team) {
 
 	for _, member := range team.Members {
 		syncTeamMember(client, forgejoTeam, member)
+	}
+}
+
+// syncTeamRepositories grants each team its declared repositories. It only
+// adds: a repo dropped from the list stays granted until removed in the UI.
+func syncTeamRepositories(client *gitea.Client, orgs []Organization) {
+	for _, org := range orgs {
+		var teams []*gitea.Team
+		for _, team := range org.Teams {
+			if team.includesAllRepositories() {
+				continue
+			}
+			if teams == nil {
+				var err error
+				if teams, _, err = client.ListOrgTeams(org.Name, gitea.ListTeamsOptions{}); err != nil {
+					log.Printf("List teams for org %s: %v", org.Name, err)
+					break
+				}
+			}
+			for _, t := range teams {
+				if t.Name != team.Name {
+					continue
+				}
+				for _, repo := range team.Repositories {
+					if _, err := client.AddTeamRepository(t.ID, org.Name, repo); err != nil {
+						log.Printf("Grant team %s repo %s/%s: %v", team.Name, org.Name, repo, err)
+					}
+				}
+			}
+		}
 	}
 }
 

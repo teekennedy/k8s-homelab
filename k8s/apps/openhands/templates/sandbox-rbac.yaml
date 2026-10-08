@@ -16,7 +16,8 @@ automountServiceAccountToken: {{ default false $cfg.daggerEngine }}
 {{- if $cfg.daggerEngine }}
 ---
 # Reach the shared Dagger engine over `kube-pod://`, which is `kubectl exec`.
-# Mirrors the dagger-pipeline grant in the woodpecker chart.
+# Narrower than the woodpecker chart's dagger-pipeline grant: it names the
+# engine pod and drops `list`, which `kubectl exec` does not need.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -25,9 +26,11 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["get", "list"]
+    resourceNames: [{{ $root.Values.daggerEnginePod | quote }}]
+    verbs: ["get"]
   - apiGroups: [""]
     resources: ["pods/exec"]
+    resourceNames: [{{ $root.Values.daggerEnginePod | quote }}]
     verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

@@ -111,3 +111,14 @@ webhooks:
 		})
 	}
 }
+
+// A team with a repository list must not be created as an all-repos team: that
+// is the whole point of listing them.
+func TestTeamIncludesAllRepositories(t *testing.T) {
+	if !(Team{}).includesAllRepositories() {
+		t.Fatal("a team with no repositories should cover the whole org")
+	}
+	if (Team{Repositories: []string{"k8s-homelab"}}).includesAllRepositories() {
+		t.Fatal("a team with repositories should be scoped to them")
+	}
+}
