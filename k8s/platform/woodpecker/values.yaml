@@ -119,16 +119,6 @@ woodpecker:
       # WOODPECKER_BACKEND_K8S_SECCTX_NONROOT: "true"
       WOODPECKER_BACKEND_K8S_VOLUME_SIZE: "1G"
 
-# Egress target for the notify-archon step in .woodpecker/ci.yaml. The relay
-# itself lives in k8s/apps/archon (values.yaml, `ciSignal`); these three only
-# have to agree with it for templates/network-policy.yaml to open the path.
-ciSignal:
-  namespace: archon
-  # The archon Deployment's app.kubernetes.io/name; the relay is a sidecar in
-  # that pod, not a workload of its own.
-  appName: archon
-  port: 9100
-
 woodpeckerResources:
   # Deliberately in values.yaml (not templates/woodpecker-resources.yaml) so
   # that renovate can pick it up.
@@ -166,20 +156,6 @@ woodpecker-resources:
       key: token
 
   users:
-    # Retires the "create a personal access token by hand in the Woodpecker UI"
-    # step that k8s/apps/archon's README used to open with. ci-verdict.sh uses
-    # this token to pull the failing step logs for a fix attempt, so it needs
-    # no more than read access to the repo, which membership of ops/Bots gives.
-    - login: archon
-      email: archon@msng.to
-      admin: false
-      credentialsSecret:
-        name: archon-forgejo-user
-        namespace: archon
-      tokenSecret:
-        name: archon-woodpecker
-        namespace: archon
-        key: token
     # Used by the forgejo-iterate skill in k8s/apps/openhands to pull the
     # failing step logs for a red PR check and to restart a pipeline it judges
     # flaky. Membership of ops/Bots is what gives it read access to the repo;
@@ -217,23 +193,6 @@ woodpecker-resources:
         # rather than loosening the mode for every contributor on a public repo.
         approvalAllowedUsers:
           - openhands
-      secrets:
-        # Shared HMAC key between the notify step in .woodpecker/ci.yaml and the
-        # ci-signal relay in the archon namespace. Generated once into the
-        # Kubernetes Secret, which is then the source of truth — Woodpecker
-        # never returns a secret's value, so it is pushed on every sync.
-        #
-        # pull_request only: nothing on a push pipeline signals Archon, and a
-        # secret exposed to more events than it needs is a larger blast radius
-        # for no gain.
-        - name: archon_ci_signal_secret
-          events:
-            - pull_request
-          generate: 48
-          mirrorSecret:
-            name: archon-ci-signal
-            namespace: archon
-            key: hmac-secret
 
 # Ordered reboot rollout for the borg hosts. See
 # templates/nixos-rollout-cronjob.yaml and nix/modules/selfupdate.

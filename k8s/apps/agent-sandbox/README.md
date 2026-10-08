@@ -6,8 +6,8 @@ optionally with its own Service and PVCs, and reports its lifecycle as status
 conditions.
 
 Nothing in this cluster uses it directly. It exists so that
-[`k8s/apps/archon`](../archon) can create a fresh, single-use pod per agent
-attempt and be told, through one condition, whether that attempt succeeded.
+[`k8s/apps/openhands`](../openhands) can create a fresh, single-use pod per
+agent session and be told, through one condition, whether that pod is ready.
 
 [upstream]: https://github.com/kubernetes-sigs/agent-sandbox
 
@@ -22,9 +22,9 @@ the `kustomize` customManager in `renovate.json` — the manifest, controller
 image, and CRD all move together since they come from the same URL.
 
 The `SandboxTemplate` / `SandboxClaim` / `SandboxWarmPool` extensions and the
-sandbox router are left out of the pulled manifest: Archon creates and deletes
-one Sandbox per attempt directly, and reads its progress from the pod log
-through the API server rather than dialing it.
+sandbox router are left out of the pulled manifest: the OpenHands app server
+creates and deletes one Sandbox per session directly, and reaches it through the
+headless Service that Sandbox owns rather than through a router.
 
 ## Upgrading
 

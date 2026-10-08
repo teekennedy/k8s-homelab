@@ -82,8 +82,8 @@ take entirely different `Config` keys and nothing here populates them.
 The ArgoCD hook stays `gogs`-typed: ArgoCD's `/api/webhook` natively
 understands the Gogs payload and reads the shared secret from `argocd-secret`'s
 `webhook.gogs.secret`. That is ArgoCD compatibility, not leftover naming.
-Archon's hook (`k8s/apps/archon`) is `gitea`-typed and subscribes to the issue
-and PR events its adapter wakes on.
+OpenHands' hook (`k8s/apps/openhands`) is `gitea`-typed and subscribes to the
+comment events its automation event source wakes on.
 
 Reconcile semantics, since they are easy to get wrong:
 

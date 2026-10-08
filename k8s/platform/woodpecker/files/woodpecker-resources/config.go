@@ -11,8 +11,8 @@ import (
 // SecretRef points at one key of one Kubernetes Secret.
 //
 // Namespace is always explicit: this job writes into namespaces other than its
-// own (the archon namespace, for one), and a defaulted namespace would make the
-// RBAC the chart generates disagree with what the job actually touches.
+// own (the openhands namespace, for one), and a defaulted namespace would make
+// the RBAC the chart generates disagree with what the job actually touches.
 type SecretRef struct {
 	Name      string `yaml:"name"`
 	Namespace string `yaml:"namespace"`

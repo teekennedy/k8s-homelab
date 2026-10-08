@@ -121,12 +121,12 @@ func TestReuseTokenAcceptsAValidStoredToken(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			writeJSON(w, wpUser{ID: 3, Login: "archon"})
+			writeJSON(w, wpUser{ID: 3, Login: "openhands"})
 		},
 	})
-	k8s := fake.NewSimpleClientset(secretWith("archon-woodpecker", "token", "stored-token"))
+	k8s := fake.NewSimpleClientset(secretWith("openhands-woodpecker", "token", "stored-token"))
 
-	got, err := reuseToken(context.Background(), k8s, configFor(stubURL), archonIdentity())
+	got, err := reuseToken(context.Background(), k8s, configFor(stubURL), openhandsIdentity())
 	if err != nil {
 		t.Fatalf("reuseToken: %v", err)
 	}
@@ -141,9 +141,9 @@ func TestReuseTokenDiscardsARevokedToken(t *testing.T) {
 	_, stubURL := stubWoodpecker(t, map[string]http.HandlerFunc{
 		"GET /api/user": func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) },
 	})
-	k8s := fake.NewSimpleClientset(secretWith("archon-woodpecker", "token", "revoked"))
+	k8s := fake.NewSimpleClientset(secretWith("openhands-woodpecker", "token", "revoked"))
 
-	got, err := reuseToken(context.Background(), k8s, configFor(stubURL), archonIdentity())
+	got, err := reuseToken(context.Background(), k8s, configFor(stubURL), openhandsIdentity())
 	if err != nil {
 		t.Fatalf("a 401 is expected, not an error: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestReuseTokenDiscardsARevokedToken(t *testing.T) {
 // A Secret that does not exist yet is normal on a cold bootstrap.
 func TestReuseTokenHandlesAMissingSecret(t *testing.T) {
 	_, stubURL := stubWoodpecker(t, nil)
-	got, err := reuseToken(context.Background(), fake.NewSimpleClientset(), configFor(stubURL), archonIdentity())
+	got, err := reuseToken(context.Background(), fake.NewSimpleClientset(), configFor(stubURL), openhandsIdentity())
 	if err != nil || got != nil {
 		t.Fatalf("want (nil, nil), got (%v, %v)", got, err)
 	}
@@ -169,9 +169,9 @@ func TestReuseTokenRejectsATokenForAnotherAccount(t *testing.T) {
 			writeJSON(w, wpUser{ID: 1, Login: "tkennedy"})
 		},
 	})
-	k8s := fake.NewSimpleClientset(secretWith("archon-woodpecker", "token", "someone-elses"))
+	k8s := fake.NewSimpleClientset(secretWith("openhands-woodpecker", "token", "someone-elses"))
 
-	_, err := reuseToken(context.Background(), k8s, configFor(stubURL), archonIdentity())
+	_, err := reuseToken(context.Background(), k8s, configFor(stubURL), openhandsIdentity())
 	if err == nil || !strings.Contains(err.Error(), "different account") {
 		t.Fatalf("want a different-account error, got %v", err)
 	}
@@ -191,10 +191,10 @@ func TestEnsureUserCreatesAMissingAccount(t *testing.T) {
 		"POST /api/users": func(w http.ResponseWriter, r *http.Request) { decodeInto(t, r, &created); writeJSON(w, created) },
 	})
 
-	if err := ensureUser(context.Background(), stub, archonIdentity()); err != nil {
+	if err := ensureUser(context.Background(), stub, openhandsIdentity()); err != nil {
 		t.Fatalf("ensureUser: %v", err)
 	}
-	if created.Login != "archon" || created.Email != "archon@msng.to" {
+	if created.Login != "openhands" || created.Email != "openhands@msng.to" {
 		t.Fatalf("created: %+v", created)
 	}
 }
@@ -205,13 +205,13 @@ func TestEnsureUserConvergesTheAdminFlag(t *testing.T) {
 	var patched wpUser
 	stub, _ := stubWoodpecker(t, map[string]http.HandlerFunc{
 		"GET /api/users": func(w http.ResponseWriter, _ *http.Request) {
-			writeJSON(w, []wpUser{{ID: 3, Login: "archon", Admin: true}})
+			writeJSON(w, []wpUser{{ID: 3, Login: "openhands", Admin: true}})
 		},
-		"PATCH /api/users/archon": func(w http.ResponseWriter, r *http.Request) { decodeInto(t, r, &patched); writeJSON(w, patched) },
-		"POST /api/users":         func(http.ResponseWriter, *http.Request) { t.Fatal("re-created an existing user") },
+		"PATCH /api/users/openhands": func(w http.ResponseWriter, r *http.Request) { decodeInto(t, r, &patched); writeJSON(w, patched) },
+		"POST /api/users":            func(http.ResponseWriter, *http.Request) { t.Fatal("re-created an existing user") },
 	})
 
-	if err := ensureUser(context.Background(), stub, archonIdentity()); err != nil {
+	if err := ensureUser(context.Background(), stub, openhandsIdentity()); err != nil {
 		t.Fatalf("ensureUser: %v", err)
 	}
 	if patched.Admin {
@@ -222,12 +222,12 @@ func TestEnsureUserConvergesTheAdminFlag(t *testing.T) {
 func TestEnsureUserIsANoOpWhenNothingDrifted(t *testing.T) {
 	stub, _ := stubWoodpecker(t, map[string]http.HandlerFunc{
 		"GET /api/users": func(w http.ResponseWriter, _ *http.Request) {
-			writeJSON(w, []wpUser{{ID: 3, Login: "Archon"}}) // forge casing differs
+			writeJSON(w, []wpUser{{ID: 3, Login: "OpenHands"}}) // forge casing differs
 		},
-		"PATCH /api/users/archon": func(http.ResponseWriter, *http.Request) { t.Fatal("patched a user that matched") },
-		"POST /api/users":         func(http.ResponseWriter, *http.Request) { t.Fatal("re-created an existing user") },
+		"PATCH /api/users/openhands": func(http.ResponseWriter, *http.Request) { t.Fatal("patched a user that matched") },
+		"POST /api/users":            func(http.ResponseWriter, *http.Request) { t.Fatal("re-created an existing user") },
 	})
-	if err := ensureUser(context.Background(), stub, archonIdentity()); err != nil {
+	if err := ensureUser(context.Background(), stub, openhandsIdentity()); err != nil {
 		t.Fatalf("ensureUser: %v", err)
 	}
 }
@@ -245,14 +245,14 @@ func TestSyncRepoSecretGeneratesAndMirrorsOnFirstUse(t *testing.T) {
 	k8s := fake.NewSimpleClientset()
 
 	secret := RepoSecret{
-		Name: "archon_ci_signal_secret", Events: []string{"pull_request"}, Generate: 32,
-		MirrorSecret: &SecretRef{Name: "archon-ci-signal", Namespace: "archon", Key: "hmac-secret"},
+		Name: "ci_shared_secret", Events: []string{"pull_request"}, Generate: 32,
+		MirrorSecret: &SecretRef{Name: "ci-shared-secret", Namespace: "openhands", Key: "hmac-secret"},
 	}
 	if err := syncRepoSecret(context.Background(), k8s, stub, 7, secret); err != nil {
 		t.Fatalf("syncRepoSecret: %v", err)
 	}
 
-	stored := mirroredValue(t, k8s, "archon", "archon-ci-signal", "hmac-secret")
+	stored := mirroredValue(t, k8s, "openhands", "ci-shared-secret", "hmac-secret")
 	if stored == "" {
 		t.Fatal("mirror secret has no value")
 	}
@@ -271,20 +271,20 @@ func TestSyncRepoSecretReusesAnExistingValue(t *testing.T) {
 	var pushed wpSecret
 	stub, _ := stubWoodpecker(t, map[string]http.HandlerFunc{
 		"GET /api/repos/7/secrets": func(w http.ResponseWriter, _ *http.Request) {
-			writeJSON(w, []wpSecret{{ID: 1, Name: "archon_ci_signal_secret"}})
+			writeJSON(w, []wpSecret{{ID: 1, Name: "ci_shared_secret"}})
 		},
 		// Already present: converge it rather than create a duplicate.
-		"PATCH /api/repos/7/secrets/archon_ci_signal_secret": func(w http.ResponseWriter, r *http.Request) {
+		"PATCH /api/repos/7/secrets/ci_shared_secret": func(w http.ResponseWriter, r *http.Request) {
 			decodeInto(t, r, &pushed)
 			writeJSON(w, pushed)
 		},
 		"POST /api/repos/7/secrets": func(http.ResponseWriter, *http.Request) { t.Fatal("re-created an existing secret") },
 	})
-	k8s := fake.NewSimpleClientset(secretWith("archon-ci-signal", "hmac-secret", "already-here"))
+	k8s := fake.NewSimpleClientset(secretWith("ci-shared-secret", "hmac-secret", "already-here"))
 
 	secret := RepoSecret{
-		Name: "archon_ci_signal_secret", Events: []string{"pull_request"}, Generate: 32,
-		MirrorSecret: &SecretRef{Name: "archon-ci-signal", Namespace: "archon", Key: "hmac-secret"},
+		Name: "ci_shared_secret", Events: []string{"pull_request"}, Generate: 32,
+		MirrorSecret: &SecretRef{Name: "ci-shared-secret", Namespace: "openhands", Key: "hmac-secret"},
 	}
 	if err := syncRepoSecret(context.Background(), k8s, stub, 7, secret); err != nil {
 		t.Fatalf("syncRepoSecret: %v", err)
@@ -376,20 +376,20 @@ func TestResolveRepoTreatsAConflictAsAlreadyActive(t *testing.T) {
 // --- writeSecretKeys -------------------------------------------------------
 
 // Several of the Secrets this job writes belong to another provisioner —
-// archon-forgejo-user is forgejo-resources' — so the write has to add a key
+// openhands-forgejo-user is forgejo-resources' — so the write has to add a key
 // rather than replace the object.
 func TestWriteSecretKeysKeepsKeysItDoesNotOwn(t *testing.T) {
-	k8s := fake.NewSimpleClientset(secretWith("archon-forgejo-user", "password", "from-forgejo"))
+	k8s := fake.NewSimpleClientset(secretWith("openhands-forgejo-user", "password", "from-forgejo"))
 
-	if err := writeSecretKeys(context.Background(), k8s, "archon", "archon-forgejo-user",
+	if err := writeSecretKeys(context.Background(), k8s, "openhands", "openhands-forgejo-user",
 		map[string]string{"token": "minted"}); err != nil {
 		t.Fatalf("writeSecretKeys: %v", err)
 	}
 
-	if got := mirroredValue(t, k8s, "archon", "archon-forgejo-user", "password"); got != "from-forgejo" {
+	if got := mirroredValue(t, k8s, "openhands", "openhands-forgejo-user", "password"); got != "from-forgejo" {
 		t.Fatalf("the other provisioner's key was dropped: got %q", got)
 	}
-	if got := mirroredValue(t, k8s, "archon", "archon-forgejo-user", "token"); got != "minted" {
+	if got := mirroredValue(t, k8s, "openhands", "openhands-forgejo-user", "token"); got != "minted" {
 		t.Fatalf("token: got %q", got)
 	}
 }
@@ -443,11 +443,11 @@ func mirroredValue(t *testing.T, k8s *fake.Clientset, namespace, name, key strin
 	return secret.StringData[key]
 }
 
-// secretWith builds a pre-existing Secret in the archon namespace, which is
+// secretWith builds a pre-existing Secret in the openhands namespace, which is
 // where every Secret this job writes across a namespace boundary lands.
 func secretWith(name, key, value string) *corev1.Secret {
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "archon"},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "openhands"},
 		Data:       map[string][]byte{key: []byte(value)},
 	}
 }
@@ -459,11 +459,11 @@ func configFor(woodpeckerURL string) Config {
 	}
 }
 
-func archonIdentity() Identity {
+func openhandsIdentity() Identity {
 	return Identity{
-		Login:             "archon",
-		Email:             "archon@msng.to",
-		CredentialsSecret: SecretRef{Name: "archon-forgejo-user", Namespace: "archon"},
-		TokenSecret:       SecretRef{Name: "archon-woodpecker", Namespace: "archon", Key: "token"},
+		Login:             "openhands",
+		Email:             "openhands@msng.to",
+		CredentialsSecret: SecretRef{Name: "openhands-forgejo-user", Namespace: "openhands"},
+		TokenSecret:       SecretRef{Name: "openhands-woodpecker", Namespace: "openhands", Key: "token"},
 	}
 }

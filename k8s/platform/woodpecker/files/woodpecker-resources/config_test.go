@@ -38,14 +38,14 @@ bootstrap:
     namespace: woodpecker
     key: token
 users:
-  - login: archon
-    email: archon@msng.to
+  - login: openhands
+    email: openhands@msng.to
     credentialsSecret:
-      name: archon-forgejo-user
-      namespace: archon
+      name: openhands-forgejo-user
+      namespace: openhands
     tokenSecret:
-      name: archon-woodpecker
-      namespace: archon
+      name: openhands-woodpecker
+      namespace: openhands
       key: token
 repositories:
   - owner: ops
@@ -54,14 +54,7 @@ repositories:
     settings:
       timeout: 100
       cancelPreviousPipelineEvents: [pull_request, push]
-    secrets:
-      - name: archon_ci_signal_secret
-        events: [pull_request]
-        generate: 48
-        mirrorSecret:
-          name: archon-ci-signal
-          namespace: archon
-          key: hmac-secret
+      approvalAllowedUsers: [openhands]
 `
 
 func TestValidateAcceptsShippedConfig(t *testing.T) {
@@ -72,8 +65,8 @@ func TestValidateAcceptsShippedConfig(t *testing.T) {
 	if got := *config.Repositories[0].Settings.Timeout; got != 100 {
 		t.Fatalf("timeout: got %d", got)
 	}
-	if got := config.Repositories[0].Secrets[0].MirrorSecret.String(); got != "archon/archon-ci-signal" {
-		t.Fatalf("mirror secret: got %q", got)
+	if got := config.Users[0].TokenSecret.String(); got != "openhands/openhands-woodpecker" {
+		t.Fatalf("token secret: got %q", got)
 	}
 }
 

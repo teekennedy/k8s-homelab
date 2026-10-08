@@ -220,26 +220,6 @@ forgejo-resources:
         - name: nixos-selfupdate
           scopes:
             - read:repository
-    # Identity the Archon agent pushes and opens PRs as (k8s/apps/archon). It is
-    # deliberately a bot account and not tkennedy: every branch and PR the
-    # sandboxed model produces has to be attributable to the automation at a
-    # glance, and the token's scopes are the blast radius.
-    #
-    # No read:misc — unlike renovate, nothing here reads server metadata. No
-    # admin. The `Bots` team membership below is what gives it push access to
-    # ops/k8s-homelab; it has no standing access to anything else.
-    - name: archon
-      fullName: Archon
-      email: archon@msng.to
-      secretName: archon-forgejo-user
-      secretNamespace: archon
-      accessTokens:
-        - name: archon
-          scopes:
-            - write:repository
-            - read:user
-            - write:issue
-            - read:organization
     # Identity the OpenHands agent pushes and opens PRs as (k8s/apps/openhands).
     # It is deliberately a bot account and not tkennedy: every branch and PR a
     # session produces has to be attributable to the automation at a glance, and
@@ -321,7 +301,6 @@ forgejo-resources:
           permission: write
           members:
             - renovate
-            - archon
             - openhands
         # Separate from Bots because of the permission: `admin` is what
         # Woodpecker's repo activation requires, and nothing else here needs it.
@@ -356,24 +335,6 @@ forgejo-resources:
           secretName: argocd-secret
           secretNamespace: argocd
           secretKey: webhook.gogs.secret
-        # Archon's community Gitea adapter (k8s/apps/archon). Must be the
-        # `gitea` type: the adapter verifies X-Gitea-Signature, which only that
-        # payload format sends.
-        #
-        # No branchFilter — it only constrains push events, and none of the
-        # events below are pushes. The adapter wakes on an @mention in an issue
-        # or PR *comment*; the issues/pull_request events are what let it see
-        # the thread the comment belongs to.
-        - url: https://archon.msng.to/webhooks/gitea
-          type: gitea
-          events:
-            - issues
-            - issue_comment
-            - pull_request
-            - pull_request_comment
-          secretName: archon-webhook
-          secretNamespace: archon
-          secretKey: webhook-secret
         # OpenHands automations (k8s/apps/openhands, "Event triggers"). The
         # path ends in the automation service's organization id and the event
         # source's name. `gitea`-typed: the source verifies X-Gitea-Signature.

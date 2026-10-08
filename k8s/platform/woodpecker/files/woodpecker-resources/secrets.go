@@ -44,8 +44,9 @@ func readSecretKey(ctx context.Context, k8s kubernetes.Interface, ref SecretRef)
 // writeSecretKeys creates the Secret or patches the given keys into it.
 //
 // The patch is additive on purpose: several of the Secrets written here are
-// shared with another provisioner (archon-forgejo-user is forgejo-resources'),
-// and replacing the object would drop keys this job knows nothing about.
+// shared with another provisioner (openhands-forgejo-user is
+// forgejo-resources'), and replacing the object would drop keys this job knows
+// nothing about.
 func writeSecretKeys(ctx context.Context, k8s kubernetes.Interface, namespace, name string, data map[string]string) error {
 	secrets := k8s.CoreV1().Secrets(namespace)
 

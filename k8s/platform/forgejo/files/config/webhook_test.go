@@ -33,18 +33,18 @@ webhooks:
     secretName: argocd-secret
     secretNamespace: argocd
     secretKey: webhook.gogs.secret
-  - url: https://archon.msng.to/webhooks/gitea
+  - url: https://openhands.msng.to/api/automation/v1/events/00000000-0000-4000-8000-000000000001/forgejo
     type: gitea
-    events: [issues, issue_comment, pull_request, pull_request_comment]
-    secretName: archon-webhook
-    secretNamespace: archon
+    events: [issue_comment, pull_request_comment]
+    secretName: openhands-forge-webhook
+    secretNamespace: openhands
     secretKey: webhook-secret
 `)
 	if errs := r.validate(); len(errs) != 0 {
 		t.Fatalf("expected no errors, got %v", errs)
 	}
-	if got := r.Webhooks[1].events(); len(got) != 4 {
-		t.Fatalf("archon events: %v", got)
+	if got := r.Webhooks[1].events(); len(got) != 2 {
+		t.Fatalf("openhands events: %v", got)
 	}
 }
 

@@ -186,7 +186,7 @@ func hasCookie(r *http.Request, name string) bool {
 // The credentials and token every case here runs with; the interesting
 // variation is in how the stubs behave, not in these strings.
 const (
-	testLogin    = "archon"
+	testLogin    = "openhands"
 	testPassword = "hunter2"
 	testToken    = "wp-token-abc"
 )
