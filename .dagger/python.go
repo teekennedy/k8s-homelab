@@ -27,19 +27,14 @@ func blackCmd() []string {
 	return []string{"black", "."}
 }
 
-// pytestDeselected is the marker expression every ordinary pytest run in this
-// repo is narrowed by.
-//
-// It has to name every marker class that is out of scope for an ordinary check,
-// not just the newest one: pytest lets a command-line -m override a project's
-// own addopts, so passing one marker here would silently re-enable the tests a
-// project had deselected for itself. Projects still set the same expression in
-// their addopts, which is what covers a bare `pytest` in an editor or a shell.
-const pytestDeselected = "not kubernetes and not integration"
+// kubernetesMarker is the pytest marker carried by tests that need a live
+// cluster. Projects deselect it in their own addopts; the integration workflow
+// selects it explicitly. See testKubernetes and TestKubernetesIntegration.
+const kubernetesMarker = "kubernetes"
 
 // pytestNoTestsExitCode is pytest's exit code for a run that collected nothing
-// to execute. Deselecting every test in a project produces it, which is the
-// expected outcome for a project whose tests all need a live cluster.
+// to execute. A project whose tests all deselect themselves — one holding only
+// cluster tests, say — produces it, and that is a pass rather than a failure.
 const pytestNoTestsExitCode = 5
 
 // PythonProject is one Python project — a directory with a pyproject.toml —
@@ -102,9 +97,12 @@ func (m *Homelab) PythonProjects(
 
 // Test runs pytest for this Python project, in the given toolchain container.
 //
-// Tests needing something this container hasn't got — a live cluster, a real
-// zpool — are deselected by marker, so an ordinary check never reaches for the
-// ambient environment. See pytestDeselected.
+// No -m here on purpose. Which markers an ordinary run excludes is a per-project
+// decision, declared in each pyproject.toml's addopts — and it has to be,
+// because a command-line -m replaces addopts rather than narrowing it. Passing
+// one from here would re-enable the tests a project deselected for itself, and
+// deselect the ones a project runs deliberately: jellyfin-exporter registers
+// `integration` precisely so those tests run by default against its stub server.
 func (pp *PythonProject) Test(ctx context.Context, container *dagger.Container) (string, error) {
 	if err := pp.usable(container); err != nil {
 		return "", err
@@ -113,7 +111,7 @@ func (pp *PythonProject) Test(ctx context.Context, container *dagger.Container) 
 	_, err := container.
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
-		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest", "-v", "-m", pytestDeselected}).
+		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest", "-v"}).
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {

@@ -53,7 +53,7 @@ var ciProfiles = []string{"ci"}
 // rebuilt from a *dagger.Directory anywhere in the module rather than being
 // built once and passed around as state.
 func ciContainer(devenvSource *dagger.Directory) *dagger.Container {
-	return withToolchainCaches(devenvShell(devenvSource, nil, ciProfiles))
+	return toolchainContainer(devenvSource, ciProfiles)
 }
 
 // integrationProfiles adds the cluster tooling the Kubernetes integration
@@ -68,7 +68,13 @@ var integrationProfiles = []string{"ci", "integration"}
 // integrationContainer returns the toolchain the Kubernetes integration
 // workflow runs in.
 func integrationContainer(devenvSource *dagger.Directory) *dagger.Container {
-	return withToolchainCaches(devenvShell(devenvSource, nil, integrationProfiles))
+	return toolchainContainer(devenvSource, integrationProfiles)
+}
+
+// toolchainContainer builds the devenv shell for profiles, with the toolchain
+// caches attached.
+func toolchainContainer(devenvSource *dagger.Directory, profiles []string) *dagger.Container {
+	return withToolchainCaches(devenvShell(devenvSource, nil, profiles))
 }
 
 // withToolchainCaches attaches the caches every language toolchain in the ci

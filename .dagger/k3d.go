@@ -16,18 +16,11 @@ import (
 // from a Dagger container, proving a kubeconfig still points at it, and taking
 // it down again. Nothing in this file knows what gets deployed to it.
 //
-// The cluster's nodes are containers in a Docker daemon. There are two places
-// that daemon can be, and the difference is entirely about which address its
-// published ports answer on:
-//
-//   - A dind service inside the engine (the default). The daemon is a Dagger
-//     service, so its ports are reachable from any container that binds it, at
-//     the alias it is bound under. Everything the run creates lives inside that
-//     service and dies with it. It needs an engine that allows privileged
-//     execs; see "Kubernetes integration tests" in README.md.
-//   - An external daemon named by DOCKER_HOST. Its published ports answer on
-//     its own host, so that host has to be routable from the engine — which
-//     rules out a unix socket and loopback, see dockerHostAddress.
+// The cluster's nodes are containers in a Docker daemon, either a dind service
+// inside the engine (the default, see dindService) or an external one named by
+// DOCKER_HOST (see dockerHostAddress). The two differ only in which address the
+// daemon's published ports answer on, which is what APIHost carries. See
+// "Kubernetes integration tests" in README.md for the prerequisites each needs.
 const (
 	// k3dAPIPort is the port the cluster's API server is published on in the
 	// Docker daemon's network namespace. Deliberately not 6443: that is the
@@ -151,13 +144,9 @@ func dockerHostAddress(dockerHost string) (string, error) {
 
 // dindService is a Docker daemon to create k3d clusters in.
 //
-// Its data root is a PRIVATE cache volume, which is the one mount that works
-// here. The container's own filesystem and a temp mount are both unusable:
-// dockerd's overlay2 driver needs a real filesystem underneath, and falls back
-// to the vfs driver — a full copy per layer — when it doesn't get one. A SHARED
-// volume would be worse than slow: dockerd takes an exclusive lock on its data
-// root, so two concurrent runs would deadlock on it. PRIVATE hands each
-// concurrent user its own instance.
+// Its data root is a PRIVATE cache volume, which is the only mount that works:
+// dockerd's overlay2 driver needs a real filesystem underneath, and SHARED would
+// deadlock two concurrent runs on dockerd's exclusive data-root lock.
 func dindService() *dagger.Service {
 	return dag.Container().
 		From(dindImage).
@@ -335,11 +324,9 @@ func (c *k3dCluster) Verify(ctx context.Context) error {
 	out, err := c.WithCluster(c.Toolchain).
 		WithExec([]string{"sh", "-c", `
 set -eu
-kubectl config view --minify --output 'jsonpath={.clusters[0].cluster.server}'
-echo
-kubectl config current-context
-kubectl get namespace kube-system --output 'jsonpath={.metadata.uid}'
-echo
+printf 'server=%s\n' "$(kubectl config view --minify --output 'jsonpath={.clusters[0].cluster.server}')"
+printf 'context=%s\n' "$(kubectl config current-context)"
+printf 'uid=%s\n' "$(kubectl get namespace kube-system --output 'jsonpath={.metadata.uid}')"
 `}).
 		Stdout(ctx)
 	if err != nil {
@@ -348,24 +335,27 @@ echo
 	return c.checkIdentity(out)
 }
 
-// checkIdentity compares the three lines Verify's probe prints — server,
-// context, kube-system UID — against what this cluster should report.
+// checkIdentity compares what Verify's probe reported against what this cluster
+// should report. The probe prints key=value lines rather than bare values, so an
+// added field or a stray warning from kubectl cannot shift the parse.
 func (c *k3dCluster) checkIdentity(probe string) error {
-	lines := strings.Split(strings.TrimSpace(probe), "\n")
-	if len(lines) != 3 {
-		return fmt.Errorf("cluster identity probe printed %d lines, want 3:\n%s", len(lines), probe)
+	got := map[string]string{}
+	for _, line := range strings.Split(probe, "\n") {
+		if key, value, ok := strings.Cut(strings.TrimSpace(line), "="); ok {
+			got[key] = value
+		}
 	}
 
 	var problems []string
 	for _, check := range []struct {
-		what, got, want string
+		key, what, want string
 	}{
-		{"API endpoint", strings.TrimSpace(lines[0]), c.Server()},
-		{"context", strings.TrimSpace(lines[1]), c.Context()},
-		{"kube-system namespace UID", strings.TrimSpace(lines[2]), c.KubeSystemUID},
+		{"server", "API endpoint", c.Server()},
+		{"context", "context", c.Context()},
+		{"uid", "kube-system namespace UID", c.KubeSystemUID},
 	} {
-		if check.got != check.want {
-			problems = append(problems, fmt.Sprintf("%s is %q, want %q", check.what, check.got, check.want))
+		if got[check.key] != check.want {
+			problems = append(problems, fmt.Sprintf("%s is %q, want %q", check.what, got[check.key], check.want))
 		}
 	}
 	if len(problems) > 0 {
@@ -375,27 +365,35 @@ func (c *k3dCluster) checkIdentity(probe string) error {
 	return nil
 }
 
-// WaitForDeployments waits until every Deployment in namespace reports
-// Available, and returns the namespace's pod and event state when it doesn't.
+// WaitForWorkloads waits for every workload in namespace to finish rolling out,
+// and returns the namespace's pod and event state when one doesn't.
 //
 // Helmfile returning successfully only means the manifests were accepted, so
-// this is what decides whether a release is actually up. It is deliberately
-// namespace-scoped and release-agnostic: a release with no Deployment at all
-// fails here, which is the right answer for one whose tests are about to run.
-func (c *k3dCluster) WaitForDeployments(ctx context.Context, namespace, timeout string) error {
+// this is what decides whether a release is actually up. It asks kubectl about
+// each of the three kinds that have a rollout rather than about Deployments
+// alone, so a release whose workload is a StatefulSet or a DaemonSet needs
+// nothing added here. A namespace with none of them fails, which is the right
+// answer for a release whose tests are about to run.
+func (c *k3dCluster) WaitForWorkloads(ctx context.Context, namespace, timeout string) error {
 	_, err := c.WithCluster(c.Toolchain).
-		WithExec([]string{
-			"kubectl", "wait",
-			"--namespace", namespace,
-			"--for", "condition=Available",
-			"--timeout", timeout,
-			"deployment", "--all",
-		}).
+		WithExec([]string{"sh", "-c", `
+set -eu
+ns=$1
+timeout=$2
+workloads=$(kubectl --namespace "$ns" get deployment,statefulset,daemonset --output name)
+if [ -z "$workloads" ]; then
+	echo "namespace $ns has no deployment, statefulset or daemonset to wait for" >&2
+	exit 1
+fi
+for workload in $workloads; do
+	kubectl --namespace "$ns" rollout status "$workload" --timeout "$timeout"
+done
+`, "--", namespace, timeout}).
 		Sync(ctx)
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("no Deployment in namespace %s became available within %s: %w\n%s",
+	return fmt.Errorf("the workloads in namespace %s did not roll out within %s: %w\n%s",
 		namespace, timeout, withExecOutput(err), c.Diagnostics(ctx, namespace))
 }
 

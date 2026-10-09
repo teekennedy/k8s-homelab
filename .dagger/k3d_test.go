@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -106,7 +107,9 @@ func TestK3dClusterNameIsDNSSafe(t *testing.T) {
 
 func TestCheckIdentity(t *testing.T) {
 	cluster := &k3dCluster{Name: "homelab-abcdef", APIHost: dindAlias, KubeSystemUID: "1111-2222"}
-	good := cluster.Server() + "\n" + cluster.Context() + "\n" + cluster.KubeSystemUID + "\n"
+	probe := func(server, context, uid string) string {
+		return fmt.Sprintf("server=%s\ncontext=%s\nuid=%s\n", server, context, uid)
+	}
 
 	tests := []struct {
 		name    string
@@ -115,28 +118,36 @@ func TestCheckIdentity(t *testing.T) {
 	}{
 		{
 			name:  "the cluster this run created",
-			probe: good,
+			probe: probe(cluster.Server(), cluster.Context(), cluster.KubeSystemUID),
 		},
 		{
 			name:    "another cluster at the same address",
-			probe:   cluster.Server() + "\n" + cluster.Context() + "\n3333-4444\n",
+			probe:   probe(cluster.Server(), cluster.Context(), "3333-4444"),
 			wantErr: "kube-system namespace UID",
 		},
 		{
 			// What a kubeconfig left over from a developer's shell looks like.
 			name:    "a different API endpoint",
-			probe:   "https://k8s.example:6443\nproduction\n3333-4444\n",
+			probe:   probe("https://k8s.example:6443", "production", "3333-4444"),
 			wantErr: "API endpoint",
 		},
 		{
 			name:    "the right cluster under the wrong context",
-			probe:   cluster.Server() + "\nproduction\n" + cluster.KubeSystemUID + "\n",
+			probe:   probe(cluster.Server(), "production", cluster.KubeSystemUID),
 			wantErr: "context",
 		},
 		{
+			// A field the probe never printed must not read as a match.
 			name:    "a probe that did not print everything",
-			probe:   cluster.Server() + "\n",
-			wantErr: "printed 1 lines",
+			probe:   "server=" + cluster.Server() + "\n",
+			wantErr: "kube-system namespace UID",
+		},
+		{
+			// kubectl warnings and blank lines are not key=value, so they are
+			// ignored rather than shifting the parse.
+			name: "noise around the values",
+			probe: "W1009 warning: something\n\n" +
+				probe(cluster.Server(), cluster.Context(), cluster.KubeSystemUID),
 		},
 	}
 	for _, tt := range tests {

@@ -61,13 +61,15 @@ _productionApps: {
 }
 
 // _appsDisabled defaults every known release to disabled, so an environment that
-// wants only a handful of releases can name those and leave the rest alone. The
-// names are derived from _stagingApps rather than listed again, so a new release
-// only has to be added to the lists above. The values are defaults (`*false`),
-// which is what lets an environment unify `true` over one of them.
+// wants only a handful of releases can name those and leave the rest alone.
+//
+// The names come from _productionApps rather than being listed again: that is
+// the full stack, and LintHelmfile already fails when a release is missing from
+// it, so it is the one list guaranteed to be complete. The values are defaults
+// (`*false`), which is what lets an environment unify `true` over one of them.
 _appsDisabled: {
 	apps: {
-		for tier, releases in _stagingApps.apps {
+		for tier, releases in _productionApps.apps {
 			(tier): {
 				for name, _ in releases {
 					(name): *false | bool

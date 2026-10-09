@@ -1,7 +1,6 @@
 """Black-box tests for reflector's ConfigMap mirroring."""
 
 import time
-from typing import Callable, Optional, TypeVar
 
 import pytest
 from kubernetes import client
@@ -19,49 +18,26 @@ AUTO_NAMESPACES = f"{ANNOTATION_PREFIX}/reflection-auto-namespaces"
 REFLECTS = f"{ANNOTATION_PREFIX}/reflects"
 
 # Reflector acts on a watch event, so a copy normally appears in well under a
-# second. The ceiling is sized for a controller that has only just become ready.
-REFLECTION_TIMEOUT = 90.0
+# second. The workflow waits for the rollout before running these, so the
+# ceiling only has to cover a slow reconcile, not a cold start.
+REFLECTION_TIMEOUT = 30.0
 POLL_INTERVAL = 0.5
 
-T = TypeVar("T")
 
-
-def wait_for(
-    probe: Callable[[], Optional[T]],
-    description: str,
-    timeout: float = REFLECTION_TIMEOUT,
-) -> T:
-    """Poll probe until it returns a non-None value, or fail after timeout.
-
-    A 404 from the API server counts as "not yet" — that is the normal state
-    while waiting for an object reflector has not created. Any other API error
-    propagates, so a broken RBAC rule fails the test instead of timing out.
-    """
-    deadline = time.monotonic() + timeout
-    while True:
-        try:
-            result = probe()
-        except ApiException as exc:
-            if exc.status != 404:
-                raise
-            result = None
-        if result is not None:
-            return result
-        if time.monotonic() >= deadline:
-            raise AssertionError(
-                f"timed out after {timeout:.0f}s waiting for {description}"
-            )
-        time.sleep(POLL_INTERVAL)
-
-
-def auto_reflect_into(namespace: str) -> dict[str, str]:
-    """Annotations that ask reflector to keep a copy in namespace up to date."""
-    return {
-        ALLOWED: "true",
-        ALLOWED_NAMESPACES: namespace,
-        AUTO_ENABLED: "true",
-        AUTO_NAMESPACES: namespace,
-    }
+def source_config_map(name: str, data: dict[str, str], target_ns: str):
+    """A ConfigMap annotated to be kept mirrored into target_ns."""
+    return client.V1ConfigMap(
+        metadata=client.V1ObjectMeta(
+            name=name,
+            annotations={
+                ALLOWED: "true",
+                ALLOWED_NAMESPACES: target_ns,
+                AUTO_ENABLED: "true",
+                AUTO_NAMESPACES: target_ns,
+            },
+        ),
+        data=data,
+    )
 
 
 def await_data(
@@ -71,18 +47,30 @@ def await_data(
     expected: dict[str, str],
     description: str,
 ) -> client.V1ConfigMap:
-    """Wait for namespace/name to exist with exactly the expected data."""
-    return wait_for(
-        lambda: _config_map_with_data(core_v1, namespace, name, expected),
-        description,
-    )
+    """Poll until namespace/name exists with exactly expected data, or fail.
 
-
-def _config_map_with_data(
-    core_v1: client.CoreV1Api, namespace: str, name: str, expected: dict[str, str]
-) -> Optional[client.V1ConfigMap]:
-    config_map = core_v1.read_namespaced_config_map(name=name, namespace=namespace)
-    return config_map if config_map.data == expected else None
+    This is the assertion, not a prelude to one: returning means the contents
+    matched, and timing out reports what was being waited for. A 404 counts as
+    "not yet" — the normal state while waiting for an object reflector has not
+    created — but any other API error propagates, so a broken RBAC rule fails
+    the test instead of burning the whole timeout.
+    """
+    deadline = time.monotonic() + REFLECTION_TIMEOUT
+    while True:
+        try:
+            config_map = core_v1.read_namespaced_config_map(
+                name=name, namespace=namespace
+            )
+            if config_map.data == expected:
+                return config_map
+        except ApiException as exc:
+            if exc.status != 404:
+                raise
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                f"timed out after {REFLECTION_TIMEOUT:.0f}s waiting for {description}"
+            )
+        time.sleep(POLL_INTERVAL)
 
 
 @pytest.mark.kubernetes
@@ -94,13 +82,7 @@ def test_configmap_is_reflected_into_the_target_namespace(
     data = {"greeting": "hello from the source namespace"}
 
     core_v1.create_namespaced_config_map(
-        namespace=source_ns,
-        body=client.V1ConfigMap(
-            metadata=client.V1ObjectMeta(
-                name=name, annotations=auto_reflect_into(target_ns)
-            ),
-            data=data,
-        ),
+        namespace=source_ns, body=source_config_map(name, data, target_ns)
     )
 
     copy = await_data(
@@ -111,7 +93,6 @@ def test_configmap_is_reflected_into_the_target_namespace(
         f"reflector to copy {source_ns}/{name} into {target_ns}",
     )
 
-    assert copy.data == data
     assert copy.metadata.annotations[REFLECTS] == f"{source_ns}/{name}"
 
 
@@ -125,13 +106,7 @@ def test_configmap_update_propagates_to_the_reflected_copy(
     updated = {"greeting": "second value", "added": "new key"}
 
     core_v1.create_namespaced_config_map(
-        namespace=source_ns,
-        body=client.V1ConfigMap(
-            metadata=client.V1ObjectMeta(
-                name=name, annotations=auto_reflect_into(target_ns)
-            ),
-            data=original,
-        ),
+        namespace=source_ns, body=source_config_map(name, original, target_ns)
     )
 
     # Wait for the first copy before updating, so that a propagated update
@@ -149,20 +124,15 @@ def test_configmap_update_propagates_to_the_reflected_copy(
     core_v1.replace_namespaced_config_map(
         name=name,
         namespace=source_ns,
-        body=client.V1ConfigMap(
-            metadata=client.V1ObjectMeta(
-                name=name, annotations=auto_reflect_into(target_ns)
-            ),
-            data=updated,
-        ),
+        body=source_config_map(name, updated, target_ns),
     )
 
-    copy = await_data(
+    # Returning at all is the assertion: await_data only returns once the copy's
+    # data matches `updated`, including the key that was not there before.
+    await_data(
         core_v1,
         target_ns,
         name,
         updated,
         f"reflector to propagate the update to {target_ns}/{name}",
     )
-
-    assert copy.data == updated

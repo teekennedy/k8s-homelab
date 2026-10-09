@@ -294,6 +294,54 @@ type helmfileListEntry struct {
 	Chart     string `json:"chart"`
 }
 
+// helmfileStateSource is the two files helmfile reads to resolve an
+// environment's releases, and nothing else, so an exec over it only re-runs
+// when one of them changes.
+func helmfileStateSource(source *dagger.Directory, env string) *dagger.Directory {
+	return dag.Directory().
+		WithFile(helmfilePath, source.File(helmfilePath)).
+		WithFile(helmfileEnvValuesPath(env), source.File(helmfileEnvValuesPath(env)))
+}
+
+// helmfileReleases returns an environment's releases as helmfile resolves them.
+func helmfileReleases(
+	ctx context.Context,
+	source *dagger.Directory,
+	env string,
+	toolchain *dagger.Container,
+) ([]helmfileListEntry, error) {
+	listJSON, err := helmfileContainer(toolchain, helmfileStateSource(source, env)).
+		WithExec([]string{"helmfile", "--environment", env, "build"}).
+		WithExec([]string{"helmfile", "--environment", env, "list", "--output", "json"}).
+		Stdout(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", env, withExecOutput(err))
+	}
+	var releases []helmfileListEntry
+	if err := json.Unmarshal([]byte(listJSON), &releases); err != nil {
+		return nil, fmt.Errorf("%s: parsing helmfile list output: %w", env, err)
+	}
+	return releases, nil
+}
+
+// helmfileEnvApps returns an environment's generated app list, keyed by tier
+// then release name. This is what the state file's installedTemplate reads to
+// decide whether a release is installed.
+func helmfileEnvApps(ctx context.Context, source *dagger.Directory, env string) (map[string]map[string]bool, error) {
+	valuesPath := helmfileEnvValuesPath(env)
+	envJSON, err := source.File(valuesPath).Contents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%s: reading %s: %w", env, valuesPath, err)
+	}
+	var values struct {
+		Apps map[string]map[string]bool `json:"apps"`
+	}
+	if err := json.Unmarshal([]byte(envJSON), &values); err != nil {
+		return nil, fmt.Errorf("%s: parsing %s: %w", env, valuesPath, err)
+	}
+	return values.Apps, nil
+}
+
 // lintHelmfileState renders the state file for env and cross-checks it.
 func lintHelmfileState(
 	ctx context.Context,
@@ -302,39 +350,16 @@ func lintHelmfileState(
 	chartPaths []string,
 	toolchain *dagger.Container,
 ) error {
-	envValuesPath := helmfileEnvValuesPath(env)
-	envValues := source.File(envValuesPath)
-
-	// The state file and the environment's values are all `build` and `list`
-	// read, so this exec only re-runs when one of those two changes.
-	state := helmfileContainer(toolchain, dag.Directory().
-		WithFile(helmfilePath, source.File(helmfilePath)).
-		WithFile(envValuesPath, envValues)).
-		WithExec([]string{"helmfile", "--environment", env, "build"})
-
-	listJSON, err := state.
-		WithExec([]string{"helmfile", "--environment", env, "list", "--output", "json"}).
-		Stdout(ctx)
+	releases, err := helmfileReleases(ctx, source, env, toolchain)
 	if err != nil {
-		return fmt.Errorf("%s: %w", env, withExecOutput(err))
+		return err
 	}
-	var releases []helmfileListEntry
-	if err := json.Unmarshal([]byte(listJSON), &releases); err != nil {
-		return fmt.Errorf("%s: parsing helmfile list output: %w", env, err)
-	}
-
-	envJSON, err := envValues.Contents(ctx)
+	apps, err := helmfileEnvApps(ctx, source, env)
 	if err != nil {
-		return fmt.Errorf("%s: reading %s: %w", env, envValuesPath, err)
-	}
-	var values struct {
-		Apps map[string]map[string]bool `json:"apps"`
-	}
-	if err := json.Unmarshal([]byte(envJSON), &values); err != nil {
-		return fmt.Errorf("%s: parsing %s: %w", env, envValuesPath, err)
+		return err
 	}
 
-	problems := helmfileStateProblems(releases, chartPaths, values.Apps, envValuesPath)
+	problems := helmfileStateProblems(releases, chartPaths, apps, helmfileEnvValuesPath(env))
 	if len(problems) > 0 {
 		return fmt.Errorf("%s:\n  %s", env, strings.Join(problems, "\n  "))
 	}

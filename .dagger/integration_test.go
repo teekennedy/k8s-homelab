@@ -1,19 +1,35 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
 
-// What the workflow decides before it creates anything: that the environment it
-// is about to deploy with enables exactly the releases under test. Helmfile's
-// installedTemplate reads that from the environment's values, so a --selector
-// can narrow a sync but cannot turn a release on or off — which makes this the
-// only place the two can be reconciled.
+// What the workflow decides before it creates anything: which releases the
+// environment it is about to deploy with has turned on, and whether the ones
+// asked for are among them. Helmfile's installedTemplate reads enablement from
+// the environment's values, so a --selector can narrow a sync but cannot turn a
+// release on — which makes the environment the only usable source of truth.
 
-func TestEnablementProblems(t *testing.T) {
-	const values = "config/gen/ephemeral/env.json"
+func TestEnabledReleases(t *testing.T) {
+	apps := map[string]map[string]bool{
+		"foundation": {"reflector": true, "traefik": false},
+		"platform":   {"forgejo": false},
+		"apps":       {"homepage": true},
+	}
+	// Sorted, so the deploy order and the summary don't depend on Go's map
+	// iteration order.
+	want := []string{"homepage", "reflector"}
+	if got := enabledReleases(apps); !slices.Equal(got, want) {
+		t.Errorf("enabledReleases() = %q, want %q", got, want)
+	}
+	if got := enabledReleases(nil); got != nil {
+		t.Errorf("enabledReleases(nil) = %q, want none", got)
+	}
+}
 
+func TestCheckEnabled(t *testing.T) {
 	tests := []struct {
 		name      string
 		enabled   []string
@@ -21,50 +37,41 @@ func TestEnablementProblems(t *testing.T) {
 		wantErr   []string
 	}{
 		{
-			name:      "the environment enables exactly what is under test",
-			enabled:   []string{"reflector"},
+			name:      "every requested release is enabled",
+			enabled:   []string{"reflector", "secret-system"},
 			requested: []string{"reflector"},
 		},
 		{
-			name:      "several releases, in a different order",
-			enabled:   []string{"secret-system", "reflector"},
+			name:      "the whole enabled set, which is the default",
+			enabled:   []string{"reflector", "secret-system"},
 			requested: []string{"reflector", "secret-system"},
 		},
 		{
-			name:      "a release under test that the environment disables",
-			enabled:   []string{},
+			// Without this the sync silently installs nothing and the tests run
+			// against a cluster missing the thing they test.
+			name:      "a requested release the environment disables",
+			enabled:   []string{"secret-system"},
 			requested: []string{"reflector"},
-			wantErr:   []string{"reflector was asked for but is not enabled"},
+			wantErr:   []string{"does not enable reflector", "it enables secret-system"},
 		},
 		{
-			// The expensive mistake: an unrelated release left enabled gets
-			// deployed, dragging in credentials the ephemeral cluster has none of.
-			name:      "a release the environment enables that nobody asked for",
-			enabled:   []string{"reflector", "forgejo"},
-			requested: []string{"reflector"},
-			wantErr:   []string{"forgejo is enabled in " + values + " but was not asked for"},
-		},
-		{
-			name:      "both at once",
-			enabled:   []string{"forgejo"},
-			requested: []string{"reflector"},
-			wantErr: []string{
-				"forgejo is enabled",
-				"reflector was asked for but is not enabled",
-			},
+			name:      "a release that is not in the state file at all",
+			enabled:   []string{"reflector"},
+			requested: []string{"reflector", "typo"},
+			wantErr:   []string{"does not enable typo"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := enablementProblems(tt.enabled, tt.requested, values)
+			err := checkEnabled(tt.enabled, tt.requested)
 			if len(tt.wantErr) == 0 {
 				if err != nil {
-					t.Fatalf("enablementProblems: unexpected error: %v", err)
+					t.Fatalf("checkEnabled: unexpected error: %v", err)
 				}
 				return
 			}
 			if err == nil {
-				t.Fatalf("enablementProblems accepted enabled=%q requested=%q, want an error",
+				t.Fatalf("checkEnabled accepted enabled=%q requested=%q, want an error",
 					tt.enabled, tt.requested)
 			}
 			for _, want := range tt.wantErr {
@@ -73,18 +80,6 @@ func TestEnablementProblems(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// The default is what `dagger call test-kubernetes-integration` with no
-// --releases runs, and it has to agree with the ephemeral environment's own
-// defaults or every call fails the enablement check.
-func TestDefaultIntegrationReleasesMatchTheEphemeralEnvironment(t *testing.T) {
-	if err := enablementProblems(defaultIntegrationReleases, defaultIntegrationReleases, "n/a"); err != nil {
-		t.Fatalf("the default releases disagree with themselves: %v", err)
-	}
-	if len(defaultIntegrationReleases) == 0 {
-		t.Fatal("defaultIntegrationReleases is empty, so the workflow would deploy nothing")
 	}
 }
 
@@ -97,7 +92,10 @@ func TestIndent(t *testing.T) {
 }
 
 func TestReleaseVerdict(t *testing.T) {
-	release := &integrationRelease{Name: "reflector", TestsPath: "k8s/foundation/reflector/tests"}
+	release := &integrationRelease{
+		Name:  "reflector",
+		Tests: &PythonProject{Path: "k8s/foundation/reflector/tests"},
+	}
 
 	tests := []struct {
 		name       string
@@ -129,7 +127,7 @@ func TestReleaseVerdict(t *testing.T) {
 			exitCode:   pytestNoTestsExitCode,
 			junit:      `<testsuites><testsuite name="pytest" tests="0"/></testsuites>`,
 			wantFailed: true,
-			wantLine:   []string{`no tests marked "kubernetes" were collected`, release.TestsPath},
+			wantLine:   []string{`no tests marked "kubernetes" were collected`, release.Tests.Path},
 		},
 		{
 			// A clean exit code with an empty report is still nothing run.

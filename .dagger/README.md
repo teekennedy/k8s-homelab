@@ -244,7 +244,8 @@ render, so it is shared by all four checks.
 #### Test Checks
 - `TestGo(source, paths)` - Run Go tests (delegates to GoModule.Test)
 - `TestPython(source, paths)` - Run Python tests (delegates to PythonProject.Test).
-  Narrowed to `-m "not kubernetes and not integration"`; see Kubernetes integration tests.
+  Passes no `-m`: which markers an ordinary run excludes is each project's own
+  `addopts`. See Kubernetes integration tests.
 
 ### Format Functions (`+generate`, auto-apply)
 These also run as part of `dagger check` (a non-empty changeset fails the check).
@@ -274,10 +275,10 @@ this repo's own helmfile, waits for them to become healthy, and runs each
 release's pytest suite against the result — then destroys the cluster.
 
 ```bash
-# Deploy and test the default release set (reflector)
+# Deploy and test everything the ephemeral environment enables
 dagger call test-kubernetes-integration
 
-# A specific set of releases
+# Narrow that to specific releases
 dagger call test-kubernetes-integration --releases=reflector
 
 # Same run, but keep the JUnit XML reports
@@ -381,14 +382,14 @@ whose values come from `config/ephemeral.cue` by way of
 
 Release enablement is the `apps` map in those values, read by the helmfile
 templates' `installedTemplate`. A `--selector` can narrow what a sync touches
-but cannot turn a release on, so the workflow checks the generated values
-up front and refuses to start unless the environment enables **exactly** the
-releases under test (`checkEphemeralEnablement`). A release enabled that nobody
-asked for would otherwise be deployed regardless of the selector, dragging in
-credentials the ephemeral cluster has none of.
+but cannot turn a release on, which makes the environment the only usable source
+of truth — so that is where the workflow gets its release set from, and
+`--releases` only narrows it. Asking for a release the environment disables is an
+error naming the file to edit, rather than a sync that silently installs nothing.
 
 `ephemeral` therefore disables everything by default (`_appsDisabled` in
-`config/base.cue`) and enables only what has tests.
+`config/base.cue`, derived from the full production list) and enables only what
+has tests.
 
 Helmfile is given the ephemeral kubeconfig through `KUBECONFIG` *and* the
 cluster's own context through `--kube-context`. Between them there is nothing
@@ -399,16 +400,15 @@ somewhere else.
 ### Health, before tests
 
 `helmfile sync` returning successfully only means the manifests were accepted,
-so the workflow then waits on Kubernetes itself:
+so the workflow then waits on Kubernetes itself — `kubectl rollout status` over
+every Deployment, StatefulSet and DaemonSet in the release's namespace, with a
+5m timeout. Namespace-scoped and workload-agnostic, so a release whose workload
+isn't a Deployment needs nothing added; a namespace with none of the three fails,
+which is the right answer for a release whose tests are about to run. When the
+wait fails, the namespace's pod status, pod detail and events are attached to the
+error.
 
-```
-kubectl wait --namespace <release namespace> --for condition=Available --timeout 5m deployment --all
-```
-
-Namespace-scoped and release-agnostic — a release with no Deployment at all
-fails here, which is the right answer for one whose tests are about to run. When
-the wait fails, the namespace's pod status, pod detail and events are attached
-to the error.
+The waits for several releases run concurrently, so their timeouts don't sum.
 
 Only then does it prove the kubeconfig still names the cluster this run created:
 same API endpoint, same context, and the same `kube-system` namespace UID that
@@ -423,17 +423,25 @@ kubeconfig happens to be valid; they run because someone selected them.
 
 - Every test carries `@pytest.mark.kubernetes`, registered in the project's
   `pyproject.toml`.
-- That `pyproject.toml` also sets `addopts = "-m 'not kubernetes'"`, which
-  covers a bare `pytest` in an editor or a shell.
-- `PythonProject.Test` — what `dagger check test-python` runs — passes
-  `-m "not kubernetes and not integration"` (`pytestDeselected`). It has to name
-  every marker class that is out of scope, not just the new one, because a
-  command-line `-m` overrides a project's own `addopts`.
+- That same `pyproject.toml` sets `addopts = "-m 'not kubernetes'"`. This is the
+  mechanism — it covers a bare `pytest` in an editor or a shell as well as
+  `dagger check test-python`, and it is the only place that *can* cover the
+  former.
+- `PythonProject.Test` deliberately passes **no** `-m`. A command-line `-m`
+  replaces `addopts` rather than narrowing it, so one passed from the runner
+  would re-enable the tests a project deselected for itself and deselect the ones
+  a project runs on purpose — `jellyfin-exporter` registers `integration`
+  precisely so those tests run by default against its stub server.
 - Deselecting every test in a project makes pytest exit 5. `Test` treats that as
   a pass, which is how a tests-only project with nothing left to run doesn't
   fail the Python check.
 - The integration workflow selects `-m kubernetes` explicitly, and a run that
   collected nothing is reported as a failure rather than a pass.
+
+The trade-off is that a new test project which forgets the `addopts` line is not
+caught statically. It fails loudly instead: the ci toolchain has no Kubernetes
+client and no `KUBECONFIG`, so the suite errors out in `dagger check` rather than
+reaching any cluster.
 
 Within the suite, missing credentials, an unreachable API server or a rejected
 credential raise rather than skip: once the tests have been selected, not
@@ -452,8 +460,10 @@ running is a failure.
    `dagger call export-cue --auto-apply`.
 5. `dagger call test-kubernetes-integration --releases=<release>`.
 
-Nothing in `.dagger` needs changing. The workflow finds the test directory from
-the release's chart path, deploys the release, waits on its namespace and runs
+Nothing in `.dagger` needs changing, and step 4 is what adds the release to the
+default run: with no `--releases`, the workflow deploys and tests everything the
+ephemeral environment enables. The workflow finds the test directory from the
+release's chart path, deploys the release, waits on its namespace and runs
 pytest; what to assert is entirely the test project's business.
 
 ### Limitations
@@ -467,8 +477,6 @@ pytest; what to assert is entirely the test project's business.
   be reused by a later run, the dind daemon is swept with `k3d cluster delete
   --all` before a cluster is created, in case a run was killed before its
   cleanup. An externally supplied daemon is never swept.
-- The health check covers Deployments. A release whose workload is a DaemonSet or
-  a StatefulSet would need that extending.
 - `k3sImage` is pinned to match `services.k3s.package` in
   `nix/modules/k3s/k3s.nix`, so the tests run against the Kubernetes version the
   real cluster does. That is deliberately *not* the k3s version the pinned k3d
