@@ -37,7 +37,7 @@ func (r *Binding) AsHomelabGoModule() *HomelabGoModule { // homelab (../../../.d
 }
 
 // Retrieve the binding value, as type HomelabKubernetesIntegrationReport
-func (r *Binding) AsHomelabKubernetesIntegrationReport() *HomelabKubernetesIntegrationReport { // homelab (../../../.dagger/integration.go:69:6)
+func (r *Binding) AsHomelabKubernetesIntegrationReport() *HomelabKubernetesIntegrationReport { // homelab (../../../.dagger/integration.go:61:6)
 	q := r.query.Select("asHomelabKubernetesIntegrationReport")
 
 	return &HomelabKubernetesIntegrationReport{
@@ -46,7 +46,7 @@ func (r *Binding) AsHomelabKubernetesIntegrationReport() *HomelabKubernetesInteg
 }
 
 // Retrieve the binding value, as type HomelabKubernetesIntegrationRun
-func (r *Binding) AsHomelabKubernetesIntegrationRun() *HomelabKubernetesIntegrationRun { // homelab (../../../.dagger/integration.go:57:6)
+func (r *Binding) AsHomelabKubernetesIntegrationRun() *HomelabKubernetesIntegrationRun { // homelab (../../../.dagger/integration.go:49:6)
 	q := r.query.Select("asHomelabKubernetesIntegrationRun")
 
 	return &HomelabKubernetesIntegrationRun{
@@ -125,7 +125,7 @@ func (r *Env) WithHomelabInput(name string, value *Homelab, description string) 
 }
 
 // Create or update a binding of type HomelabKubernetesIntegrationReport in the environment
-func (r *Env) WithHomelabKubernetesIntegrationReportInput(name string, value *HomelabKubernetesIntegrationReport, description string) *Env { // homelab (../../../.dagger/integration.go:69:6)
+func (r *Env) WithHomelabKubernetesIntegrationReportInput(name string, value *HomelabKubernetesIntegrationReport, description string) *Env { // homelab (../../../.dagger/integration.go:61:6)
 	assertNotNil("value", value)
 	q := r.query.Select("withHomelabKubernetesIntegrationReportInput")
 	q = q.Arg("name", name)
@@ -138,7 +138,7 @@ func (r *Env) WithHomelabKubernetesIntegrationReportInput(name string, value *Ho
 }
 
 // Declare a desired HomelabKubernetesIntegrationReport output to be assigned in the environment
-func (r *Env) WithHomelabKubernetesIntegrationReportOutput(name string, description string) *Env { // homelab (../../../.dagger/integration.go:69:6)
+func (r *Env) WithHomelabKubernetesIntegrationReportOutput(name string, description string) *Env { // homelab (../../../.dagger/integration.go:61:6)
 	q := r.query.Select("withHomelabKubernetesIntegrationReportOutput")
 	q = q.Arg("name", name)
 	q = q.Arg("description", description)
@@ -149,7 +149,7 @@ func (r *Env) WithHomelabKubernetesIntegrationReportOutput(name string, descript
 }
 
 // Create or update a binding of type HomelabKubernetesIntegrationRun in the environment
-func (r *Env) WithHomelabKubernetesIntegrationRunInput(name string, value *HomelabKubernetesIntegrationRun, description string) *Env { // homelab (../../../.dagger/integration.go:57:6)
+func (r *Env) WithHomelabKubernetesIntegrationRunInput(name string, value *HomelabKubernetesIntegrationRun, description string) *Env { // homelab (../../../.dagger/integration.go:49:6)
 	assertNotNil("value", value)
 	q := r.query.Select("withHomelabKubernetesIntegrationRunInput")
 	q = q.Arg("name", name)
@@ -162,7 +162,7 @@ func (r *Env) WithHomelabKubernetesIntegrationRunInput(name string, value *Homel
 }
 
 // Declare a desired HomelabKubernetesIntegrationRun output to be assigned in the environment
-func (r *Env) WithHomelabKubernetesIntegrationRunOutput(name string, description string) *Env { // homelab (../../../.dagger/integration.go:57:6)
+func (r *Env) WithHomelabKubernetesIntegrationRunOutput(name string, description string) *Env { // homelab (../../../.dagger/integration.go:49:6)
 	q := r.query.Select("withHomelabKubernetesIntegrationRunOutput")
 	q = q.Arg("name", name)
 	q = q.Arg("description", description)
@@ -610,16 +610,16 @@ func (r *Homelab) FormatNix(opts ...HomelabFormatNixOpts) *Changeset { // homela
 
 // HomelabFormatPythonOpts contains options for Homelab.FormatPython
 type HomelabFormatPythonOpts struct {
-	Source *Directory // homelab (../../../.dagger/python.go:236:2)
+	Source *Directory // homelab (../../../.dagger/python.go:228:2)
 
-	Paths []string // homelab (../../../.dagger/python.go:238:2)
+	Paths []string // homelab (../../../.dagger/python.go:230:2)
 
-	Container *Container // homelab (../../../.dagger/python.go:240:2)
+	Container *Container // homelab (../../../.dagger/python.go:232:2)
 }
 
 // FormatPython formats Python files with black across all discovered projects.
 // Returns a changeset. Use `dagger call format-python --auto-apply` to apply.
-func (r *Homelab) FormatPython(opts ...HomelabFormatPythonOpts) *Changeset { // homelab (../../../.dagger/python.go:232:1)
+func (r *Homelab) FormatPython(opts ...HomelabFormatPythonOpts) *Changeset { // homelab (../../../.dagger/python.go:224:1)
 	q := r.query.Select("formatPython")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
@@ -769,24 +769,21 @@ func (r *Homelab) UnmarshalJSON(bs []byte) error {
 
 // HomelabKubernetesIntegrationReportsOpts contains options for Homelab.KubernetesIntegrationReports
 type HomelabKubernetesIntegrationReportsOpts struct {
-	Source *Directory // homelab (../../../.dagger/integration.go:135:2)
+	Source *Directory // homelab (../../../.dagger/integration.go:118:2)
 
-	Releases []string // homelab (../../../.dagger/integration.go:137:2)
+	Releases []string // homelab (../../../.dagger/integration.go:120:2)
 
-	RepeatSync bool // homelab (../../../.dagger/integration.go:139:2)
+	RepeatSync bool // homelab (../../../.dagger/integration.go:122:2)
 
-	Container *Container // homelab (../../../.dagger/integration.go:141:2)
+	Container *Container // homelab (../../../.dagger/integration.go:124:2)
 }
 
 // KubernetesIntegrationReports runs the same workflow and returns the JUnit XML
-// reports, one file per release:
+// reports, one file per release. A failing test is not an error here, but a
+// cluster that never came up, or a release that never became healthy, is.
 //
 //	dagger call kubernetes-integration-reports export --path=./reports
-//
-// A failing test is not an error here — getting the report out is the point —
-// but a cluster that never came up, or a release that never became healthy,
-// still is.
-func (r *Homelab) KubernetesIntegrationReports(opts ...HomelabKubernetesIntegrationReportsOpts) *Directory { // homelab (../../../.dagger/integration.go:132:1)
+func (r *Homelab) KubernetesIntegrationReports(opts ...HomelabKubernetesIntegrationReportsOpts) *Directory { // homelab (../../../.dagger/integration.go:115:1)
 	q := r.query.Select("kubernetesIntegrationReports")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
@@ -1061,23 +1058,18 @@ func (r *Homelab) PythonProjects(ctx context.Context, opts ...HomelabPythonProje
 
 // HomelabRunKubernetesIntegrationOpts contains options for Homelab.RunKubernetesIntegration
 type HomelabRunKubernetesIntegrationOpts struct {
-	RepeatSync bool // homelab (../../../.dagger/integration.go:228:2)
+	RepeatSync bool // homelab (../../../.dagger/integration.go:204:2)
 
-	Container *Container // homelab (../../../.dagger/integration.go:230:2)
+	Container *Container // homelab (../../../.dagger/integration.go:206:2)
 }
 
-// RunKubernetesIntegration is the cached half of the workflow, and what
-// TestKubernetesIntegration and KubernetesIntegrationReports call: plan, create,
-// deploy, wait, prove, test, destroy. It is exported only so that they can reach
-// it through the module's own API, which is what lets Dagger cache it on its own
-// arguments; invoke those two instead.
+// RunKubernetesIntegration is the workflow itself: plan, create, deploy, wait,
+// prove, test, destroy. It is exported only so that TestKubernetesIntegration
+// and KubernetesIntegrationReports can call it through the module's own API;
+// invoke those instead.
 //
-// source is the scoped layout scopedIntegrationSource builds — the state file,
-// the ephemeral values and the chosen releases' charts — rather than the whole
-// repo. That is the point: the caller's `source` covers everything under k8s/, so
-// a change to any chart re-runs the caller, but only a change to something this
-// run deploys changes this argument.
-func (r *Homelab) RunKubernetesIntegration(source *Directory, releases []string, opts ...HomelabRunKubernetesIntegrationOpts) *HomelabKubernetesIntegrationRun { // homelab (../../../.dagger/integration.go:224:1)
+// source is the layout integrationSource builds, not the whole repo.
+func (r *Homelab) RunKubernetesIntegration(source *Directory, releases []string, opts ...HomelabRunKubernetesIntegrationOpts) *HomelabKubernetesIntegrationRun { // homelab (../../../.dagger/integration.go:200:1)
 	assertNotNil("source", source)
 	q := r.query.Select("runKubernetesIntegration")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -1136,36 +1128,30 @@ func (r *Homelab) TestGo(ctx context.Context, opts ...HomelabTestGoOpts) (string
 
 // HomelabTestKubernetesIntegrationOpts contains options for Homelab.TestKubernetesIntegration
 type HomelabTestKubernetesIntegrationOpts struct {
-	Source *Directory // homelab (../../../.dagger/integration.go:93:2)
+	Source *Directory // homelab (../../../.dagger/integration.go:79:2)
 	//
 	// Helmfile releases to deploy and test, narrowing the set the ephemeral
 	// environment enables. Empty means all of them.
 	//
-	Releases []string // homelab (../../../.dagger/integration.go:97:2)
+	Releases []string // homelab (../../../.dagger/integration.go:83:2)
 	//
 	// Sync twice before testing, to check that re-syncing a cluster that
 	// already has the releases on it succeeds.
 	//
-	RepeatSync bool // homelab (../../../.dagger/integration.go:101:2)
+	RepeatSync bool // homelab (../../../.dagger/integration.go:87:2)
 
-	Container *Container // homelab (../../../.dagger/integration.go:103:2)
+	Container *Container // homelab (../../../.dagger/integration.go:89:2)
 }
 
 // TestKubernetesIntegration deploys releases to a throwaway k3s cluster and runs
 // their Kubernetes integration tests against it.
 //
-// Deliberately not a `+check`: it needs an engine that allows privileged execs,
-// and a PR can change both this code and the tests it runs. Invoke it explicitly:
+// Deliberately not a `+check`: it needs an engine that allows privileged execs.
+// See "Kubernetes integration tests" in README.md.
 //
 //	dagger call test-kubernetes-integration
-//	dagger call test-kubernetes-integration --releases=reflector
-//
-// The result is cached like any function call: the same source and arguments
-// return the earlier verdict without starting a cluster. The cluster is created,
-// used and destroyed inside this call. Nothing reads,
-// writes or merges a kubeconfig outside the engine, and no host context
-// changes. See "Kubernetes integration tests" in README.md for prerequisites.
-func (r *Homelab) TestKubernetesIntegration(ctx context.Context, opts ...HomelabTestKubernetesIntegrationOpts) (string, error) { // homelab (../../../.dagger/integration.go:90:1)
+//	dagger call test-kubernetes-integration --releases=<name>
+func (r *Homelab) TestKubernetesIntegration(ctx context.Context, opts ...HomelabTestKubernetesIntegrationOpts) (string, error) { // homelab (../../../.dagger/integration.go:76:1)
 	if r.testKubernetesIntegration != nil {
 		return *r.testKubernetesIntegration, nil
 	}
@@ -1197,15 +1183,15 @@ func (r *Homelab) TestKubernetesIntegration(ctx context.Context, opts ...Homelab
 
 // HomelabTestPythonOpts contains options for Homelab.TestPython
 type HomelabTestPythonOpts struct {
-	Source *Directory // homelab (../../../.dagger/python.go:273:2)
+	Source *Directory // homelab (../../../.dagger/python.go:265:2)
 
-	Paths []string // homelab (../../../.dagger/python.go:275:2)
+	Paths []string // homelab (../../../.dagger/python.go:267:2)
 
-	Container *Container // homelab (../../../.dagger/python.go:277:2)
+	Container *Container // homelab (../../../.dagger/python.go:269:2)
 }
 
 // TestPython runs pytest for all discovered Python projects.
-func (r *Homelab) TestPython(ctx context.Context, opts ...HomelabTestPythonOpts) (string, error) { // homelab (../../../.dagger/python.go:270:1)
+func (r *Homelab) TestPython(ctx context.Context, opts ...HomelabTestPythonOpts) (string, error) { // homelab (../../../.dagger/python.go:262:1)
 	if r.testPython != nil {
 		return *r.testPython, nil
 	}
@@ -1904,7 +1890,7 @@ func (r *HomelabGoModule) AsNode() Node {
 }
 
 // KubernetesIntegrationReport is one release's JUnit XML report.
-type HomelabKubernetesIntegrationReport struct { // homelab (../../../.dagger/integration.go:69:6)
+type HomelabKubernetesIntegrationReport struct { // homelab (../../../.dagger/integration.go:61:6)
 	query *querybuilder.Selection
 
 	id      *ID
@@ -1968,7 +1954,7 @@ func (r *HomelabKubernetesIntegrationReport) UnmarshalJSON(bs []byte) error {
 }
 
 // Release is the helmfile release the report is for.
-func (r *HomelabKubernetesIntegrationReport) Release(ctx context.Context) (string, error) { // homelab (../../../.dagger/integration.go:71:2)
+func (r *HomelabKubernetesIntegrationReport) Release(ctx context.Context) (string, error) { // homelab (../../../.dagger/integration.go:63:2)
 	if r.release != nil {
 		return *r.release, nil
 	}
@@ -1981,7 +1967,7 @@ func (r *HomelabKubernetesIntegrationReport) Release(ctx context.Context) (strin
 }
 
 // XML is the report's contents.
-func (r *HomelabKubernetesIntegrationReport) XML(ctx context.Context) (string, error) { // homelab (../../../.dagger/integration.go:73:2)
+func (r *HomelabKubernetesIntegrationReport) XML(ctx context.Context) (string, error) { // homelab (../../../.dagger/integration.go:65:2)
 	if r.xml != nil {
 		return *r.xml, nil
 	}
@@ -2002,13 +1988,9 @@ func (r *HomelabKubernetesIntegrationReport) AsNode() Node {
 }
 
 // KubernetesIntegrationRun is the outcome of one workflow run that got as far
-// as running tests.
-//
-// Plain data only, and the reports as text rather than a Directory: a directory
-// produced by execs that used a service and a secret cannot outlive the session
-// that made it, and a function result holding one is not cached across sessions.
-// The reports are small enough that nothing is lost.
-type HomelabKubernetesIntegrationRun struct { // homelab (../../../.dagger/integration.go:57:6)
+// as running tests. It is plain data, with no Directory, so that the call is
+// cached; see Caching in README.md.
+type HomelabKubernetesIntegrationRun struct { // homelab (../../../.dagger/integration.go:49:6)
 	query *querybuilder.Selection
 
 	id      *ID
@@ -2023,7 +2005,7 @@ func (r *HomelabKubernetesIntegrationRun) WithGraphQLQuery(q *querybuilder.Selec
 
 // Failed names the releases whose tests did not all pass. Empty is a pass;
 // an infrastructure failure is an error instead, not an entry here.
-func (r *HomelabKubernetesIntegrationRun) Failed(ctx context.Context) ([]string, error) { // homelab (../../../.dagger/integration.go:65:2)
+func (r *HomelabKubernetesIntegrationRun) Failed(ctx context.Context) ([]string, error) { // homelab (../../../.dagger/integration.go:57:2)
 	q := r.query.Select("failed")
 
 	var response []string
@@ -2082,7 +2064,7 @@ func (r *HomelabKubernetesIntegrationRun) UnmarshalJSON(bs []byte) error {
 }
 
 // Reports holds one JUnit XML report per release.
-func (r *HomelabKubernetesIntegrationRun) Reports(ctx context.Context) ([]HomelabKubernetesIntegrationReport, error) { // homelab (../../../.dagger/integration.go:62:2)
+func (r *HomelabKubernetesIntegrationRun) Reports(ctx context.Context) ([]HomelabKubernetesIntegrationReport, error) { // homelab (../../../.dagger/integration.go:54:2)
 	q := r.query.Select("reports")
 
 	q = q.Select("id")
@@ -2116,7 +2098,7 @@ func (r *HomelabKubernetesIntegrationRun) Reports(ctx context.Context) ([]Homela
 
 // Summary is the per-release verdict, with pytest's output folded in for
 // the ones that failed.
-func (r *HomelabKubernetesIntegrationRun) Summary(ctx context.Context) (string, error) { // homelab (../../../.dagger/integration.go:60:2)
+func (r *HomelabKubernetesIntegrationRun) Summary(ctx context.Context) (string, error) { // homelab (../../../.dagger/integration.go:52:2)
 	if r.summary != nil {
 		return *r.summary, nil
 	}
@@ -2154,7 +2136,7 @@ func (r *HomelabPythonProject) WithGraphQLQuery(q *querybuilder.Selection) *Home
 }
 
 // Format runs black on this project, returning the resulting changes.
-func (r *HomelabPythonProject) Format(container *Container) *Changeset { // homelab (../../../.dagger/python.go:202:1)
+func (r *HomelabPythonProject) Format(container *Container) *Changeset { // homelab (../../../.dagger/python.go:194:1)
 	assertNotNil("container", container)
 	q := r.query.Select("format")
 	q = q.Arg("container", container)
