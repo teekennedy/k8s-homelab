@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -25,6 +26,21 @@ import (
 func blackCmd() []string {
 	return []string{"black", "."}
 }
+
+// pytestDeselected is the marker expression every ordinary pytest run in this
+// repo is narrowed by.
+//
+// It has to name every marker class that is out of scope for an ordinary check,
+// not just the newest one: pytest lets a command-line -m override a project's
+// own addopts, so passing one marker here would silently re-enable the tests a
+// project had deselected for itself. Projects still set the same expression in
+// their addopts, which is what covers a bare `pytest` in an editor or a shell.
+const pytestDeselected = "not kubernetes and not integration"
+
+// pytestNoTestsExitCode is pytest's exit code for a run that collected nothing
+// to execute. Deselecting every test in a project produces it, which is the
+// expected outcome for a project whose tests all need a live cluster.
+const pytestNoTestsExitCode = 5
 
 // PythonProject is one Python project — a directory with a pyproject.toml —
 // carrying only that project's files, so changing one project does not
@@ -85,6 +101,10 @@ func (m *Homelab) PythonProjects(
 }
 
 // Test runs pytest for this Python project, in the given toolchain container.
+//
+// Tests needing something this container hasn't got — a live cluster, a real
+// zpool — are deselected by marker, so an ordinary check never reaches for the
+// ambient environment. See pytestDeselected.
 func (pp *PythonProject) Test(ctx context.Context, container *dagger.Container) (string, error) {
 	if err := pp.usable(container); err != nil {
 		return "", err
@@ -93,15 +113,74 @@ func (pp *PythonProject) Test(ctx context.Context, container *dagger.Container) 
 	_, err := container.
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
-		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest", "-v"}).
+		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest", "-v", "-m", pytestDeselected}).
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			if execErr.ExitCode == pytestNoTestsExitCode {
+				return fmt.Sprintf("Python tests deselected in %s (nothing left to run)", pp.Path), nil
+			}
 			return "", fmt.Errorf("pytest failed in %s:\n%s%s%w", pp.Path, execErr.Stdout, execErr.Stderr, err)
 		}
 		return "", fmt.Errorf("pytest failed in %s: %w", pp.Path, err)
 	}
 	return fmt.Sprintf("Python tests passed in %s", pp.Path), nil
+}
+
+// pytestRun is one pytest invocation that was allowed to finish whatever its
+// verdict, so that its report survives a failing test.
+type pytestRun struct {
+	// ExitCode is pytest's own exit code.
+	ExitCode int
+	// Output is the combined pytest log.
+	Output string
+	// Junit is the JUnit XML report.
+	Junit *dagger.File
+}
+
+// testKubernetes runs this project's `kubernetes`-marked tests in container,
+// which must already carry a KUBECONFIG for the cluster under test. The project
+// decides what to assert; this only decides how pytest is invoked, so a new
+// release's tests need nothing added here.
+//
+// pytest's exit code is captured instead of being left to fail the exec,
+// because a failed exec's filesystem cannot be read and the JUnit report is
+// most wanted exactly when a test failed.
+func (pp *PythonProject) testKubernetes(ctx context.Context, container *dagger.Container) (*pytestRun, error) {
+	if err := pp.usable(container); err != nil {
+		return nil, err
+	}
+
+	const (
+		outDir       = "/out"
+		junitPath    = outDir + "/junit.xml"
+		exitCodePath = outDir + "/exit-code"
+	)
+
+	run := container.
+		WithMountedDirectory("/src", pp.Source).
+		WithWorkdir("/src").
+		WithExec([]string{"sh", "-c", `
+set -u
+mkdir -p "$(dirname "$2")"
+uv run --link-mode copy pytest -v -m "$1" "--junit-xml=$2" 2>&1
+printf %s "$?" > "$3"
+`, "--", kubernetesMarker, junitPath, exitCodePath})
+
+	output, err := run.Stdout(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("running the %s tests in %s: %w", kubernetesMarker, pp.Path, withExecOutput(err))
+	}
+	code, err := run.File(exitCodePath).Contents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("reading pytest's exit code for %s: %w", pp.Path, err)
+	}
+	exitCode, err := strconv.Atoi(strings.TrimSpace(code))
+	if err != nil {
+		return nil, fmt.Errorf("pytest in %s reported an unreadable exit code %q: %w", pp.Path, code, err)
+	}
+
+	return &pytestRun{ExitCode: exitCode, Output: output, Junit: run.File(junitPath)}, nil
 }
 
 // Format runs black on this project, returning the resulting changes.

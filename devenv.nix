@@ -77,6 +77,17 @@ in {
       ];
     };
 
+    # What the Kubernetes integration workflow needs on top of ci: k3d to build
+    # the ephemeral cluster, kubectl to wait on rollouts and to prove a
+    # kubeconfig points where it should. Separate from ci because no `dagger
+    # check` has any business holding a Kubernetes client.
+    integration.module = {
+      packages = with pkgs; [
+        k3d
+        kubectl
+      ];
+    };
+
     # Tools for driving the cluster and the lab hosts by hand. None of this is
     # reachable from a Dagger check.
     interactive.module = {

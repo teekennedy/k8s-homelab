@@ -10,6 +10,17 @@ const (
 	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.4.0"
 	// renovate: datasource=docker depName=nixos/nix
 	nixImage = "nixos/nix:2.35.2"
+	// dindImage is the Docker daemon the Kubernetes integration workflow runs
+	// k3d clusters in. The only pinned image outside the toolchain: a daemon is
+	// not something the devenv profile can provide, because it has to outlive a
+	// single exec as a service.
+	// renovate: datasource=docker depName=docker
+	dindImage = "docker:29.9.0-dind"
+	// k3sImage is what the ephemeral clusters run. Keep its minor version in
+	// step with services.k3s.package in nix/modules/k3s/k3s.nix, so the tests
+	// run against the Kubernetes version the real cluster does.
+	// renovate: datasource=docker depName=rancher/k3s
+	k3sImage = "rancher/k3s:v1.36.5-k3s1"
 )
 
 func nixContainer() *dagger.Container {
@@ -43,6 +54,21 @@ var ciProfiles = []string{"ci"}
 // built once and passed around as state.
 func ciContainer(devenvSource *dagger.Directory) *dagger.Container {
 	return withToolchainCaches(devenvShell(devenvSource, nil, ciProfiles))
+}
+
+// integrationProfiles adds the cluster tooling the Kubernetes integration
+// workflow drives — k3d and kubectl — on top of the ci toolchain.
+//
+// A separate profile rather than more packages in ci: every check runs in the
+// ci container, and none of them has any use for a Kubernetes client. This way
+// `dagger check` keeps running in a container that cannot reach a cluster even
+// if something tried.
+var integrationProfiles = []string{"ci", "integration"}
+
+// integrationContainer returns the toolchain the Kubernetes integration
+// workflow runs in.
+func integrationContainer(devenvSource *dagger.Directory) *dagger.Container {
+	return withToolchainCaches(devenvShell(devenvSource, nil, integrationProfiles))
 }
 
 // withToolchainCaches attaches the caches every language toolchain in the ci

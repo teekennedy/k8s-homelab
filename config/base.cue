@@ -60,6 +60,23 @@ _productionApps: {
 	}
 }
 
+// _appsDisabled defaults every known release to disabled, so an environment that
+// wants only a handful of releases can name those and leave the rest alone. The
+// names are derived from _stagingApps rather than listed again, so a new release
+// only has to be added to the lists above. The values are defaults (`*false`),
+// which is what lets an environment unify `true` over one of them.
+_appsDisabled: {
+	apps: {
+		for tier, releases in _stagingApps.apps {
+			(tier): {
+				for name, _ in releases {
+					(name): *false | bool
+				}
+			}
+		}
+	}
+}
+
 // _stagingApps is a minimal application stack for staging/ephemeral environments.
 // All known releases are listed so --include-transitive-needs can resolve deps;
 // set to false to exclude from the environment.

@@ -1,0 +1,4 @@
+# Kubernetes integration tests. They run against a deployed reflector (see
+# tests/README.md), so they are source for the Dagger workflow rather than
+# chart content, and have no business inside a packaged chart.
+tests/

@@ -49,6 +49,12 @@ func (m *Homelab) ciContainer() *dagger.Container {
 	return ciContainer(m.DevenvSource)
 }
 
+// integrationContainer returns the toolchain container the Kubernetes
+// integration workflow runs in: the ci one plus a Kubernetes client and k3d.
+func (m *Homelab) integrationContainer() *dagger.Container {
+	return integrationContainer(m.DevenvSource)
+}
+
 // FormatNix formats Nix files with alejandra and removes dead code with deadnix.
 // Returns a changeset. Use `dagger call format-nix --auto-apply` to apply.
 // +generate

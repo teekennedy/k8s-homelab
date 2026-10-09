@@ -287,8 +287,11 @@ func (m *Homelab) LintHelmfile(ctx context.Context,
 
 // helmfileListEntry is one release in `helmfile list --output json`.
 type helmfileListEntry struct {
-	Name  string `json:"name"`
-	Chart string `json:"chart"`
+	Name string `json:"name"`
+	// Namespace is where helmfile deploys the release. Templated per release in
+	// the state file, so it is read from helmfile rather than guessed.
+	Namespace string `json:"namespace"`
+	Chart     string `json:"chart"`
 }
 
 // lintHelmfileState renders the state file for env and cross-checks it.

@@ -1,0 +1,27 @@
+[project]
+name = "reflector-integration-tests"
+version = "1.0.0"
+description = "Kubernetes integration tests for the reflector release: ConfigMap reflection and update propagation"
+requires-python = ">=3.11"
+# Nothing is packaged or deployed from here, so the whole dependency surface is
+# the test one.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "black>=24.0.0",
+    "kubernetes>=31.0.0",
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "kubernetes: talks to a live cluster; runs only when selected with `-m kubernetes`",
+]
+# Every test here carries the `kubernetes` marker, so a bare `pytest` — an
+# editor, a developer's shell, the ordinary `dagger check test-python` — collects
+# them and runs none. Running them takes an explicit `-m kubernetes`, which is
+# what keeps a KUBECONFIG pointing at production from being written to by
+# accident.
+addopts = "-m 'not kubernetes'"
