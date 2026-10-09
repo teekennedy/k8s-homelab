@@ -1,0 +1,162 @@
+{{- $name := printf "%s-auth-sessions" (include "openhands.fullname" .) -}}
+{{- $cfg := .Values.authSessions -}}
+{{/*
+Selector labels for the session store pod. See canvasSelectorLabels for why
+every workload needs a component of its own.
+*/}}
+{{- define "openhands.authSessionsSelectorLabels" -}}
+{{ include "openhands.selectorLabels" . }}
+app.kubernetes.io/component: auth-sessions
+{{- end }}
+---
+# oauth2-proxy's session store. In a cookie, a session's refresh token is held
+# by the browser, and every request made in parallel once it is due redeems
+# it on its own; Authelia answers the second use of a rotated token by
+# revoking the session. Here the proxy replicas take a lock to refresh, and
+# the rest wait for the result.
+#
+# In memory only: losing it costs a sign-in.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+  annotations:
+    secret-generator.v1.mittwald.de/autogenerate: redis-password
+    secret-generator.v1.mittwald.de/length: "48"
+type: Opaque
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth-sessions
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "openhands.authSessionsSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "openhands.labels" . | nindent 8 }}
+        app.kubernetes.io/component: auth-sessions
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: valkey
+          image: {{ $cfg.image | quote }}
+          imagePullPolicy: IfNotPresent
+          # The password goes in a config file rather than on the command
+          # line, where anything that can list processes would read it.
+          command:
+            - sh
+            - -c
+            - |-
+              set -eu
+              umask 077
+              printf 'requirepass %s\n' "$VALKEY_PASSWORD" > /tmp/auth.conf
+              exec valkey-server /tmp/auth.conf --dir /tmp --save "" \
+                --appendonly no --maxmemory "$VALKEY_MAXMEMORY" \
+                --maxmemory-policy allkeys-lru
+          env:
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}
+                  key: redis-password
+            # The memory request, in bytes: below the limit, so eviction
+            # starts before the kernel does.
+            - name: VALKEY_MAXMEMORY
+              valueFrom:
+                resourceFieldRef:
+                  containerName: valkey
+                  resource: requests.memory
+                  divisor: "1"
+          ports:
+            - name: valkey
+              containerPort: 6379
+              protocol: TCP
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            tcpSocket:
+              port: valkey
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: valkey
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml $cfg.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth-sessions
+spec:
+  type: ClusterIP
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: valkey
+      protocol: TCP
+  selector:
+    {{- include "openhands.authSessionsSelectorLabels" . | nindent 4 }}
+---
+# Sessions are for oauth2-proxy alone, and the store calls nothing.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "openhands.authSessionsSelectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: oauth2-proxy
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - port: valkey
+          protocol: TCP

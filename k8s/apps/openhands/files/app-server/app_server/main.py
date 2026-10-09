@@ -93,6 +93,7 @@ class State:
             default_spec=settings.default_spec,
             start_timeout=settings.start_timeout,
             max_events=settings.max_events,
+            usage_limit_wait=settings.usage_limit_wait_seconds,
         )
         self.automations = Automations(self.http, settings)
         # Where sandbox webhooks land.
@@ -141,6 +142,7 @@ async def reconcile_forever(state: State) -> None:
         try:
             await state.sandboxes.reconcile()
             await state.conversations.refresh()
+            await state.conversations.resume_due()
             await state.sandboxes.collect(*state.conversations.sandbox_use())
         except Exception:
             log.exception("reconcile failed")
@@ -162,6 +164,7 @@ async def serve() -> None:
         settings.default_spec,
     )
     await state.conversations.abandon_unfinished_tasks()
+    state.conversations.backfill()
     servers = [
         uvicorn.Server(
             uvicorn.Config(

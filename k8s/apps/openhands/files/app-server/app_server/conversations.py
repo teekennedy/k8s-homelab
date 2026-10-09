@@ -12,11 +12,12 @@ import json
 import logging
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
 
+from . import usage_limit
 from .db import Database, now
 from .forge import Forge
 from .sandboxes import SandboxManager, Status
@@ -39,6 +40,11 @@ EVENT_SORTS = {"TIMESTAMP": "ASC", "TIMESTAMP_DESC": "DESC"}
 # Display title until the user renames it; the agent server's own titling
 # uses the agent's LLM, which for an ACP agent is not a litellm model.
 TITLE_LENGTH = 60
+# A conversation waiting out a usage limit is run again this long after the
+# reset, and not at all once it is this late: by then its prompt cache is
+# cold, and continuing is the user's call.
+RESUME_MARGIN = timedelta(seconds=30)
+RESUME_GRACE = timedelta(minutes=10)
 
 
 def conversation_id(value: str) -> str:
@@ -82,6 +88,7 @@ class ConversationService:
         default_spec: str,
         start_timeout: float,
         max_events: int = 0,
+        usage_limit_wait: float = 0,
     ):
         self.db = db
         self.sandboxes = sandboxes
@@ -93,6 +100,9 @@ class ConversationService:
         self.default_spec = default_spec
         self.start_timeout = start_timeout
         self.max_events = max_events
+        # The longest a usage limit is waited out, in seconds; see
+        # `_usage_limit_hit`.
+        self.usage_limit_wait = usage_limit_wait
         self._running: set[asyncio.Task] = set()
 
     # --- sandbox spec -------------------------------------------------------
@@ -463,7 +473,9 @@ class ConversationService:
             "SELECT sandbox_id, meta FROM conversations WHERE deleted_at IS NULL"
         ):
             claimed.add(row["sandbox_id"])
-            if json.loads(row["meta"]).get("execution_status") == "running":
+            meta = json.loads(row["meta"])
+            waiting = (meta.get("usage_limit") or {}).get("state") == "waiting"
+            if meta.get("execution_status") == "running" or waiting:
                 busy.add(row["sandbox_id"])
         return busy, claimed
 
@@ -532,6 +544,178 @@ class ConversationService:
                 )
         # A working agent is activity, whether or not a browser is watching.
         self.sandboxes.touch(sandbox_id)
+        self._title_from_events(conv_id, events)
+        for event in events:
+            reset = usage_limit.reset_time(event)
+            if reset:
+                self._usage_limit_hit(sandbox_id, conv_id, event, reset)
+
+    def _title_from_events(self, conv_id: str, events: list[dict[str, Any]]) -> None:
+        """Title a conversation that was started without a message — one with
+        an attachment is — from the first message it is sent."""
+        for event in events:
+            if event.get("kind") != "MessageEvent" or event.get("source") != "user":
+                continue
+            title = _title_from({"initial_message": event.get("llm_message")})
+            if title:
+                self.db.run(
+                    "UPDATE conversations SET title = ? WHERE id = ? AND title IS NULL",
+                    title,
+                    conv_id,
+                )
+                return
+
+    # --- usage limits -------------------------------------------------------
+
+    def _usage_limit_hit(
+        self,
+        sandbox_id: str,
+        conv_id: str,
+        error: dict[str, Any],
+        reset: datetime,
+        act: bool = True,
+    ) -> None:
+        """A turn ended on the subscription's usage limit. A reset that is
+        near is waited out, and `resume_due` runs the conversation again; for
+        one further off the sandbox is suspended and the user decides. Either
+        way the transcript says so. An automation run's sandbox is the
+        automation service's: the run fails and takes its sandbox with it.
+
+        `act` is False for a limit read back from history, long past."""
+        row = self.row(conv_id)
+        if row is None or row["sandbox_id"] != sandbox_id:
+            return
+        meta = json.loads(row["meta"])
+        seen = meta.get("usage_limit")
+        # Redelivered, or an older one read back by `drain`.
+        if seen and datetime.fromisoformat(seen["resets_at"]) >= reset:
+            return
+        at = datetime.now(UTC)
+        sandbox = self.sandboxes.live_row(sandbox_id)
+        if not act or sandbox is None or sandbox["owner_kind"] == "service":
+            state = "ended"
+        elif (reset - at).total_seconds() <= self.usage_limit_wait:
+            state = "waiting"
+        else:
+            state = "suspended"
+        meta["usage_limit"] = {
+            "resets_at": reset.isoformat(),
+            "event_id": error["id"],
+            "state": state,
+        }
+        notice = usage_limit.notice_event(
+            error, usage_limit.notice_text(reset, at, state)
+        )
+        with self.db.tx() as c:
+            c.execute(
+                "UPDATE conversations SET meta = ? WHERE id = ?",
+                (json.dumps(meta), conv_id),
+            )
+            c.execute(
+                "INSERT OR IGNORE INTO events (conversation_id, id, timestamp, kind,"
+                " body) VALUES (?, ?, ?, ?, ?)",
+                (
+                    conv_id,
+                    notice["id"],
+                    notice["timestamp"],
+                    notice["kind"],
+                    json.dumps(notice),
+                ),
+            )
+        log.info(
+            "conversation %s hit its usage limit, reset %s: %s", conv_id, reset, state
+        )
+        if state == "suspended":
+            job = asyncio.create_task(self._suspend_for_limit(sandbox_id, conv_id))
+            self._running.add(job)
+            job.add_done_callback(self._running.discard)
+
+    async def _suspend_for_limit(self, sandbox_id: str, conv_id: str) -> None:
+        try:
+            # The pod takes any events it has not posted yet with it.
+            await self.drain(sandbox_id, conv_id)
+        except Exception:
+            log.exception("could not read the last events of %s", sandbox_id)
+        await self.sandboxes.pause(sandbox_id)
+
+    def _set_limit_state(self, conv_id: str, state: str) -> None:
+        row = self.row(conv_id)
+        if row is None:
+            return
+        meta = json.loads(row["meta"])
+        meta["usage_limit"]["state"] = state
+        self.db.run(
+            "UPDATE conversations SET meta = ? WHERE id = ?", json.dumps(meta), conv_id
+        )
+
+    async def resume_due(self) -> None:
+        """Run the conversations whose usage limit has reset. Call after
+        `refresh`, so a conversation the user already continued is seen as
+        such."""
+        at = datetime.now(UTC)
+        for row in self.db.all(
+            "SELECT id, meta FROM conversations WHERE deleted_at IS NULL"
+        ):
+            meta = json.loads(row["meta"])
+            limit = meta.get("usage_limit") or {}
+            if limit.get("state") != "waiting":
+                continue
+            due = datetime.fromisoformat(limit["resets_at"]) + RESUME_MARGIN
+            if at < due:
+                continue
+            conv_id = row["id"]
+            runtime = await self.runtime(conv_id)
+            if meta.get("execution_status") != "error" or runtime is None:
+                # Continued, or stopped, by hand.
+                self._set_limit_state(conv_id, "superseded")
+                continue
+            if at > due + RESUME_GRACE:
+                log.warning("conversation %s: too late to continue it", conv_id)
+                self._set_limit_state(conv_id, "expired")
+                continue
+            url, key = runtime
+            try:
+                resp = await self.http.post(
+                    f"{url}/api/conversations/{conv_id}/run",
+                    headers={"X-Session-API-Key": key},
+                    timeout=30,
+                )
+            except httpx.HTTPError as e:
+                log.warning("could not continue %s, will retry: %s", conv_id, e)
+                continue
+            # 409: it is running already.
+            if resp.status_code < 300 or resp.status_code == 409:
+                log.info("conversation %s continued after its usage limit", conv_id)
+                self._set_limit_state(conv_id, "resumed")
+            else:
+                log.warning(
+                    "could not continue %s, will retry (%s): %s",
+                    conv_id,
+                    resp.status_code,
+                    resp.text[:300],
+                )
+
+    def backfill(self) -> None:
+        """Bring history recorded by an earlier version up to date: titles for
+        conversations that never got one, and a note where a usage limit ended
+        the transcript."""
+        for row in self.db.all(
+            "SELECT c.id, e.body FROM conversations c JOIN events e"
+            " ON e.conversation_id = c.id WHERE c.title IS NULL"
+            " AND e.kind = 'MessageEvent' ORDER BY e.timestamp, e.id"
+        ):
+            self._title_from_events(row["id"], [json.loads(row["body"])])
+        for row in self.db.all(
+            "SELECT c.id, c.sandbox_id, e.body FROM conversations c JOIN events e"
+            " ON e.conversation_id = c.id WHERE c.deleted_at IS NULL"
+            " AND e.kind = 'ConversationErrorEvent' ORDER BY e.timestamp"
+        ):
+            event = json.loads(row["body"])
+            reset = usage_limit.reset_time(event)
+            if reset:
+                self._usage_limit_hit(
+                    row["sandbox_id"], row["id"], event, reset, act=False
+                )
 
     async def drain(self, sandbox_id: str, conv_id: str) -> None:
         """Read a conversation's events and status straight from its sandbox.

@@ -50,6 +50,16 @@ to pass `--lock-to-cloud`.
 `openhands.msng.to` resolves to the internal VIP and the namespace carries
 `internal-gateway-access: "true"`, never `external-gateway-access`.
 
+oauth2-proxy keeps its sessions in a Valkey of its own
+(`templates/auth-sessions.yaml`), not in the cookie. A session is renewed with
+a refresh token that Authelia rotates on every use and revokes, session and
+all, on a second use. With the session in a cookie, each of the requests a
+page makes in parallel redeems that token for itself, on whichever replica it
+reached, and all but one of them is a second use: returning to an idle tab
+ended the session. The store gives the replicas a lock to refresh under. It is
+in memory only, so restarting it costs a sign-in, and while it is down the
+proxy answers nothing.
+
 The page carries no credential. The app server accepts a browser on the user
 header oauth2-proxy sets, and hands it each conversation's own session key; it
 also forwards the browser's automation calls with that service's key. There is
@@ -599,6 +609,7 @@ The app server's reconciler applies `appServer.limits` once a minute.
 | `automationOrphanMinutes` | 10 | An automation run's sandbox that never got a conversation is deleted. |
 | `automationMaxMinutes` | 120 | An automation run's sandbox is deleted, whatever it is doing. |
 | `maxEventsPerConversation` | 20000 | The oldest events of a transcript are dropped. |
+| `usageLimitWaitMinutes` | 30 | A conversation stopped by a usage limit that resets within this long continues by itself; see "Usage limits". |
 
 Idle means no request or stream traffic through `/runtime/<sandbox>`, no event
 from its agent, and no agent turn in progress — a long task keeps its sandbox
@@ -611,6 +622,32 @@ conversation becomes an archived one.
 
 A run that fails while its sandbox is still starting never releases it, which
 is what `automationOrphanMinutes` is for.
+
+### Usage limits
+
+A subscription's usage limit ends the agent's turn with an error that says
+when the window resets (`usage_limit_reached`, `resets_at`). The app server
+reads that from the conversation's events and does one of three things, each
+recorded as a message in the transcript:
+
+| The limit resets | What happens |
+| --- | --- |
+| within `usageLimitWaitMinutes` | The sandbox stays up, exempt from the idle limit, and the conversation is run again half a minute after the reset. |
+| later than that | The sandbox is suspended. Continuing after the reset, by sending a message, is the user's decision. |
+| during an automation run | Nothing is held: the run fails with the limit as its error, and its sandbox goes with it. A run's timeout is no longer than the wait would be. |
+
+The threshold is about the prompt cache, not patience. A provider keeps a
+conversation's prompt cached for about an hour; one continued inside that
+reads its history at the cached rate, and one continued later pays for all of
+it again, against the limit that has only just reset. Thirty minutes leaves the
+rest of the hour to finish in.
+
+A waiting conversation that was continued or stopped by hand is left alone,
+and so is one the app server could not run within ten minutes of the reset.
+Only an error that carries a reset time counts: an ordinary rate limit is the
+SDK's to retry. The message exists in the app server's history alone, so it
+shows wherever a transcript is read from there — a suspended or archived
+conversation — and not in the live event stream of a running sandbox.
 
 ## Metrics
 

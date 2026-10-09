@@ -33,6 +33,24 @@ def call(method: str, url: str, key: str, body: dict | None = None) -> dict:
         return json.loads(response.read() or b"{}")
 
 
+def reason(agent_url: str, conversation_id: str, key: str) -> str:
+    """The conversation's last error, as a suffix for the run's own: without
+    it a run that hit a usage limit reads the same as one that crashed."""
+    try:
+        page = call(
+            "GET",
+            f"{agent_url}/api/conversations/{conversation_id}/events/search"
+            "?limit=20&sort_order=TIMESTAMP_DESC",
+            key,
+        )
+    except Exception:
+        return ""
+    for event in page.get("items") or []:
+        if event.get("kind") == "ConversationErrorEvent":
+            return f": {event.get('code')}: {(event.get('detail') or '')[:400]}"
+    return ""
+
+
 def wait(agent_url: str, conversation_id: str, key: str) -> str | None:
     """Block until the conversation stops; the reason it failed, or None."""
     started = time.monotonic()
@@ -45,7 +63,9 @@ def wait(agent_url: str, conversation_id: str, key: str) -> str | None:
         elif status == "finished" or (status == "idle" and ran):
             return None
         elif status in FAILED_STATES:
-            return f"conversation ended {status}"
+            return (
+                f"conversation ended {status}{reason(agent_url, conversation_id, key)}"
+            )
         elif time.monotonic() - started > START_GRACE_SECONDS:
             return f"conversation never started (status {status})"
         time.sleep(POLL_SECONDS)

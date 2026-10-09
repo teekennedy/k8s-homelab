@@ -283,6 +283,8 @@ spec:
               value: {{ mul $cfg.limits.automationMaxMinutes 60 | quote }}
             - name: MAX_EVENTS_PER_CONVERSATION
               value: {{ $cfg.limits.maxEventsPerConversation | quote }}
+            - name: USAGE_LIMIT_WAIT_SECONDS
+              value: {{ mul $cfg.limits.usageLimitWaitMinutes 60 | quote }}
             # uv keeps its state under HOME and unpacks wheels through a temp
             # directory; the root filesystem is read-only, so both point at the
             # emptyDir.

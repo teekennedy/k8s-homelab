@@ -304,6 +304,12 @@ appServer:
     automationMaxMinutes: 120
     # Events kept per conversation; the oldest are dropped first.
     maxEventsPerConversation: 20000
+    # A conversation stopped by its subscription's usage limit continues by
+    # itself if the limit resets within this long; past it, the sandbox is
+    # suspended and continuing is left to the user. Keep it well under the
+    # hour a provider caches a prompt for: a continued conversation then
+    # still reads its history from cache. 0: never waits.
+    usageLimitWaitMinutes: 30
   # SQLite database: sandboxes, minted API keys, settings and the conversation
   # history. The only copy, so it is backed up.
   storage:
@@ -432,6 +438,18 @@ oauth2ProxyInstance:
   secretName: openhands-oauth2-proxy-secrets
   labelsTemplate: openhands.labels
 
+# oauth2-proxy's session store: one Valkey, in memory. See
+# templates/auth-sessions.yaml.
+authSessions:
+  image: valkey/valkey:9-alpine
+  resources:
+    requests:
+      cpu: 10m
+      memory: 48Mi
+    limits:
+      cpu: 250m
+      memory: 64Mi
+
 oauth2-proxy:
   fullnameOverride: openhands-auth
   config:
@@ -447,6 +465,12 @@ oauth2-proxy:
       cookie_secure = true
       cookie_httponly = true
       cookie_samesite = "lax"
+      # A cookie of its own per sign-in attempt. An expired session sends
+      # every request of a page load to sign in at once, and with one shared
+      # cookie the callback is checked against the last attempt's PKCE
+      # verifier rather than its own: a 500.
+      cookie_csrf_per_request = true
+      cookie_csrf_expire = "5m"
       whitelist_domains = ["openhands.msng.to"]
       email_domains = ["*"]
       reverse_proxy = true
@@ -465,6 +489,16 @@ oauth2-proxy:
       skip_auth_routes = ["POST=^/api/automation/v1/events/"]
       upstreams = ["http://openhands.openhands.svc.cluster.local:8000/"]
       trusted_proxy_ips = ["10.42.0.0/16"]
+
+  # Sessions live in authSessions, below, not in the cookie.
+  sessionStorage:
+    type: redis
+    redis:
+      existingSecret: openhands-auth-sessions
+      passwordKey: redis-password
+      clientType: standalone
+      standalone:
+        connectionUrl: redis://openhands-auth-sessions.openhands.svc.cluster.local:6379
 
   replicaCount: 2
 

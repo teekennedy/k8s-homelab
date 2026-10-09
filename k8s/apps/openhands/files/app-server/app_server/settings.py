@@ -68,6 +68,9 @@ class Settings:
     service_max_seconds: float = 0
     # Events kept per conversation; the oldest go first.
     max_events: int = 0
+    # The longest a conversation waits out a usage limit before continuing by
+    # itself; past it, its sandbox is suspended instead. 0: never waits.
+    usage_limit_wait_seconds: float = 0
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -105,4 +108,7 @@ class Settings:
             service_orphan_seconds=float(os.environ.get("SERVICE_ORPHAN_SECONDS", "0")),
             service_max_seconds=float(os.environ.get("SERVICE_MAX_SECONDS", "0")),
             max_events=int(os.environ.get("MAX_EVENTS_PER_CONVERSATION", "0")),
+            usage_limit_wait_seconds=float(
+                os.environ.get("USAGE_LIMIT_WAIT_SECONDS", "0")
+            ),
         )
