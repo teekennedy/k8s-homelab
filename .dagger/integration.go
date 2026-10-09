@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// The Kubernetes integration workflow: a throwaway k3d cluster, the releases
+// The Kubernetes integration workflow: a throwaway k3s cluster, the releases
 // under test deployed onto it with the repo's own helmfile, and each release's
 // pytest suite run against the result.
 //
@@ -58,16 +58,18 @@ type kubernetesIntegrationRun struct {
 	Failed []string
 }
 
-// TestKubernetesIntegration deploys releases to a throwaway k3d cluster and runs
+// TestKubernetesIntegration deploys releases to a throwaway k3s cluster and runs
 // their Kubernetes integration tests against it.
 //
-// Deliberately not a `+check`: it needs a Docker daemon and some minutes, and
-// `dagger check` is meant to stay runnable with neither. Invoke it explicitly:
+// Deliberately not a `+check`: it needs an engine that allows privileged execs,
+// and a PR can change both this code and the tests it runs. Invoke it explicitly:
 //
 //	dagger call test-kubernetes-integration
 //	dagger call test-kubernetes-integration --releases=reflector
 //
-// The cluster is created, used and destroyed inside this call. Nothing reads,
+// The result is cached like any function call: the same source and arguments
+// return the earlier verdict without starting a cluster. The cluster is created,
+// used and destroyed inside this call. Nothing reads,
 // writes or merges a kubeconfig outside the engine, and no host context
 // changes. See "Kubernetes integration tests" in README.md for prerequisites.
 func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
@@ -78,11 +80,6 @@ func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 	// environment enables. Empty means all of them.
 	// +optional
 	releases []string,
-	// An existing Docker daemon to create the cluster in, as tcp://host:port,
-	// whose host the engine can route to. Empty runs a daemon inside the
-	// engine, which needs one that allows privileged execs.
-	// +optional
-	dockerHost string,
 	// Sync twice before testing, to check that re-syncing a cluster that
 	// already has the releases on it succeeds.
 	// +optional
@@ -90,7 +87,7 @@ func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 	// +optional
 	container *dagger.Container,
 ) (string, error) {
-	run, err := m.runKubernetesIntegration(ctx, source, releases, dockerHost, repeatSync, container)
+	run, err := m.runKubernetesIntegration(ctx, source, releases, repeatSync, container)
 	if err != nil {
 		return "", err
 	}
@@ -116,13 +113,11 @@ func (m *Homelab) KubernetesIntegrationReports(ctx context.Context,
 	// +optional
 	releases []string,
 	// +optional
-	dockerHost string,
-	// +optional
 	repeatSync bool,
 	// +optional
 	container *dagger.Container,
 ) (*dagger.Directory, error) {
-	run, err := m.runKubernetesIntegration(ctx, source, releases, dockerHost, repeatSync, container)
+	run, err := m.runKubernetesIntegration(ctx, source, releases, repeatSync, container)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +130,6 @@ func (m *Homelab) runKubernetesIntegration(
 	ctx context.Context,
 	source *dagger.Directory,
 	releases []string,
-	dockerHost string,
 	repeatSync bool,
 	container *dagger.Container,
 ) (run *kubernetesIntegrationRun, err error) {
@@ -153,7 +147,7 @@ func (m *Homelab) runKubernetesIntegration(
 		return nil, err
 	}
 
-	cluster, err := newK3dCluster(ctx, toolchain, dockerHost)
+	cluster, err := newK3sCluster(toolchain)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +160,7 @@ func (m *Homelab) runKubernetesIntegration(
 	if err := deployForTesting(ctx, cluster, plan, repeatSync); err != nil {
 		return nil, err
 	}
-	return runIntegrationTests(ctx, cluster, plan)
+	return runIntegrationTests(ctx, cluster, plan, container)
 }
 
 // deployForTesting creates the cluster, puts the planned releases on it, waits
@@ -175,7 +169,7 @@ func (m *Homelab) runKubernetesIntegration(
 // one holds.
 func deployForTesting(
 	ctx context.Context,
-	cluster *k3dCluster,
+	cluster *k3sCluster,
 	plan []*integrationRelease,
 	repeatSync bool,
 ) error {
@@ -321,7 +315,7 @@ func checkEnabled(enabled, requested []string) error {
 // helmfile.yaml.gotmpl and the same generated environment values that deploy
 // production deploy this, which is the only way the workflow tests what the
 // cluster actually runs.
-func syncReleases(ctx context.Context, cluster *k3dCluster, plan []*integrationRelease, attempt int) error {
+func syncReleases(ctx context.Context, cluster *k3sCluster, plan []*integrationRelease, attempt int) error {
 	args := []string{
 		"helmfile",
 		"--environment", ephemeralEnvironment,
@@ -359,17 +353,22 @@ func syncReleases(ctx context.Context, cluster *k3dCluster, plan []*integrationR
 // index, so the summary's order follows the plan rather than who finished first.
 func runIntegrationTests(
 	ctx context.Context,
-	cluster *k3dCluster,
+	cluster *k3sCluster,
 	plan []*integrationRelease,
+	container *dagger.Container,
 ) (*kubernetesIntegrationRun, error) {
-	tested := cluster.WithCluster(cluster.Toolchain)
 	results := make([]*pytestRun, len(plan))
 	reports := make([]*junitReport, len(plan))
 
 	g := new(errgroup.Group)
 	for i, r := range plan {
 		g.Go(func() error {
-			result, err := r.Tests.testKubernetes(ctx, tested)
+			// The install comes first and knows nothing of the cluster, and it is
+			// built from the toolchain without the repo mounted in: a mount is
+			// part of an exec's cache key, so one carrying the whole source would
+			// reinstall on every unrelated edit.
+			env := r.Tests.kubernetesEnv(container)
+			result, err := r.Tests.testKubernetes(ctx, cluster.WithCluster(env))
 			if err != nil {
 				return err
 			}

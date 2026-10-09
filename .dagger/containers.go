@@ -10,12 +10,6 @@ const (
 	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.4.0"
 	// renovate: datasource=docker depName=nixos/nix
 	nixImage = "nixos/nix:2.35.2"
-	// dindImage is the Docker daemon the Kubernetes integration workflow runs
-	// k3d clusters in. The only pinned image outside the toolchain: a daemon is
-	// not something the devenv profile can provide, because it has to outlive a
-	// single exec as a service.
-	// renovate: datasource=docker depName=docker
-	dindImage = "docker:29.8.2-dind"
 	// k3sImage is what the ephemeral clusters run. Keep its minor version in
 	// step with services.k3s.package in nix/modules/k3s/k3s.nix, so the tests
 	// run against the Kubernetes version the real cluster does.
@@ -57,7 +51,7 @@ func ciContainer(devenvSource *dagger.Directory) *dagger.Container {
 }
 
 // integrationProfiles adds the cluster tooling the Kubernetes integration
-// workflow drives — k3d and kubectl — on top of the ci toolchain.
+// workflow drives — kubectl and curl — on top of the ci toolchain.
 //
 // A separate profile rather than more packages in ci: every check runs in the
 // ci container, and none of them has any use for a Kubernetes client. This way

@@ -1,9 +1,9 @@
 package homelab
 
-// ephemeral is the throwaway single-node k3d cluster that the Dagger Kubernetes
+// ephemeral is the throwaway single-node k3s cluster that the Dagger Kubernetes
 // integration workflow creates and destroys around a test run (see
-// .dagger/k3d.go). It has no NixOS hosts: the nodes are containers in a Docker
-// daemon, so `hosts` is empty and nothing provisions them.
+// .dagger/k3s.go). It has no NixOS hosts: the node is a Dagger service, so
+// `hosts` is empty and nothing provisions it.
 //
 // Releases are disabled by default here. Enable one once it has integration
 // tests under k8s/<tier>/<release>/tests — that is what the workflow deploys.

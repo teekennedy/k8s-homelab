@@ -12,7 +12,7 @@ Dagger — the cluster is whichever one `KUBECONFIG` names.
 
 ## Running them
 
-Normally through Dagger, which builds a throwaway k3d cluster, deploys reflector
+Normally through Dagger, which builds a throwaway k3s cluster, deploys reflector
 onto it and runs these against it:
 
 ```bash

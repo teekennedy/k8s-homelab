@@ -40,7 +40,7 @@ The combination means:
 | `helm.go` | Chart discovery and path matching shared by the helmfile checks |
 | `helmfile.go` | Per-release helmfile Template/Validate and the shared render, aggregate BuildHelmfile/ValidateHelmfile/LintHelmfile |
 | `kubernetes.go` | Per-release Polaris/Kubeconform on the helmfile render, aggregate ValidatePolaris/ValidateKubeconform |
-| `k3d.go` | k3dCluster: creating, reaching, verifying and destroying an ephemeral k3d cluster |
+| `k3s.go` | k3sCluster: starting, reaching, verifying and destroying an ephemeral k3s cluster |
 | `integration.go` | The Kubernetes integration workflow: plan, deploy with helmfile, wait, verify, run each release's pytest suite |
 | `junit.go` | Parsing pytest's JUnit XML into a summary |
 | `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
@@ -164,7 +164,7 @@ functions rather than checks, so nothing drives them in a batch.
 
 `TestKubernetesIntegration` and `KubernetesIntegrationReports` take the same
 optional `container` but fall back to `integrationContainer()` — the ci profile
-plus the `integration` one, which adds k3d and kubectl. Nothing in `dagger
+plus the `integration` one, which adds kubectl and curl. Nothing in `dagger
 check` runs in that container; see Kubernetes integration tests below.
 
 ### Per-Project Module Types
@@ -269,8 +269,8 @@ These also run as part of `dagger check` (a non-empty changeset fails the check)
 ## Kubernetes integration tests
 
 Some things cannot be checked by rendering a chart: whether reflector actually
-copies a ConfigMap, for instance. `TestKubernetesIntegration` builds a
-throwaway single-node k3d cluster, deploys the releases under test onto it with
+copies a ConfigMap, for instance. `TestKubernetesIntegration` starts a
+throwaway single-node k3s cluster, deploys the releases under test onto it with
 this repo's own helmfile, waits for them to become healthy, and runs each
 release's pytest suite against the result — then destroys the cluster.
 
@@ -292,88 +292,77 @@ The workflow is repeatable with no manual steps: every run gets a fresh cluster
 under a new random name and destroys it again, so running it twice in a row
 needs nothing in between.
 
-It is **not** a `+check`, on purpose: it needs a Docker daemon and several
-minutes, and `dagger check` has to stay runnable with neither. Nothing was added
-to `dagger check` by any of this — the Python check keeps passing on a machine
-with no Docker, no k3d and no cluster.
+It is **not** a `+check`, on purpose, and nothing in `dagger check` runs it. It
+needs an engine that allows privileged execs, and `dagger check` runs whatever a
+PR contains: a PR that changes `.woodpecker/ci.yaml`, this module or the pytest
+suites it runs could use a privileged exec to escape the container. It runs
+only when someone invokes it, on an engine that someone has chosen to give
+`insecureRootCapabilities` — and the intent is to run it on trusted refs only,
+after a merge and before a deploy, rather than on PRs. The Python check keeps
+passing on a machine with no cluster at all.
 
 ### Prerequisites
 
-The cluster's nodes are containers in a Docker daemon, and there are two places
-that daemon can be.
-
-**A dind service inside the engine (the default).** Nothing is needed on the
-host, but the engine has to allow privileged execs, because `dockerd` cannot
-mount overlayfs or write iptables rules without them:
+The cluster is a `k3s server` run as a Dagger service, and `k3s` cannot run
+containers without privileges: it starts containerd and a kubelet, which
+create cgroups and mount filesystems. The engine therefore has to allow
+privileged execs:
 
 ```json
 { "security": { "insecureRootCapabilities": true } }
 ```
 
 `k8s/platform/dagger-engine/values.yaml` sets this to `false`, so the in-cluster
-engine cannot run the dind service. It does not reject it outright: `dockerd`
-just never comes up, so the service start is bounded at 2 minutes and the
-workflow then fails naming this prerequisite rather than hanging. Run it against
-an engine that allows privileged execs — a local Docker-based engine is the usual
-answer:
+engine cannot run the service. It does not reject it outright: `k3s` just never
+comes up, so the service start is bounded at 3 minutes and the workflow then
+fails naming this prerequisite rather than hanging. Run it against an engine
+that allows privileged execs — a local Docker-based engine is the usual answer:
 
 ```bash
 unset _EXPERIMENTAL_DAGGER_RUNNER_HOST   # don't use the in-cluster engine
 dagger call test-kubernetes-integration
 ```
 
-**An external daemon.** Pass one instead, and no privileged exec is needed:
+There is no Docker daemon, k3d or `DOCKER_HOST` involved: nothing outside the
+engine is needed.
 
-```bash
-dagger call test-kubernetes-integration --docker-host=tcp://docker.lan:2375
-```
-
-Its host has to be routable *from the engine*, because that is where the
-cluster's API port gets published. A `unix://` socket and any loopback address
-are rejected up front (`dockerHostAddress`) rather than left to fail as an
-unexplained connection timeout: a socket names no host to reach the published
-port on, and loopback inside a Dagger container is the container itself.
-
-### Networking
+### Networking and credentials
 
 ```
 Dagger exec (helmfile, kubectl, pytest)
-  │  KUBECONFIG=/run/k3d/kubeconfig → https://dockerd:6445
+  │  KUBECONFIG=/run/k3s/kubeconfig → https://k3s:6443
   ▼
-dind service, bound at the alias "dockerd"
-  ├─ 2375  the Docker API, which k3d drives via DOCKER_HOST
-  └─ 6445  the cluster's API server, published by k3d's load balancer
-       ▼
-     k3s server container, listening on 6443 inside the daemon
+k3s service, bound at the alias "k3s"
+  └─ 6443  the API server
 ```
 
 A kubeconfig pointing at `localhost` is useless inside a Dagger container, so
-the cluster is created with `--api-port 0.0.0.0:6445` and the kubeconfig's
-server URL is rewritten to the address the containers actually use. TLS
-verification stays on: `--k3s-arg --tls-san=dockerd@server:*` puts that hostname
-on the API server's certificate.
+the API server's certificate is issued for the service's alias
+(`--tls-san k3s`) and the kubeconfig names that alias.
 
-Port 6445 is exposed with `ExperimentalSkipHealthcheck`, because k3d only
-publishes it once the cluster exists, long after the service has to report
-itself up.
+The kubeconfig is built by the workflow, not taken from k3s. The API server is
+started with `--kube-apiserver-arg token-auth-file=...`, naming a file that
+holds a random per-run token mapped to `system:masters`; the file is a Dagger
+secret mounted into the service. The client side gets its CA from `/cacerts`,
+the one endpoint k3s serves without credentials, and `kubectl config` assembles
+a kubeconfig from that CA and the token. The fetch of `/cacerts` is the only
+request that does not verify the server — it is what supplies the CA — and it
+stays inside the engine's service network. Every call after it verifies.
 
 ### Kubeconfig isolation
 
 The admin kubeconfig only ever exists as a `*dagger.File` inside the engine,
-mounted at `/run/k3d/kubeconfig` in the containers that need it. Concretely:
+mounted at `/run/k3s/kubeconfig` in the containers that need it. Concretely:
 
-- `k3d cluster create` runs with `--kubeconfig-update-default=false` and
-  `--kubeconfig-switch-context=false`. k3d defaults both to true, which would
-  merge the cluster into the caller's kubeconfig and switch its current context.
-- The kubeconfig is fetched by redirecting `k3d kubeconfig get` into a file.
-  It is never printed, because it carries the cluster-admin client certificate
-  and a function's stdout is its log.
-- No host file is read, written or merged, and no existing file is overwritten.
-- Cluster names are random (`homelab-<12 hex>`), and the cluster is only ever
-  deleted by name. With the default dind daemon, everything the run created dies
-  with the service, so no shared Docker resource is touched either way.
+- No host file is read, written or merged, and no host context changes.
+- The token is a Dagger secret, so it is masked in logs, and it is random per
+  run, so a leaked one opens nothing once the service has stopped.
+- Cluster names are random (`homelab-<12 hex>`), and the only thing the run
+  ever stops is its own service.
 - `Close` is deferred before the cluster exists, so a failed deploy, a failing
-  test or a panic all still take the cluster down.
+  test or a panic all still take the cluster down. It runs on a context
+  detached from the caller's, with a one-minute limit of its own, because an
+  interrupted run is exactly when the caller's context is already cancelled.
 
 ### Deploying with the existing helmfile
 
@@ -401,14 +390,15 @@ somewhere else.
 
 ### Health, before tests
 
-`helmfile sync` returning successfully only means the manifests were accepted,
-so the workflow then waits on Kubernetes itself — `kubectl rollout status` over
-every Deployment, StatefulSet and DaemonSet in the release's namespace, with a
-5m timeout. Namespace-scoped and workload-agnostic, so a release whose workload
-isn't a Deployment needs nothing added; a namespace with none of the three fails,
-which is the right answer for a release whose tests are about to run. When the
-wait fails, the namespace's pod status, pod detail and events are attached to the
-error.
+The cluster is not used until the API server answers `/readyz` and the node is
+`Ready`. `helmfile sync` returning successfully then only means the manifests
+were accepted, so the workflow waits on Kubernetes itself — `kubectl rollout
+status` over every Deployment, StatefulSet and DaemonSet in the release's
+namespace, with a 5m timeout. Namespace-scoped and workload-agnostic, so a
+release whose workload isn't a Deployment needs nothing added; a namespace with
+none of the three fails, which is the right answer for a release whose tests are
+about to run. When the wait fails, the namespace's pod status, pod detail and
+events are attached to the error.
 
 The waits for several releases run concurrently, so their timeouts don't sum.
 
@@ -468,26 +458,66 @@ ephemeral environment enables. The workflow finds the test directory from the
 release's chart path, deploys the release, waits on its namespace and runs
 pytest; what to assert is entirely the test project's business.
 
+### Caching
+
+The call is cached at three levels, and the workflow is arranged so each one can
+do its job.
+
+1. **The function call.** Dagger caches a function's result on its arguments.
+   `source` is a content-addressed directory filtered by the `+ignore` list, so
+   re-running with nothing changed in `helmfile.yaml.gotmpl`, the ephemeral
+   environment's values or anything under `k8s/` returns the earlier verdict
+   without starting a cluster. Editing anything outside that list (`README.md`,
+   `.woodpecker/`, `nix/`) is also a hit. The flip side is that the filter is
+   coarse: it cannot know which releases a run will deploy, so a change to *any*
+   chart under `k8s/` re-runs the whole thing.
+2. **Execs that do not touch the cluster.** The toolchain, the helmfile planning
+   (`helmfile build` and `list`) and each test project's `uv sync` are all built
+   *before* anything cluster-specific is applied to the container, so they are
+   cached whatever the cluster looks like. The `uv sync` copies in only
+   `pyproject.toml` and `uv.lock` before installing, and runs on the toolchain
+   *without* the repo mounted — a mount is part of an exec's cache key — so
+   editing a test reinstalls nothing.
+3. **Execs that do.** Everything from the first use of the service on is unique
+   to the run, by design: `HOMELAB_K3S_CLUSTER=<random name>` is in its
+   environment, and the kubeconfig it mounts carries a random token. Caching one
+   would mean serving "helmfile sync succeeded" for a cluster that has since been
+   destroyed.
+
+What persists *between* runs that are not cached is the containerd root, in a
+`PRIVATE` cache volume (about 540MB with reflector's images in it). The k3s
+image itself is an ordinary image layer, cached by the engine.
+
+Measured on engine v0.21.10, one release (reflector), same host:
+
+| Run | k3d in dind | k3s service |
+| --- | --- | --- |
+| Nothing changed | 2.8s | 3.9s |
+| File outside the `+ignore` list changed | — | 4.0s |
+| A reflector test changed | 99s | 57s |
+| An unrelated chart changed | 107s | 57s |
+| First run, warm toolchain, empty volumes | — | 91s |
+
+A run that is not cached spends roughly: 8s for k3s to boot and the node to go
+Ready, 19s in `helmfile sync`, 11s in `rollout status`, 5s in pytest and the rest
+in loading the module and planning.
+
 ### Limitations
 
-- The default dind daemon needs an engine that allows privileged execs, which
-  the in-cluster engine does not. See Prerequisites.
-- The dind daemon's data root is a `PRIVATE` cache volume. It has to be a real
-  filesystem — `dockerd`'s overlay2 driver falls back to a copy-per-layer vfs
-  driver otherwise — and it cannot be `SHARED`, because `dockerd` locks its data
-  root and two concurrent runs would deadlock. Because a released instance can
-  be reused by a later run, the dind daemon is swept with `k3d cluster delete
-  --all` before a cluster is created, in case a run was killed before its
-  cleanup. An externally supplied daemon is never swept.
+- Needs an engine that allows privileged execs, which the in-cluster engine
+  does not. See Prerequisites.
+- k3s's containerd root is a `PRIVATE` cache volume, keyed on the k3s image tag.
+  It has to be a real filesystem for overlayfs, and two containerds cannot share
+  a root. It is deliberately not wiped between runs, so it is what makes images
+  pulled once stay pulled; a run killed mid-flight leaves its containers' metadata
+  in it for the next k3s to find.
 - `k3sImage` is pinned to match `services.k3s.package` in
   `nix/modules/k3s/k3s.nix`, so the tests run against the Kubernetes version the
-  real cluster does. That is deliberately *not* the k3s version the pinned k3d
-  defaults to (`k3d version` prints both), so a `k3d cluster create` failure
-  that mentions k3s is the first place to look.
+  real cluster does.
 - Dagger's exec cache keys on the command and the filesystem, neither of which
-  captures that an exec against a service depends on live state. Every container
-  in a run therefore carries `HOMELAB_K3D_CLUSTER=<random name>`, which makes
-  every exec unique to that run.
+  captures that an exec against a service depends on live state. Every exec that
+  touches the cluster therefore carries `HOMELAB_K3S_CLUSTER=<random name>`,
+  which makes it unique to that run.
 
 ## Caching & Performance
 
@@ -796,7 +826,7 @@ Terraform errors with `|| true`.
 - `helm.go` - Chart discovery and path matching
 - `helmfile.go` - helmfileRelease struct and helmfile functions
 - `kubernetes.go` - Polaris and Kubeconform on rendered releases
-- `k3d.go` - Ephemeral k3d cluster lifecycle for the integration workflow
+- `k3s.go` - Ephemeral k3s cluster lifecycle for the integration workflow
 - `integration.go` - The Kubernetes integration workflow
 - `junit.go` - pytest JUnit XML parsing
 - `terraform.go` - TerraformModule struct and Terraform-specific functions

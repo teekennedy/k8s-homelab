@@ -50,7 +50,7 @@ func (m *Homelab) ciContainer() *dagger.Container {
 }
 
 // integrationContainer returns the toolchain container the Kubernetes
-// integration workflow runs in: the ci one plus a Kubernetes client and k3d.
+// integration workflow runs in: the ci one plus a Kubernetes client.
 func (m *Homelab) integrationContainer() *dagger.Container {
 	return integrationContainer(m.DevenvSource)
 }

@@ -657,13 +657,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg releases", err))
 				}
 			}
-			var dockerHost string
-			if inputArgs["dockerHost"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["dockerHost"]), &dockerHost)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg dockerHost", err))
-				}
-			}
 			var repeatSync bool
 			if inputArgs["repeatSync"] != nil {
 				err = json.Unmarshal([]byte(inputArgs["repeatSync"]), &repeatSync)
@@ -678,7 +671,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
 				}
 			}
-			return (*Homelab).KubernetesIntegrationReports(&parent, ctx, source, releases, dockerHost, repeatSync, container)
+			return (*Homelab).KubernetesIntegrationReports(&parent, ctx, source, releases, repeatSync, container)
 		case "LintGo":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -860,13 +853,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg releases", err))
 				}
 			}
-			var dockerHost string
-			if inputArgs["dockerHost"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["dockerHost"]), &dockerHost)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg dockerHost", err))
-				}
-			}
 			var repeatSync bool
 			if inputArgs["repeatSync"] != nil {
 				err = json.Unmarshal([]byte(inputArgs["repeatSync"]), &repeatSync)
@@ -881,7 +867,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
 				}
 			}
-			return (*Homelab).TestKubernetesIntegration(&parent, ctx, source, releases, dockerHost, repeatSync, container)
+			return (*Homelab).TestKubernetesIntegration(&parent, ctx, source, releases, repeatSync, container)
 		case "TestPython":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)

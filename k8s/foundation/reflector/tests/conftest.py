@@ -2,7 +2,7 @@
 
 These tests treat reflector as a black box: they create ConfigMaps, annotate
 them, and watch for the copies reflector is supposed to make. Nothing here knows
-how reflector was deployed, so the same suite works against the ephemeral k3d
+how reflector was deployed, so the same suite works against the ephemeral k3s
 cluster the Dagger workflow builds and against any other cluster KUBECONFIG
 names.
 

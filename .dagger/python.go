@@ -136,10 +136,29 @@ type pytestRun struct {
 	Junit *dagger.File
 }
 
+// kubernetesEnv installs this project's locked dependencies into toolchain, and
+// puts its tests beside them.
+//
+// Kept apart from testKubernetes, and applied to a container that knows nothing
+// about the cluster, so that the install is an exec Dagger can serve from cache:
+// it depends on the project and the toolchain, not on the run. It also depends on
+// nothing but the two files that decide what gets installed, so editing a test
+// does not reinstall anything. The project is copied rather than mounted,
+// because the environment has to land in the layer for the exec after this one
+// to see it.
+func (pp *PythonProject) kubernetesEnv(toolchain *dagger.Container) *dagger.Container {
+	return toolchain.
+		WithWorkdir("/src").
+		WithFile("pyproject.toml", pp.Source.File("pyproject.toml")).
+		WithFile("uv.lock", pp.Source.File("uv.lock")).
+		WithExec([]string{"uv", "sync", "--frozen", "--no-install-project", "--link-mode", "copy"}).
+		WithDirectory("/src", pp.Source)
+}
+
 // testKubernetes runs this project's `kubernetes`-marked tests in container,
-// which must already carry a KUBECONFIG for the cluster under test. The project
-// decides what to assert; this only decides how pytest is invoked, so a new
-// release's tests need nothing added here.
+// which must come from kubernetesEnv and already carry a KUBECONFIG for the
+// cluster under test. The project decides what to assert; this only decides how
+// pytest is invoked, so a new release's tests need nothing added here.
 //
 // pytest's exit code is captured instead of being left to fail the exec,
 // because a failed exec's filesystem cannot be read and the JUnit report is
@@ -156,12 +175,10 @@ func (pp *PythonProject) testKubernetes(ctx context.Context, container *dagger.C
 	)
 
 	run := container.
-		WithMountedDirectory("/src", pp.Source).
-		WithWorkdir("/src").
 		WithExec([]string{"sh", "-c", `
 set -u
 mkdir -p "$(dirname "$2")"
-uv run --link-mode copy pytest -v -m "$1" "--junit-xml=$2" 2>&1
+uv run --no-sync pytest -v -m "$1" "--junit-xml=$2" 2>&1
 printf %s "$?" > "$3"
 `, "--", kubernetesMarker, junitPath, exitCodePath})
 

@@ -77,13 +77,14 @@ in {
       ];
     };
 
-    # What the Kubernetes integration workflow needs on top of ci: k3d to build
-    # the ephemeral cluster, kubectl to wait on rollouts and to prove a
-    # kubeconfig points where it should. Separate from ci because no `dagger
-    # check` has any business holding a Kubernetes client.
+    # What the Kubernetes integration workflow needs on top of ci: kubectl to
+    # build the ephemeral cluster's kubeconfig, wait on rollouts and prove that
+    # kubeconfig points where it should, and curl to fetch the cluster CA.
+    # Separate from ci because no `dagger check` has any business holding a
+    # Kubernetes client.
     integration.module = {
       packages = with pkgs; [
-        k3d
+        curl
         kubectl
       ];
     };
