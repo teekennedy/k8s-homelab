@@ -31,6 +31,7 @@ from starlette.background import BackgroundTask
 
 from .auth import principal
 from .sandboxes import SandboxManager
+from .terminal_events import TerminalMirror
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -228,6 +229,8 @@ async def proxy_ws(ws: WebSocket, sandbox_id: str, path: str):
             elif msg.get("bytes") is not None:
                 await upstream.send(msg["bytes"])
 
+    mirror = TerminalMirror()
+
     async def upstream_to_client():
         async for msg in upstream:
             # A stream that is carrying events is a sandbox in use.
@@ -235,7 +238,8 @@ async def proxy_ws(ws: WebSocket, sandbox_id: str, path: str):
             if isinstance(msg, bytes):
                 await ws.send_bytes(msg)
             else:
-                await ws.send_text(msg)
+                for frame in mirror.frames(msg):
+                    await ws.send_text(frame)
 
     tasks = [
         asyncio.create_task(client_to_upstream()),
