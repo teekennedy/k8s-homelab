@@ -9,7 +9,7 @@ dagger-helm:
       {
         "logLevel": "info",
         "security": {
-          "insecureRootCapabilities": false
+          "insecureRootCapabilities": true
         },
         "gc": {
           "enabled": true,
