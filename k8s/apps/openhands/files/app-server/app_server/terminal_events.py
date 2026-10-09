@@ -103,11 +103,15 @@ class TerminalMirror:
 
     def frames(self, message: str) -> list[str]:
         """The frames to send in place of one upstream text frame: the frame
-        itself, then any terminal events it implies."""
+        itself, or for a shell command the terminal events that stand in for
+        it, since the canvas would otherwise draw a card for each."""
         try:
             event = json.loads(message)
         except ValueError:
             return [message]
         if not isinstance(event, dict):
             return [message]
-        return [message, *(json.dumps(e) for e in self.mirror(event))]
+        mirrored = self.mirror(event)
+        if not mirrored:
+            return [message]
+        return [json.dumps(e) for e in mirrored]

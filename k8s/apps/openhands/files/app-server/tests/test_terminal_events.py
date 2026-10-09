@@ -54,5 +54,13 @@ def test_other_events_pass_through_alone():
     assert m.mirror({"kind": "MessageEvent"}) == []
     assert m.mirror(_call("completed") | {"tool_kind": "edit"}) == []
     assert m.frames("not json") == ["not json"]
-    frames = m.frames(json.dumps(_call("in_progress")))
-    assert len(frames) == 2 and frames[0] == json.dumps(_call("in_progress"))
+    other = json.dumps({"kind": "MessageEvent"})
+    assert m.frames(other) == [other]
+
+
+def test_a_shell_command_replaces_its_acp_event():
+    m = TerminalMirror()
+    (start,) = m.frames(json.dumps(_call("in_progress")))
+    assert json.loads(start)["kind"] == "ActionEvent"
+    (done,) = m.frames(json.dumps(_call("completed")))
+    assert json.loads(done)["kind"] == "ObservationEvent"
