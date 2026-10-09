@@ -133,6 +133,13 @@ class SettingsStore:
         agent = copy.deepcopy(doc["agent_settings"])
         llm = agent.get("llm") or {}
         api_key_set = bool(llm.get("api_key"))
+        # Cloud Canvas gates native launches on the settings readiness flag.
+        # Subscription credentials are resolved by the sandbox, not stored here.
+        resolved = self.resolve_agent(None)
+        if resolved.get("agent_kind") == "openhands":
+            api_key_set = api_key_set or (
+                (resolved.get("llm") or {}).get("auth_type") == "subscription"
+            )
         if "api_key" in llm:
             llm["api_key"] = None
         return {

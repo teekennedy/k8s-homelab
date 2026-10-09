@@ -81,8 +81,10 @@ def test_delegates_to_the_conversations_own_agent_server(api, user, runtime):
 
     changes = api.get(f"{BASE}/git/changes", params={"path": "/w"}, headers=user)
     assert changes.json() == [{"status": "MODIFIED", "path": "a.py"}]
+    assert runtime.last("/api/git/changes").url.params["ref"] == "HEAD"
     diff = api.get(f"{BASE}/git/diff", params={"path": "a.py"}, headers=user)
     assert diff.json() == {"modified": "b", "original": "a"}
+    assert runtime.last("/api/git/diff").url.params["ref"] == "HEAD"
 
     assert api.get(f"{BASE}/download", headers=user).content == b"PK zip"
 

@@ -137,7 +137,11 @@ async def git_changes(
 ) -> list[Any]:
     _known(request, conv_id)
     got = await _call(
-        request, conv_id, "GET", "/api/git/changes", params={"path": path}
+        request,
+        conv_id,
+        "GET",
+        "/api/git/changes",
+        params={"path": path, "ref": "HEAD"},
     )
     return got if got is not None else []
 
@@ -145,7 +149,9 @@ async def git_changes(
 @router.get(f"{BASE}/git/diff")
 async def git_diff(conv_id: str, request: Request, path: str) -> JSONResponse:
     _known(request, conv_id)
-    got = await _call(request, conv_id, "GET", "/api/git/diff", params={"path": path})
+    got = await _call(
+        request, conv_id, "GET", "/api/git/diff", params={"path": path, "ref": "HEAD"}
+    )
     if got is None:
         raise HTTPException(404, "the conversation's sandbox is not running")
     return JSONResponse(got)

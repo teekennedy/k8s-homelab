@@ -20,7 +20,7 @@ async def detail(name: str, request: Request) -> dict[str, Any]:
     return {
         "name": name,
         "config": _profiles(lambda: _store(request).llm_config(name)),
-        "api_key_set": False,
+        "api_key_set": True,
     }
 
 

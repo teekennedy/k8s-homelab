@@ -94,6 +94,7 @@ def test_llm_profile_crud_and_selection(api, user, state, base):
     # Cloud Canvas gates its composer on this backend-auth readiness signal.
     summary = api.get(base, headers=user).json()["profiles"][0]
     assert summary["api_key_set"] is True
+    assert api.get(f"{base}/codex", headers=user).json()["api_key_set"] is True
     assert "api_key" not in api.get(f"{base}/codex", headers=user).json()["config"]
     assert api.delete(f"{base}/codex", headers=user).status_code == 409
     assert (
@@ -115,6 +116,23 @@ def test_llm_profile_crud_and_selection(api, user, state, base):
         state.settings_store.save_profile(
             "broken", {"agent_kind": "openhands", "llm_profile_ref": "missing"}
         )
+
+
+def test_cloud_native_launch_reports_subscription_readiness(api, user, state):
+    store = state.settings_store
+    store.save_llm_profile("codex", {"model": "gpt-5.5"})
+    store.save_profile(
+        "isolated-codex", {"agent_kind": "openhands", "llm_profile_ref": "codex"}
+    )
+    native = store.get_profile("isolated-codex")["profile"]["id"]
+    default = store.list_profiles()["active_agent_profile_id"]
+    assert api.get("/api/v1/settings", headers=user).json()["llm_api_key_set"] is False
+    api.post(f"/api/agent-profiles/{native}/activate", headers=user)
+    settings = api.get("/api/v1/settings", headers=user).json()
+    assert settings["llm_api_key_set"] is True
+    assert "api_key" not in store.resolve_agent(None)["llm"]
+    api.post(f"/api/agent-profiles/{default}/activate", headers=user)
+    assert api.get("/api/v1/settings", headers=user).json()["llm_api_key_set"] is False
 
 
 def test_switch_llm_uses_sandbox_auth_and_updates_metadata(api, user, state, kube):
