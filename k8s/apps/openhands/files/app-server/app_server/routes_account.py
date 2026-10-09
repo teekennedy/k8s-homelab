@@ -99,14 +99,6 @@ async def analytics(who: Caller) -> None:
     """Product analytics. Dropped: telemetry is off for this deployment."""
 
 
-@router.get("/api/organizations/{org_id}/profiles")
-@router.get("/api/v1/settings/profiles")
-async def llm_profiles(who: Caller, org_id: str | None = None) -> dict[str, Any]:
-    """LLM profiles. Conversations here run ACP agents, which bring their own
-    model; an OpenHands-kind agent profile falls back to agent_settings."""
-    return {"profiles": [], "active_profile": None}
-
-
 def _empty_page() -> dict[str, Any]:
     return {"items": [], "next_page_id": None}
 

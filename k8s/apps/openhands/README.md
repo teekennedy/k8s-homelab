@@ -4,7 +4,8 @@
 starting agent sessions, the history of every session that has run, and the
 automation backend that will later run them on a schedule or on an event. The
 model itself is not OpenHands' — sessions drive **Claude Code** as an external
-agent over [ACP][acp].
+agent over [ACP][acp], or the native **OpenHands agent with OpenAI Codex models**
+using a ChatGPT subscription.
 
 [upstream]: https://github.com/OpenHands/OpenHands
 [acp]: https://agentclientprotocol.com/protocol/overview
@@ -81,6 +82,7 @@ and every other namespace, is denied.
 | Secret | Keys | Where from |
 | --- | --- | --- |
 | `openhands-anthropic` | `CLAUDE_CODE_OAUTH_TOKEN` | `claude setup-token` |
+| `openhands-openai` | `openai_oauth.json` | SDK subscription login; see below |
 
 ```sh
 kubectl -n openhands create secret generic openhands-anthropic \
@@ -139,6 +141,100 @@ browser.
 Codex and Gemini CLI ship as presets alongside Claude Code, and **Custom**
 accepts the launch command of any stdio ACP server; credentials for them have
 to reach the sandbox pod's environment, as `openhands-anthropic` does.
+
+The seeded **codex** and **isolated-codex** agent profiles use the native
+OpenHands agent, not the Codex ACP preset. They retain OpenHands' file editor,
+terminal and git event integration. `codex` runs on `repo`; `isolated-codex`
+runs on `isolated`. Claude remains the default, including for automations
+until another agent profile is activated. These additional profiles and their
+LLM profiles are seeded on an existing database too, preserving UI edits.
+
+### OpenAI subscription authentication
+
+This uses the subscription transport already in `openhands-sdk==1.53.0`:
+`auth_type: subscription`, `subscription_vendor: openai`. The SDK obtains OAuth
+credentials, sends Responses requests to
+`https://chatgpt.com/backend-api/codex/responses`, and refreshes tokens itself.
+It does not run Codex CLI and does not read `~/.codex/auth.json` or
+`OPENAI_API_KEY`. The credential format and transport are upstream OpenHands
+behavior, not an OpenAI guarantee that every listed model is included in every
+plan. See the [SDK implementation][sdk-subscription] and
+[OpenAI authentication documentation][openai-auth]. A successful inference
+request verifies access; the model list alone does not.
+
+[sdk-subscription]: https://github.com/OpenHands/software-agent-sdk/blob/v1.53.0/openhands-sdk/openhands/sdk/llm/auth/openai.py
+[openai-auth]: https://learn.chatgpt.com/docs/auth
+
+1. Enable device code login in your ChatGPT account's security settings (or
+   have your workspace admin enable it). Use the account/workspace with your
+   eligible Codex subscription.
+2. On your workstation, use the same SDK version as the sandbox to perform a
+   fresh login into a dedicated temporary directory. This needs `uv` and
+   Python 3.13; allow uv to download Python if it is not installed. It asks for
+   consent, prints a device URL/code, and waits while you authorize it in your
+   browser. This command authenticates without making an inference request.
+
+   ```sh
+   openhands_auth_dir=$(mktemp -d)
+   OH_PERSISTENCE_DIR="$openhands_auth_dir" \
+     UV_PYTHON_DOWNLOADS=automatic UV_PYTHON_PREFERENCE=managed \
+     uv run --no-project --python 3.13 --with openhands-sdk==1.53.0 \
+     python -c 'from openhands.sdk import LLM; LLM.subscription_login(vendor="openai", model="gpt-5.5", force_login=True, open_browser=False, auth_method="device_code")'
+   ```
+
+   If device login is unavailable, change `auth_method` to `"browser"` and
+   follow the printed URL on this workstation; the callback uses localhost
+   port 1455. Do not use `codex login` for this native-agent credential.
+3. Install the SDK cache as the shared Kubernetes Secret. This creates or
+   updates it without printing credentials or putting them in shell history.
+
+   ```sh
+   kubectl -n openhands create secret generic openhands-openai \
+     --from-file=openai_oauth.json="$openhands_auth_dir/auth/openai_oauth.json" \
+     --dry-run=client -o yaml | kubectl -n openhands apply -f -
+   rm -rf "$openhands_auth_dir"
+   unset openhands_auth_dir
+   ```
+
+4. Sync the chart through Argo CD, then choose **codex** or **isolated-codex**
+   in the agent picker and start a new conversation. Select an LLM profile in
+   the model picker: **codex** (`gpt-5.5`), **codex-luna** (`gpt-5.6-luna`), or
+   **codex-astra** (`gpt-6-astra`). These IDs are in the pinned SDK's allowlist;
+   account availability still varies. Edit/create LLM profiles in Settings
+   to select another model supported by that SDK version. This server's LLM
+   profiles always use OpenAI subscription auth; API keys are rejected.
+
+The optional Secret is mounted only in `seed-home`, never read by the app
+server. That initContainer copies it to
+`/workspace/home/.openhands/auth/openai_oauth.json` with mode `0600`, in a
+`0700` directory. Each sandbox has its own writable cache on its workspace
+PVC. The SDK refreshes there; suspending/resuming keeps the refreshed cache.
+A SHA-256 marker prevents the original seed from overwriting refreshed tokens
+on resume. Changing the seed replaces the cache on the next pod start.
+A missing Secret leaves Claude usable; a native Codex start fails with
+"OpenAI subscription login is required" until the Secret is installed.
+The cloud frontend's profile list uses `api_key_set` as its backend-auth
+readiness signal, so these profiles advertise it as true; no API key is stored
+or returned. Actual subscription authentication is checked at sandbox launch.
+
+**Shared seed lifecycle:** the Kubernetes Secret is a snapshot, and refreshed
+tokens are not written back to it. OAuth refresh-token rotation can invalidate
+the snapshot or sibling sandboxes sharing the original login. This setup
+does not coordinate refresh across pods: it cannot guarantee that concurrent
+Codex sandboxes keep authenticating indefinitely. If a new session cannot
+authenticate, or a running one reports a refresh error, repeat the fresh login
+and Secret update above. New sandboxes get the new seed immediately; suspend
+and resume affected existing sandboxes to rerun `seed-home`. A Secret update
+alone does not change an already-running agent's in-memory credentials.
+Independent logins per sandbox or a coordinated credential broker would be
+needed to remove the shared-refresh limitation.
+
+Authentication uses the subscription's limits and account permissions. The
+OpenHands cost metric remains an estimate, not your subscription bill. Do not
+commit the OAuth cache or put it into Settings → Secrets: it contains both
+access and refresh tokens. Deleting a sandbox deletes its writable copy;
+revoking the login at OpenAI ends its access. Both specs receive this credential,
+as they already receive the Claude credential.
 
 ## Skills
 
@@ -256,7 +352,7 @@ docker buildx build --platform linux/amd64 \
 then set `sandboxSpecs.image` to `<tag>`. The token needs `write:packages`, and
 the package must be readable by the cluster (public, or an imagePullSecret).
 
-### Models
+### Claude models
 
 The model picker's entries are fixed in the frontend, and all but one are
 aliases — `opus[1m]`, `sonnet`, `haiku` — that the Claude Code CLI in the
@@ -421,12 +517,12 @@ reports back. So a run gets what a conversation gets — a pod, a workspace and 
 session key of its own — and leaves nothing behind but its transcript.
 
 What runs in that sandbox is ours. The automation service's own run scripts
-build an agent from an LLM API key, and the only model credential here is the
-Claude Code login, so every automation is a *custom* one running the same
+build an agent from an LLM API key, while these agents use subscriptions,
+so every automation is a *custom* one running the same
 small tarball (`app_server/automation_run.py`), which the app server uploads to
 the automation service's own store. Its entry
 point asks the app server to start the run's conversation, which is therefore
-the same ACP agent, with the same credentials and secrets, as one started from
+the same selected agent, with the same credentials and secrets, as one started from
 the UI — and is listed beside them, titled with the automation's name. It then
 waits for the conversation to stop and reports the outcome.
 
@@ -620,9 +716,11 @@ kubectl -n openhands logs deploy/openhands-app-server | grep 'collect:'
 
 - **No editor tab.** The agent server's bundled editor listens on a second
   port the runtime proxy does not reach, so sandboxes start with it off.
-- **No LLM profiles.** Conversations run ACP agents, which bring their own
-  model; switching model is the ACP model switch, and an OpenHands-kind agent
-  profile launches from `agent_settings`.
+- **LLM profiles support OpenAI subscriptions only.** The model picker uses
+  the active LLM profile for new native-agent conversations, falling back to
+  the agent profile's `llm_profile_ref` when none is active. Switching model
+  in a running native conversation affects only that conversation. ACP
+  conversations keep their own model picker.
 - **The Files tab does not follow an ACP agent's edits.** The frontend
   refreshes its file queries on `FileEditorObservation`-style events only; an
   ACP agent's edit arrives as an `ACPToolCallEvent` (`tool_kind: "edit"`), so

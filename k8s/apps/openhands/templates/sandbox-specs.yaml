@@ -72,6 +72,20 @@ spec:
             - |
               {{- include "openhands.seedSkillsScript" $root | nindent 14 }}
               mkdir -p /workspace/project
+              # Preserve refreshed credentials until the shared seed changes.
+              if [ -s /opt/openai-auth/openai_oauth.json ]; then
+                umask 077
+                auth="$HOME/.openhands/auth"
+                mkdir -p "$auth"
+                chmod 700 "$auth"
+                seed=$(sha256sum /opt/openai-auth/openai_oauth.json | cut -d ' ' -f 1)
+                previous=$(cat "$auth/.seed-sha256" 2>/dev/null || true)
+                if [ ! -s "$auth/openai_oauth.json" ] || [ "$seed" != "$previous" ]; then
+                  cp /opt/openai-auth/openai_oauth.json "$auth/openai_oauth.json"
+                  chmod 600 "$auth/openai_oauth.json"
+                  printf '%s\n' "$seed" > "$auth/.seed-sha256"
+                fi
+              fi
           env:
             - name: HOME
               value: /workspace/home
@@ -89,6 +103,9 @@ spec:
               mountPath: /workspace
             - name: skills
               mountPath: /opt/openhands-skills
+              readOnly: true
+            - name: openai-auth
+              mountPath: /opt/openai-auth
               readOnly: true
       containers:
         - name: agent-server
@@ -165,6 +182,14 @@ spec:
               readOnly: true
             {{- end }}
       volumes:
+        - name: openai-auth
+          secret:
+            secretName: {{ $root.Values.openai.secretName }}
+            optional: true
+            defaultMode: 0440
+            items:
+              - key: openai_oauth.json
+                path: openai_oauth.json
         # Only the config file: the keys beside it are already env vars.
         - name: sandbox-config
           secret:

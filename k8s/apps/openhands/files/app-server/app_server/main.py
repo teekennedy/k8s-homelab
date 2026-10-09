@@ -16,6 +16,7 @@ from . import (
     proxy,
     routes_account,
     routes_conversations,
+    routes_llm_profiles,
     routes_runtime,
     routes_sandboxes,
     routes_settings,
@@ -72,6 +73,7 @@ class State:
         # Streams can stay open for a whole agent turn.
         self.http = httpx.AsyncClient(timeout=httpx.Timeout(30, read=None))
         self.settings_store = SettingsStore(db, settings.settings_seed_file)
+        self.settings_store.ensure_declared_profiles()
         # The profile picker is how a conversation chooses a spec, so every
         # spec but the default needs a profile named after it.
         self.settings_store.ensure_profiles(
@@ -108,6 +110,10 @@ def build_api(state: State) -> FastAPI:
     app.include_router(routes_conversations.router)
     app.include_router(routes_runtime.router)
     app.include_router(routes_settings.router)
+    app.include_router(routes_llm_profiles.router, prefix="/api/v1/settings/profiles")
+    app.include_router(
+        routes_llm_profiles.router, prefix="/api/organizations/{org_id}/profiles"
+    )
     app.include_router(routes_account.router)
     app.include_router(proxy.router)
 

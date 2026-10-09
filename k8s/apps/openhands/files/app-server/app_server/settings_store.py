@@ -9,6 +9,7 @@ them; POST sends `*_diff` objects plus preferences) and the agent server's own
 
 import copy
 import json
+import re
 import shlex
 import uuid
 from pathlib import Path
@@ -20,6 +21,7 @@ SETTINGS_KEY = "settings"
 PROFILES_KEY = "agent_profiles"
 # The declared model last applied per ACP server; see apply_declared_models.
 APPLIED_MODELS_KEY = "applied_models"
+LLM_PROFILES_KEY = "llm_profiles"
 
 # Fields an ACP profile carries over onto agent_settings at launch.
 ACP_PROFILE_FIELDS = (
@@ -231,6 +233,8 @@ class SettingsStore:
         doc = self._profiles()
         existing = doc["profiles"].get(name)
         profile = self._new_profile(name, body, existing)
+        if profile["agent_kind"] == "openhands":
+            self.llm_config(profile["llm_profile_ref"])
         self._declared_server(profile)
         if self._command(profile):
             profile["acp_command"] = profile["acp_args"] = None
@@ -285,6 +289,107 @@ class SettingsStore:
         if missing:
             self._put(PROFILES_KEY, doc)
 
+    def ensure_declared_profiles(self) -> None:
+        """Seed additional agents and LLMs without replacing UI edits."""
+        llms = self._llm_profiles()
+        for name, config in (self._seed.get("llm_profiles") or {}).items():
+            if name not in llms["profiles"]:
+                llms["profiles"][name] = self._subscription_config(config)
+        self._put(LLM_PROFILES_KEY, llms)
+        agents = self._profiles()
+        for name, body in (self._seed.get("agent_profiles") or {}).items():
+            if name not in agents["profiles"]:
+                agents["profiles"][name] = self._new_profile(name, body, None)
+        self._put(PROFILES_KEY, agents)
+
+    def _llm_profiles(self) -> dict[str, Any]:
+        return self._get(LLM_PROFILES_KEY, {"profiles": {}, "active": None})
+
+    @staticmethod
+    def _subscription_config(config: dict[str, Any]) -> dict[str, Any]:
+        """Subscription profiles contain model settings, never credentials."""
+        if not isinstance(config, dict):
+            raise ProfileError(422, "llm must be an object")
+        model = config.get("model")
+        if not isinstance(model, str) or not model.strip():
+            raise ProfileError(422, "model is required")
+        if config.get("api_key") or config.get("provider_connection_id"):
+            raise ProfileError(422, "subscription credentials belong in the sandbox")
+        return {
+            "model": model,
+            "auth_type": "subscription",
+            "subscription_vendor": "openai",
+            "stream": True,
+            **{
+                k: config[k]
+                for k in ("reasoning_effort", "max_input_tokens")
+                if config.get(k) is not None
+            },
+        }
+
+    def llm_config(self, name: str) -> dict[str, Any]:
+        config = self._llm_profiles()["profiles"].get(name)
+        if config is None:
+            raise ProfileError(404, f"LLM profile {name!r} not found")
+        return copy.deepcopy(config)
+
+    def list_llm_profiles(self) -> dict[str, Any]:
+        doc = self._llm_profiles()
+        return {
+            "profiles": [
+                # Cloud Canvas uses this as backend credential readiness and
+                # does not inspect subscription auth in profile details.
+                # The credential itself is resolved inside the sandbox.
+                {"name": name, "model": cfg["model"], "api_key_set": True}
+                for name, cfg in doc["profiles"].items()
+            ],
+            "active_profile": doc["active"],
+        }
+
+    def save_llm_profile(self, name: str, config: dict[str, Any]) -> dict[str, str]:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", name):
+            raise ProfileError(422, "invalid LLM profile name")
+        doc = self._llm_profiles()
+        doc["profiles"][name] = self._subscription_config(config)
+        self._put(LLM_PROFILES_KEY, doc)
+        return {"name": name, "message": "saved"}
+
+    def mutate_llm_profile(self, name: str, new_name: str | None) -> dict[str, str]:
+        self.llm_config(name)
+        if new_name is not None:
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", new_name):
+                raise ProfileError(422, "invalid LLM profile name")
+            if new_name in self._llm_profiles()["profiles"]:
+                raise ProfileError(409, "LLM profile already exists")
+        agents = self._profiles()
+        refs = [
+            p for p in agents["profiles"].values() if p.get("llm_profile_ref") == name
+        ]
+        if refs and new_name is None:
+            raise ProfileError(409, "LLM profile is referenced by an agent profile")
+        doc = self._llm_profiles()
+        config = doc["profiles"].pop(name)
+        if new_name is not None:
+            doc["profiles"][new_name] = config
+            for profile in refs:
+                profile["llm_profile_ref"] = new_name
+                profile["revision"] += 1
+            self._put(PROFILES_KEY, agents)
+        if doc["active"] == name:
+            doc["active"] = new_name
+        self._put(LLM_PROFILES_KEY, doc)
+        return {
+            "name": new_name or name,
+            "message": "renamed" if new_name else "deleted",
+        }
+
+    def activate_llm_profile(self, name: str) -> dict[str, Any]:
+        config = self.llm_config(name)
+        doc = self._llm_profiles()
+        doc["active"] = name
+        self._put(LLM_PROFILES_KEY, doc)
+        return {"name": name, "message": "activated", "model": config["model"]}
+
     def apply_declared_models(self) -> None:
         """Set the declared default model on the stored settings and on every
         profile of that ACP server — once per declared value. Until the value
@@ -325,9 +430,7 @@ class SettingsStore:
         """agent_settings for a new conversation: the stored settings, with
         the named (or active) ACP profile's fields laid over them.
 
-        An OpenHands-kind profile resolves through an LLM profile, which this
-        server does not store; its conversations launch from agent_settings,
-        which is also what the frontend falls back to.
+        OpenHands profiles resolve the active LLM selection or their own ref.
         """
         agent = copy.deepcopy(self.settings()["agent_settings"])
         doc = self._profiles()
@@ -338,4 +441,9 @@ class SettingsStore:
             for field in ACP_PROFILE_FIELDS:
                 if profile.get(field) is not None:
                     agent[field] = profile[field]
+        elif profile and profile["agent_kind"] == "openhands":
+            agent = {k: v for k, v in agent.items() if not k.startswith("acp_")}
+            agent["agent_kind"] = "openhands"
+            name = self._llm_profiles()["active"] or profile["llm_profile_ref"]
+            agent["llm"] = self.llm_config(name)
         return self._with_command(agent)

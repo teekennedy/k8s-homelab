@@ -88,6 +88,11 @@ ci:
 anthropic:
   secretName: openhands-anthropic
 
+# SDK OAuth cache, copied to each sandbox's writable auth directory. This is
+# not Codex CLI auth.json. See README.md, "OpenAI subscription authentication".
+openai:
+  secretName: openhands-openai
+
 # --- Remote Control ---------------------------------------------------------
 # A separate, long-lived pod running `claude remote-control` in server mode, so
 # a session can be driven from claude.ai/code or the Claude mobile app. It
@@ -251,6 +256,21 @@ appServer:
   # no setup. Written to the database once; the Settings UI owns them after
   # that. Shapes: GET /api/v1/settings and POST /api/agent-profiles/{name}.
   defaults:
+    # Seeded on every start when missing; subsequent UI edits are preserved.
+    llm_profiles:
+      codex:
+        model: gpt-5.5
+      codex-luna:
+        model: gpt-5.6-luna
+      codex-astra:
+        model: gpt-6-astra
+    agent_profiles:
+      codex:
+        agent_kind: openhands
+        llm_profile_ref: codex
+      isolated-codex:
+        agent_kind: openhands
+        llm_profile_ref: codex
     agent_settings:
       agent_kind: acp
       acp_server: claude-code
