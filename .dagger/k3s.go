@@ -154,8 +154,8 @@ func (c *k3sCluster) service() *dagger.Service {
 		WithMountedTemp("/var/log").
 		WithExposedPort(k3sAPIPort).
 		AsService(dagger.ContainerAsServiceOpts{
-			Args: c.serverArgs(),
-			UseEntrypoint: true,
+			Args:                     c.serverArgs(),
+			UseEntrypoint:            true,
 			InsecureRootCapabilities: true,
 		})
 }
