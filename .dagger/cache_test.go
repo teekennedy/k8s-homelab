@@ -155,7 +155,10 @@ type check struct {
 
 // allChecks is the registry the shape test and the scenario tables iterate.
 func allChecks() []check {
-	return []check{testGoCheck(), lintGoCheck(), buildHelmfileCheck(), validateHelmfileCheck()}
+	return []check{
+		testGoCheck(), lintGoCheck(), buildHelmfileCheck(), validateHelmfileCheck(),
+		validatePolarisCheck(), validateKubeconformCheck(),
+	}
 }
 
 // sameArgv is a wantUnitArgv for checks whose units all run the same commands

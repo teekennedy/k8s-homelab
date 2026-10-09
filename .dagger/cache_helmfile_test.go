@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"path"
 	"slices"
 	"strings"
 	"testing"
@@ -149,6 +150,58 @@ func validateHelmfileCheck() check {
 	}
 }
 
+func validatePolarisCheck() check {
+	return check{
+		name:      "validate-polaris",
+		fixture:   helmfileFixture,
+		scenarios: polarisScenarios,
+		invoke: func(ctx context.Context, m *Homelab, source *dagger.Directory, ctr *dagger.Container) error {
+			_, err := m.ValidatePolaris(ctx, source, helmfileEnvironments, nil, ctr)
+			return err
+		},
+		unitOf: unitByHelmfileRelease,
+		mount:  strings.TrimPrefix(helmRepoRoot, "/"),
+		// The audit runs on the shared render's output.
+		wantUnitArgv: func(unit string) []string {
+			return []string{
+				helmfileTemplateArgv(unit),
+				"polaris audit --audit-path /rendered.yaml --format pretty --only-show-failed-tests true" +
+					" --set-exit-code-on-danger --config /polaris.yaml --merge-config",
+			}
+		},
+		wantUnitFiles: helmfileUnitFiles,
+		shimTools:     []string{"helmfile", "polaris"},
+		shimMarker:    markerFromHelmfileArgs,
+	}
+}
+
+func validateKubeconformCheck() check {
+	return check{
+		name:      "validate-kubeconform",
+		fixture:   helmfileFixture,
+		scenarios: kubeconformScenarios,
+		invoke: func(ctx context.Context, m *Homelab, source *dagger.Directory, ctr *dagger.Container) error {
+			_, err := m.ValidateKubeconform(ctx, source, helmfileEnvironments, nil, ctr)
+			return err
+		},
+		unitOf: unitByHelmfileRelease,
+		mount:  strings.TrimPrefix(helmRepoRoot, "/"),
+		// The schema catalog is unpacked between the two, by execs that name no
+		// unit and so are not listed here.
+		wantUnitArgv: func(unit string) []string {
+			return []string{
+				helmfileTemplateArgv(unit),
+				"kubeconform -strict -ignore-missing-schemas -schema-location default" +
+					" -schema-location /schemas/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json" +
+					" -summary /rendered.yaml",
+			}
+		},
+		wantUnitFiles: helmfileUnitFiles,
+		shimTools:     []string{"helmfile", "kubeconform"},
+		shimMarker:    markerFromHelmfileArgs,
+	}
+}
+
 // helmfileTemplateArgv is the render every helmfile unit starts with.
 func helmfileTemplateArgv(unit string) string {
 	env, release, _ := strings.Cut(unit, ".")
@@ -162,6 +215,9 @@ func helmfileTemplateArgv(unit string) string {
 // --selector. That the mount is scoped to match is asserted separately, by
 // helmfileUnitFiles. Execs that are not a helmfile invocation return "".
 func unitByHelmfileRelease(e daggerfake.Exec) string {
+	if len(e.Args) > 0 && slices.Contains(auditTools, e.Args[0]) {
+		return unitByMountedRelease(e)
+	}
 	if !slices.Contains(e.Args, "helmfile") {
 		return ""
 	}
@@ -180,11 +236,40 @@ func unitByHelmfileRelease(e daggerfake.Exec) string {
 	return env + "." + release
 }
 
+// auditTools are the tools that audit a release's render. Their argv names
+// neither the environment nor the release, so their unit is read off the tree
+// they run against instead; see unitByMountedRelease.
+var auditTools = []string{"polaris", "kubeconform"}
+
+// unitByMountedRelease names an audit exec's unit from the release tree mounted
+// at /repo, which holds exactly one environment's env.json and one non-library
+// chart.
+func unitByMountedRelease(e daggerfake.Exec) string {
+	var env, release string
+	for _, f := range e.Files[strings.TrimPrefix(helmRepoRoot, "/")] {
+		if strings.HasPrefix(f, "config/gen/") && strings.HasSuffix(f, "/env.json") {
+			env = path.Base(path.Dir(f))
+		}
+		if dir, ok := strings.CutSuffix(f, "/Chart.yaml"); ok && !strings.HasPrefix(dir, sharedChartsPath+"/") {
+			release = path.Base(dir)
+		}
+	}
+	if env == "" || release == "" {
+		return ""
+	}
+	return env + "." + release
+}
+
 // markerFromHelmfileArgs is the engine backend's shimMarker for the helmfile
-// checks: the shim standing in for helmfile reads the same two arguments
-// unitByHelmfileRelease does.
+// checks. The shim standing in for helmfile reads the same two arguments
+// unitByHelmfileRelease does; the audit shims have no such arguments, so they
+// read the tree in /repo as unitByMountedRelease does.
 const markerFromHelmfileArgs = `$(e=; n=; while [ $# -gt 0 ]; do case "$1" in ` +
-	`--environment) e=$2 ;; name=*) n=${1#name=} ;; esac; shift; done; echo "$e.$n")`
+	`--environment) e=$2 ;; name=*) n=${1#name=} ;; esac; shift; done; ` +
+	`if [ -z "$e" ]; then ` +
+	`e=$(basename "$(dirname config/gen/*/env.json)"); ` +
+	`n=$(basename "$(dirname "$(find k8s -name Chart.yaml -not -path 'k8s/charts/*')")"); fi; ` +
+	`echo "$e.$n")`
 
 // ---------------------------------------------------------------------------
 // scenarios
@@ -239,6 +324,26 @@ func helmfileScenarios() []scenario {
 			rerun:     helmfileUnits,
 			toolchain: toolchainRebuilt,
 		},
+	}
+}
+
+// polarisScenarios and kubeconformScenarios add the per-chart config file each
+// audit reads to the shared table: editing it re-runs that chart's audit and
+// no other.
+func polarisScenarios() []scenario {
+	return append(helmfileScenarios(), chartConfigScenario("k8s/apps/alpha/polaris.yaml", "exemptions: []\n"))
+}
+
+func kubeconformScenarios() []scenario {
+	return append(helmfileScenarios(), chartConfigScenario("k8s/apps/alpha/kubeconform.yaml", "skipKinds:\n  - Foo\n"))
+}
+
+func chartConfigScenario(file, content string) scenario {
+	return scenario{
+		name:   "editing " + path.Base(file) + " invalidates only that chart",
+		edit:   addFiles(map[string]string{file: content}),
+		rerun:  []string{prodAlpha, stagingAlpha},
+		cached: []string{prodBeta, stagingBeta},
 	}
 }
 

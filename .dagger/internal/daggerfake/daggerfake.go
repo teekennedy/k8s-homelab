@@ -437,9 +437,10 @@ func (e *Engine) applyQuery(field string, args map[string]any) (any, error) {
 		return newContainer(), nil
 	case "cacheVolume":
 		return &cacheVal{key: str(args["key"])}, nil
-	case "node":
-		return e.lookup(str(args["id"]))
-	case "loadDirectoryFromID", "loadFileFromID", "loadContainerFromID", "loadCacheVolumeFromID", "loadChangesetFromID":
+	case "http":
+		// Fetched content is not modelled; the URL stands in for it.
+		return &fileVal{opaque: digest("http", str(args["url"]))}, nil
+	case "node", "loadDirectoryFromID", "loadFileFromID", "loadContainerFromID", "loadCacheVolumeFromID", "loadChangesetFromID":
 		return e.lookup(str(args["id"]))
 	case "defaultPlatform":
 		return "linux/amd64", nil
@@ -710,6 +711,13 @@ func (e *Engine) applyContainer(c *ctrVal, field string, args map[string]any) (a
 		at := clean(str(args["path"]))
 		next := c.step(fmt.Sprintf("withMountedCache %s=%s seed=%s", at, vol.key, seed))
 		next.mounts[at] = "cache:" + vol.key
+		return next, nil
+
+	case "withNewFile":
+		at := clean(str(args["path"]))
+		contents := digest("new-file", str(args["contents"]))
+		next := c.step(fmt.Sprintf("withNewFile %s=%s", at, contents))
+		next.mounts[at] = contents
 		return next, nil
 
 	case "withUnixSocket":

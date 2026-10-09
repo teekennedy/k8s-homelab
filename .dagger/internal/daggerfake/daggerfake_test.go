@@ -186,6 +186,31 @@ func TestMountedContentReachesTheExecKey(t *testing.T) {
 	}
 }
 
+// TestNewFileAndHTTPReachTheExecKey pins the two ways an exec gets an input that
+// is not a directory: a file written into the container, keyed by its contents,
+// and a download, keyed by its URL.
+func TestNewFileAndHTTPReachTheExecKey(t *testing.T) {
+	key := func(contents, url string) string {
+		e := New()
+		id := queryString(t, e, `{http(url:"`+url+`"){id}}`)
+		return soleExecKey(t, e, `{container{from(address:"alpine")`+
+			`{withNewFile(path:"/cfg.yaml", contents:"`+contents+`")`+
+			`{withMountedFile(path:"/catalog.tgz", source:"`+id+`")`+
+			`{withExec(args:["tool"]){sync}}}}}}`)
+	}
+
+	base := key("one", "https://example.com/a.tgz")
+	if base != key("one", "https://example.com/a.tgz") {
+		t.Error("the same inputs produced different cache keys")
+	}
+	if base == key("CHANGED", "https://example.com/a.tgz") {
+		t.Error("changing a new file's contents did not change the exec's cache key")
+	}
+	if base == key("one", "https://example.com/b.tgz") {
+		t.Error("changing the download's URL did not change the exec's cache key")
+	}
+}
+
 // TestCacheMountNameKeysTheExec pins the BuildKit rule the model encodes: a
 // cache volume is identified by name, and its mutable contents never invalidate
 // the exec that mounts it. This is why the Go build and module caches in
