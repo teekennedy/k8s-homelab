@@ -338,7 +338,7 @@ sandboxSpecs:
   # tag (Renovate bumps that, not this) and adds kubectl, the dagger CLI and the Claude
   # Code adapter.
   # Rebuild, push and bump this tag together.
-  image: ghcr.io/teekennedy/openhands-sandbox:1.53.0-python-2
+  image: ghcr.io/teekennedy/openhands-sandbox:1.53.0-python-3
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:

@@ -13,7 +13,7 @@ ARG KUBECTL_VERSION=v1.36.0
 ARG CLAUDE_ADAPTER_VERSION=0.87.0
 # Must match the engine (k8s/platform/dagger-engine/values.yaml), so Renovate
 # does not track it on its own.
-ARG DAGGER_VERSION=0.21.8
+ARG DAGGER_VERSION=0.21.10
 ARG TARGETARCH
 
 USER root
