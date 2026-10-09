@@ -2,9 +2,8 @@
 
 These tests treat reflector as a black box: they create ConfigMaps, annotate
 them, and watch for the copies reflector is supposed to make. Nothing here knows
-how reflector was deployed, so the same suite works against the ephemeral k3s
-cluster the Dagger workflow builds and against any other cluster KUBECONFIG
-names.
+how reflector was deployed, so the same suite works against any cluster
+KUBECONFIG names.
 
 The suite does not try to work out for itself whether the cluster it has been
 pointed at is safe to write to — the `kubernetes` marker is what keeps it from

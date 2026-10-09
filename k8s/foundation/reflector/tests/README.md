@@ -2,8 +2,8 @@
 
 Black-box tests for the deployed reflector: that it copies an annotated
 ConfigMap into another namespace, and that it propagates later edits to the
-copy. They know nothing about how reflector was deployed, and nothing about
-Dagger — the cluster is whichever one `KUBECONFIG` names.
+copy. They know nothing about how reflector was deployed — the cluster is
+whichever one `KUBECONFIG` names.
 
 | File | Contents |
 |---|---|
@@ -12,17 +12,8 @@ Dagger — the cluster is whichever one `KUBECONFIG` names.
 
 ## Running them
 
-Normally through Dagger, which builds a throwaway k3s cluster, deploys reflector
-onto it and runs these against it:
-
-```bash
-dagger call test-kubernetes-integration --releases=reflector
-```
-
-See "Kubernetes integration tests" in `.dagger/README.md` for prerequisites.
-
-Against a cluster you already have — one that is running reflector, and that you
-are content to have namespaces created and deleted in:
+Against a cluster that is running reflector, and that you are content to have
+namespaces created and deleted in:
 
 ```bash
 KUBECONFIG=/path/to/kubeconfig uv run pytest -m kubernetes -v
@@ -31,16 +22,14 @@ KUBECONFIG=/path/to/kubeconfig uv run pytest -m kubernetes -v
 ## They do not run by accident
 
 Every test here carries `@pytest.mark.kubernetes`, and `pyproject.toml`
-deselects that marker by default. A bare `pytest` — an editor, a shell, `dagger
-check test-python` — collects both tests and runs neither:
+deselects that marker by default. A bare `pytest` — an editor, a shell, a generic
+Python test runner — collects both tests and runs neither:
 
 ```
 collected 2 items / 2 deselected / 0 selected
 ```
 
-That `addopts` line is the whole mechanism, and it has to live here: the Dagger
-Python runner passes no `-m` at all, because a command-line one would replace
-this rather than narrow it. It matters because a developer's shell very often has
+That `addopts` line is the whole mechanism. It matters because a developer's shell very often has
 `KUBECONFIG` pointing at production, and these tests write to the cluster.
 
 Once they have been selected, though, not running is a failure: there is no

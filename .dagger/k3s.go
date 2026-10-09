@@ -12,44 +12,36 @@ import (
 	"dagger/homelab/internal/dagger"
 )
 
-// Everything here is about one throwaway k3s cluster: starting it, reaching it
-// from a Dagger container, proving a kubeconfig still points at it, and taking
-// it down again. Nothing in this file knows what gets deployed to it.
-//
-// The cluster is a single `k3s server` run as a Dagger service, so it needs an
-// engine that allows privileged execs. See "Kubernetes integration tests" in
-// README.md.
+// One throwaway k3s cluster: starting it, reaching it from a Dagger container,
+// proving a kubeconfig still points at it, and stopping it. See "Kubernetes
+// integration tests" in README.md.
 const (
 	// k3sAPIPort is the port k3s serves its API on.
 	k3sAPIPort = 6443
-	// k3sAlias is the hostname the service is bound at, and so the hostname the
-	// API server's certificate is issued for.
+	// k3sAlias is the hostname the service is bound at, and the one the API
+	// server's certificate is issued for.
 	k3sAlias = "k3s"
-	// kubeconfigPath is where the cluster's admin kubeconfig is mounted in
-	// every container that talks to it.
+	// kubeconfigPath is where the admin kubeconfig is mounted.
 	kubeconfigPath = "/run/k3s/kubeconfig"
-	// apiAuthFilePath is where the service mounts the API server's static token
-	// file.
+	// apiAuthFilePath is where the API server's static token file is mounted.
 	apiAuthFilePath = "/etc/homelab/tokens.csv"
 	// containerdPath is where k3s keeps the images it has pulled.
 	containerdPath = "/var/lib/rancher/k3s/agent/containerd"
 	// k3sStartTimeout bounds how long the service gets to start listening.
 	k3sStartTimeout = 3 * time.Minute
-	// k3sReadyTimeout bounds the wait for the API server and the node to become
-	// ready once the service is listening.
+	// k3sReadyTimeout bounds the wait for the node to become Ready once the
+	// service is listening.
 	k3sReadyTimeout = "3m"
-	// closeTimeout bounds Close. It runs on a context detached from the caller's,
-	// so it needs a limit of its own.
+	// closeTimeout bounds Close, which runs on a detached context.
 	closeTimeout = time.Minute
 )
 
 // k3sEntrypoint nests cgroups before handing over to k3s, which only does that
-// itself when it is PID 1 — which it is not under Dagger's init shim.
+// itself when it is PID 1, and it is not under Dagger's init shim.
 //
 // The cgroup v2 block is from moby's hack/dind
 // (https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/hack/dind#L28-L37),
-// used with permission of its author, as k3d and the daggerverse k3s module do.
-// Moby is Apache-2.0: https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/LICENSE
+// Apache-2.0: https://github.com/moby/moby/blob/ed89041433a031cafc0a0f19cfe573c31688d377/LICENSE
 const k3sEntrypoint = `#!/bin/sh
 set -o errexit
 set -o nounset
@@ -67,23 +59,19 @@ exec "$@"
 type k3sCluster struct {
 	// Name is the cluster name, unique per run.
 	Name string
-	// APIHost is the hostname a Dagger container reaches the cluster's
-	// Kubernetes API server on. It is also a SAN on the API server's
-	// certificate, so clients verify TLS rather than skipping it.
+	// APIHost is the hostname containers reach the API server on, and a SAN on
+	// its certificate.
 	APIHost string
-	// Toolchain carries kubectl and curl, with nothing yet that ties it to this
-	// cluster: execs derived from it are cached across runs.
+	// Toolchain carries kubectl and curl and nothing tied to this cluster, so
+	// execs derived from it are cached across runs.
 	Toolchain *dagger.Container
-	// Kubeconfig is the cluster's admin kubeconfig. It only ever exists inside
-	// the engine.
+	// Kubeconfig is the admin kubeconfig. It only ever exists inside the engine.
 	Kubeconfig *dagger.File
-	// KubeSystemUID is the kube-system namespace's UID, read once when the
-	// cluster came up. No two clusters share it, which is what makes it usable
-	// as the cluster's identity.
+	// KubeSystemUID is the kube-system namespace's UID, read once at creation.
+	// It is the cluster's identity: no two clusters share it.
 	KubeSystemUID string
 
-	// token is the admin credential: a static token the API server accepts as
-	// system:masters.
+	// token is the admin credential, accepted as system:masters.
 	token *dagger.Secret
 	// tokenAuth is token in the API server's token-auth-file format.
 	tokenAuth *dagger.Secret
@@ -91,9 +79,8 @@ type k3sCluster struct {
 	server *dagger.Service
 }
 
-// newK3sCluster reserves a cluster name and its credential. It starts nothing —
-// Create does — so that a caller can defer Close before anything exists to
-// clean up.
+// newK3sCluster reserves a cluster name and credential. It starts nothing, so a
+// caller can defer Close before Create.
 func newK3sCluster(toolchain *dagger.Container) (*k3sCluster, error) {
 	name, err := k3sClusterName()
 	if err != nil {
@@ -109,8 +96,7 @@ func newK3sCluster(toolchain *dagger.Container) (*k3sCluster, error) {
 		Name:      name,
 		APIHost:   k3sAlias,
 		Toolchain: toolchain,
-		// Named per cluster, so no two clusters' secrets are ever the same one
-		// to the engine.
+		// Named per cluster, so the engine never treats two as the same secret.
 		token:     dag.SetSecret("k3s-token-"+name, token),
 		tokenAuth: dag.SetSecret("k3s-token-auth-"+name, tokenAuthLine(token)),
 	}, nil
@@ -125,8 +111,8 @@ func k3sClusterName() (string, error) {
 	return "homelab-" + hex.EncodeToString(suffix), nil
 }
 
-// tokenAuthLine is one line of the API server's token-auth-file: the token, a
-// user name and uid, and the groups it belongs to.
+// tokenAuthLine is one line of the API server's token-auth-file: token, user
+// name, uid and groups.
 func tokenAuthLine(token string) string {
 	return fmt.Sprintf("%s,homelab-admin,homelab-admin,%q\n", token, "system:masters")
 }
@@ -135,29 +121,21 @@ func tokenAuthLine(token string) string {
 func (c *k3sCluster) serverArgs() []string {
 	return []string{
 		"k3s", "server",
-		// Nothing the integration tests use, and each is a workload to pull and
-		// wait for.
+		// Workloads to pull and wait for that nothing here uses.
 		"--disable", "traefik",
 		"--disable", "metrics-server",
-		// The API server reaches nodes directly. The tunnel it would otherwise
-		// use serves `kubectl logs` and `exec`, which nothing here needs.
+		// Skips the tunnel that serves `kubectl logs` and `exec`.
 		"--egress-selector-mode=disabled",
-		// APIHost has to be a SAN on the API server's certificate, or every
-		// client reaching the cluster by that name has to skip verification.
+		// Without the SAN, clients reaching APIHost must skip verification.
 		"--tls-san", c.APIHost,
-		// The credential the kubeconfig carries. The admin client certificate k3s
-		// generates is unreachable from outside the service.
+		// The credential the kubeconfig carries; k3s's own admin certificate is
+		// unreachable from outside the service.
 		"--kube-apiserver-arg", "token-auth-file=" + apiAuthFilePath,
 	}
 }
 
-// service is the k3s server.
-//
-// Its containerd root is a PRIVATE cache volume. That keeps pulled images across
-// runs, and it is also what lets containerd use overlayfs, which needs a real
-// filesystem underneath rather than Dagger's own overlay. PRIVATE because two
-// containerds cannot share a root. It is deliberately not wiped on start; the
-// volume is keyed on the k3s image, so a version bump starts clean.
+// service is the k3s server. Its containerd root is a PRIVATE cache volume keyed
+// on the k3s image; see Limitations in README.md.
 func (c *k3sCluster) service() *dagger.Service {
 	return dag.Container().
 		From(k3sImage).
@@ -170,29 +148,21 @@ func (c *k3sCluster) service() *dagger.Service {
 			dag.CacheVolume("homelab-k3s-containerd-"+k3sImage),
 			dagger.ContainerWithMountedCacheOpts{Sharing: dagger.CacheSharingModePrivate},
 		).
-		// Per-run state that has to be a real filesystem but must not outlive the
-		// run: stale kubelet or CNI state would be read by the next cluster.
+		// Real filesystems that must not outlive the run.
 		WithMountedTemp("/var/lib/kubelet").
 		WithMountedTemp("/var/lib/cni").
 		WithMountedTemp("/var/log").
 		WithExposedPort(k3sAPIPort).
 		AsService(dagger.ContainerAsServiceOpts{
 			Args: c.serverArgs(),
-			// Through the entrypoint, which sets up cgroups before k3s starts.
 			UseEntrypoint: true,
-			// k3s runs containerd and a kubelet, which cannot create cgroups or
-			// mount filesystems without this.
 			InsecureRootCapabilities: true,
 		})
 }
 
-// withService returns ctr able to reach the cluster's service.
-//
-// The cluster name is passed as an environment variable as well, so that every
-// exec derived from this container is unique to this run. Dagger's exec cache
-// keys on the command and the filesystem, neither of which captures that an exec
-// against a service depends on live state. Everything that does not touch the
-// cluster is built before this is applied, which is what keeps it cacheable.
+// withService returns ctr bound to the cluster's service. The cluster name goes
+// in the environment so that every exec derived from the result is unique to
+// this run; see Caching in README.md.
 func (c *k3sCluster) withService(ctr *dagger.Container) *dagger.Container {
 	return ctr.
 		WithServiceBinding(c.APIHost, c.server).
@@ -200,9 +170,7 @@ func (c *k3sCluster) withService(ctr *dagger.Container) *dagger.Container {
 }
 
 // WithCluster returns ctr able to talk to the cluster: the admin kubeconfig
-// mounted at a fixed path with KUBECONFIG naming it. The kubeconfig is a file in
-// the engine; no host file is read, written or merged, and no host context
-// changes.
+// mounted with KUBECONFIG naming it.
 func (c *k3sCluster) WithCluster(ctr *dagger.Container) *dagger.Container {
 	return c.withService(ctr).
 		WithMountedFile(kubeconfigPath, c.Kubeconfig).
@@ -221,10 +189,8 @@ func (c *k3sCluster) Context() string {
 
 // Create starts the cluster, builds its kubeconfig and captures its identity.
 func (c *k3sCluster) Create(ctx context.Context) error {
-	// Bounded, because an engine that refuses privileged execs does not reject
-	// the service — k3s simply never comes up, and the start blocks on the port
-	// healthcheck until something gives up. Without this the workflow hangs
-	// instead of naming its one prerequisite.
+	// Bounded because an engine that refuses privileged execs does not reject
+	// the service: k3s never comes up and the start blocks on its port.
 	startCtx, cancel := context.WithTimeout(ctx, k3sStartTimeout)
 	defer cancel()
 
@@ -245,10 +211,8 @@ server=$1 context=$2 kubeconfig=$3 timeout=$4
 ca=$(dirname "$kubeconfig")/ca.crt
 mkdir -p "$(dirname "$kubeconfig")"
 
-# /cacerts is the one endpoint k3s serves without credentials, and it is how the
-# server's CA is obtained. The request skips verification because the CA is
-# what it fetches; every call after this one verifies against it. The server
-# only answers once its CA exists, so this also waits for k3s to be up.
+# /cacerts is served without credentials. Verification is skipped because this
+# fetches the CA; every later call verifies. It answers only once k3s is up.
 curl --fail --silent --show-error --insecure \
 	--retry 60 --retry-delay 2 --retry-connrefused --retry-all-errors \
 	--output "$ca" "$server/cacerts"
@@ -260,10 +224,8 @@ kubectl config set-context "$context" --cluster "$context" --user "$context" --k
 kubectl config use-context "$context" --kubeconfig "$kubeconfig"
 rm "$ca"
 
-# Listening is not ready: the API server answers before it has finished
-# starting, and nothing can be scheduled until the node has registered and is
-# Ready. kubectl wait fails outright, rather than waiting, on a node that does
-# not exist yet, so the node has to be waited for first.
+# kubectl wait fails outright on a node that has not registered yet, so wait
+# for the node to exist first.
 deadline=$(( $(date +%s) + 180 ))
 until [ -n "$(kubectl --kubeconfig "$kubeconfig" get nodes --output name 2>/dev/null)" ]; do
 	if [ "$(date +%s)" -ge "$deadline" ]; then
@@ -293,14 +255,9 @@ kubectl --kubeconfig "$kubeconfig" wait --for condition=Ready node --all --timeo
 }
 
 // Verify fails unless the kubeconfig still names the cluster this run created:
-// the same API endpoint, the same context, and the same kube-system UID that
-// was read when it came up.
-//
-// The first two catch a kubeconfig that was never swapped in; the UID is the one
-// that cannot be faked by editing a kubeconfig, because a different cluster
-// answering at the same address has a different one. This runs before any test
-// does, so a misconfigured workflow fails instead of writing to someone's real
-// cluster.
+// the same endpoint, context and kube-system UID. The UID cannot be faked by
+// editing a kubeconfig. It runs before any test does, so a misconfigured
+// workflow fails instead of writing to another cluster.
 func (c *k3sCluster) Verify(ctx context.Context) error {
 	out, err := c.WithCluster(c.Toolchain).
 		WithExec([]string{"sh", "-c", `
@@ -316,9 +273,8 @@ printf 'uid=%s\n' "$(kubectl get namespace kube-system --output 'jsonpath={.meta
 	return c.checkIdentity(out)
 }
 
-// checkIdentity compares what Verify's probe reported against what this cluster
-// should report. The probe prints key=value lines rather than bare values, so an
-// added field or a stray warning from kubectl cannot shift the parse.
+// checkIdentity compares Verify's key=value probe output with this cluster's
+// identity.
 func (c *k3sCluster) checkIdentity(probe string) error {
 	got := map[string]string{}
 	for _, line := range strings.Split(probe, "\n") {
@@ -346,15 +302,9 @@ func (c *k3sCluster) checkIdentity(probe string) error {
 	return nil
 }
 
-// WaitForWorkloads waits for every workload in namespace to finish rolling out,
-// and returns the namespace's pod and event state when one doesn't.
-//
-// Helmfile returning successfully only means the manifests were accepted, so
-// this is what decides whether a release is actually up. It asks kubectl about
-// each of the three kinds that have a rollout rather than about Deployments
-// alone, so a release whose workload is a StatefulSet or a DaemonSet needs
-// nothing added here. A namespace with none of them fails, which is the right
-// answer for a release whose tests are about to run.
+// WaitForWorkloads waits for every Deployment, StatefulSet and DaemonSet in
+// namespace to roll out, and attaches the namespace's diagnostics to the error
+// when one doesn't. A namespace with none of them fails.
 func (c *k3sCluster) WaitForWorkloads(ctx context.Context, namespace, timeout string) error {
 	_, err := c.WithCluster(c.Toolchain).
 		WithExec([]string{"sh", "-c", `
@@ -378,10 +328,8 @@ done
 		namespace, timeout, withExecOutput(err), c.Diagnostics(ctx, namespace))
 }
 
-// Diagnostics returns what a namespace looks like when something in it did not
-// come up. Best effort: it is only ever used to decorate an error, so a failure
-// to collect it is reported in place of the diagnostics rather than replacing
-// the error the caller already has.
+// Diagnostics returns a namespace's pods and events. Best effort: a failure to
+// collect them is reported in their place, not instead of the caller's error.
 func (c *k3sCluster) Diagnostics(ctx context.Context, namespace string) string {
 	out, err := c.WithCluster(c.Toolchain).
 		WithExec([]string{"sh", "-c", `
@@ -400,12 +348,9 @@ kubectl --namespace "$ns" get events --sort-by=.lastTimestamp || true
 	return out
 }
 
-// Close stops the cluster, whatever happened to the run. Stopping the service
-// is what frees everything the cluster occupies.
-//
-// Safe to call when Create never got that far. It runs on a context detached
-// from the caller's: an interrupted run is exactly when the caller's context is
-// already cancelled and the cluster still needs to go.
+// Close stops the cluster. Safe to call when Create never got that far. It runs
+// on a context detached from the caller's, which is already cancelled when a run
+// is interrupted.
 func (c *k3sCluster) Close(ctx context.Context) error {
 	if c.server == nil {
 		return nil

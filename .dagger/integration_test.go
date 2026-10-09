@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
@@ -153,5 +154,140 @@ func TestReleaseVerdict(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The cache-granularity questions for the workflow. The cluster itself cannot be
+// modelled without an engine, so these cover the two places a cache key is
+// decided before any cluster exists: the source RunKubernetesIntegration is
+// called with, and the dependency install that precedes the cluster.
+
+func integrationFixture() repo {
+	return repo{
+		helmfilePath:                      "releases: []\n",
+		"config/gen/ephemeral/env.json":   "{\"name\": \"ephemeral\"}\n",
+		"config/gen/production/env.json":  "{\"name\": \"production\"}\n",
+		"k8s/charts/shared/Chart.yaml":    "name: shared\n",
+		"k8s/foundation/alpha/Chart.yaml": "name: alpha\n",
+		"k8s/foundation/alpha/tests/t.py": "def test_a(): ...\n",
+		"k8s/foundation/beta/Chart.yaml":  "name: beta\n",
+		"k8s/foundation/beta/tests/t.py":  "def test_b(): ...\n",
+		"k8s/apps/gamma/Chart.yaml":       "name: gamma\n",
+	}
+}
+
+func scopedSourceID(t *testing.T, files repo, chosen ...string) string {
+	t.Helper()
+	var plan []*integrationRelease
+	for _, chart := range chosen {
+		plan = append(plan, &integrationRelease{Chart: chart})
+	}
+	id, err := integrationSource(files.directory(), plan).ID(context.Background())
+	if err != nil {
+		t.Fatalf("integrationSource: %v", err)
+	}
+	return string(id)
+}
+
+func TestIntegrationSourceCacheGranularity(t *testing.T) {
+	const alpha = "k8s/foundation/alpha"
+	tests := []struct {
+		name        string
+		edit        func(*testing.T, repo) repo
+		chosen      []string
+		wantChanged bool
+	}{
+		{"a chart that is not deployed", edit("k8s/foundation/beta/Chart.yaml", "name: beta2\n"), []string{alpha}, false},
+		{"a test of a chart that is not deployed", edit("k8s/foundation/beta/tests/t.py", "x\n"), []string{alpha}, false},
+		{"an app in another tier", edit("k8s/apps/gamma/Chart.yaml", "name: gamma2\n"), []string{alpha}, false},
+		{"another environment's values", edit("config/gen/production/env.json", "{}\n"), []string{alpha}, false},
+		{"a deployed chart", edit("k8s/foundation/alpha/Chart.yaml", "name: alpha2\n"), []string{alpha}, true},
+		{"a deployed release's test", edit("k8s/foundation/alpha/tests/t.py", "x\n"), []string{alpha}, true},
+		{"the shared charts", edit("k8s/charts/shared/Chart.yaml", "name: shared2\n"), []string{alpha}, true},
+		{"the state file", edit(helmfilePath, "releases: [x]\n"), []string{alpha}, true},
+		{"the ephemeral values", edit("config/gen/ephemeral/env.json", "{}\n"), []string{alpha}, true},
+		{
+			"a chart once it is deployed too",
+			edit("k8s/foundation/beta/Chart.yaml", "name: beta2\n"),
+			[]string{alpha, "k8s/foundation/beta"},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeEngine(t)
+			base := integrationFixture()
+			before := scopedSourceID(t, base, tt.chosen...)
+			after := scopedSourceID(t, tt.edit(t, base), tt.chosen...)
+			if changed := before != after; changed != tt.wantChanged {
+				t.Errorf("scoped source changed = %v, want %v", changed, tt.wantChanged)
+			}
+		})
+	}
+}
+
+// Choosing different releases is a different argument, so it must not be served
+// the other's result.
+func TestIntegrationSourceDependsOnChosenReleases(t *testing.T) {
+	fakeEngine(t)
+	files := integrationFixture()
+	if scopedSourceID(t, files, "k8s/foundation/alpha") == scopedSourceID(t, files, "k8s/foundation/beta") {
+		t.Error("different releases produced the same scoped source")
+	}
+}
+
+func TestKubernetesEnvCacheGranularity(t *testing.T) {
+	project := func() repo {
+		return repo{
+			"pyproject.toml": "[project]\nname = \"t\"\n",
+			"uv.lock":        "version = 1\n",
+			"test_a.py":      "def test_a(): ...\n",
+			"conftest.py":    "\n",
+		}
+	}
+	installKey := func(t *testing.T, files repo) string {
+		t.Helper()
+		engine := fakeEngine(t)
+		pp := &PythonProject{Path: "tests", Source: files.directory()}
+		if _, err := pp.kubernetesEnv(dag.Container().From("toolchain")).Sync(context.Background()); err != nil {
+			t.Fatalf("kubernetesEnv: %v", err)
+		}
+		for _, e := range engine.Execs() {
+			if len(e.Args) > 0 && e.Args[0] == "uv" {
+				return e.CacheKey
+			}
+		}
+		t.Fatal("kubernetesEnv ran no uv exec")
+		return ""
+	}
+
+	tests := []struct {
+		name        string
+		edit        func(*testing.T, repo) repo
+		wantChanged bool
+	}{
+		{"a test", edit("test_a.py", "def test_a(): pass\n"), false},
+		{"the fixtures", edit("conftest.py", "import os\n"), false},
+		{"a new test file", addFiles(map[string]string{"test_b.py": "x\n"}), false},
+		{"the lock file", edit("uv.lock", "version = 2\n"), true},
+		{"the project metadata", edit("pyproject.toml", "[project]\nname = \"u\"\n"), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			base := project()
+			before := installKey(t, base)
+			after := installKey(t, tt.edit(t, base))
+			if changed := before != after; changed != tt.wantChanged {
+				t.Errorf("dependency install re-ran = %v, want %v", changed, tt.wantChanged)
+			}
+		})
+	}
+}
+
+// Close is deferred before Create, so it has to cope with a cluster that never
+// started.
+func TestCloseBeforeCreate(t *testing.T) {
+	if err := (&k3sCluster{Name: "homelab-abcdef"}).Close(context.Background()); err != nil {
+		t.Errorf("Close on a cluster that never started: %v", err)
 	}
 }

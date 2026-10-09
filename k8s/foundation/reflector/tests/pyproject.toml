@@ -20,8 +20,8 @@ markers = [
     "kubernetes: talks to a live cluster; runs only when selected with `-m kubernetes`",
 ]
 # Every test here carries the `kubernetes` marker, so a bare `pytest` — an
-# editor, a developer's shell, the ordinary `dagger check test-python` — collects
-# them and runs none. Running them takes an explicit `-m kubernetes`, which is
+# editor, a developer's shell, a generic Python test runner — collects them and
+# runs none. Running them takes an explicit `-m kubernetes`, which is
 # what keeps a KUBECONFIG pointing at production from being written to by
 # accident.
 addopts = "-m 'not kubernetes'"

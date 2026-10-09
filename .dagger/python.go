@@ -137,15 +137,9 @@ type pytestRun struct {
 }
 
 // kubernetesEnv installs this project's locked dependencies into toolchain, and
-// puts its tests beside them.
-//
-// Kept apart from testKubernetes, and applied to a container that knows nothing
-// about the cluster, so that the install is an exec Dagger can serve from cache:
-// it depends on the project and the toolchain, not on the run. It also depends on
-// nothing but the two files that decide what gets installed, so editing a test
-// does not reinstall anything. The project is copied rather than mounted,
-// because the environment has to land in the layer for the exec after this one
-// to see it.
+// puts its tests beside them. The install depends on pyproject.toml and uv.lock
+// only, so it stays cached when a test is edited. The project is copied rather
+// than mounted so the environment lands in the layer.
 func (pp *PythonProject) kubernetesEnv(toolchain *dagger.Container) *dagger.Container {
 	return toolchain.
 		WithWorkdir("/src").
@@ -157,12 +151,10 @@ func (pp *PythonProject) kubernetesEnv(toolchain *dagger.Container) *dagger.Cont
 
 // testKubernetes runs this project's `kubernetes`-marked tests in container,
 // which must come from kubernetesEnv and already carry a KUBECONFIG for the
-// cluster under test. The project decides what to assert; this only decides how
-// pytest is invoked, so a new release's tests need nothing added here.
+// cluster under test.
 //
-// pytest's exit code is captured instead of being left to fail the exec,
-// because a failed exec's filesystem cannot be read and the JUnit report is
-// most wanted exactly when a test failed.
+// pytest's exit code is captured instead of failing the exec, because a failed
+// exec's filesystem cannot be read and the JUnit report is wanted most then.
 func (pp *PythonProject) testKubernetes(ctx context.Context, container *dagger.Container) (*pytestRun, error) {
 	if err := pp.usable(container); err != nil {
 		return nil, err

@@ -11,8 +11,7 @@ const (
 	// renovate: datasource=docker depName=nixos/nix
 	nixImage = "nixos/nix:2.35.2"
 	// k3sImage is what the ephemeral clusters run. Keep its minor version in
-	// step with services.k3s.package in nix/modules/k3s/k3s.nix, so the tests
-	// run against the Kubernetes version the real cluster does.
+	// step with the production cluster's.
 	// renovate: datasource=docker depName=rancher/k3s
 	k3sImage = "rancher/k3s:v1.36.5-k3s1"
 )

@@ -312,11 +312,10 @@ privileged execs:
 { "security": { "insecureRootCapabilities": true } }
 ```
 
-`k8s/platform/dagger-engine/values.yaml` sets this to `false`, so the in-cluster
-engine cannot run the service. It does not reject it outright: `k3s` just never
+An engine that does not allow them does not reject the service: `k3s` just never
 comes up, so the service start is bounded at 3 minutes and the workflow then
-fails naming this prerequisite rather than hanging. Run it against an engine
-that allows privileged execs — a local Docker-based engine is the usual answer:
+fails naming this prerequisite rather than hanging. A local Docker-based engine
+is the usual answer:
 
 ```bash
 unset _EXPERIMENTAL_DAGGER_RUNNER_HOST   # don't use the in-cluster engine
@@ -526,13 +525,8 @@ in loading the module and planning.
   a root. It is deliberately not wiped between runs, so it is what makes images
   pulled once stay pulled; a run killed mid-flight leaves its containers' metadata
   in it for the next k3s to find.
-- `k3sImage` is pinned to match `services.k3s.package` in
-  `nix/modules/k3s/k3s.nix`, so the tests run against the Kubernetes version the
-  real cluster does.
-- Dagger's exec cache keys on the command and the filesystem, neither of which
-  captures that an exec against a service depends on live state. Every exec that
-  touches the cluster therefore carries `HOMELAB_K3S_CLUSTER=<random name>`,
-  which makes it unique to that run.
+- `k3sImage` is pinned to the production cluster's Kubernetes minor version, so
+  the tests run against the version it does.
 
 ## Caching & Performance
 

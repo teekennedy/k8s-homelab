@@ -16,12 +16,8 @@ import (
 
 // The Kubernetes integration workflow: a throwaway k3s cluster, the releases
 // under test deployed onto it with the repo's own helmfile, and each release's
-// pytest suite run against the result.
-//
-// Nothing here is release-specific. A release joins the workflow by being
-// enabled in the ephemeral environment (config/ephemeral.cue) and growing a
-// tests/ directory next to its chart; reflector is just the first one to do it.
-// The assertions live in that directory, not here.
+// pytest suite run against the result. A release joins by being enabled in the
+// ephemeral environment and having a tests/ directory next to its chart.
 
 const (
 	// ephemeralEnvironment is the helmfile environment the workflow deploys
@@ -48,12 +44,8 @@ type integrationRelease struct {
 }
 
 // KubernetesIntegrationRun is the outcome of one workflow run that got as far
-// as running tests.
-//
-// Plain data only, and the reports as text rather than a Directory: a directory
-// produced by execs that used a service and a secret cannot outlive the session
-// that made it, and a function result holding one is not cached across sessions.
-// The reports are small enough that nothing is lost.
+// as running tests. It is plain data, with no Directory, so that the call is
+// cached; see Caching in README.md.
 type KubernetesIntegrationRun struct {
 	// Summary is the per-release verdict, with pytest's output folded in for
 	// the ones that failed.
@@ -76,17 +68,11 @@ type KubernetesIntegrationReport struct {
 // TestKubernetesIntegration deploys releases to a throwaway k3s cluster and runs
 // their Kubernetes integration tests against it.
 //
-// Deliberately not a `+check`: it needs an engine that allows privileged execs,
-// and a PR can change both this code and the tests it runs. Invoke it explicitly:
+// Deliberately not a `+check`: it needs an engine that allows privileged execs.
+// See "Kubernetes integration tests" in README.md.
 //
 //	dagger call test-kubernetes-integration
-//	dagger call test-kubernetes-integration --releases=reflector
-//
-// The result is cached like any function call: the same source and arguments
-// return the earlier verdict without starting a cluster. The cluster is created,
-// used and destroyed inside this call. Nothing reads,
-// writes or merges a kubeconfig outside the engine, and no host context
-// changes. See "Kubernetes integration tests" in README.md for prerequisites.
+//	dagger call test-kubernetes-integration --releases=<name>
 func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/ephemeral/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
@@ -122,13 +108,10 @@ func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 }
 
 // KubernetesIntegrationReports runs the same workflow and returns the JUnit XML
-// reports, one file per release:
+// reports, one file per release. A failing test is not an error here, but a
+// cluster that never came up, or a release that never became healthy, is.
 //
 //	dagger call kubernetes-integration-reports export --path=./reports
-//
-// A failing test is not an error here — getting the report out is the point —
-// but a cluster that never came up, or a release that never became healthy,
-// still is.
 func (m *Homelab) KubernetesIntegrationReports(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/ephemeral/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
@@ -163,14 +146,9 @@ func (m *Homelab) KubernetesIntegrationReports(ctx context.Context,
 	return dir, nil
 }
 
-// scopedIntegrationRun plans the run against the caller's whole source, then
-// hands the workflow only what it reads.
-//
-// The workflow is run through the module's own API so that Dagger caches it on
-// its arguments. The caller's `source` has to cover every chart, because which
-// ones a run deploys is only known once the ephemeral environment has been read,
-// so a change to any chart re-runs the caller. Re-running the caller costs the
-// plan; the workflow itself is a cache hit unless something it deploys changed.
+// scopedIntegrationRun plans against the caller's whole source, then calls
+// RunKubernetesIntegration with only what that run reads, so that its result is
+// cached on that and not on the rest of the repo. See Caching in README.md.
 func (m *Homelab) scopedIntegrationRun(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -187,18 +165,9 @@ func (m *Homelab) scopedIntegrationRun(
 		return nil, err
 	}
 
-	// What helmfile reads to sync those releases — the same layout the
-	// per-release render checks use — and nothing else. A release's tests live in
-	// its chart directory, so they come along.
-	scoped := helmfileStateSource(source, ephemeralEnvironment).
-		WithDirectory(sharedChartsPath, source.Directory(sharedChartsPath))
-	for _, r := range plan {
-		scoped = scoped.WithDirectory(r.Chart, source.Directory(r.Chart))
-	}
-	// Evaluated before it is passed on. An unevaluated directory is identified
-	// by the recipe that builds it, which names the caller's whole source; an
-	// evaluated one by its content, which is what has to decide the cache hit.
-	scoped, err = scoped.Sync(ctx)
+	// Evaluated before it is passed on: an unevaluated directory is identified by
+	// the recipe that builds it, which names the caller's whole source.
+	scoped, err := integrationSource(source, plan).Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("scoping the source to %s: %w", strings.Join(releaseNames(plan), ", "), err)
 	}
@@ -210,17 +179,24 @@ func (m *Homelab) scopedIntegrationRun(
 		}), nil
 }
 
-// RunKubernetesIntegration is the cached half of the workflow, and what
-// TestKubernetesIntegration and KubernetesIntegrationReports call: plan, create,
-// deploy, wait, prove, test, destroy. It is exported only so that they can reach
-// it through the module's own API, which is what lets Dagger cache it on its own
-// arguments; invoke those two instead.
+// integrationSource is what helmfile and the tests read for the planned
+// releases: the state file, the ephemeral values, the shared charts and each
+// release's chart directory, tests included.
+func integrationSource(source *dagger.Directory, plan []*integrationRelease) *dagger.Directory {
+	scoped := helmfileStateSource(source, ephemeralEnvironment).
+		WithDirectory(sharedChartsPath, source.Directory(sharedChartsPath))
+	for _, r := range plan {
+		scoped = scoped.WithDirectory(r.Chart, source.Directory(r.Chart))
+	}
+	return scoped
+}
+
+// RunKubernetesIntegration is the workflow itself: plan, create, deploy, wait,
+// prove, test, destroy. It is exported only so that TestKubernetesIntegration
+// and KubernetesIntegrationReports can call it through the module's own API;
+// invoke those instead.
 //
-// source is the scoped layout scopedIntegrationSource builds — the state file,
-// the ephemeral values and the chosen releases' charts — rather than the whole
-// repo. That is the point: the caller's `source` covers everything under k8s/, so
-// a change to any chart re-runs the caller, but only a change to something this
-// run deploys changes this argument.
+// source is the layout integrationSource builds, not the whole repo.
 func (m *Homelab) RunKubernetesIntegration(ctx context.Context,
 	source *dagger.Directory,
 	releases []string,
@@ -228,28 +204,13 @@ func (m *Homelab) RunKubernetesIntegration(ctx context.Context,
 	repeatSync bool,
 	// +optional
 	container *dagger.Container,
-) (*KubernetesIntegrationRun, error) {
-	return m.runKubernetesIntegration(ctx, source, releases, repeatSync, container)
-}
-
-// runKubernetesIntegration is the whole workflow: plan, create, deploy, wait,
-// prove, test, destroy.
-func (m *Homelab) runKubernetesIntegration(
-	ctx context.Context,
-	source *dagger.Directory,
-	releases []string,
-	repeatSync bool,
-	container *dagger.Container,
 ) (run *KubernetesIntegrationRun, err error) {
 	if container == nil {
 		container = m.integrationContainer()
 	}
-	// The same scoping the render checks use: helm's repository config is
-	// per-exec, and the repo is mounted where helmfile expects to be run from.
 	toolchain := helmfileContainer(container, source)
 
-	// Planned before anything is created, so a typo in --releases or a release
-	// that was never enabled costs nothing.
+	// Planned before anything is created, so a typo in --releases costs nothing.
 	plan, err := integrationPlan(ctx, source, toolchain, releases)
 	if err != nil {
 		return nil, err
@@ -259,8 +220,8 @@ func (m *Homelab) runKubernetesIntegration(
 	if err != nil {
 		return nil, err
 	}
-	// Deferred before the cluster exists so that every path out of here — a
-	// failed deploy, a failing test, a panic unwinding through — takes it down.
+	// Deferred before the cluster exists so that every path out of here takes it
+	// down.
 	defer func() {
 		err = errors.Join(err, cluster.Close(ctx))
 	}()
@@ -273,8 +234,7 @@ func (m *Homelab) runKubernetesIntegration(
 
 // deployForTesting creates the cluster, puts the planned releases on it, waits
 // for them to roll out, and proves the kubeconfig still names the cluster this
-// run created. The order matters: each step is only meaningful once the previous
-// one holds.
+// run created.
 func deployForTesting(
 	ctx context.Context,
 	cluster *k3sCluster,
@@ -284,8 +244,7 @@ func deployForTesting(
 	if err := cluster.Create(ctx); err != nil {
 		return err
 	}
-	// A second sync, when asked for, checks helmfile's idempotency against a
-	// cluster that already has the releases on it rather than only an empty one.
+	// A second sync checks that re-syncing a populated cluster succeeds.
 	syncs := 1
 	if repeatSync {
 		syncs = 2
@@ -296,8 +255,7 @@ func deployForTesting(
 		}
 	}
 
-	// Namespace-disjoint and read-only, so they run together: serially their
-	// timeouts would sum.
+	// Concurrent, so the timeouts don't sum.
 	g := new(errgroup.Group)
 	for _, r := range plan {
 		g.Go(func() error {
@@ -315,15 +273,12 @@ func deployForTesting(
 	return cluster.Verify(ctx)
 }
 
-// integrationPlan works out which releases to deploy and what the workflow needs
-// to know about each: the namespace helmfile puts it in, and where its tests are.
+// integrationPlan works out which releases to deploy, the namespace helmfile
+// puts each in, and where its tests are.
 //
-// The releases come from the ephemeral environment itself when the caller named
-// none. Enablement lives in that environment's generated `apps` map, read by the
-// state file's installedTemplate, so it is the only thing that decides what a
-// sync installs — which makes it the right default and the only workable source
-// of truth. `releases` can then narrow that set, because a --selector genuinely
-// does narrow a sync even though it cannot turn a release on.
+// The default is every release the ephemeral environment enables, since that
+// map is what the state file's installedTemplate reads. `releases` can narrow
+// that set, but a --selector cannot turn a release on.
 func integrationPlan(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -361,12 +316,10 @@ func integrationPlan(
 			return nil, fmt.Errorf("release %q has no namespace in the %s environment", name, ephemeralEnvironment)
 		}
 		testsPath := path.Join(entry.Chart, kubernetesTestsDir)
-		// Discovered the same way every other Python check discovers a project,
-		// so its source is scoped by the same rule.
 		projects := pythonProjects(ctx, source, []string{path.Join(testsPath, "pyproject.toml")})
 		if len(projects) != 1 {
 			return nil, fmt.Errorf("release %q has no Kubernetes integration tests: expected a "+
-				"Python project at %s (see k8s/foundation/reflector/tests for the shape of one)",
+				"Python project at %s ",
 				name, testsPath)
 		}
 		plan = append(plan, &integrationRelease{
@@ -394,9 +347,8 @@ func enabledReleases(apps map[string]map[string]bool) []string {
 }
 
 // checkEnabled fails unless every requested release is one the environment
-// enables, naming the file to edit rather than leaving helmfile to skip it
-// silently — a release the app list disables is simply never installed, and the
-// tests would then run against a cluster missing the thing they test.
+// enables. Helmfile would otherwise skip a disabled release silently and the
+// tests would run against a cluster missing it.
 func checkEnabled(enabled, requested []string) error {
 	on := map[string]bool{}
 	for _, r := range enabled {
@@ -419,20 +371,12 @@ func checkEnabled(enabled, requested []string) error {
 }
 
 // syncReleases deploys the planned releases with the repo's own helmfile.
-//
-// There is no separate state file for development clusters: the same
-// helmfile.yaml.gotmpl and the same generated environment values that deploy
-// production deploy this, which is the only way the workflow tests what the
-// cluster actually runs.
 func syncReleases(ctx context.Context, cluster *k3sCluster, plan []*integrationRelease, attempt int) error {
 	args := []string{
 		"helmfile",
 		"--environment", ephemeralEnvironment,
-		// KUBECONFIG names the file (WithCluster sets it) and this names the
-		// context inside it. Between them there is nothing left for an ambient
-		// current-context to decide: a kubeconfig that is not the ephemeral
-		// cluster's has no context by this name, and helmfile fails rather than
-		// deploying somewhere else.
+		// A kubeconfig that is not the ephemeral cluster's has no context by this
+		// name, so helmfile fails rather than deploying somewhere else.
 		"--kube-context", cluster.Context(),
 	}
 	for _, r := range plan {
@@ -442,8 +386,7 @@ func syncReleases(ctx context.Context, cluster *k3sCluster, plan []*integrationR
 
 	ctr := cluster.WithCluster(cluster.Toolchain)
 	if attempt > 1 {
-		// Without this the repeat is the identical exec, which Dagger would
-		// serve from cache — proving nothing about syncing twice.
+		// Otherwise the repeat is the identical exec and comes from cache.
 		ctr = ctr.WithEnvVariable("HOMELAB_HELMFILE_SYNC", strconv.Itoa(attempt))
 	}
 
@@ -456,10 +399,8 @@ func syncReleases(ctx context.Context, cluster *k3sCluster, plan []*integrationR
 
 // runIntegrationTests runs each release's pytest suite against the cluster.
 //
-// The suites run together — each in its own container, and the suites give their
-// namespaces random names precisely so they can — rather than making release
-// N+1's `uv` resolve wait on release N's verdict. Results are collected by
-// index, so the summary's order follows the plan rather than who finished first.
+// The suites run concurrently. Results are collected by index, so the summary
+// follows the plan's order.
 func runIntegrationTests(
 	ctx context.Context,
 	cluster *k3sCluster,
@@ -473,10 +414,7 @@ func runIntegrationTests(
 	g := new(errgroup.Group)
 	for i, r := range plan {
 		g.Go(func() error {
-			// The install comes first and knows nothing of the cluster, and it is
-			// built from the toolchain without the repo mounted in: a mount is
-			// part of an exec's cache key, so one carrying the whole source would
-			// reinstall on every unrelated edit.
+			// Installed before the cluster is applied, so the install is cached.
 			env := r.Tests.kubernetesEnv(container)
 			result, err := r.Tests.testKubernetes(ctx, cluster.WithCluster(env))
 			if err != nil {
@@ -526,9 +464,7 @@ func releaseVerdict(
 		return fmt.Sprintf("%s: %s", release.Name, totals), false
 	}
 
-	// Anything else is a failure, including a clean exit with nothing run: the
-	// workflow asked for this release's `kubernetes` tests, so collecting none
-	// means they were never exercised.
+	// A clean exit with nothing collected is a failure too: the tests never ran.
 	detail := []string{fmt.Sprintf("%s: %s (pytest exit code %d)", release.Name, totals, result.ExitCode)}
 	if totals.Tests == 0 {
 		detail = append(detail, fmt.Sprintf("  no tests marked %q were collected in %s",
