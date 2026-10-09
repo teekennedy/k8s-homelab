@@ -30,10 +30,14 @@ spec:
             description: {{ "Step {{ $labels.step }} in workflow {{ $labels.workflow }} failed on {{ $labels.repo }}. Check https://ci.msng.to/{{ $labels.repo }} for the run." | quote }}
 
         # Total CI outage: no agent connected at all, so nothing in the queue
-        # can ever run. `for: 5m` rides out a rollout/restart of the agent
+        # can ever run. `woodpecker_worker_count` is the workers idle and
+        # waiting for a task, not the connected ones: it is also 0 while every
+        # agent is busy. A running workflow (`woodpecker_running_steps` counts
+        # queue tasks, i.e. workflows) means an agent is there, so only both at
+        # zero is an outage. `for: 5m` rides out a rollout/restart of the agent
         # deployment rather than paging on a routine redeploy.
         - alert: WoodpeckerNoWorkers
-          expr: woodpecker_worker_count == 0
+          expr: woodpecker_worker_count == 0 and woodpecker_running_steps == 0
           for: 5m
           labels:
             severity: critical
