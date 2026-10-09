@@ -15,7 +15,7 @@ const (
 	// not something the devenv profile can provide, because it has to outlive a
 	// single exec as a service.
 	// renovate: datasource=docker depName=docker
-	dindImage = "docker:29.9.0-dind"
+	dindImage = "docker:29.8.2-dind"
 	// k3sImage is what the ephemeral clusters run. Keep its minor version in
 	// step with services.k3s.package in nix/modules/k3s/k3s.nix, so the tests
 	// run against the Kubernetes version the real cluster does.

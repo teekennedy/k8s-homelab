@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"dagger/homelab/internal/dagger"
 )
@@ -37,6 +38,8 @@ const (
 	kubeconfigPath = "/run/k3d/kubeconfig"
 	// k3dCreateTimeout bounds `k3d cluster create --wait`.
 	k3dCreateTimeout = "5m"
+	// dindStartTimeout bounds how long the dind service gets to start listening.
+	dindStartTimeout = 2 * time.Minute
 )
 
 // k3dCluster is one ephemeral k3d cluster and the Docker daemon holding it.
@@ -79,11 +82,20 @@ func newK3dCluster(ctx context.Context, toolchain *dagger.Container, dockerHost 
 	c := &k3dCluster{Name: name}
 
 	if dockerHost == "" {
-		svc, err := dindService().Start(ctx)
+		// Bounded, because an engine that refuses privileged execs does not
+		// reject the service — dockerd simply never comes up, and the start
+		// blocks on the port healthcheck until something gives up. Without this
+		// the workflow hangs instead of naming its one prerequisite.
+		startCtx, cancel := context.WithTimeout(ctx, dindStartTimeout)
+		defer cancel()
+
+		svc, err := dindService().Start(startCtx)
 		if err != nil {
-			return nil, fmt.Errorf("starting the dind service for k3d cluster %s "+
-				"(an engine with `insecureRootCapabilities: false` rejects it; see "+
-				"\"Kubernetes integration tests\" in .dagger/README.md): %w", name, err)
+			return nil, fmt.Errorf("the docker daemon for k3d cluster %s did not come up within %s. "+
+				"An engine configured with `insecureRootCapabilities: false` cannot run it, which "+
+				"looks exactly like this; pass --docker-host to use a daemon outside the engine, or "+
+				"see \"Kubernetes integration tests\" in .dagger/README.md: %w",
+				name, dindStartTimeout, err)
 		}
 		c.docker = svc
 		c.APIHost = dindAlias

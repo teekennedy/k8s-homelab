@@ -311,9 +311,11 @@ mount overlayfs or write iptables rules without them:
 ```
 
 `k8s/platform/dagger-engine/values.yaml` sets this to `false`, so the in-cluster
-engine rejects the dind service with `security.insecure is not allowed`. Run the
-workflow against an engine that allows it — a local Docker-based engine is the
-usual answer:
+engine cannot run the dind service. It does not reject it outright: `dockerd`
+just never comes up, so the service start is bounded at 2 minutes and the
+workflow then fails naming this prerequisite rather than hanging. Run it against
+an engine that allows privileged execs — a local Docker-based engine is the usual
+answer:
 
 ```bash
 unset _EXPERIMENTAL_DAGGER_RUNNER_HOST   # don't use the in-cluster engine
