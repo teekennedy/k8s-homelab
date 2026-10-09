@@ -64,6 +64,8 @@ class TerminalMirror:
             )
         if event.get("status") in _FINAL:
             self._started.discard(call_id)
+            # The adapter reports no exit code; the status is all it knows.
+            exit_code = 1 if event.get("status") == "failed" else 0
             out.append(
                 {
                     "kind": "ObservationEvent",
@@ -75,6 +77,16 @@ class TerminalMirror:
                     "action_id": action_id,
                     "observation": {
                         "kind": "TerminalObservation",
+                        "command": command,
+                        "exit_code": exit_code,
+                        "timeout": False,
+                        "metadata": {
+                            "exit_code": exit_code,
+                            "pid": -1,
+                            "working_dir": None,
+                            "prefix": "",
+                            "suffix": "",
+                        },
                         "content": [
                             {
                                 "type": "text",

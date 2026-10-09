@@ -26,6 +26,15 @@ def test_start_mirrors_an_action_and_completion_an_observation():
     (obs,) = m.mirror(_call("completed", raw_output="ok"))
     assert obs["source"] == "environment" and obs["action_id"] == action["id"]
     assert obs["observation"]["content"] == [{"type": "text", "text": "ok"}]
+    # The tab reads exit_code at the top level or under metadata.
+    assert obs["observation"]["exit_code"] == 0
+    assert obs["observation"]["metadata"]["exit_code"] == 0
+
+
+def test_a_failed_call_reports_a_nonzero_exit_code():
+    _, obs = TerminalMirror().mirror(_call("failed"))
+    assert obs["observation"]["exit_code"] == 1
+    assert obs["observation"]["metadata"]["exit_code"] == 1
 
 
 def test_a_call_first_seen_complete_gets_both_events():
