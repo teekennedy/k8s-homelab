@@ -151,6 +151,58 @@ func (r *PythonProject) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
+func (r KubernetesIntegrationRun) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Summary string
+		Reports []*KubernetesIntegrationReport
+		Failed  []string
+	}
+	concrete.Summary = r.Summary
+	concrete.Reports = r.Reports
+	concrete.Failed = r.Failed
+	return json.Marshal(&concrete)
+}
+
+func (r *KubernetesIntegrationRun) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Summary string
+		Reports []*KubernetesIntegrationReport
+		Failed  []string
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Summary = concrete.Summary
+	r.Reports = concrete.Reports
+	r.Failed = concrete.Failed
+	return nil
+}
+
+func (r KubernetesIntegrationReport) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Release string
+		XML     string
+	}
+	concrete.Release = r.Release
+	concrete.XML = r.XML
+	return json.Marshal(&concrete)
+}
+
+func (r *KubernetesIntegrationReport) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Release string
+		XML     string
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Release = concrete.Release
+	r.XML = concrete.XML
+	return nil
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -812,6 +864,41 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).PythonProjects(&parent, ctx, source), nil
+		case "RunKubernetesIntegration":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var source *dagger.Directory
+			if inputArgs["source"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
+				}
+			}
+			var releases []string
+			if inputArgs["releases"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["releases"]), &releases)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg releases", err))
+				}
+			}
+			var repeatSync bool
+			if inputArgs["repeatSync"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["repeatSync"]), &repeatSync)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg repeatSync", err))
+				}
+			}
+			var container *dagger.Container
+			if inputArgs["container"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
+				}
+			}
+			return (*Homelab).RunKubernetesIntegration(&parent, ctx, source, releases, repeatSync, container)
 		case "TestGo":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)

@@ -38,6 +38,8 @@ const (
 type integrationRelease struct {
 	// Name is the helmfile release name.
 	Name string
+	// Chart is the chart's directory relative to the repo root.
+	Chart string
 	// Namespace is the namespace helmfile deploys it into, taken from the
 	// helmfile state rather than assumed from the name.
 	Namespace string
@@ -45,17 +47,30 @@ type integrationRelease struct {
 	Tests *PythonProject
 }
 
-// kubernetesIntegrationRun is the outcome of one workflow run that got as far
+// KubernetesIntegrationRun is the outcome of one workflow run that got as far
 // as running tests.
-type kubernetesIntegrationRun struct {
+//
+// Plain data only, and the reports as text rather than a Directory: a directory
+// produced by execs that used a service and a secret cannot outlive the session
+// that made it, and a function result holding one is not cached across sessions.
+// The reports are small enough that nothing is lost.
+type KubernetesIntegrationRun struct {
 	// Summary is the per-release verdict, with pytest's output folded in for
 	// the ones that failed.
 	Summary string
 	// Reports holds one JUnit XML report per release.
-	Reports *dagger.Directory
+	Reports []*KubernetesIntegrationReport
 	// Failed names the releases whose tests did not all pass. Empty is a pass;
 	// an infrastructure failure is an error instead, not an entry here.
 	Failed []string
+}
+
+// KubernetesIntegrationReport is one release's JUnit XML report.
+type KubernetesIntegrationReport struct {
+	// Release is the helmfile release the report is for.
+	Release string
+	// XML is the report's contents.
+	XML string
 }
 
 // TestKubernetesIntegration deploys releases to a throwaway k3s cluster and runs
@@ -87,15 +102,23 @@ func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 	// +optional
 	container *dagger.Container,
 ) (string, error) {
-	run, err := m.runKubernetesIntegration(ctx, source, releases, repeatSync, container)
+	run, err := m.scopedIntegrationRun(ctx, source, releases, repeatSync, container)
 	if err != nil {
 		return "", err
 	}
-	if len(run.Failed) > 0 {
-		return "", fmt.Errorf("integration tests failed for %s:\n%s",
-			strings.Join(run.Failed, ", "), run.Summary)
+	summary, err := run.Summary(ctx)
+	if err != nil {
+		return "", fmt.Errorf("running the Kubernetes integration tests: %w", err)
 	}
-	return "Kubernetes integration tests passed\n" + run.Summary, nil
+	failed, err := run.Failed(ctx)
+	if err != nil {
+		return "", fmt.Errorf("reading which releases failed: %w", err)
+	}
+	if len(failed) > 0 {
+		return "", fmt.Errorf("integration tests failed for %s:\n%s",
+			strings.Join(failed, ", "), summary)
+	}
+	return "Kubernetes integration tests passed\n" + summary, nil
 }
 
 // KubernetesIntegrationReports runs the same workflow and returns the JUnit XML
@@ -117,11 +140,96 @@ func (m *Homelab) KubernetesIntegrationReports(ctx context.Context,
 	// +optional
 	container *dagger.Container,
 ) (*dagger.Directory, error) {
-	run, err := m.runKubernetesIntegration(ctx, source, releases, repeatSync, container)
+	run, err := m.scopedIntegrationRun(ctx, source, releases, repeatSync, container)
 	if err != nil {
 		return nil, err
 	}
-	return run.Reports, nil
+	reports, err := run.Reports(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("running the Kubernetes integration tests: %w", err)
+	}
+	dir := dag.Directory()
+	for _, report := range reports {
+		release, err := report.Release(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("reading a report's release name: %w", err)
+		}
+		xml, err := report.XML(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("reading the report for %s: %w", release, err)
+		}
+		dir = dir.WithNewFile(fmt.Sprintf("junit-%s.xml", release), xml)
+	}
+	return dir, nil
+}
+
+// scopedIntegrationRun plans the run against the caller's whole source, then
+// hands the workflow only what it reads.
+//
+// The workflow is run through the module's own API so that Dagger caches it on
+// its arguments. The caller's `source` has to cover every chart, because which
+// ones a run deploys is only known once the ephemeral environment has been read,
+// so a change to any chart re-runs the caller. Re-running the caller costs the
+// plan; the workflow itself is a cache hit unless something it deploys changed.
+func (m *Homelab) scopedIntegrationRun(
+	ctx context.Context,
+	source *dagger.Directory,
+	releases []string,
+	repeatSync bool,
+	container *dagger.Container,
+) (*dagger.HomelabKubernetesIntegrationRun, error) {
+	toolchain := container
+	if toolchain == nil {
+		toolchain = m.integrationContainer()
+	}
+	plan, err := integrationPlan(ctx, source, toolchain, releases)
+	if err != nil {
+		return nil, err
+	}
+
+	// What helmfile reads to sync those releases — the same layout the
+	// per-release render checks use — and nothing else. A release's tests live in
+	// its chart directory, so they come along.
+	scoped := helmfileStateSource(source, ephemeralEnvironment).
+		WithDirectory(sharedChartsPath, source.Directory(sharedChartsPath))
+	for _, r := range plan {
+		scoped = scoped.WithDirectory(r.Chart, source.Directory(r.Chart))
+	}
+	// Evaluated before it is passed on. An unevaluated directory is identified
+	// by the recipe that builds it, which names the caller's whole source; an
+	// evaluated one by its content, which is what has to decide the cache hit.
+	scoped, err = scoped.Sync(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("scoping the source to %s: %w", strings.Join(releaseNames(plan), ", "), err)
+	}
+
+	return dag.Homelab(dagger.HomelabOpts{DevenvSource: m.DevenvSource}).
+		RunKubernetesIntegration(scoped, releaseNames(plan), dagger.HomelabRunKubernetesIntegrationOpts{
+			RepeatSync: repeatSync,
+			Container:  container,
+		}), nil
+}
+
+// RunKubernetesIntegration is the cached half of the workflow, and what
+// TestKubernetesIntegration and KubernetesIntegrationReports call: plan, create,
+// deploy, wait, prove, test, destroy. It is exported only so that they can reach
+// it through the module's own API, which is what lets Dagger cache it on its own
+// arguments; invoke those two instead.
+//
+// source is the scoped layout scopedIntegrationSource builds — the state file,
+// the ephemeral values and the chosen releases' charts — rather than the whole
+// repo. That is the point: the caller's `source` covers everything under k8s/, so
+// a change to any chart re-runs the caller, but only a change to something this
+// run deploys changes this argument.
+func (m *Homelab) RunKubernetesIntegration(ctx context.Context,
+	source *dagger.Directory,
+	releases []string,
+	// +optional
+	repeatSync bool,
+	// +optional
+	container *dagger.Container,
+) (*KubernetesIntegrationRun, error) {
+	return m.runKubernetesIntegration(ctx, source, releases, repeatSync, container)
 }
 
 // runKubernetesIntegration is the whole workflow: plan, create, deploy, wait,
@@ -132,7 +240,7 @@ func (m *Homelab) runKubernetesIntegration(
 	releases []string,
 	repeatSync bool,
 	container *dagger.Container,
-) (run *kubernetesIntegrationRun, err error) {
+) (run *KubernetesIntegrationRun, err error) {
 	if container == nil {
 		container = m.integrationContainer()
 	}
@@ -263,6 +371,7 @@ func integrationPlan(
 		}
 		plan = append(plan, &integrationRelease{
 			Name:      name,
+			Chart:     entry.Chart,
 			Namespace: entry.Namespace,
 			Tests:     projects[0],
 		})
@@ -356,9 +465,10 @@ func runIntegrationTests(
 	cluster *k3sCluster,
 	plan []*integrationRelease,
 	container *dagger.Container,
-) (*kubernetesIntegrationRun, error) {
+) (*KubernetesIntegrationRun, error) {
 	results := make([]*pytestRun, len(plan))
 	reports := make([]*junitReport, len(plan))
+	contents := make([]string, len(plan))
 
 	g := new(errgroup.Group)
 	for i, r := range plan {
@@ -372,15 +482,15 @@ func runIntegrationTests(
 			if err != nil {
 				return err
 			}
-			contents, err := result.Junit.Contents(ctx)
+			xml, err := result.Junit.Contents(ctx)
 			if err != nil {
 				return fmt.Errorf("reading the JUnit report for %s: %w", r.Name, err)
 			}
-			report, err := parseJUnitReport(contents)
+			report, err := parseJUnitReport(xml)
 			if err != nil {
 				return fmt.Errorf("%s: %w\n%s", r.Name, err, indent(result.Output, "  "))
 			}
-			results[i], reports[i] = result, report
+			results[i], reports[i], contents[i] = result, report, xml
 			return nil
 		})
 	}
@@ -388,10 +498,10 @@ func runIntegrationTests(
 		return nil, fmt.Errorf("running the integration tests: %w", err)
 	}
 
-	run := &kubernetesIntegrationRun{Reports: dag.Directory()}
+	run := &KubernetesIntegrationRun{}
 	summary := make([]string, len(plan))
 	for i, r := range plan {
-		run.Reports = run.Reports.WithFile(fmt.Sprintf("junit-%s.xml", r.Name), results[i].Junit)
+		run.Reports = append(run.Reports, &KubernetesIntegrationReport{Release: r.Name, XML: contents[i]})
 		line, failed := releaseVerdict(r, results[i], reports[i])
 		if failed {
 			run.Failed = append(run.Failed, r.Name)

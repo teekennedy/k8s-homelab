@@ -2,7 +2,10 @@
   "name": "homelab",
   "engineVersion": "v0.21.10",
   "sdk": {
-    "source": "go"
+    "source": "go",
+    "experimental": {
+      "SELF_CALLS": true
+    }
   },
   "source": ".dagger"
 }

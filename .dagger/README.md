@@ -460,29 +460,44 @@ pytest; what to assert is entirely the test project's business.
 
 ### Caching
 
-The call is cached at three levels, and the workflow is arranged so each one can
+The call is cached at four levels, and the workflow is arranged so each one can
 do its job.
 
-1. **The function call.** Dagger caches a function's result on its arguments.
-   `source` is a content-addressed directory filtered by the `+ignore` list, so
-   re-running with nothing changed in `helmfile.yaml.gotmpl`, the ephemeral
-   environment's values or anything under `k8s/` returns the earlier verdict
-   without starting a cluster. Editing anything outside that list (`README.md`,
-   `.woodpecker/`, `nix/`) is also a hit. The flip side is that the filter is
-   coarse: it cannot know which releases a run will deploy, so a change to *any*
-   chart under `k8s/` re-runs the whole thing.
-2. **Execs that do not touch the cluster.** The toolchain, the helmfile planning
+1. **The outer function call.** Dagger caches a function's result on its
+   arguments. `source` is a content-addressed directory filtered by the
+   `+ignore` list, so re-running with nothing changed in
+   `helmfile.yaml.gotmpl`, the ephemeral environment's values or anything under
+   `k8s/` returns the earlier verdict without starting a cluster. Editing
+   anything outside that list (`README.md`, `.woodpecker/`, `nix/`) is also a
+   hit. The filter is coarse — it cannot know which releases a run will deploy —
+   so a change to *any* chart under `k8s/` re-runs this level, which costs only
+   the plan.
+2. **The inner function call.** `TestKubernetesIntegration` and
+   `KubernetesIntegrationReports` plan against the whole source, then pass
+   `RunKubernetesIntegration` only what the run reads: the state file, the
+   ephemeral values, the shared charts and the chosen releases' charts (tests
+   included). It is called through the module's own API, which needs the
+   experimental self-calls capability (`dagger develop --with-self-calls`, kept
+   in `dagger.json`). The workflow itself therefore re-runs only when something
+   it deploys or tests changes.
+3. **Execs that do not touch the cluster.** The toolchain, the helmfile planning
    (`helmfile build` and `list`) and each test project's `uv sync` are all built
    *before* anything cluster-specific is applied to the container, so they are
    cached whatever the cluster looks like. The `uv sync` copies in only
    `pyproject.toml` and `uv.lock` before installing, and runs on the toolchain
    *without* the repo mounted — a mount is part of an exec's cache key — so
    editing a test reinstalls nothing.
-3. **Execs that do.** Everything from the first use of the service on is unique
+4. **Execs that do.** Everything from the first use of the service on is unique
    to the run, by design: `HOMELAB_K3S_CLUSTER=<random name>` is in its
    environment, and the kubeconfig it mounts carries a random token. Caching one
    would mean serving "helmfile sync succeeded" for a cluster that has since been
    destroyed.
+
+`RunKubernetesIntegration` returns plain data — strings, with the JUnit reports
+as XML text — and never a `Directory`. A directory built from execs that used a
+service and a secret cannot outlive the session that made it, and a function
+result holding one is silently not cached across sessions: the inner call
+re-ran every time until it returned text instead.
 
 What persists *between* runs that are not cached is the containerd root, in a
 `PRIVATE` cache volume (about 540MB with reflector's images in it). The k3s
@@ -492,10 +507,10 @@ Measured on engine v0.21.10, one release (reflector), same host:
 
 | Run | k3d in dind | k3s service |
 | --- | --- | --- |
-| Nothing changed | 2.8s | 3.9s |
-| File outside the `+ignore` list changed | — | 4.0s |
-| A reflector test changed | 99s | 57s |
-| An unrelated chart changed | 107s | 57s |
+| Nothing changed | 2.8s | 3s |
+| File outside the `+ignore` list changed | — | 4s |
+| An unrelated chart changed | 107s | 3s |
+| A reflector test changed | 99s | 55s |
 | First run, warm toolchain, empty volumes | — | 91s |
 
 A run that is not cached spends roughly: 8s for k3s to boot and the node to go
