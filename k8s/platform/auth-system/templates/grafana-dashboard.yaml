@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+data:
+  authelia.json: |-
+{{ .Files.Get "files/authelia-dashboard.json" | indent 4 }}

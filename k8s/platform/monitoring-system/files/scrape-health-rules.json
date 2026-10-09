@@ -1,0 +1,78 @@
+{
+  "groups": [
+    {
+      "name": "scrape-health",
+      "interval": "1m",
+      "rules": [
+        {
+          "alert": "PrometheusTargetScrapeFailed",
+          "expr": "up == 0",
+          "for": "30m",
+          "labels": {
+            "severity": "warning",
+            "component": "monitoring"
+          },
+          "annotations": {
+            "summary": "Prometheus cannot scrape {{ $labels.job }} / {{ $labels.instance }}",
+            "description": "Scrapes have failed for 30 minutes. Check the target error in Prometheus, NetworkPolicies, routing, TLS and endpoint health. Job={{ $labels.job }}, endpoint={{ $labels.endpoint }}, path={{ $labels.metrics_path }}."
+          }
+        },
+        {
+          "alert": "PrometheusScrapeGroupDisappeared",
+          "expr": "group by (job, namespace, service, node, endpoint, metrics_path) (present_over_time(up[24h]))\nunless\ngroup by (job, namespace, service, node, endpoint, metrics_path) (up)",
+          "for": "30m",
+          "labels": {
+            "severity": "warning",
+            "component": "monitoring"
+          },
+          "annotations": {
+            "summary": "Scrape group {{ $labels.job }} disappeared",
+            "description": "A scrape group seen in the last 24 hours has been absent for 30 minutes. Check ServiceMonitor/PodMonitor/ScrapeConfig discovery and endpoints. This can also indicate intentional removal; it expires after the 24-hour history window. Pod/instance labels are ignored to tolerate replacements. Stable node labels are retained where the scraper supplies them."
+          }
+        },
+        {
+          "alert": "PrometheusRequiredJobUnavailable",
+          "expr": "absent(up{job=\"kubelet\"} == 1)",
+          "for": "30m",
+          "labels": {
+            "severity": "warning",
+            "component": "monitoring",
+            "job": "kubelet"
+          },
+          "annotations": {
+            "summary": "Required scrape job kubelet unavailable",
+            "description": "No healthy target for required job kubelet for 30 minutes, including when discovery returns no targets. Check discovery, NetworkPolicies and node endpoints."
+          }
+        },
+        {
+          "alert": "PrometheusRequiredJobUnavailable",
+          "expr": "absent(up{job=\"node-exporter\"} == 1)",
+          "for": "30m",
+          "labels": {
+            "severity": "warning",
+            "component": "monitoring",
+            "job": "node-exporter"
+          },
+          "annotations": {
+            "summary": "Required scrape job node-exporter unavailable",
+            "description": "No healthy target for required job node-exporter for 30 minutes, including when discovery returns no targets. Check discovery, NetworkPolicies and node endpoints."
+          }
+        },
+        {
+          "alert": "PrometheusRequiredJobUnavailable",
+          "expr": "absent(up{job=\"etcd\"} == 1)",
+          "for": "30m",
+          "labels": {
+            "severity": "warning",
+            "component": "monitoring",
+            "job": "etcd"
+          },
+          "annotations": {
+            "summary": "Required scrape job etcd unavailable",
+            "description": "No healthy target for required job etcd for 30 minutes, including when discovery returns no targets. Check discovery, NetworkPolicies and node endpoints."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "groups": [
+    {
+      "name": "authelia",
+      "interval": "1m",
+      "rules": [
+        {
+          "alert": "AutheliaMetricsUnavailable",
+          "expr": "absent(up{namespace=\"auth-system\",service=\"auth-system-authelia\"} == 1)",
+          "for": "30m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "Authelia metrics unavailable",
+            "description": "No Authelia metrics target has been scraped successfully for 30 minutes. Check discovery, endpoints, NetworkPolicies and the metrics listener; this does not prove authentication is down."
+          }
+        },
+        {
+          "alert": "AutheliaOIDCServerErrors",
+          "expr": "sum by (endpoint) (increase(authelia_request_duration_openid_connect_count{namespace=\"auth-system\",code=~\"5..\"}[10m])) >= 5",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "OIDC endpoint {{ $labels.endpoint }} returning server errors",
+            "description": "OIDC endpoint {{ $labels.endpoint }} produced at least five server errors in ten minutes. Inspect Authelia logs and LDAP, Valkey and PostgreSQL health. Normal 400/401/403 responses are not treated as outages."
+          }
+        },
+        {
+          "alert": "AutheliaAuthorizationServerErrors",
+          "expr": "sum (increase(authelia_authz{namespace=\"auth-system\",code=~\"5..\"}[10m])) >= 5",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "Authorization checks returning server errors",
+            "description": "Authorization checks produced at least five server errors in ten minutes. Inspect Authelia logs and LDAP, Valkey and PostgreSQL health. Normal 400/401/403 responses are not treated as outages."
+          }
+        },
+        {
+          "alert": "AutheliaAuthenticationSlow",
+          "expr": "((sum(increase(authelia_authn_duration_count{namespace=\"auth-system\",success=\"true\"}[15m])) - sum(increase(authelia_authn_duration_bucket{namespace=\"auth-system\",success=\"true\",le=\"1\"}[15m]))) / sum(increase(authelia_authn_duration_count{namespace=\"auth-system\",success=\"true\"}[15m])) > 0.2) and (sum(increase(authelia_authn_duration_count{namespace=\"auth-system\",success=\"true\"}[15m])) >= 20)",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "Successful authentication processing is slow",
+            "description": "Over 20% of successful attempts exceeded one second, with at least 20 observations in 15 minutes. This is server processing time, not time spent entering credentials. Inspect backend latency; tune against normal traffic."
+          }
+        },
+        {
+          "alert": "AutheliaOIDCTokenSlow",
+          "expr": "((sum(increase(authelia_request_duration_openid_connect_count{namespace=\"auth-system\",endpoint=\"token\",code=~\"2..\"}[15m])) - sum(increase(authelia_request_duration_openid_connect_bucket{namespace=\"auth-system\",endpoint=\"token\",code=~\"2..\",le=\"1\"}[15m]))) / sum(increase(authelia_request_duration_openid_connect_count{namespace=\"auth-system\",endpoint=\"token\",code=~\"2..\"}[15m])) > 0.2) and (sum(increase(authelia_request_duration_openid_connect_count{namespace=\"auth-system\",endpoint=\"token\",code=~\"2..\"}[15m])) >= 20)",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "Successful authentication processing is slow",
+            "description": "Over 20% of successful attempts exceeded one second, with at least 20 observations in 15 minutes. This is server processing time, not time spent entering credentials. Inspect backend latency; tune against normal traffic."
+          }
+        },
+        {
+          "alert": "AutheliaFailedLogins",
+          "expr": "sum(increase(authelia_authn{namespace=\"auth-system\",success=\"false\"}[15m])) >= 20",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "Elevated failed authentication attempts",
+            "description": "At least 20 failed attempts in 15 minutes. Review authentication logs for users and source IPs. This may be a broken client, user error or abuse; it is not proof of an attack."
+          }
+        },
+        {
+          "alert": "AutheliaFailedPasskeys",
+          "expr": "sum(increase(authelia_authn_passkey{namespace=\"auth-system\",success=\"false\"}[15m])) >= 20",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "Elevated failed authentication attempts",
+            "description": "At least 20 failed attempts in 15 minutes. Review authentication logs for users and source IPs. This may be a broken client, user error or abuse; it is not proof of an attack."
+          }
+        },
+        {
+          "alert": "AutheliaFailedMFA",
+          "expr": "sum by (type)(increase(authelia_authn_second_factor{namespace=\"auth-system\",success=\"false\"}[15m])) >= 20",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "Elevated failed authentication attempts",
+            "description": "At least 20 failed attempts in 15 minutes. Review authentication logs for users and source IPs. This may be a broken client, user error or abuse; it is not proof of an attack."
+          }
+        },
+        {
+          "alert": "AutheliaRegulatedAttempts",
+          "expr": "(sum(increase(authelia_authn{namespace=\"auth-system\",banned=\"true\"}[15m])) or vector(0)) + (sum(increase(authelia_authn_second_factor{namespace=\"auth-system\",banned=\"true\"}[15m])) or vector(0)) >= 10",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "component": "authentication",
+            "namespace": "auth-system"
+          },
+          "annotations": {
+            "summary": "Repeated regulated authentication attempts",
+            "description": "At least ten already-regulated attempts in 15 minutes. These are attempts, not unique users or new bans. Review logs before interpreting this as abuse."
+          }
+        }
+      ]
+    }
+  ]
+}
