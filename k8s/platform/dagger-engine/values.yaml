@@ -13,7 +13,7 @@ dagger-helm:
         },
         "gc": {
           "enabled": true,
-          "maxUsedSpace": "55GB",
+          "maxUsedSpace": "150GB",
           "minFreeSpace": "15%"
         }
       }
@@ -51,4 +51,4 @@ dagger-helm:
         accessModes: [ReadWriteOnce]
         resources:
           requests:
-            storage: 80Gi
+            storage: 200Gi
