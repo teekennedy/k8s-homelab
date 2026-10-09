@@ -174,9 +174,18 @@ if [[ $auto_merge -eq 1 ]]; then
   delete_branch=$(jq -r '.default_delete_branch_after_merge // true' <<<"$repo_info")
 
   echo "Enabling auto-merge (method: ${merge_method}, delete branch on merge: ${delete_branch})..."
-  api_call POST "/repos/${owner}/${repo}/pulls/${pr_number}/merge" \
-    -d "$(jq -n --arg do "$merge_method" --argjson delete "$delete_branch" \
-      '{Do: $do, merge_when_checks_succeed: true, delete_branch_after_merge: $delete}')" >/dev/null
+  merge_payload=$(jq -n --arg style "$merge_method" --argjson delete "$delete_branch" \
+    '{Do: $style, merge_when_checks_succeed: true, delete_branch_after_merge: $delete}')
+  # Forgejo answers 405 when asked right after a push, before it has finished
+  # evaluating the new head; the same request succeeds moments later.
+  if ! merge_out=$(api_call POST "/repos/${owner}/${repo}/pulls/${pr_number}/merge" -d "$merge_payload" 2>&1); then
+    echo "Auto-merge request failed, retrying in 5s: ${merge_out}" >&2
+    sleep 5
+    if ! merge_out=$(api_call POST "/repos/${owner}/${repo}/pulls/${pr_number}/merge" -d "$merge_payload" 2>&1); then
+      echo "error: could not enable auto-merge: ${merge_out}" >&2
+      exit 1
+    fi
+  fi
 else
   echo "Auto-merge disabled (--no-auto-merge); cancelling any scheduled auto-merge..."
   api_call DELETE "/repos/${owner}/${repo}/pulls/${pr_number}/merge" >/dev/null 2>&1 || true
