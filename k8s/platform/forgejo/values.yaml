@@ -173,6 +173,7 @@ forgejo-resources:
             - read:user
             - write:issue
             - read:misc
+            - read:organization
     - name: homepage
       fullName: Homepage
       email: homepage@msng.to
