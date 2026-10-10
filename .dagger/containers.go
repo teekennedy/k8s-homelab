@@ -13,7 +13,7 @@ const (
 	// k3sImage is what the ephemeral clusters run. Keep its minor version in
 	// step with the production cluster's.
 	// renovate: datasource=docker depName=rancher/k3s
-	k3sImage = "rancher/k3s:v1.36.5-k3s1"
+	k3sImage = "rancher/k3s:v1.37.1-k3s1"
 )
 
 func nixContainer() *dagger.Container {
