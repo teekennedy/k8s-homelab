@@ -1,4 +1,3 @@
-# TMP comment to trigger devenv-release-tag pipeline. Please delete
 require_version: true
 imports:
   - ./cmd/lab
