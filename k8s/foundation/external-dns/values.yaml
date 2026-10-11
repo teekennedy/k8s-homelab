@@ -1,6 +1,6 @@
 external-dns:
   image:
-    # renovate: external-dns image, tracked with the chart for changelog
+    repository: registry.k8s.io/external-dns/external-dns
     tag: v0.23.0
   provider:
     name: cloudflare
@@ -38,7 +38,7 @@ external-dns:
 external-dns-internal:
   fullnameOverride: external-dns-internal
   image:
-    # renovate: external-dns image, tracked with the chart for changelog
+    repository: registry.k8s.io/external-dns/external-dns
     tag: v0.23.0
   policy: sync
   provider:
@@ -92,7 +92,7 @@ external-dns-internal:
 external-dns-public-internal:
   fullnameOverride: external-dns-public-internal
   image:
-    # renovate: external-dns image, tracked with the chart for changelog
+    repository: registry.k8s.io/external-dns/external-dns
     tag: v0.23.0
   policy: sync
   provider:
