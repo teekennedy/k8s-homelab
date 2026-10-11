@@ -6,7 +6,7 @@
 #
 # Needs git-cliff, curl, jq and git in a full-history clone, plus
 # FORGEJO_TOKEN and Woodpecker's CI_* variables.
-set -eu
+set -euo pipefail
 
 # Versioning starts at devenv-1.0.0 on this commit. It is a baseline only: the
 # commit predates the publish pipeline, so no image is built for it.
@@ -24,10 +24,10 @@ create_release() { # tag, commit, notes
   echo "Created $1 at $2"
 }
 
-git fetch --tags --force --quiet
-if ! git tag --list 'devenv-*' | grep -q .; then
+if [ -z "$(git tag --list 'devenv-*')" ]; then
   create_release devenv-1.0.0 "$BOOTSTRAP_SHA" 'Baseline for devenv versioning.'
-  git fetch --tags --force --quiet
+  # The release created the tag on the server; mirror it locally for git-cliff.
+  git tag devenv-1.0.0 "$BOOTSTRAP_SHA"
 fi
 
 pending=$(git cliff --unreleased --context | jq '[.[] | select(.version == null) | .commits[]] | length')
