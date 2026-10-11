@@ -140,7 +140,7 @@ in {
       git-hooks.hooks.dagger-check = {
         enable = true;
         name = "dagger check";
-        entry = "${dagger}/bin/dagger check";
+        entry = "${dagger}/bin/dagger --progress=plain check";
         language = "system";
         # Nothing about this hook is per-file: it always runs the whole suite.
         pass_filenames = false;
