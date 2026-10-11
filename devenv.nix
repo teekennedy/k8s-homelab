@@ -53,6 +53,7 @@ in {
         black
         cue
         deadnix
+        git-cliff
         go
         golangci-lint
         # Shell utilities the checks themselves shell out to (helm dependency

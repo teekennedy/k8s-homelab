@@ -174,19 +174,17 @@ forgejo-resources:
             - write:issue
             - read:misc
             - read:organization
-    - name: release-please
-      fullName: Release Please
-      email: release-please@msng.to
-      secretName: release-please-forgejo-user
+    # Tags devenv releases from Woodpecker (.woodpecker/devenv-release-tag.yaml).
+    # Creating a release needs nothing beyond repository write.
+    - name: release-bot
+      fullName: Release Bot
+      email: release-bot@msng.to
+      secretName: release-bot-forgejo-user
       secretNamespace: woodpecker
       accessTokens:
-        - name: release-please
+        - name: release-bot
           scopes:
             - write:repository
-            - read:user
-            - write:issue
-            - read:misc
-            - read:organization
     - name: homepage
       fullName: Homepage
       email: homepage@msng.to
@@ -314,12 +312,7 @@ forgejo-resources:
           permission: write
           members:
             - renovate
-        - name: Releases
-          permission: write
-          repositories:
-            - k8s-homelab
-          members:
-            - release-please
+            - release-bot
         # The OpenHands agent runs with no human watching its tool calls, so it
         # gets its own team scoped to exactly the repo it works on, rather than
         # sharing Bots, which covers every repo in the org. Create-only: a team

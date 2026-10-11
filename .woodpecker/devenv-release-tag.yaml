@@ -1,0 +1,31 @@
+# https://woodpecker-ci.org/docs/usage/workflow-syntax
+#
+# Tags a devenv release when main gains releasable changes; the tag pipeline in
+# devenv-release.yaml publishes it.
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - devenv.nix
+        - devenv.yaml
+        - devenv.lock
+        - "cmd/lab/**"
+
+# Tags are needed to find the last release and the history to find what changed.
+clone:
+  git:
+    tags: true
+
+steps:
+  - name: tag-release
+    # The only image release_bot_token is released to; see
+    # k8s/platform/woodpecker/values.yaml.
+    image: alpine/git
+    environment:
+      FORGEJO_TOKEN:
+        from_secret: release_bot_token
+    commands:
+      - apk add --no-cache curl jq git-cliff
+      - git config --global --add safe.directory "$CI_WORKSPACE"
+      - scripts/release-devenv.sh

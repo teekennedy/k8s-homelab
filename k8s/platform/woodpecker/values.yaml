@@ -193,15 +193,17 @@ woodpecker-resources:
         # rather than loosening the mode for every contributor on a public repo.
         approvalAllowedUsers:
           - openhands
-          - release-please
       secrets:
-        - name: release_please_token
+        # Can push to main, so it is only handed to push pipelines, and only to the
+        # one step whose image is listed here (.woodpecker/devenv-release-tag.yaml).
+        # Keep that image out of every other step.
+        - name: release_bot_token
           events:
             - push
           images:
-            - node:22-bookworm-slim
+            - alpine/git
           mirrorSecret:
-            name: release-please-forgejo-user
+            name: release-bot-forgejo-user
             namespace: woodpecker
             key: token
 
