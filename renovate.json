@@ -458,13 +458,13 @@
       "registryUrls": ["https://registry.opentofu.org"]
     },
     {
-      "description": "Run tofu init to tidy up lockfiles after maintenance",
+      "description": "Add hashes for all used platforms when updating terraform lockfile.",
       "matchManagers": [
         "terraform"
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger generate homelab:validate-terraform -y"
+          "dagger generate homelab:lock-terraform -y"
         ],
         "fileFilters": [
           "**/.terraform.lock.hcl"
