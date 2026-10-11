@@ -12,12 +12,16 @@ when:
         - devenv.lock
         - "cmd/lab/**"
 
-# Tags are needed to find the last release and the history to find what changed.
+# Tags are needed to find the last release and the full history, trees included,
+# to find what changed. A partial or shallow clone would make git lazily fetch
+# missing objects, which fails: only the clone step has credentials.
 clone:
   git:
     # default clone image, must be explicitly specified when changing settings
     image: woodpeckerci/plugin-git
     tags: true
+    partial: false
+    depth: 0
 
 steps:
   - name: tag-release
