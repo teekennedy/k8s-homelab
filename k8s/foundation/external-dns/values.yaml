@@ -1,4 +1,7 @@
 external-dns:
+  image:
+    # renovate: external-dns image, tracked with the chart for changelog
+    tag: v0.23.0
   provider:
     name: cloudflare
   policy: sync
@@ -34,6 +37,9 @@ external-dns:
 # in Unifi DNS so internal clients avoid NAT reflection.
 external-dns-internal:
   fullnameOverride: external-dns-internal
+  image:
+    # renovate: external-dns image, tracked with the chart for changelog
+    tag: v0.23.0
   policy: sync
   provider:
     name: webhook
@@ -85,6 +91,9 @@ external-dns-internal:
 # to the public MetalLB VIP in Unifi DNS so they're reachable from the LAN.
 external-dns-public-internal:
   fullnameOverride: external-dns-public-internal
+  image:
+    # renovate: external-dns image, tracked with the chart for changelog
+    tag: v0.23.0
   policy: sync
   provider:
     name: webhook

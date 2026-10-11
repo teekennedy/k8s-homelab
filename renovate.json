@@ -189,6 +189,19 @@
       "extractVersionTemplate": "^v(?<version>.*)$"
     },
     {
+      "description": "Pin the external-dns image tag in values.yaml instead of inheriting the chart's appVersion. The chart's own release notes only say 'update image version', so tracking the image from its GitHub releases puts the real external-dns changelog in the same (directory-grouped) PR as the chart bump.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "k8s/foundation/external-dns/values.yaml"
+      ],
+      "matchStrings": [
+        "#\\s*renovate: external-dns image[^\\n]*\\n\\s*tag:\\s*(?<currentValue>\\S+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kubernetes-sigs/external-dns",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
       "description": "Track pinned Grafana Drilldown app plugins in grafana.ini preinstall",
       "customType": "regex",
       "managerFilePatterns": [
