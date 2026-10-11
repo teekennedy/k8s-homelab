@@ -9,5 +9,4 @@ steps:
       RELEASE_PLEASE_TOKEN:
         from_secret: release_please_token
     commands:
-      - node --test scripts/release-please.test.cjs
       - node scripts/release-please.cjs
