@@ -1,9 +1,15 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"path"
+	"reflect"
 	"strings"
 	"testing"
 
+	"code.gitea.io/sdk/gitea"
 	"gopkg.in/yaml.v3"
 )
 
@@ -120,5 +126,126 @@ func TestTeamIncludesAllRepositories(t *testing.T) {
 	}
 	if (Team{Repositories: []string{"k8s-homelab"}}).includesAllRepositories() {
 		t.Fatal("a team with repositories should be scoped to them")
+	}
+}
+
+func TestTeamUnits(t *testing.T) {
+	got := parseTeam(t, "name: Bots").units()
+	if len(got) != len(defaultTeamUnits) {
+		t.Fatalf("default units: %v", got)
+	}
+
+	got = parseTeam(t, `
+name: Bots
+units: [repo.code, repo.releases]
+`).units()
+	if len(got) != 2 || got[0] != gitea.RepoUnitCode || got[1] != gitea.RepoUnitReleases {
+		t.Fatalf("configured units: %v", got)
+	}
+}
+
+func parseTeam(t *testing.T, doc string) Team {
+	t.Helper()
+	var team Team
+	if err := yaml.Unmarshal([]byte(doc), &team); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	return team
+}
+
+// fakeForgejo serves just the team endpoints and records the calls that matter.
+type fakeForgejo struct {
+	t            *testing.T
+	createdUnits []gitea.RepoUnitType
+	addedMembers []string
+	teamExists   bool
+}
+
+func (f *fakeForgejo) reply(w http.ResponseWriter, status int, body string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if _, err := w.Write([]byte(body)); err != nil {
+		f.t.Errorf("write response: %v", err)
+	}
+}
+
+func (f *fakeForgejo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	route := r.Method + " " + r.URL.Path
+	if strings.HasPrefix(r.URL.Path, "/api/v1/teams/7/members/") {
+		route = r.Method + " member"
+	}
+	switch route {
+	case "GET /api/v1/orgs/ops/teams":
+		f.listTeams(w)
+	case "POST /api/v1/orgs/ops/teams":
+		f.createTeam(w, r)
+	case "GET member":
+		f.reply(w, http.StatusNotFound, `{}`)
+	case "PUT member":
+		f.addedMembers = append(f.addedMembers, path.Base(r.URL.Path))
+		f.reply(w, http.StatusNoContent, "")
+	default:
+		f.t.Errorf("unexpected request %s", route)
+		f.reply(w, http.StatusNotFound, `{}`)
+	}
+}
+
+func (f *fakeForgejo) listTeams(w http.ResponseWriter) {
+	body := `[]`
+	if f.teamExists {
+		body = `[{"id": 7, "name": "Bots"}]`
+	}
+	f.reply(w, http.StatusOK, body)
+}
+
+func (f *fakeForgejo) createTeam(w http.ResponseWriter, r *http.Request) {
+	var opt gitea.CreateTeamOption
+	if err := json.NewDecoder(r.Body).Decode(&opt); err != nil {
+		f.t.Errorf("decode create team: %v", err)
+	}
+	f.createdUnits = opt.Units
+	f.reply(w, http.StatusOK, `{"id": 7, "name": "Bots"}`)
+}
+
+func newFakeForgejo(t *testing.T, teamExists bool) (*fakeForgejo, *gitea.Client) {
+	t.Helper()
+	f := &fakeForgejo{t: t, teamExists: teamExists}
+	srv := httptest.NewServer(f)
+	t.Cleanup(srv.Close)
+	c, err := gitea.NewClient(srv.URL, gitea.SetGiteaVersion(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f, c
+}
+
+func botsOrg() []Organization {
+	return []Organization{{Name: "ops", Teams: []Team{{
+		Name:    "Bots",
+		Units:   []gitea.RepoUnitType{gitea.RepoUnitCode, gitea.RepoUnitReleases},
+		Members: []string{"renovate", "release-bot"},
+	}}}}
+}
+
+// Members are added by syncTeamMembers, after users exist. Adding them while
+// the team is created lost any user that was new in the same run.
+func TestSyncOrgTeamCreatesWithUnitsButNoMembers(t *testing.T) {
+	f, client := newFakeForgejo(t, false)
+	syncOrgTeam(client, "ops", botsOrg()[0].Teams[0])
+
+	if len(f.createdUnits) != 2 || f.createdUnits[1] != gitea.RepoUnitReleases {
+		t.Fatalf("created with units %v", f.createdUnits)
+	}
+	if len(f.addedMembers) != 0 {
+		t.Fatalf("members added during team creation: %v", f.addedMembers)
+	}
+}
+
+func TestSyncTeamMembersAddsMissingMembers(t *testing.T) {
+	f, client := newFakeForgejo(t, true)
+	syncTeamMembers(client, botsOrg())
+
+	if want := []string{"renovate", "release-bot"}; !reflect.DeepEqual(f.addedMembers, want) {
+		t.Fatalf("added %v, want %v", f.addedMembers, want)
 	}
 }

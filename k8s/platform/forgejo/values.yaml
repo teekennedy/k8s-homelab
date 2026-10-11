@@ -310,6 +310,12 @@ forgejo-resources:
             - tkennedy
         - name: Bots
           permission: write
+          # release-bot creates devenv releases; the default units omit them.
+          units:
+            - repo.code
+            - repo.issues
+            - repo.pulls
+            - repo.releases
           members:
             - renovate
             - release-bot

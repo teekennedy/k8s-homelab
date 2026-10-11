@@ -17,7 +17,7 @@ api="$CI_FORGE_URL/api/v1/repos/$CI_REPO"
 create_release() { # tag, commit, notes
   jq -n --arg tag "$1" --arg sha "$2" --arg body "$3" \
     '{tag_name: $tag, target_commitish: $sha, name: $tag, body: $body}' |
-    curl -fsS -X POST "$api/releases" \
+    curl --fail-with-body -sS -X POST "$api/releases" \
       -H "Authorization: token $FORGEJO_TOKEN" \
       -H 'Content-Type: application/json' \
       --data @- >/dev/null

@@ -34,10 +34,26 @@ type Team struct {
 	// Repositories are the org's repos the team is granted, by name. Empty
 	// means every repo in the org, including ones created later.
 	Repositories []string
+	// Units are the repo units the team can access, e.g. "repo.releases".
+	// Defaults to defaultTeamUnits.
+	Units []gitea.RepoUnitType
 }
 
 func (t Team) includesAllRepositories() bool {
 	return len(t.Repositories) == 0
+}
+
+func (t Team) units() []gitea.RepoUnitType {
+	if len(t.Units) == 0 {
+		return defaultTeamUnits
+	}
+	return t.Units
+}
+
+var defaultTeamUnits = []gitea.RepoUnitType{
+	gitea.RepoUnitCode,
+	gitea.RepoUnitIssues,
+	gitea.RepoUnitPulls,
 }
 
 type Organization struct {
@@ -695,6 +711,7 @@ func main() {
 	syncOIDC(ctx, k8sConfig, k8sClient, config.PodExec, config.OIDC)
 	syncOrganizations(client, config.Organizations)
 	syncUsers(ctx, k8sClient, client, forgejoHost, config.Users)
+	syncTeamMembers(client, config.Organizations)
 	syncRepositories(ctx, client, k8sClient, config.Repositories)
 	// After the repos exist, so a team can be granted one created this run.
 	syncTeamRepositories(client, config.Organizations)
@@ -758,39 +775,48 @@ func syncOrgTeam(client *gitea.Client, orgName string, team Team) {
 		return
 	}
 
-	var forgejoTeam *gitea.Team
 	for _, t := range existingTeams {
 		if t.Name == team.Name {
-			forgejoTeam = t
-			break
-		}
-	}
-
-	if forgejoTeam == nil {
-		perm := gitea.AccessModeOwner
-		if team.Permission != "" {
-			perm = gitea.AccessMode(team.Permission)
-		}
-		var err error
-		forgejoTeam, _, err = client.CreateTeam(orgName, gitea.CreateTeamOption{
-			Name:                    team.Name,
-			Permission:              perm,
-			IncludesAllRepositories: team.includesAllRepositories(),
-			Units: []gitea.RepoUnitType{
-				gitea.RepoUnitCode,
-				gitea.RepoUnitIssues,
-				gitea.RepoUnitPulls,
-			},
-		})
-		if err != nil {
-			log.Printf("Create team %s in org %s: %v", team.Name, orgName, err)
 			return
 		}
-		log.Printf("Created team %s in org %s", team.Name, orgName)
 	}
 
-	for _, member := range team.Members {
-		syncTeamMember(client, forgejoTeam, member)
+	perm := gitea.AccessModeOwner
+	if team.Permission != "" {
+		perm = gitea.AccessMode(team.Permission)
+	}
+	if _, _, err := client.CreateTeam(orgName, gitea.CreateTeamOption{
+		Name:                    team.Name,
+		Permission:              perm,
+		IncludesAllRepositories: team.includesAllRepositories(),
+		Units:                   team.units(),
+	}); err != nil {
+		log.Printf("Create team %s in org %s: %v", team.Name, orgName, err)
+		return
+	}
+	log.Printf("Created team %s in org %s", team.Name, orgName)
+}
+
+// syncTeamMembers adds each team's declared members. It runs after syncUsers
+// because a member that does not exist yet cannot be added, and a failed add is
+// only logged, so a new user would stay out of its team until the next run.
+func syncTeamMembers(client *gitea.Client, orgs []Organization) {
+	for _, org := range orgs {
+		teams, _, err := client.ListOrgTeams(org.Name, gitea.ListTeamsOptions{})
+		if err != nil {
+			log.Printf("List teams for org %s: %v", org.Name, err)
+			continue
+		}
+		for _, team := range org.Teams {
+			for _, t := range teams {
+				if t.Name != team.Name {
+					continue
+				}
+				for _, member := range team.Members {
+					syncTeamMember(client, t, member)
+				}
+			}
+		}
 	}
 }
 
