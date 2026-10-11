@@ -194,14 +194,11 @@ woodpecker-resources:
         approvalAllowedUsers:
           - openhands
       secrets:
-        # Can push to main, so it is only handed to push pipelines, and only to the
-        # one step whose image is listed here (.woodpecker/devenv-release-tag.yaml).
-        # Keep that image out of every other step.
+        # Can push to main, so it is only handed to push pipelines, e.g.
+        # .woodpecker/devenv-release-tag.yaml
         - name: release_bot_token
           events:
             - push
-          images:
-            - alpine/git
           mirrorSecret:
             name: release-bot-forgejo-user
             namespace: woodpecker
