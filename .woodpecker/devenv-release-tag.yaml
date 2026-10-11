@@ -19,9 +19,13 @@ clone:
   git:
     # default clone image, must be explicitly specified when changing settings
     image: woodpeckerci/plugin-git
-    tags: true
-    partial: false
-    depth: 0
+    # https://github.com/woodpecker-ci/plugin-git/blob/main/docs.md
+    settings:
+      tags: true
+      partial: false
+      depth: 0
+      lfs: false
+      recursive: false
 
 steps:
   - name: tag-release
