@@ -5,10 +5,10 @@
 # at start. Build and push, then set `sandboxSpecs.image` in values.yaml; see
 # README.md, "Sandbox image".
 #   docker buildx build --platform linux/amd64 -t ghcr.io/teekennedy/openhands-sandbox:<tag> --push files/sandbox
-FROM ghcr.io/openhands/agent-server:1.53.0-python
+FROM ghcr.io/openhands/agent-server:1.54.0-python
 
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
-ARG KUBECTL_VERSION=v1.36.0
+ARG KUBECTL_VERSION=v1.37.1
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
 ARG CLAUDE_ADAPTER_VERSION=0.87.0
 # Must match the engine (k8s/platform/dagger-engine/values.yaml), so Renovate
