@@ -5,7 +5,7 @@
 # at start. Build and push, then set `sandboxSpecs.image` in values.yaml; see
 # README.md, "Sandbox image".
 #   docker buildx build --platform linux/amd64 -t ghcr.io/teekennedy/openhands-sandbox:<tag> --push files/sandbox
-FROM ghcr.io/openhands/agent-server:1.54.0-python
+FROM ghcr.io/openhands/agent-server:1.54.0
 
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 ARG KUBECTL_VERSION=v1.37.1
