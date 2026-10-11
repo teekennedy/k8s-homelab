@@ -1,0 +1,18 @@
+{
+  "separate-pull-requests": true,
+  "pull-request-footer": "This release PR is generated automatically by Release Please. Release automation was configured by an AI agent (OpenHands) on behalf of the repository owner.",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "component": "devenv",
+      "include-component-in-tag": true,
+      "include-v-in-tag": false,
+      "tag-separator": "-",
+      "version-file": "devenv-version.txt",
+      "changelog-path": "devenv-CHANGELOG.md",
+      "changelog-host": "https://git.msng.to",
+      "bump-minor-pre-major": false,
+      "bump-patch-for-minor-pre-major": false
+    }
+  }
+}

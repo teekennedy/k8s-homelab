@@ -193,6 +193,17 @@ woodpecker-resources:
         # rather than loosening the mode for every contributor on a public repo.
         approvalAllowedUsers:
           - openhands
+          - release-please
+      secrets:
+        - name: release_please_token
+          events:
+            - push
+          images:
+            - node:22-bookworm-slim
+          mirrorSecret:
+            name: release-please-forgejo-user
+            namespace: woodpecker
+            key: token
 
 # The shared Dagger engine the pipelines exec into; templates/dagger-rbac.yaml
 # grants access to this one pod.

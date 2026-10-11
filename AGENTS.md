@@ -23,3 +23,9 @@ Comments should be concise and scoped to the configuration or code they are comm
 
 ## Secrets & Security
 In-cluster secrets, such OIDC client secrets or an admin password for an in-cluster service should be auto-generated using [kubernetes-secret-generator] custom resources or annotations whenever possible. Secrets from terraform provisioned external resources should be added to the cluster using the `kubernetes_secret_v1` resource. Secrets used by NixOS configuration and services should be managed exclusively through `sops`. Never commit decrypted secrets — prefer referencing `config.sops.secrets.<name>.path` from modules.
+
+## Release Automation
+- The root manifest package is the devenv container, not the entire repository. `scripts/release-please.cjs` filters its version candidates to `devenv.nix`, `devenv.yaml`, `devenv.lock`, and `cmd/lab/**`; other manifest packages retain normal path handling.
+- Release Please runs in bare Node on main pushes. Its checksum-pinned Forgejo action bundle includes PR #21; the adapter also corrects merged-commit file retrieval. Run `node --test scripts/release-please.test.cjs` before changing the pin or adapter. `RELEASE_PLEASE_LIVE_TEST=1` additionally checks the real Forgejo read API using `FORGEJO_TOKEN`.
+- Bot creation and push-only token synchronization are declarative in the Forgejo and Woodpecker chart values. Deploy Forgejo resources before Woodpecker resources.
+- `dagger call publish-devenv --tag=devenv-1.2.3 --username=teekennedy --token=env:GHCR_ACCESS_TOKEN` builds and pushes through Dagger. `export-image` only exports to the host image store; it does not publish to GHCR.
