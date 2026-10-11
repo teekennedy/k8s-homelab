@@ -421,6 +421,18 @@
       "sourceUrl": "https://codeberg.org/forgejo/forgejo"
     },
     {
+      "description": "OpenHands agent-server source url.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/openhands/agent-server"
+      ],
+      "sourceUrl": "https://github.com/OpenHands/software-agent-sdk",
+      "extractVersion": "^(?<version>\\d+\\.\\d+\\.\\d+)-python$",
+      "versioning": "semver"
+    },
+    {
       "description": "Track smallstep/step-cli changelog from GitHub releases",
       "matchDatasources": [
         "docker"
