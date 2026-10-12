@@ -62,10 +62,35 @@ func TestReleaseLabels(t *testing.T) {
 	if !strings.HasPrefix(description, "Devenv shell CI profile\n\nFeatures ci: Add tooling") {
 		t.Errorf("description lacks profile and plain-text changelog: %q", description)
 	}
-	if !utf8.ValidString(description) || utf8.RuneCountInString(description) > 512 || !strings.HasSuffix(description, "…") {
+	if !utf8.ValidString(description) || len(description) > 512 || !strings.HasSuffix(description, "…") {
 		t.Errorf("description exceeds GitHub's limit or has invalid truncation: %q", description)
 	}
 	if got := releaseDescription("Basic description", ""); got != "Basic description" {
 		t.Errorf("empty changelog: %q", got)
+	}
+}
+
+func TestReleaseDescriptionByteLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"ascii at limit", strings.Repeat("a", 512), strings.Repeat("a", 512)},
+		{"ascii overflow", strings.Repeat("a", 513), strings.Repeat("a", 509) + "…"},
+		{"unicode at limit", strings.Repeat("é", 256), strings.Repeat("é", 256)},
+		{"unicode overflow", strings.Repeat("é", 257), strings.Repeat("é", 254) + "…"},
+		{"emoji overflow", strings.Repeat("🙂", 129), strings.Repeat("🙂", 127) + "…"},
+		{"mixed boundary", strings.Repeat("a", 508) + "🙂tail", strings.Repeat("a", 508) + "…"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := releaseDescription(tc.input, "")
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+			if !utf8.ValidString(got) || len(got) > 512 {
+				t.Errorf("invalid UTF-8 or oversized description: %q (%d bytes)", got, len(got))
+			}
+		})
 	}
 }

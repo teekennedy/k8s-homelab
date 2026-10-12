@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"dagger/homelab/internal/dagger"
 	"golang.org/x/sync/errgroup"
@@ -62,7 +63,7 @@ func withImageLabels(container *dagger.Container, labels map[string]string) *dag
 	return container
 }
 
-// GitHub displays plain text descriptions with a maximum of 512 characters.
+// Keep plain-text descriptions within 512 UTF-8 bytes, including the ellipsis.
 func releaseDescription(description, changelog string) string {
 	var lines []string
 	for line := range strings.SplitSeq(changelog, "\n") {
@@ -75,9 +76,13 @@ func releaseDescription(description, changelog string) string {
 	if len(lines) > 0 {
 		description += "\n\n" + strings.Join(lines, " ")
 	}
-	runes := []rune(description)
-	if len(runes) > 512 {
-		return strings.TrimSpace(string(runes[:511])) + "…"
+	if len(description) > 512 {
+		const ellipsis = "…"
+		end := 512 - len(ellipsis)
+		for !utf8.RuneStart(description[end]) {
+			end--
+		}
+		return strings.TrimSpace(description[:end]) + ellipsis
 	}
 	return description
 }

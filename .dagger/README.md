@@ -891,8 +891,9 @@ Both devenv artifacts use the canonical CI tag's notes. The script rejects a
 checkout that does not match the requested tag and its canonical sibling.
 
 GitHub renders `org.opencontainers.image.description` as plain text and limits
-it to 512 characters. Released images include the base description plus a
-truncated plain-text changelog preview. The complete notes remain in
+it to 512 characters. Released images use a stricter 512-byte UTF-8 budget,
+including the ellipsis, for the base description and truncated plain-text
+changelog preview. The complete notes remain in
 `io.github.teekennedy.homelab.changelog`, and
 `org.opencontainers.image.documentation` links to the Forgejo release. Standard
 OCI keys are also emitted as manifest annotations by Dagger.
