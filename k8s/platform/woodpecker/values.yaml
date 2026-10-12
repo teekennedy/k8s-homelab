@@ -215,7 +215,7 @@ daggerEngine:
 nixosRollout:
   # alpine/kubectl ships kubectl; openssh-client is apk-installed at runtime.
   # renovate: datasource=docker depName=alpine/kubectl
-  image: alpine/kubectl:1.37.0
+  image: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
   # Written by the deploybot-ssh-cert-issuer CronJob in cert-system, which
   # reissues it every 6h with a 12h validity.
   certSecretName: deploybot-ssh-cert
