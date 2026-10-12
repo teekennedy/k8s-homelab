@@ -16,7 +16,7 @@ app-template:
         spoolman:
           image:
             repository: ghcr.io/donkie/spoolman
-            tag: "0.27.0"
+            tag: "0.27.0@sha256:7aba565eff774c6dda212d4204de8fa30bf68d513127ef875cc7ef3197a4664e"
             pullPolicy: IfNotPresent
           env:
             TZ: America/Denver
