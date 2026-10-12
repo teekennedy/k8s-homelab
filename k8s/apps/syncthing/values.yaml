@@ -4,7 +4,7 @@ image:
   repository: syncthing/syncthing
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "2.1.0@sha256:7c60eb0ec887696c8684de88aea2dfe39a7391184b29d33c0aad778c99c7683e"
+  tag: "2.1.5@sha256:397aa00b92b48d65540ea3ae3cbf271b87bdccbe07a0b7bd7d2debc3a7b29138"
 
 nameOverride: ""
 fullnameOverride: ""
