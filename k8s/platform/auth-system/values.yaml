@@ -1,17 +1,17 @@
 psql:
   # Deliberately in values.yaml so that renovate can pick it up.
-  image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
+  image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie@sha256:79be0d10e78b7ac4520cf6c5db199a8bb7f6de53b3229f47e90cab5865528a0d
 
 # Used by templates/valkey-statefulset.yaml. Deliberately in values.yaml (not
 # the template) so that renovate can pick it up.
 valkey:
-  image: valkey/valkey:9-alpine
+  image: valkey/valkey:9-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
 
 oidcJwks:
   # Images used by templates/authelia-oidc-jwks.yaml. Deliberately in
   # values.yaml (not the template) so that renovate can pick them up.
-  stepCliImage: smallstep/step-cli:0.31.0
-  kubectlImage: alpine/kubectl:1.37.0
+  stepCliImage: smallstep/step-cli:0.31.0@sha256:107e8497646c0e7c06cc5b6fd6fa13b5d2001909df6d7da3706b8541ed42bddf
+  kubectlImage: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
 
 # Maps each Authelia OIDC client to the Secret holding its plaintext client
 # secret, so the PreSync sync job can bcrypt-hash it into the aggregate Secret
@@ -61,7 +61,7 @@ oidcClientSecrets:
     freshrss: freshrss/freshrss-oidc-authelia
   image:
     repository: ghcr.io/astral-sh/uv
-    tag: alpine
+    tag: alpine@sha256:20d3fe1308ffa40b51c5c20e002bab5fece40585edcee8ec99357309e8363424
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -702,7 +702,7 @@ app-template:
         lldap:
           image:
             repository: ghcr.io/lldap/lldap
-            tag: "2026-09-22-alpine-rootless"
+            tag: "2026-09-22-alpine-rootless@sha256:0b694bb4cf324f2b918c73db13a6518926e5de6a73996c27e0238b1f3d342aae"
             pullPolicy: IfNotPresent
           env:
             # debugging
