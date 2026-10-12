@@ -21,6 +21,8 @@ class ReleaseTests(unittest.TestCase):
         (self.repo / ".dagger").mkdir()
         (self.repo / RESOURCES).mkdir(parents=True)
         shutil.copy(ROOT / ".dagger/releases.json", self.repo / ".dagger")
+        (self.repo / "scripts").mkdir()
+        shutil.copy(ROOT / "scripts/release-metadata.sh", self.repo / "scripts")
         shutil.copy(ROOT / "cliff.toml", self.repo)
         shutil.copy(ROOT / RESOURCES / "cliff.toml", self.repo / RESOURCES)
         (self.repo / "devenv.nix").write_text("{}\n")
@@ -118,14 +120,30 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             self.metadata("devenv-ci-1.1.1")
 
-    def test_shared_metadata_changes_release_both_projects(self):
+    def test_shared_metadata_changes_do_not_release_projects(self):
         self.release()
         (self.repo / ".dagger/releases.go").write_text("// Updated image labels\n")
         self.commit("feat(containers): add image labels")
         releases = self.release()
-        self.assertEqual(
-            [r["tag_name"] for r in releases[-3:]],
-            ["devenv-ci-1.2.0", "devenv-shell-1.2.0", "forgejo-resources-1.1.0"],
+        self.assertEqual(len(releases), 1)
+        self.assertEqual(releases[0]["tag_name"], "forgejo-resources-1.0.0")
+
+    def test_metadata_for_tag_without_project_changes(self):
+        self.release()
+        (self.repo / ".dagger/releases.go").write_text("// Shared change\n")
+        self.commit("fix(containers): adjust shared labels")
+        for tag in ["devenv-ci-1.1.2", "devenv-shell-1.1.2", "forgejo-resources-1.0.1"]:
+            self.git("tag", tag)
+        self.assertEqual(self.metadata("forgejo-resources-1.0.1")["changelog"], "")
+        self.assertEqual(self.metadata("devenv-shell-1.1.2")["changelog"], "")
+        (self.repo / RESOURCES / "main.go").write_text("package main\n// repair\n")
+        self.commit("fix(forgejo-resources): repair reconciliation")
+        releases = self.release()
+        self.assertEqual(len(releases), 2)
+        self.assertEqual(releases[-1]["tag_name"], "forgejo-resources-1.0.2")
+        self.assertIn(
+            "Repair reconciliation",
+            self.metadata("forgejo-resources-1.0.2")["changelog"],
         )
 
     def test_retry_completes_artifact_pair(self):

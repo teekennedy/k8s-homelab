@@ -856,8 +856,8 @@ Terraform errors with `|| true`.
 ## Container releases
 
 `.dagger/releases.json` maps each project to its working directory, git-cliff
-config, and artifact prefixes. Release path filters include the image inputs and
-shared metadata code/config. The first artifact is the canonical version
+config, and artifact prefixes. Only each project's include paths in its cliff.toml
+trigger releases; changes to shared release tooling do not bump projects. The first artifact is the canonical version
 stream; a single bump creates every artifact tag at the same commit. Root
 `cliff.toml` includes historical `devenv-*` tags to preserve existing versions.
 Devenv publishes `devenv-ci-<version>` with `ci` and
@@ -887,7 +887,10 @@ The tag publishing pipeline runs `scripts/release-metadata.sh <tag>` in a full
 clone, then supplies the JSON to `publish-release --metadata=<file>`. Metadata
 contains the exact tagged commit, its committer timestamp (for reproducible
 `org.opencontainers.image.created` values), and git-cliff notes for that release.
-Both devenv artifacts use the canonical CI tag's notes. The script rejects a
+Both devenv artifacts use the canonical CI tag's notes. Metadata generation uses
+an explicit commit range from the previous project tag, including legacy prefixes
+listed in the manifest, to the requested commit. It also supports existing tags
+with no relevant commits (an empty changelog). The script rejects a
 checkout that does not match the requested tag and its canonical sibling.
 
 GitHub renders `org.opencontainers.image.description` as plain text and limits

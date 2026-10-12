@@ -44,7 +44,8 @@ for project in $(jq -r 'keys[]' "$manifest"); do
   current=$(git tag --points-at "$CI_COMMIT_SHA" --list "$canonical-*")
   if [ -n "$current" ]; then
     version=${current#"$canonical-"}
-    notes=$(cliff --current --strip all)
+    metadata=$("$root/scripts/release-metadata.sh" "$current")
+    notes=$(printf '%s' "$metadata" | jq -r .changelog)
   else
     pending=$(cliff --unreleased --context | jq '[.[] | select(.version == null) | .commits[]] | length')
     if [ "$pending" -eq 0 ]; then
