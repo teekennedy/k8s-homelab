@@ -421,7 +421,7 @@
       "sourceUrl": "https://codeberg.org/forgejo/forgejo"
     },
     {
-      "description": "OpenHands agent-server source url.",
+      "description": "Track stable OpenHands Python image variants while comparing upstream semver versions for software-agent-sdk release notes.",
       "matchDatasources": [
         "docker"
       ],
@@ -429,7 +429,7 @@
         "ghcr.io/openhands/agent-server"
       ],
       "sourceUrl": "https://github.com/OpenHands/software-agent-sdk",
-      "extractVersion": "^(?<version>\\d+\\.\\d+\\.\\d+)-python$",
+      "versionCompatibility": "^(?<version>\\d+\\.\\d+\\.\\d+)(?<compatibility>-python)$",
       "versioning": "semver"
     },
     {
