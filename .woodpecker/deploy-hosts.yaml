@@ -17,7 +17,7 @@ when:
 
 steps:
   - name: build
-    image: alpine/kubectl:1.37.0
+    image: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
     backend_options:
       kubernetes:
         serviceAccountName: nixos-deploy
@@ -116,7 +116,7 @@ steps:
         exit $rc
 
   - name: stage
-    image: alpine/kubectl:1.37.0
+    image: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
     depends_on: [build]
     backend_options:
       kubernetes:
@@ -169,7 +169,7 @@ steps:
         exit $rc
 
   - name: rollout
-    image: alpine/kubectl:1.37.0
+    image: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
     depends_on: [stage]
     backend_options:
       kubernetes:

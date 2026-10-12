@@ -18,7 +18,7 @@ when:
 clone:
   git:
     # default clone image, must be explicitly specified when changing settings
-    image: woodpeckerci/plugin-git
+    image: woodpeckerci/plugin-git@sha256:550075c844fcec0af41d9d28f9860aa5d8c43e1e9419be4b9266dc02c2f29804
     # https://github.com/woodpecker-ci/plugin-git/blob/main/docs.md
     settings:
       tags: true
@@ -31,7 +31,7 @@ steps:
   - name: tag-release
     # The only image release_bot_token is released to; see
     # k8s/platform/woodpecker/values.yaml.
-    image: alpine/git
+    image: alpine/git@sha256:ce84fd6a057b4dc5cf5009da2dd832f1c6d096c1984bf50496cf3c256402264d
     environment:
       FORGEJO_TOKEN:
         from_secret: release_bot_token
