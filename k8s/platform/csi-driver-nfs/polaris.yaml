@@ -17,3 +17,10 @@ exemptions:
       - runAsRootAllowed
       - privilegeEscalationAllowed
       - dangerousCapabilities
+  # CSI plugins register with the kubelet and mount volumes under
+  # /var/lib/kubelet.
+  - controllerNames:
+      - csi-nfs-node
+      - csi-nfs-controller
+    rules:
+      - hostPathSet

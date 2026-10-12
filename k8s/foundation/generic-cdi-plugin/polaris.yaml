@@ -15,3 +15,9 @@ exemptions:
       - runAsPrivileged
       - runAsRootAllowed
       - privilegeEscalationAllowed
+  # Registers with the kubelet under /var/lib/kubelet and reads the host's CDI
+  # spec.
+  - controllerNames:
+      - generic-cdi-plugin-daemonset
+    rules:
+      - hostPathSet

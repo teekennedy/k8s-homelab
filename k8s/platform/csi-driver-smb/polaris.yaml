@@ -16,3 +16,9 @@ exemptions:
       - runAsPrivileged
       - runAsRootAllowed
       - privilegeEscalationAllowed
+  # CSI node plugins register with the kubelet and mount volumes under
+  # /var/lib/kubelet.
+  - controllerNames:
+      - csi-smb-node
+    rules:
+      - hostPathSet

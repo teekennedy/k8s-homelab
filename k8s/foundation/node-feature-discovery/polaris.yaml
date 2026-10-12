@@ -1,0 +1,7 @@
+exemptions:
+  # The worker detects hardware features from the host's /sys, /boot and
+  # library paths.
+  - controllerNames:
+      - node-feature-discovery-worker
+    rules:
+      - hostPathSet

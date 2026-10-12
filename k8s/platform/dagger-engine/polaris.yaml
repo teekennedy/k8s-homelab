@@ -8,3 +8,8 @@ exemptions:
       - runAsRootAllowed
       - dangerousCapabilities
       - privilegeEscalationAllowed
+  # The chart exposes the engine's socket directory on the host by default.
+  - controllerNames:
+      - dagger-engine-dagger-helm-engine
+    rules:
+      - hostPathSet

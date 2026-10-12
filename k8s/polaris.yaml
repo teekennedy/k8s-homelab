@@ -36,6 +36,7 @@ checks:
   hostPIDSet: danger
   hostNetworkSet: danger
   hostPortSet: warning
+  hostPathSet: warning
   procMount: warning
   hostProcess: warning
   privilegeEscalationAllowed: danger
@@ -59,7 +60,6 @@ checks:
 
   # Pending: wanted, but releases still fail them. Enable one at a time as the
   # failures are fixed or exempted.
-  hostPathSet: ignore # warning
   readinessProbeMissing: ignore # warning
   livenessProbeMissing: ignore # warning
   cpuRequestsMissing: ignore # warning

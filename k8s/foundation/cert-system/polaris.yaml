@@ -29,3 +29,9 @@ exemptions:
       - deploybot-ssh-cert-issuer
     rules:
       - sensitiveContainerEnvVar
+  # Writes the NFS mTLS certificates to /var/lib/nfs-mtls, where the host's
+  # NFS client reads them.
+  - controllerNames:
+      - nfs-mtls-cert-sync
+    rules:
+      - hostPathSet

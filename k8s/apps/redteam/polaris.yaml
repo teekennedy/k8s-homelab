@@ -1,0 +1,6 @@
+exemptions:
+  # The VPN sidecar needs the host's /dev/net/tun device to create its tunnel.
+  - controllerNames:
+      - redteam-external
+    rules:
+      - hostPathSet

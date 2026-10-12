@@ -25,3 +25,8 @@ exemptions:
       - runAsRootAllowed
       - privilegeEscalationAllowed
       - tagNotSpecified
+  # Reads the host's container logs from /var/log.
+  - controllerNames:
+      - crowdsec-agent
+    rules:
+      - hostPathSet

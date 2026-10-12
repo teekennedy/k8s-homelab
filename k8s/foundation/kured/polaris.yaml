@@ -10,3 +10,8 @@ exemptions:
       - privilegeEscalationAllowed
       - dangerousCapabilities
       - hostPIDSet
+  # Watches the host's reboot sentinel under /var/run.
+  - controllerNames:
+      - kured
+    rules:
+      - hostPathSet

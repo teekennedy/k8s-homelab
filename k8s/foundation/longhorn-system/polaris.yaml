@@ -48,3 +48,10 @@ exemptions:
     rules:
       - privilegeEscalationAllowed
       - runAsRootAllowed
+  # Longhorn manages host block devices and stores replicas in
+  # /var/lib/longhorn.
+  - controllerNames:
+      - longhorn-manager
+      - longhorn-pre-upgrade
+    rules:
+      - hostPathSet

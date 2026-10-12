@@ -14,3 +14,13 @@ exemptions:
       # (mode 750, owned by root:root) and /var/log/journal across nodes
       # with varying systemd-journal GIDs. Verified on-cluster 2026-07-01.
       - runAsRootAllowed
+  # node-exporter reads host metrics from /proc, /sys and the root filesystem.
+  - controllerNames:
+      - monitoring-system-prometheus-node-exporter
+    rules:
+      - hostPathSet
+  # promtail tails the host's pod and journal logs.
+  - controllerNames:
+      - monitoring-system-promtail
+    rules:
+      - hostPathSet

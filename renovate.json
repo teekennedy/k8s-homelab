@@ -29,7 +29,7 @@
         ".dagger/**/*.go"
       ],
       "matchStrings": [
-        "//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n[^\"]*\"[^:]+:(?<currentValue>[^\"]+)\""
+        "//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n[^\"]*\"[^:]+:(?<currentValue>[^\"@]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\""
       ]
     },
     {
@@ -81,6 +81,19 @@
       ],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "Donkie/Spoolman",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "Sync copyparty appVersion with GitHub releases",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "k8s/apps/copyparty/Chart.yaml"
+      ],
+      "matchStrings": [
+        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "9001/copyparty",
       "extractVersionTemplate": "^v(?<version>.*)$"
     },
     {
@@ -579,6 +592,15 @@
         ],
         "executionMode": "branch"
       }
+    },
+    {
+      "description": "Digest pins get their own PR per project folder. The folder grouping above does not reach them: its groupName is not rendered for pin updates, which put every pin in the repo on one branch.",
+      "matchUpdateTypes": [
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": "{{packageFileDir}} digest pins",
+      "groupSlug": "pin-{{packageFileDir}}"
     },
     {
       "description": "Automerge all non-major (minor/patch) updates, and digest pins and their updates.",
