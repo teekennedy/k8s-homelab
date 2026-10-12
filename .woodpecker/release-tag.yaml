@@ -38,3 +38,4 @@ steps:
     commands:
       - apk add --no-cache curl jq git-cliff
       - git config --global --add safe.directory "$CI_WORKSPACE"
+      - scripts/release.sh
