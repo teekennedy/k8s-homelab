@@ -350,17 +350,14 @@ kubectl -n openhands get sandbox -L openhands.msng.to/sandbox-spec
 ### Sandbox image
 
 `files/sandbox/Dockerfile` is the upstream agent server with `kubectl` and the
-`dagger` CLI added; the CLI version must match the engine's. To publish a new
-one (after bumping the `FROM` tag or either CLI version):
+`dagger` CLI added; the CLI version must match the engine's.
 
-```sh
-echo "$GHCR_TOKEN" | docker login ghcr.io -u teekennedy --password-stdin
-docker buildx build --platform linux/amd64 \
-  -t ghcr.io/teekennedy/openhands-sandbox:<tag> --push files/sandbox
-```
-
-then set `sandboxSpecs.image` to `<tag>`. The token needs `write:packages`, and
-the package must be readable by the cluster (public, or an imagePullSecret).
+A conventional commit on `main` that touches `files/sandbox/` (a bumped `FROM`
+tag or CLI version, say) is tagged `openhands-sandbox-<version>` and published
+as `ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-<version>`; release notes
+use `files/sandbox/cliff.toml`. Renovate then proposes the new tag for
+`sandboxSpecs.image`. The package must be readable by the cluster (public, or
+an imagePullSecret).
 
 ### Claude models
 
@@ -373,7 +370,7 @@ has, and nothing here names a model.
 The Claude Code ACP adapter, which carries the CLI, is baked into the sandbox
 image (`CLAUDE_ADAPTER_VERSION` in `files/sandbox/Dockerfile`), so a sandbox
 starts without installing anything. Bumping it is how a new model arrives:
-change that ARG, then rebuild and push the image as under "Sandbox image".
+change that ARG; the image is released as under "Sandbox image".
 
 Three things about the Claude Code agent are declared in `values.yaml`, under
 `appServer.acpServers.claude-code`, rather than left to the Settings UI:

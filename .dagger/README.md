@@ -870,7 +870,8 @@ stream; a single bump creates every artifact tag at the same commit. Root
 `cliff.toml` includes historical `devenv-*` tags to preserve existing versions.
 Devenv publishes `devenv-ci-<version>` with `ci` and
 `devenv-shell-<version>` with `ci` plus `interactive`. Forgejo resources starts
-at `forgejo-resources-1.0.0` and uses its own cliff.toml.
+at `forgejo-resources-1.0.0` and uses its own cliff.toml. The OpenHands sandbox
+starts at `openhands-sandbox-0.2.0`, likewise with its own cliff.toml.
 
 `scripts/release.sh` creates Forgejo releases on main pushes. The shared tag
 pipeline invokes `dagger call publish-release --tag=<tag> --username=teekennedy

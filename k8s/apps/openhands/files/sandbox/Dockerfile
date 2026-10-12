@@ -2,9 +2,9 @@
 # run Dagger on the shared engine over `kube-pod://`, and a newer Claude Code
 # ACP adapter installed over the one in the image's /acp-node (which its
 # /usr/local/bin/claude-agent-acp wrapper runs), so a sandbox installs nothing
-# at start. Build and push, then set `sandboxSpecs.image` in values.yaml; see
-# README.md, "Sandbox image".
-#   docker buildx build --platform linux/amd64 -t ghcr.io/teekennedy/openhands-sandbox:<tag> --push files/sandbox
+# at start. Released as ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-<version>
+# by any conventional commit that touches this directory; see README.md,
+# "Sandbox image".
 FROM ghcr.io/openhands/agent-server:1.54.0-python@sha256:082368832a7e48087b64da38c7b2cf2442dd7621fde69f8d06ed52283ff136f8
 
 

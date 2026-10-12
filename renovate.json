@@ -250,7 +250,7 @@
       "description": "Version homelab images within their artifact tag prefix",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["ghcr.io/teekennedy/k8s-homelab"],
-      "versioning": "regex:^(?<compatibility>devenv-ci|devenv-shell|forgejo-resources)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+      "versioning": "regex:^(?<compatibility>devenv-ci|devenv-shell|forgejo-resources|openhands-sandbox)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
       "pinDigests": true
     },
     {

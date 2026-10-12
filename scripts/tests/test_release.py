@@ -10,6 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 RESOURCES = Path("k8s/platform/forgejo/files/forgejo-resources")
+SANDBOX = Path("k8s/apps/openhands/files/sandbox")
 
 
 class ReleaseTests(unittest.TestCase):
@@ -24,6 +25,9 @@ class ReleaseTests(unittest.TestCase):
         shutil.copy(ROOT / "scripts/release-metadata.sh", self.repo / "scripts")
         shutil.copy(ROOT / "cliff.toml", self.repo)
         shutil.copy(ROOT / RESOURCES / "cliff.toml", self.repo / RESOURCES)
+        # Left untracked: only tests that stage SANDBOX release the sandbox.
+        (self.repo / SANDBOX).mkdir(parents=True)
+        shutil.copy(ROOT / SANDBOX / "cliff.toml", self.repo / SANDBOX)
         (self.repo / "devenv.nix").write_text("{}\n")
         (self.repo / RESOURCES / "main.go").write_text("package main\n")
         self.git("init", "-q")
@@ -170,6 +174,23 @@ class ReleaseTests(unittest.TestCase):
                 self.assertNotIn("Baseline", releases[-1]["body"])
                 self.git("tag", "-d", "forgejo-resources-1.0.1")
                 self.git("tag", "-d", f"forgejo-resources-{expected}")
+
+    def test_sandbox_starts_at_initial_tag(self):
+        self.release()
+        for content, message, expected in [
+            ("FROM scratch\n", "chore(deps): update agent-server", "0.2.0"),
+            ("FROM scratch\n# fix\n", "fix(openhands): repair sandbox", "0.2.1"),
+            ("FROM scratch\n# feat\n", "feat(openhands): add a CLI", "0.3.0"),
+        ]:
+            with self.subTest(message=message):
+                (self.repo / SANDBOX / "Dockerfile").write_text(content)
+                self.git("add", str(SANDBOX))
+                self.commit(message)
+                releases = self.release()
+                tag = f"openhands-sandbox-{expected}"
+                self.assertEqual(releases[-1]["tag_name"], tag)
+                self.assertEqual(self.metadata(tag)["changelog"], releases[-1]["body"])
+        self.assertEqual(len(releases), 4)
 
     def test_retry_completes_artifact_pair(self):
         (self.repo / "devenv.nix").write_text("{ fixed = true; }\n")

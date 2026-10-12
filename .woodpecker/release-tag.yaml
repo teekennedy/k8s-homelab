@@ -11,6 +11,7 @@ when:
         - devenv.lock
         - "cmd/lab/**"
         - "k8s/platform/forgejo/files/forgejo-resources/**"
+        - "k8s/apps/openhands/files/sandbox/**"
 
 # Tags are needed to find the last release and the full history, trees included,
 # to find what changed. A partial or shallow clone would make git lazily fetch

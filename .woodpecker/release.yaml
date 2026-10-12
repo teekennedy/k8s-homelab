@@ -4,6 +4,7 @@ when:
       - refs/tags/devenv-ci-*
       - refs/tags/devenv-shell-*
       - refs/tags/forgejo-resources-*
+      - refs/tags/openhands-sandbox-*
 
 # git-cliff needs the tagged project's complete history and sibling artifact tags.
 clone:

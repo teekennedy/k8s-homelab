@@ -32,5 +32,16 @@
         "description": "Reconcile Forgejo users, organizations, teams, access tokens, and repositories."
       }
     ]
+  },
+  "openhands-sandbox": {
+    "directory": "k8s/apps/openhands/files/sandbox",
+    "config": "cliff.toml",
+    "artifacts": [
+      {
+        "prefix": "openhands-sandbox",
+        "title": "OpenHands sandbox",
+        "description": "OpenHands agent server with kubectl, Dagger, and the Claude Code ACP adapter."
+      }
+    ]
   }
 }

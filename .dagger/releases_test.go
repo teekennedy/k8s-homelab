@@ -63,6 +63,7 @@ func TestArtifactForTag(t *testing.T) {
 		{"devenv-ci-1.2.3", ".", []string{"ci"}},
 		{"devenv-shell-1.2.3", ".", []string{"ci", "interactive"}},
 		{"forgejo-resources-1.0.0", "k8s/platform/forgejo/files/forgejo-resources", nil},
+		{"openhands-sandbox-0.2.0", "k8s/apps/openhands/files/sandbox", nil},
 	} {
 		t.Run(tc.tag, func(t *testing.T) {
 			project, artifact, err := artifactForTag(tc.tag)
