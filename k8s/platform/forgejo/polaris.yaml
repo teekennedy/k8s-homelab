@@ -32,3 +32,10 @@ exemptions:
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
+  # Helm test pods come from upstream charts with no resource settings.
+  - controllerNames:
+      - forgejo-test-connection
+    rules:
+      - cpuRequestsMissing
+      - memoryRequestsMissing
+      - memoryLimitsMissing

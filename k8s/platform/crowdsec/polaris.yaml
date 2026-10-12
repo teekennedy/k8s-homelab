@@ -37,3 +37,11 @@ exemptions:
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
+  # Helm test pods come from upstream charts with no resource settings.
+  - controllerNames:
+      - crowdsec-test-agent
+      - crowdsec-test-lapi-up
+    rules:
+      - cpuRequestsMissing
+      - memoryRequestsMissing
+      - memoryLimitsMissing

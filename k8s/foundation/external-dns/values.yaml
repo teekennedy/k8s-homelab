@@ -32,6 +32,12 @@ external-dns:
     enabled: true
     serviceMonitor:
       enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 256Mi
+    limits:
+      memory: 384Mi
 
 # Internal instance: resolves non-wspublic resources to cluster IPs
 # in Unifi DNS so internal clients avoid NAT reflection.
@@ -73,6 +79,12 @@ external-dns-internal:
           port: http-webhook
         initialDelaySeconds: 5
         periodSeconds: 10
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          memory: 192Mi
   txtOwnerId: homelab-internal
   sources:
     - service
@@ -86,6 +98,12 @@ external-dns-internal:
     enabled: true
     serviceMonitor:
       enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 256Mi
+    limits:
+      memory: 384Mi
 
 # Internal instance for public services: resolves wspublic resources
 # to the public MetalLB VIP in Unifi DNS so they're reachable from the LAN.
@@ -127,6 +145,12 @@ external-dns-public-internal:
           port: http-webhook
         initialDelaySeconds: 5
         periodSeconds: 10
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          memory: 192Mi
   txtOwnerId: homelab-public-internal
   sources:
     - service
@@ -143,6 +167,12 @@ external-dns-public-internal:
     enabled: true
     serviceMonitor:
       enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 256Mi
+    limits:
+      memory: 384Mi
 
 ddnsUpdater:
   enabled: true

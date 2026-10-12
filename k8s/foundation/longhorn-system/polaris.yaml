@@ -63,3 +63,21 @@ exemptions:
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
+  # The chart has no resource settings for these.
+  - controllerNames:
+      - longhorn-driver-deployer
+      - longhorn-ui
+      - longhorn-post-upgrade
+      - longhorn-pre-upgrade
+      - longhorn-uninstall
+    rules:
+      - cpuRequestsMissing
+      - memoryRequestsMissing
+      - memoryLimitsMissing
+  # The chart has no resource settings for the manager's image pre-pull sidecar.
+  - controllerNames:
+      - longhorn-manager
+    rules:
+      - cpuRequestsMissing
+      - memoryRequestsMissing
+      - memoryLimitsMissing

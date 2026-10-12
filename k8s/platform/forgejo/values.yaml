@@ -159,6 +159,12 @@ forgejo:
         ACCOUNT_LINKING: auto
       openid:
         ENABLE_OPENID_SIGNIN: false
+  resources:
+    requests:
+      cpu: 200m
+      memory: 384Mi
+    limits:
+      memory: 768Mi
 
 forgejo-resources:
   users:

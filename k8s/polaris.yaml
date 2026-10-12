@@ -30,6 +30,9 @@ checks:
   pullPolicyAlways: danger
 
   # efficiency
+  cpuRequestsMissing: warning
+  memoryRequestsMissing: warning
+  memoryLimitsMissing: warning
   # CPU limits throttle; requests are what scheduling needs.
   cpuLimitsMissing: ignore
 
@@ -62,9 +65,6 @@ checks:
 
   # Pending: wanted, but releases still fail them. Enable one at a time as the
   # failures are fixed or exempted.
-  cpuRequestsMissing: ignore # warning
-  memoryRequestsMissing: ignore # warning
-  memoryLimitsMissing: ignore # warning
   linuxHardening: ignore # warning
   insecureCapabilities: ignore # warning
   automountServiceAccountToken: ignore # warning

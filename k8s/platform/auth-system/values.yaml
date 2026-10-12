@@ -755,6 +755,12 @@ app-template:
                 periodSeconds: 10
                 timeoutSeconds: 1
                 failureThreshold: 3
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 192Mi
   defaultPodOptions:
     automountServiceAccountToken: false
     securityContext:

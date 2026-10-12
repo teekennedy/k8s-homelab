@@ -9,11 +9,44 @@ cert-manager:
     enabled: true
     servicemonitor:
       enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 192Mi
+    limits:
+      memory: 256Mi
+  cainjector:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+  webhook:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 96Mi
+      limits:
+        memory: 192Mi
+  startupapicheck:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 96Mi
+      limits:
+        memory: 192Mi
 
 trust-manager:
   app:
     trust:
       namespace: cert-system
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 192Mi
 
 # OpenSSH user CA backing the deploybot login on the borg hosts.
 # See templates/deploybot-ssh-ca.yaml for why this is not a cert-manager issuer.

@@ -135,6 +135,12 @@ argo-cd:
       enabled: true
       serviceMonitor:
         enabled: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 96Mi
+      limits:
+        memory: 192Mi
   # Authelia OIDC is configured under configs.cm.oidc.config
   dex:
     enabled: false
@@ -142,16 +148,34 @@ argo-cd:
     metrics: *metrics
     livenessProbe:
       enabled: true
+    resources:
+      requests:
+        cpu: 340m
+        memory: 1536Mi
+      limits:
+        memory: 3Gi
   applicationSet:
     livenessProbe:
       enabled: true
     readinessProbe:
       enabled: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 256Mi
+      limits:
+        memory: 384Mi
   notifications:
     livenessProbe:
       enabled: true
     readinessProbe:
       enabled: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 256Mi
+      limits:
+        memory: 384Mi
   repoServer:
     metrics: *metrics
     # helmfile CMP sidecar: renders k8s/<tier>/<name> charts via `helmfile template`
@@ -197,12 +221,24 @@ argo-cd:
           # Filesystem separation from the repo-server's own /tmp, per the CMP docs.
           - mountPath: /tmp
             name: cmp-tmp
+        resources:
+          requests:
+            cpu: 190m
+            memory: 1536Mi
+          limits:
+            memory: 3Gi
     volumes:
       - name: argocd-cmp-cm
         configMap:
           name: argocd-cmp-cm
       - name: cmp-tmp
         emptyDir: {}
+    resources:
+      requests:
+        cpu: 150m
+        memory: 768Mi
+      limits:
+        memory: 1Gi
   redis:
     metrics:
       enabled: false
@@ -210,6 +246,19 @@ argo-cd:
       enabled: true
     readinessProbe:
       enabled: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 192Mi
+      limits:
+        memory: 256Mi
+  redisSecretInit:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 96Mi
+      limits:
+        memory: 192Mi
 # https://github.com/argoproj/argo-helm/blob/main/charts/argocd-apps/values.yaml
 argocd-apps:
   applications:
@@ -238,3 +287,9 @@ argo-events:
     rbac:
       namespaced: false
     replicas: 1
+    resources:
+      requests:
+        cpu: 10m
+        memory: 192Mi
+      limits:
+        memory: 384Mi

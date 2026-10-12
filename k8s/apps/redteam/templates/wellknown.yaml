@@ -69,6 +69,12 @@ spec:
               mountPath: /out
       containers:
         - name: nginx
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
           image: "{{ .Values.wellknown.nginxImage }}"
           securityContext:
             runAsUser: 101

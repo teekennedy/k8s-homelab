@@ -77,6 +77,12 @@ app-template:
           command:
             - sleep
             - infinity
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
 
     main:
       replicas: 1
@@ -287,6 +293,12 @@ app-template:
                   port: 9696
                 periodSeconds: 10
                 timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 60m
+              memory: 384Mi
+            limits:
+              memory: 768Mi
         # https://docs.linuxserver.io/images/docker-radarr/
         radarr:
           image:
@@ -333,6 +345,12 @@ app-template:
                   port: 7878
                 periodSeconds: 10
                 timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 30m
+              memory: 512Mi
+            limits:
+              memory: 768Mi
         # https://docs.linuxserver.io/images/docker-sonarr/
         sonarr:
           image:
@@ -383,6 +401,12 @@ app-template:
                   port: 8989
                 periodSeconds: 10
                 timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 40m
+              memory: 512Mi
+            limits:
+              memory: 768Mi
     unpackerr:
       pod:
         securityContext:
@@ -409,6 +433,12 @@ app-template:
                 secretKeyRef:
                   name: api-keys
                   key: RADARR_API_KEY
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
     cleanuparr:
       pod:
         securityContext:
@@ -451,6 +481,12 @@ app-template:
                 failureThreshold: 3
                 initialDelaySeconds: 30
                 periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
     downloader:
       replicas: 1
       pod:
@@ -611,6 +647,12 @@ app-template:
                   name: jellyfin-qbittorrent-admin
                   key: password
             QBITTORRENT_BASE_URL: http://localhost:8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
     configarr:
       type: cronjob
       cronjob:
@@ -645,6 +687,12 @@ app-template:
           tty: true # for color support
           env:
             LOG_STACKTRACE: "true"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 96Mi
+            limits:
+              memory: 192Mi
   service:
     main:
       controller: main

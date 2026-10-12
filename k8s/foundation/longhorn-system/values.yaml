@@ -44,3 +44,17 @@ longhorn:
       enabled: true
   persistence:
     reclaimPolicy: Retain
+  longhornManager:
+    resources:
+      requests:
+        cpu: 400m
+        memory: 768Mi
+      limits:
+        memory: 1Gi
+  longhornGlobalManager:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 192Mi

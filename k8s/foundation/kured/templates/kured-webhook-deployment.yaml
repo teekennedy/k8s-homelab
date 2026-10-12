@@ -30,6 +30,12 @@ spec:
                   app.kubernetes.io/name: kured-webhook
       containers:
         - name: webhook
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 192Mi
           image: "{{ .Values.webhook.image.repository }}:{{ .Values.webhook.image.tag }}"
           imagePullPolicy: IfNotPresent
           securityContext:

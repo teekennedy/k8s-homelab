@@ -23,6 +23,12 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: lldap-bootstrap
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
           # Same image as the lldap deployment (see app-template.controllers.lldap
           # in values.yaml) so renovate updates both together and they never drift.
           image: "{{ (index .Values "app-template" "controllers" "lldap" "containers" "lldap" "image" "repository") }}:{{ (index .Values "app-template" "controllers" "lldap" "containers" "lldap" "image" "tag") }}"

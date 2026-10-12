@@ -100,6 +100,12 @@ woodpecker:
       tls:
         - hosts:
             - ci.msng.to
+    resources:
+      requests:
+        cpu: 10m
+        memory: 192Mi
+      limits:
+        memory: 384Mi
 
   agent:
     replicaCount: 2
@@ -118,6 +124,12 @@ woodpecker:
       # TODO get a base image with dagger CLI preinstalled and use that with a non-root user
       # WOODPECKER_BACKEND_K8S_SECCTX_NONROOT: "true"
       WOODPECKER_BACKEND_K8S_VOLUME_SIZE: "1G"
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 192Mi
 
 woodpeckerResources:
   # Deliberately in values.yaml (not templates/woodpecker-resources.yaml) so

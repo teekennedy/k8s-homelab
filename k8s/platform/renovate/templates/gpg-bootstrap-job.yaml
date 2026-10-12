@@ -53,6 +53,12 @@ spec:
       restartPolicy: Never
       containers:
         - name: gpg-bootstrap
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
           image: "{{ .Values.gpgBootstrap.image }}"
           command: ["/bin/sh", "-c"]
           args:

@@ -22,3 +22,10 @@ exemptions:
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
+  # Helm test pods come from upstream charts with no resource settings.
+  - controllerNames:
+      - homepage-test-connection
+    rules:
+      - cpuRequestsMissing
+      - memoryRequestsMissing
+      - memoryLimitsMissing

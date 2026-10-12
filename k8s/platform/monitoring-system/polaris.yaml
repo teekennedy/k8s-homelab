@@ -37,3 +37,10 @@ exemptions:
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
+  # Helm test pods come from upstream charts with no resource settings.
+  - controllerNames:
+      - monitoring-system-grafana-test
+    rules:
+      - cpuRequestsMissing
+      - memoryRequestsMissing
+      - memoryLimitsMissing

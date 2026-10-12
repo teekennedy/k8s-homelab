@@ -17,6 +17,12 @@ spec:
       containers:
       - image: "{{ .Values.image }}"
         name: generic-cdi-plugin
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
         command: 
           - /generic-cdi-plugin
           - /var/run/cdi/nvidia-container-toolkit.json

@@ -28,6 +28,12 @@ kured:
     # How long after successful reboot to wait before releasing lock.
     # Gives the cluster some time to settle after node comes back online.
     lockReleaseDelay: 5m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 96Mi
+    limits:
+      memory: 192Mi
 
 webhook:
   enabled: true
