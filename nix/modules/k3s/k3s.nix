@@ -15,7 +15,7 @@ in {
   };
   config = {
     # Only update k3s one minor version at a time
-    services.k3s.package = pkgs.k3s_1_36;
+    services.k3s.package = pkgs.k3s_1_37;
     # https://docs.k3s.io/installation/requirements#inbound-rules-for-k3s-nodes
     networking.firewall.allowedTCPPorts = lib.mkMerge [
       [
