@@ -6,7 +6,7 @@ standby:
   replicas: 2
   image:
     repository: nginxinc/nginx-unprivileged
-    tag: 1.31.6-alpine
+    tag: 1.31.6-alpine@sha256:884e0b7f42f303641b0f4e78755aea647521dca0b89ca3be7992ad78b5c07434
   resources:
     requests:
       cpu: 5m
@@ -117,7 +117,7 @@ traefik:
         emptyDir: {}
     initContainers:
       - name: fetch-crowdsec-bouncer-plugin
-        image: alpine/git:v2.52.0
+        image: alpine/git:v2.52.0@sha256:4a0e72d49596a1f5d3701aeedafdadc5c0da4062be4657c7bdc4017387f591cc
         # HOME defaults to /root which we can't write to (non-root user + RO rootfs).
         # Point git at /tmp (a writable emptyDir) for its config dotfiles.
         env:
