@@ -54,6 +54,7 @@ in {
         cue
         deadnix
         git-cliff
+        gitMinimal
         go
         golangci-lint
         # Shell utilities the checks themselves shell out to (helm dependency
@@ -66,6 +67,7 @@ in {
         gnutar
         gzip
         helmfile-wrapped
+        jq
         kubeconform
         kubernetes-helm
         kubernetes-polaris
@@ -105,9 +107,8 @@ in {
         forgejo-cli
         # Full git rather than the gitMinimal that prek already pulls into the
         # closure: this is the one on an interactive $PATH, so it should have the
-        # perl subcommands. It stays out of the ci profile because no check
-        # shells out to git, and having it there costs ~160MB once perl,
-        # gettext and the man pages come along.
+        # perl subcommands. The ci profile uses gitMinimal for release tests
+        # without pulling in perl, gettext and the man pages.
         git
         k9s
         kind

@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[2]
 RESOURCES = Path("k8s/platform/forgejo/files/forgejo-resources")
 
 
-@unittest.skipUnless(shutil.which("git-cliff"), "git-cliff is required")
 class ReleaseTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -145,6 +144,32 @@ class ReleaseTests(unittest.TestCase):
             "Repair reconciliation",
             self.metadata("forgejo-resources-1.0.2")["changelog"],
         )
+        (self.repo / "devenv.nix").write_text("{ repaired = true; }\n")
+        self.commit("fix(devenv): repair tooling")
+        releases = self.release()
+        self.assertEqual(
+            [r["tag_name"] for r in releases[-2:]],
+            ["devenv-ci-1.1.3", "devenv-shell-1.1.3"],
+        )
+
+    def test_minor_and_major_after_tag_without_project_changes(self):
+        for message, expected in [
+            ("feat(forgejo-resources): add reconciliation", "1.1.0"),
+            ("feat(forgejo-resources)!: replace reconciliation", "2.0.0"),
+        ]:
+            with self.subTest(message=message):
+                (self.repo / ".dagger/releases.go").write_text(f"// {message}\n")
+                self.commit("fix(containers): adjust shared labels")
+                self.git("tag", "forgejo-resources-1.0.1")
+                (self.repo / RESOURCES / "main.go").write_text(f"// {message}\n")
+                self.commit(message)
+                releases = self.release()
+                self.assertEqual(
+                    releases[-1]["tag_name"], f"forgejo-resources-{expected}"
+                )
+                self.assertNotIn("Baseline", releases[-1]["body"])
+                self.git("tag", "-d", "forgejo-resources-1.0.1")
+                self.git("tag", "-d", f"forgejo-resources-{expected}")
 
     def test_retry_completes_artifact_pair(self):
         (self.repo / "devenv.nix").write_text("{ fixed = true; }\n")

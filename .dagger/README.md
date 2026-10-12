@@ -37,6 +37,7 @@ The combination means:
 | `main.go` | Homelab struct, constructor, Nix/CUE/YAML/Woodpecker/CLI functions |
 | `golang.go` | GoModule struct, per-module Test/Lint, aggregate TestGo/LintGo |
 | `python.go` | PythonProject struct, per-project Test/Format, aggregate TestPython/FormatPython |
+| `scripts.go` | TestScripts runs script regression tests with scoped repository inputs |
 | `helm.go` | Chart discovery and path matching shared by the helmfile checks |
 | `helmfile.go` | Per-release helmfile Template/Validate and the shared render, aggregate BuildHelmfile/ValidateHelmfile/LintHelmfile |
 | `kubernetes.go` | Per-release Polaris/Kubeconform on the helmfile render, aggregate ValidatePolaris/ValidateKubeconform |
@@ -246,6 +247,7 @@ render, so it is shared by all four checks.
 - `TestPython(source, paths)` - Run Python tests (delegates to PythonProject.Test).
   Passes no `-m`: which markers an ordinary run excludes is each project's own
   `addopts`. See Kubernetes integration tests.
+- `TestScripts(source)` - Run release script regression tests with their scripts, manifest, and cliff configs. Script tests run separately from TestPython; FormatPython still formats them.
 
 ### Format Functions (`+generate`, auto-apply)
 These also run as part of `dagger check` (a non-empty changeset fails the check).

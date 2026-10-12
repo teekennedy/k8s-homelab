@@ -261,7 +261,7 @@ func (m *Homelab) FormatPython(
 // +check
 func (m *Homelab) TestPython(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "scripts/tests/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 	// +optional
 	paths []string,
