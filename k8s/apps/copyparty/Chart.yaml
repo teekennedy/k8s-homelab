@@ -5,7 +5,7 @@ type: application
 # Bump on any change to the chart templates/values.
 version: 0.1.4
 # Tracks the copyparty/iv image tag deployed by this chart.
-appVersion: "1.20.19"
+appVersion: "1.20.24"
 dependencies:
   # Dedicated oauth2-proxy instance used as a Traefik forwardAuth middleware.
   # See values.yaml for why the shared platform instances can't be reused.
