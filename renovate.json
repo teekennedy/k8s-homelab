@@ -600,7 +600,10 @@
         "pinDigest"
       ],
       "groupName": "{{packageFileDir}} digest pins",
-      "groupSlug": "pin-{{packageFileDir}}"
+      "groupSlug": "pin-{{packageFileDir}}",
+      "group": {
+        "commitMessageTopic": "{{packageFileDir}} dependencies"
+      }
     },
     {
       "description": "Automerge all non-major (minor/patch) updates, and digest pins and their updates.",
