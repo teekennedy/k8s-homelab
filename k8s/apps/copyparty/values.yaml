@@ -129,8 +129,6 @@ resources:
     cpu: 100m
     memory: 512Mi
   limits:
-    # Thumbnailing (FFmpeg/libvips) and up2k hashing are the CPU-hungry bits.
-    cpu: "4"
     memory: 6Gi
 
 nodeSelector: {}
@@ -217,7 +215,6 @@ oauth2-proxy:
       cpu: 25m
       memory: 64Mi
     limits:
-      cpu: 500m
       memory: 256Mi
 
   service:

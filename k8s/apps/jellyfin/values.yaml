@@ -60,7 +60,6 @@ exporter:
       cpu: 10m
       memory: 32Mi
     limits:
-      cpu: 200m
       memory: 128Mi
 
 app-template:
@@ -173,7 +172,6 @@ app-template:
               memory: 1Gi
               gpu.intel.com/i915: "1"
             limits:
-              cpu: 4000m
               memory: 6Gi
               gpu.intel.com/i915: "1"
     seerr:
@@ -204,7 +202,6 @@ app-template:
               cpu: 500m
               memory: 400Mi
             limits:
-              cpu: 1000m
               memory: 800Mi
           # https://docs.seerr.dev/getting-started/docker
           probes:
@@ -507,7 +504,6 @@ app-template:
               cpu: 10m
               memory: 16Mi
             limits:
-              cpu: 100m
               memory: 64Mi
       containers:
         # https://docs.linuxserver.io/images/docker-qbittorrent/
@@ -552,7 +548,6 @@ app-template:
               cpu: 750m
               memory: 1Gi
             limits:
-              cpu: 2000m
               memory: 6Gi
         gluetun:
           image:
@@ -563,7 +558,6 @@ app-template:
               cpu: 250m
               memory: 128Mi
             limits:
-              cpu: 750m
               memory: 384Mi
           env:
             TZ: America/Denver

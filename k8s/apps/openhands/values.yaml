@@ -323,7 +323,6 @@ appServer:
       cpu: 50m
       memory: 128Mi
     limits:
-      cpu: "1"
       memory: 512Mi
 
 # --- Sandbox specs ----------------------------------------------------------
@@ -447,7 +446,6 @@ authSessions:
       cpu: 10m
       memory: 48Mi
     limits:
-      cpu: 250m
       memory: 64Mi
 
 oauth2-proxy:
@@ -507,7 +505,6 @@ oauth2-proxy:
       cpu: 25m
       memory: 64Mi
     limits:
-      cpu: 500m
       memory: 256Mi
 
   service:

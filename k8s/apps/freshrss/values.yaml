@@ -327,7 +327,6 @@ app-template:
               cpu: 50m
               memory: 128Mi
             limits:
-              cpu: "2"
               memory: 1Gi
 
     # Feed refresh. Replaces the image's built-in cron (which needs root to
@@ -391,7 +390,6 @@ app-template:
               cpu: 25m
               memory: 64Mi
             limits:
-              cpu: "1"
               memory: 512Mi
 
   defaultPodOptions:

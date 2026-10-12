@@ -55,7 +55,8 @@ crowdsec:
     # Resources for the LAPI pod
     resources:
       limits:
-        cpu: 750m
+        # Unsets the chart's default CPU limit.
+        cpu: null
         memory: 256Mi
       requests:
         cpu: 125m
@@ -113,6 +114,8 @@ crowdsec:
     # Resources for agent pods
     resources:
       limits:
+        # Unsets the chart's default CPU limit.
+        cpu: null
         memory: 128Mi
       requests:
         cpu: 50m

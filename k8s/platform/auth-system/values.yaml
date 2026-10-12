@@ -636,7 +636,6 @@ authelia:
           name: authelia-ca-trust-store
     resources:
       limits:
-        cpu: '4.00'
         memory: '500Mi'
       requests:
         cpu: '0.25'

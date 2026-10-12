@@ -113,7 +113,6 @@ spec:
             cpu: "100m"
           limits:
             memory: "512Mi"
-            cpu: "500m"
       - name: sentinel
         image: "{{ .Values.valkey.image }}"
         securityContext:
@@ -171,7 +170,6 @@ spec:
             cpu: "50m"
           limits:
             memory: "128Mi"
-            cpu: "200m"
       volumes:
       - name: config
         configMap:

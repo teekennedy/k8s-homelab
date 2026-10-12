@@ -90,13 +90,11 @@ app-template:
                 timeoutSeconds: 1
                 tcpSocket:
                   port: &terrariaPort 7777
-          # CPU requests set to just over 4 to avoid running on my underpowered Intel N150 system
           resources:
             requests:
-              cpu: 4001m
+              cpu: 4000m
               memory: 6Gi
             limits:
-              cpu: 4001m
               memory: 6Gi
     discord-bot:
       strategy: RollingUpdate
@@ -175,7 +173,6 @@ app-template:
               cpu: 50m
               memory: 64Mi
             limits:
-              cpu: 200m
               memory: 128Mi
     terraria-web:
       strategy: Recreate
@@ -219,7 +216,6 @@ app-template:
               cpu: 100m
               memory: 150Mi
             limits:
-              cpu: 250m
               memory: 250Mi
 
   service:

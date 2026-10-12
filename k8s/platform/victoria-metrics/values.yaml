@@ -11,7 +11,6 @@ victoria-metrics-single:
         cpu: 300m
         memory: 768Mi
       limits:
-        cpu: 1000m
         memory: 3Gi
     persistentVolume:
       enabled: true

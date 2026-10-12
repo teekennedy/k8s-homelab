@@ -12,7 +12,6 @@ kubernetes-secret-generator:
     runAsUser: 1000
   resources:
     limits:
-      cpu: 100m
       memory: 512Mi
     requests:
       cpu: 50m
