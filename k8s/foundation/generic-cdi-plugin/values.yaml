@@ -2,4 +2,4 @@
 # renovate can pick it up. Note: upstream only publishes a floating `main`
 # tag (no versioned releases), so renovate can track digest updates here
 # but won't have a version to bump.
-image: ghcr.io/olfillasodikno/generic-cdi-plugin:main
+image: ghcr.io/olfillasodikno/generic-cdi-plugin:main@sha256:5399b02c75e7e1ef2f9f4d2ab75e05cfa66fac6e30bd2a8ea1045f8c02bda4ec
