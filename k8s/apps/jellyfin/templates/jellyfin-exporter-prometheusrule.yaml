@@ -33,7 +33,10 @@ spec:
             custom_link_url: "https://jellyfin.msng.to/web/#/dashboard"
 
         - alert: JellyfinStuckSession
-          expr: min_over_time(jellyfin_active_streams[12h]) > 0
+          # Aggregated so the 12h run follows the exporter across pod
+          # replacements instead of each pod's own series.
+          expr: max(jellyfin_active_streams) > 0
+          for: 12h
           labels:
             severity: warning
             component: media
