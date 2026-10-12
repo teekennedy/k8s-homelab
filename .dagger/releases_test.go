@@ -1,11 +1,58 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 	"unicode/utf8"
 )
+
+func TestEngineReleaseLabels(t *testing.T) {
+	requireEngine(t)
+	ctx := context.Background()
+	_, artifact, err := artifactForTag("forgejo-resources-1.0.4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := releaseMetadata{
+		Revision:  strings.Repeat("a", 40),
+		Created:   "2026-10-11T12:00:00Z",
+		Changelog: "### Bug Fixes\n- Fix title label\n",
+	}
+	for _, authored := range []bool{false, true} {
+		t.Run(fmt.Sprintf("existing=%t", authored), func(t *testing.T) {
+			container := dag.Container()
+			wantTitle, wantDescription := artifact.Title, artifact.Description
+			if authored {
+				wantTitle, wantDescription = "forgejo-resources", "Reconcile users and repos."
+				container = container.
+					WithLabel("org.opencontainers.image.title", wantTitle).
+					WithLabel("org.opencontainers.image.description", wantDescription).
+					WithLabel("org.opencontainers.image.version", "dev")
+			}
+			container, err := withReleaseLabels(ctx, container, artifact, "forgejo-resources-1.0.4", metadata)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for key, want := range map[string]string{
+				"org.opencontainers.image.title":       wantTitle,
+				"org.opencontainers.image.description": wantDescription + "\n\nBug Fixes Fix title label",
+				"org.opencontainers.image.version":     "1.0.4",
+				"org.opencontainers.image.revision":    metadata.Revision,
+			} {
+				got, err := container.Label(ctx, key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got != want {
+					t.Errorf("%s: got %q, want %q", key, got, want)
+				}
+			}
+		})
+	}
+}
 
 func TestArtifactForTag(t *testing.T) {
 	for _, tc := range []struct {
@@ -44,7 +91,7 @@ func TestReleaseLabels(t *testing.T) {
 		Created:   "2026-10-11T12:00:00Z",
 		Changelog: "### Features\n- **ci:** Add tooling\n" + strings.Repeat("é", 600),
 	}
-	labels := releaseLabels(artifact, "devenv-ci-1.2.3", metadata)
+	labels := releaseLabels(artifact, "devenv-ci-1.2.3", metadata, nil)
 	for key, want := range map[string]string{
 		"org.opencontainers.image.source":        imageSource,
 		"org.opencontainers.image.licenses":      "MIT",
@@ -67,6 +114,50 @@ func TestReleaseLabels(t *testing.T) {
 	}
 	if got := releaseDescription("Basic description", ""); got != "Basic description" {
 		t.Errorf("empty changelog: %q", got)
+	}
+}
+
+func TestReleaseLabelsPreserveImageMetadata(t *testing.T) {
+	_, artifact, err := artifactForTag("forgejo-resources-1.0.4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	existing := map[string]string{
+		"org.opencontainers.image.title":         "forgejo-resources",
+		"org.opencontainers.image.description":   "Reconcile Forgejo users and repos.",
+		"org.opencontainers.image.source":        "https://example.com/source",
+		"org.opencontainers.image.url":           "https://example.com",
+		"org.opencontainers.image.documentation": "https://example.com/docs",
+		"org.opencontainers.image.licenses":      "",
+		"org.opencontainers.image.version":       "dev",
+		"org.opencontainers.image.revision":      "unknown",
+		"org.opencontainers.image.created":       "old timestamp",
+	}
+	metadata := releaseMetadata{
+		Revision:  strings.Repeat("a", 40),
+		Created:   "2026-10-11T12:00:00Z",
+		Changelog: "### Bug Fixes\n- Fix title label\n",
+	}
+	labels := releaseLabels(artifact, "forgejo-resources-1.0.4", metadata, existing)
+	for key, want := range existing {
+		switch key {
+		case "org.opencontainers.image.description":
+			want += "\n\nBug Fixes Fix title label"
+		case "org.opencontainers.image.version":
+			want = "1.0.4"
+		case "org.opencontainers.image.revision":
+			want = metadata.Revision
+		case "org.opencontainers.image.created":
+			want = metadata.Created
+		}
+		if labels[key] != want {
+			t.Errorf("%s: got %q, want %q", key, labels[key], want)
+		}
+	}
+	delete(existing, "org.opencontainers.image.title")
+	labels = releaseLabels(artifact, "forgejo-resources-1.0.4", metadata, existing)
+	if labels["org.opencontainers.image.title"] != artifact.Title {
+		t.Error("missing title did not fall back to the manifest")
 	}
 }
 

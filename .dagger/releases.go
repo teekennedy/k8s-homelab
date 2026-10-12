@@ -87,9 +87,17 @@ func releaseDescription(description, changelog string) string {
 	return description
 }
 
-func releaseLabels(artifact releaseArtifact, tag string, metadata releaseMetadata) map[string]string {
-	labels := imageLabels(artifact.Title, releaseDescription(artifact.Description, metadata.Changelog),
+func releaseLabels(artifact releaseArtifact, tag string, metadata releaseMetadata, existing map[string]string) map[string]string {
+	labels := imageLabels(artifact.Title, artifact.Description,
 		"https://git.msng.to/ops/k8s-homelab/releases/tag/"+tag)
+	// Image-authored metadata takes precedence over release manifest defaults.
+	for _, field := range []string{"title", "description", "source", "url", "documentation", "licenses"} {
+		key := "org.opencontainers.image." + field
+		if value, ok := existing[key]; ok {
+			labels[key] = value
+		}
+	}
+	labels["org.opencontainers.image.description"] = releaseDescription(labels["org.opencontainers.image.description"], metadata.Changelog)
 	labels["org.opencontainers.image.version"] = strings.TrimPrefix(tag, artifact.Prefix+"-")
 	if metadata.Revision != "" {
 		labels["org.opencontainers.image.revision"] = metadata.Revision
@@ -99,6 +107,26 @@ func releaseLabels(artifact releaseArtifact, tag string, metadata releaseMetadat
 		labels["io.github.teekennedy.homelab.changelog"] = metadata.Changelog
 	}
 	return labels
+}
+
+func withReleaseLabels(ctx context.Context, container *dagger.Container, artifact releaseArtifact, tag string, metadata releaseMetadata) (*dagger.Container, error) {
+	labels, err := container.Labels(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read image labels: %w", err)
+	}
+	existing := make(map[string]string, len(labels))
+	for _, label := range labels {
+		name, err := label.Name(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read image label name: %w", err)
+		}
+		value, err := label.Value(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read image label %s: %w", name, err)
+		}
+		existing[name] = value
+	}
+	return withImageLabels(container, releaseLabels(artifact, tag, metadata, existing)), nil
 }
 
 type releaseProject struct {
@@ -162,7 +190,7 @@ func (m *Homelab) ReleaseContainer(
 	} else {
 		container = ws.Directory(project.Directory, dagger.WorkspaceDirectoryOpts{Gitignore: true}).DockerBuild()
 	}
-	return withImageLabels(container, releaseLabels(artifact, tag, release)), nil
+	return withReleaseLabels(ctx, container, artifact, tag, release)
 }
 
 // PublishRelease selects the container and profiles from the release tag and pushes to GHCR.

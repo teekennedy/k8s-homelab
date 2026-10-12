@@ -895,12 +895,18 @@ listed in the manifest, to the requested commit. It also supports existing tags
 with no relevant commits (an empty changelog). The script rejects a
 checkout that does not match the requested tag and its canonical sibling.
 
+Publishing preserves existing title, source, URL, documentation, and license
+labels, using defaults only for missing labels. An existing description supplies
+the base text for the release-note preview. Version, revision, creation time,
+and changelog labels describe the release.
+
 GitHub renders `org.opencontainers.image.description` as plain text and limits
 it to 512 characters. Released images use a stricter 512-byte UTF-8 budget,
 including the ellipsis, for the base description and truncated plain-text
 changelog preview. The complete notes remain in
 `io.github.teekennedy.homelab.changelog`, and
-`org.opencontainers.image.documentation` links to the Forgejo release. Standard
+`org.opencontainers.image.documentation` defaults to the Forgejo release when
+the image has no documentation label. Standard
 OCI keys are also emitted as manifest annotations by Dagger.
 
 Inspect a release's metadata without publishing:
