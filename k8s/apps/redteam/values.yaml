@@ -1,11 +1,11 @@
 # Custom session image: needs claude, kubectl, git, curl, nmap, nc, jq, python3.
-image: "ghcr.io/teekennedy/k8s-homelab-devenv:v0.1.0-claude-redteam"
+image: "ghcr.io/teekennedy/k8s-homelab-devenv:v0.1.0-claude-redteam@sha256:58015b5c64a8e93ef9e9a224d967e6c1120250c0d7ffb810c1c0a7298052ccaa"
 
 wellknown:
   # Deliberately in values.yaml (not templates/wellknown.yaml) so that
   # renovate can pick them up.
-  busyboxImage: busybox:stable
-  nginxImage: nginxinc/nginx-unprivileged:stable
+  busyboxImage: busybox:stable@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+  nginxImage: nginxinc/nginx-unprivileged:stable@sha256:8f18dedfceea3d7feb98792810c8c9925c985890ade257f2ec1b2f492b4eaebb
 
 # Repo the internal session pre-clones (unauthenticated read; public via mirror).
 repoURL: "https://git.msng.to/ops/k8s-homelab"
@@ -18,7 +18,7 @@ kubeApiCidr: "10.43.0.1/32"
 lanCidr: "10.69.0.0/16"
 
 gluetun:
-  image: qmcgaw/gluetun:v3.41.3
+  image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
   # Custom self-hosted WireGuard endpoint (see README: why not a commercial VPN).
   # Non-secret bits here; WIREGUARD_PRIVATE_KEY + WIREGUARD_ADDRESSES come from the
   # redteam-vpn Secret.
