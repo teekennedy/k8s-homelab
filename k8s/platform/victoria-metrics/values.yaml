@@ -4,7 +4,7 @@ victoria-metrics-single:
     fullnameOverride: victoria-metrics-server
     image:
       image: victoriametrics/victoria-metrics
-      tag: "v1.153.0"
+      tag: "v1.153.0@sha256:5eff7af5341e401471002f58d106d399e614a62f3d240f2dbc21901e49eed5dd"
     retentionPeriod: "4y"
     resources:
       requests:
