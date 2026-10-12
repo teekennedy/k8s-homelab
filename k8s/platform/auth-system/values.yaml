@@ -65,7 +65,8 @@ oidcClientSecrets:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      memory: 256Mi
+      # uv fetching CPython and the dependencies is OOMKilled at 256Mi.
+      memory: 1Gi
     requests:
       cpu: 100m
       memory: 128Mi
