@@ -17,7 +17,7 @@ app-template:
         terraria:
           image:
             repository: ghcr.io/passivelemon/terraria-docker
-            tag: terraria-1.4.5.6
+            tag: terraria-1.4.5.6@sha256:d60f280522d6c71079638b5036bdd6c4ac9f93c9f3250477ddb345fc2c6933f3
             pullPolicy: IfNotPresent
           args:
             # Allow steam friends to join
@@ -109,7 +109,7 @@ app-template:
         discord-bot:
           image:
             repository: ghcr.io/astral-sh/uv
-            tag: alpine
+            tag: alpine@sha256:20d3fe1308ffa40b51c5c20e002bab5fece40585edcee8ec99357309e8363424
             pullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -187,7 +187,7 @@ app-template:
         terraria-web:
           image:
             repository: ghcr.io/teekennedy/terraria-server-live-map
-            tag: "6713bbf"
+            tag: "6713bbf@sha256:a8771f692cb77cf89835aee4d23d24bb0f50b50e159bc0bb8234d1231e4e510c"
             pullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
