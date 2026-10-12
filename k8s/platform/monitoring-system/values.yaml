@@ -406,6 +406,39 @@ kube-prometheus-stack:
         memory: 128Mi
       limits:
         memory: 256Mi
+    rbac:
+      extraRules:
+        - apiGroups: ["longhorn.io"]
+          resources: ["volumes"]
+          verbs: ["list", "watch"]
+    customResourceState:
+      enabled: true
+      config:
+        kind: CustomResourceStateMetrics
+        spec:
+          resources:
+            # Longhorn's own exporter has no metric for volume conditions.
+            - groupVersionKind:
+                group: longhorn.io
+                version: v1beta2
+                kind: Volume
+              metricNamePrefix: kube_longhorn_volume
+              labelsFromPath:
+                volume: [metadata, name]
+                data_locality: [spec, dataLocality]
+                pvc: [status, kubernetesStatus, pvcName]
+                pvc_namespace: [status, kubernetesStatus, namespace]
+              metrics:
+                - name: status_condition
+                  help: Longhorn volume condition, 1 when the condition is True.
+                  each:
+                    type: Gauge
+                    gauge:
+                      path: [status, conditions]
+                      labelsFromPath:
+                        type: [type]
+                        reason: [reason]
+                      valueFrom: [status]
 
 loki:
   enabled: true

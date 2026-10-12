@@ -49,6 +49,21 @@ spec:
       labels:
         issue: Longhorn volumes are Degraded.
         severity: warning
+    # A strict-local volume holds exactly one replica, so an unschedulable one
+    # is a surplus replica. Longhorn then rejects every update to the volume,
+    # including the detach on the next pod restart.
+    - alert: LonghornStrictLocalReplicaUnschedulable
+      annotations:
+        description: Longhorn strict-local volume {{`{{$labels.volume}}`}} for the PVC {{`{{$labels.pvc}}`}} in the {{`{{$labels.pvc_namespace}}`}} namespace has had an
+          unschedulable replica ({{`{{$labels.reason}}`}}) for more than 15 minutes. Delete the stopped replica that has no node before the volume next detaches.
+        summary: Longhorn strict-local volume {{`{{$labels.volume}}`}} has an unschedulable replica
+        custom_link_text: volume
+        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/volume/{{`{{$labels.volume}}`}}
+      expr: kube_longhorn_volume_status_condition{type="Scheduled", data_locality="strict-local"} == 0
+      for: 15m
+      labels:
+        issue: Longhorn strict-local volume {{`{{$labels.volume}}`}} has an unschedulable replica.
+        severity: warning
     - alert: LonghornNodeStorageWarning
       annotations:
         description: The used storage of node {{`{{$labels.node}}`}} is at {{`{{$value}}`}}% capacity for

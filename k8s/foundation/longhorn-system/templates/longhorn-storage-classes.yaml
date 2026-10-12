@@ -45,11 +45,16 @@ apiVersion: storage.k8s.io/v1
 metadata:
   name: longhorn-strict-local
   namespace: {{ .Release.Namespace }}
+  annotations:
+    # StorageClass parameters are immutable; delete and recreate on change.
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
 provisioner: driver.longhorn.io
 allowVolumeExpansion: true
 volumeBindingMode: WaitForFirstConsumer
 parameters:
   numberOfReplicas: "1" # Required for strict-local
   dataLocality: "strict-local"
+  # Auto-balance can add a second replica, which strict-local cannot schedule.
+  replicaAutoBalance: "disabled"
   staleReplicaTimeout: "720" # 12 hours in minutes
 reclaimPolicy: Delete
