@@ -16,3 +16,9 @@ exemptions:
       - runAsRootAllowed
       - privilegeEscalationAllowed
       - tagNotSpecified
+  # Helm test pods run once and exit.
+  - controllerNames:
+      - homepage-test-connection
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

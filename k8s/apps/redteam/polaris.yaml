@@ -4,3 +4,10 @@ exemptions:
       - redteam-external
     rules:
       - hostPathSet
+  # The session containers are `sleep infinity` shells entered with kubectl exec.
+  - controllerNames:
+      - redteam-external
+      - redteam-internal
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

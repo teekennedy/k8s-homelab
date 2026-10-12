@@ -23,3 +23,10 @@ exemptions:
     rules:
       - clusterrolePodExecAttach
       - clusterrolebindingPodExecAttach
+  # The helmfile config-management sidecar serves a unix socket to the repo
+  # server and has nothing to probe.
+  - controllerNames:
+      - argocd-repo-server
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

@@ -21,3 +21,9 @@ exemptions:
       - generic-cdi-plugin-daemonset
     rules:
       - hostPathSet
+  # The plugin only serves the kubelet's device-plugin socket.
+  - controllerNames:
+      - generic-cdi-plugin-daemonset
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

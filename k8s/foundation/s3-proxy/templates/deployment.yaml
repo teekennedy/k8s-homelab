@@ -56,6 +56,11 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 30
+            failureThreshold: 5
       volumes:
         - name: data
           persistentVolumeClaim:

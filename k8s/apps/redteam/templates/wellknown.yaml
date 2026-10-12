@@ -77,6 +77,14 @@ spec:
               drop: [ALL]
           ports:
             - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 30
+            failureThreshold: 5
           volumeMounts:
             - name: content
               mountPath: /usr/share/nginx/html/.well-known

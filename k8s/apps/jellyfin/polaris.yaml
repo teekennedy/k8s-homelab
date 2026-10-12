@@ -45,3 +45,15 @@ exemptions:
       - jellyfin-unpackerr
     rules:
       - privilegeEscalationAllowed
+  # unpackerr polls the arr APIs and listens on no port.
+  - controllerNames:
+      - jellyfin-unpackerr
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing
+  # A `sleep infinity` shell for debugging.
+  - controllerNames:
+      - jellyfin-debug
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

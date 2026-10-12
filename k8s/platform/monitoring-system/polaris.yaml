@@ -24,3 +24,16 @@ exemptions:
       - monitoring-system-promtail
     rules:
       - hostPathSet
+  # Helm test pods run once and exit.
+  - controllerNames:
+      - monitoring-system-grafana-test
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing
+  # The k8s-sidecar config watchers have no health endpoint at this version.
+  - controllerNames:
+      - monitoring-system-grafana
+      - monitoring-system-loki
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

@@ -228,6 +228,15 @@ app-template:
                 periodSeconds: 15
                 successThreshold: 1
                 timeoutSeconds: 3
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /api/v1/status
+                  port: 5055
+                periodSeconds: 10
+                timeoutSeconds: 3
     arrs:
       replicas: 1
       pod:
@@ -249,6 +258,35 @@ app-template:
                 secretKeyRef:
                   name: api-keys
                   key: PROWLARR_API_KEY
+          probes:
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 9696
+                failureThreshold: 30
+                periodSeconds: 10
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 9696
+                failureThreshold: 5
+                periodSeconds: 30
+                timeoutSeconds: 5
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 9696
+                periodSeconds: 10
+                timeoutSeconds: 5
         # https://docs.linuxserver.io/images/docker-radarr/
         radarr:
           image:
@@ -266,6 +304,35 @@ app-template:
             RADARR__LOG__CONSOLELEVEL: "info"
             RADARR__LOG__DBENABLED: "false"
             RADARR__UPDATE__AUTOMATICALLY: "false"
+          probes:
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 7878
+                failureThreshold: 30
+                periodSeconds: 10
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 7878
+                failureThreshold: 5
+                periodSeconds: 30
+                timeoutSeconds: 5
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 7878
+                periodSeconds: 10
+                timeoutSeconds: 5
         # https://docs.linuxserver.io/images/docker-sonarr/
         sonarr:
           image:
@@ -287,6 +354,35 @@ app-template:
             SONARR__LOG__DBENABLED: "false"
             # Disable automatic updates
             SONARR__UPDATE__AUTOMATICALLY: "false"
+          probes:
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 8989
+                failureThreshold: 30
+                periodSeconds: 10
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 8989
+                failureThreshold: 5
+                periodSeconds: 30
+                timeoutSeconds: 5
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                httpGet:
+                  path: /ping
+                  port: 8989
+                periodSeconds: 10
+                timeoutSeconds: 5
     unpackerr:
       pod:
         securityContext:
@@ -387,6 +483,34 @@ app-template:
             TZ: America/Denver
             PUID: "1200"
             PGID: "1200"
+          probes:
+            # TCP: the web API only skips authentication for localhost, and the
+            # kubelet probes from the node's address.
+            startup:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: 8080
+                failureThreshold: 30
+                periodSeconds: 10
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: 8080
+                failureThreshold: 5
+                periodSeconds: 30
+                timeoutSeconds: 5
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: 8080
+                periodSeconds: 10
+                timeoutSeconds: 5
           resources:
             requests:
               cpu: 750m
@@ -432,10 +556,49 @@ app-template:
             capabilities:
               add:
                 - NET_ADMIN
+          probes:
+            # gluetun's health server listens on localhost only, so use its own
+            # healthcheck command. It fails while the VPN is down.
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                exec:
+                  command: ["/gluetun-entrypoint", "healthcheck"]
+                failureThreshold: 10
+                periodSeconds: 30
+                timeoutSeconds: 10
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                exec:
+                  command: ["/gluetun-entrypoint", "healthcheck"]
+                periodSeconds: 15
+                timeoutSeconds: 10
         qbittorrent-metrics:
           image:
             repository: ghcr.io/martabal/qbittorrent-exporter
             tag: v2.0.3@sha256:bc4fa09481634ee894ebfb4d47c8aa239a32a12567b043afa01fa42a3075d1a5
+          probes:
+            # TCP: /metrics fails whenever qBittorrent itself is unreachable.
+            liveness:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: 8090
+                failureThreshold: 5
+                periodSeconds: 30
+                timeoutSeconds: 5
+            readiness:
+              enabled: true
+              custom: true
+              spec:
+                tcpSocket:
+                  port: 8090
+                periodSeconds: 10
+                timeoutSeconds: 5
           env:
             QBITTORRENT_USERNAME:
               valueFrom:

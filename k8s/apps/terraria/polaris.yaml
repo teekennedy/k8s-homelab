@@ -10,3 +10,10 @@ exemptions:
       - terraria
     rules:
       - privilegeEscalationAllowed
+  # The game server only has a startup probe: a recurring TCP probe on the game
+  # port registers as a connecting player.
+  - controllerNames:
+      - terraria
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

@@ -1,1 +1,7 @@
-exemptions: []
+exemptions:
+  # A shell loop with no health endpoint.
+  - controllerNames:
+      - ddns-updater
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

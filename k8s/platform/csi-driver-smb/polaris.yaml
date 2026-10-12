@@ -22,3 +22,11 @@ exemptions:
       - csi-smb-node
     rules:
       - hostPathSet
+  # The driver container gets its liveness from the liveness-probe sidecar. The
+  # chart has no settings for readiness, or for probing the CSI sidecars.
+  - controllerNames:
+      - csi-smb-node
+      - csi-smb-controller
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

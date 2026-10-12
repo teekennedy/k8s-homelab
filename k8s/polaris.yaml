@@ -9,6 +9,8 @@
 checks:
   # reliability
   tagNotSpecified: danger
+  readinessProbeMissing: warning
+  livenessProbeMissing: warning
   pdbDisruptionsIsZero: warning
   hpaMaxAvailability: warning
   hpaMinAvailability: warning
@@ -60,8 +62,6 @@ checks:
 
   # Pending: wanted, but releases still fail them. Enable one at a time as the
   # failures are fixed or exempted.
-  readinessProbeMissing: ignore # warning
-  livenessProbeMissing: ignore # warning
   cpuRequestsMissing: ignore # warning
   memoryRequestsMissing: ignore # warning
   memoryLimitsMissing: ignore # warning

@@ -26,3 +26,9 @@ exemptions:
       - runAsRootAllowed
       - privilegeEscalationAllowed
       - tagNotSpecified
+  # Helm test pods run once and exit.
+  - controllerNames:
+      - forgejo-test-connection
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

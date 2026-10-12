@@ -140,6 +140,18 @@ argo-cd:
     enabled: false
   controller:
     metrics: *metrics
+    livenessProbe:
+      enabled: true
+  applicationSet:
+    livenessProbe:
+      enabled: true
+    readinessProbe:
+      enabled: true
+  notifications:
+    livenessProbe:
+      enabled: true
+    readinessProbe:
+      enabled: true
   repoServer:
     metrics: *metrics
     # helmfile CMP sidecar: renders k8s/<tier>/<name> charts via `helmfile template`
@@ -194,6 +206,10 @@ argo-cd:
   redis:
     metrics:
       enabled: false
+    livenessProbe:
+      enabled: true
+    readinessProbe:
+      enabled: true
 # https://github.com/argoproj/argo-helm/blob/main/charts/argocd-apps/values.yaml
 argocd-apps:
   applications:

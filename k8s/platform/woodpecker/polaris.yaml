@@ -32,3 +32,9 @@ exemptions:
       - woodpecker-resources-config
     rules:
       - sensitiveConfigmapContent
+  # The agent chart has no probe settings.
+  - controllerNames:
+      - woodpecker-agent
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

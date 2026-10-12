@@ -372,6 +372,12 @@ loki:
   test:
     enabled: false
   loki:
+    # TCP rather than /ready, which fails while the ingester replays its WAL.
+    livenessProbe:
+      tcpSocket:
+        port: http-metrics
+      periodSeconds: 30
+      failureThreshold: 5
     auth_enabled: false
     commonConfig:
       replication_factor: 1
@@ -435,9 +441,26 @@ loki:
     replicas: 0
   backend:
     replicas: 0
+  gateway:
+    livenessProbe:
+      tcpSocket:
+        port: http-metrics
+      periodSeconds: 30
+      failureThreshold: 5
+  lokiCanary:
+    livenessProbe:
+      tcpSocket:
+        port: http-metrics
+      periodSeconds: 30
+      failureThreshold: 5
 
 promtail:
   enabled: true
+  livenessProbe:
+    tcpSocket:
+      port: http-metrics
+    periodSeconds: 30
+    failureThreshold: 5
   config:
     clients:
       - url: http://monitoring-system-loki:3100/loki/api/v1/push

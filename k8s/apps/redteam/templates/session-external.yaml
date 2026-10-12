@@ -64,6 +64,19 @@ spec:
           volumeMounts:
             - name: tun
               mountPath: /dev/net/tun
+          # gluetun's health server listens on localhost only, so use its own
+          # healthcheck command. It fails while the VPN is down.
+          readinessProbe:
+            exec:
+              command: ["/gluetun-entrypoint", "healthcheck"]
+            periodSeconds: 15
+            timeoutSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["/gluetun-entrypoint", "healthcheck"]
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 10
         - name: session
           image: {{ .Values.image }}
           command: ["sleep", "infinity"]

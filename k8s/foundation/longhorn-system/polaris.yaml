@@ -55,3 +55,11 @@ exemptions:
       - longhorn-pre-upgrade
     rules:
       - hostPathSet
+  # The chart has no probe settings for these.
+  - controllerNames:
+      - longhorn-manager
+      - longhorn-driver-deployer
+      - longhorn-ui
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing
