@@ -154,7 +154,7 @@ pr_number=$(api_call GET "/repos/${owner}/${repo}/pulls?state=open&limit=50" |
 
 if [[ -z $pr_number ]]; then
   echo "Creating PR: ${branch} -> ${base_branch}..."
-  fj pr create --autofill --base "$base_branch" --head "$branch" --repo "${owner}/${repo}" >/dev/null
+  fj pr create --host "$forge_host" --autofill --base "$base_branch" --head "$branch" --repo "${owner}/${repo}" >/dev/null
   pr_number=$(api_call GET "/repos/${owner}/${repo}/pulls?state=open&limit=50" |
     jq -r --arg branch "$branch" '[.[] | select(.head.ref == $branch)][0].number // empty')
   if [[ -z $pr_number ]]; then
