@@ -9,7 +9,7 @@ FROM scratch
 
 ARG VERSION=dev
 ARG REVISION=unknown
-LABEL org.opencontainers.image.title="Forgejo resources" \
+LABEL org.opencontainers.image.title="forgejo-resources" \
       org.opencontainers.image.description="Reconcile Forgejo users, organizations, teams, access tokens, and repos." \
       org.opencontainers.image.source="https://github.com/teekennedy/k8s-homelab" \
       org.opencontainers.image.url="https://github.com/teekennedy/k8s-homelab" \
