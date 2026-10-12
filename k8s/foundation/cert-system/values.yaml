@@ -1,7 +1,7 @@
 nfsMtlsCertSync:
   # Deliberately in values.yaml (not templates/nfs-mtls-cert-sync.yaml) so
   # that renovate can pick it up.
-  alpineImage: alpine:3
+  alpineImage: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 cert-manager:
   installCRDs: true
@@ -20,7 +20,7 @@ trust-manager:
 deploybotSshCa:
   # alpine/kubectl ships kubectl; openssh-keygen is apk-installed at runtime.
   # renovate: datasource=docker depName=alpine/kubectl
-  image: alpine/kubectl:1.37.0
+  image: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
   caSecretName: deploybot-ssh-ca
   certSecretName: deploybot-ssh-cert
   # Namespace the short-lived credential is published into. The RBAC allowing
