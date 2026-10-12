@@ -5,7 +5,8 @@ psql:
 forgejoResources:
   # Deliberately in values.yaml (not templates/forgejo-resources.yaml) so
   # that renovate can pick it up.
-  golangImage: golang:1.27-alpine
+  image: ghcr.io/teekennedy/k8s-homelab:forgejo-resources-1.0.3@sha256:155ff945de77d438e6a86aaa4e439539a98f74f313bf248b7c49d3b40818785d
+  waitImage: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 # Valkey replication set + Sentinel, ported from k8s/platform/auth-system.
 # Deliberately a *separate* instance from Authelia's rather than one shared

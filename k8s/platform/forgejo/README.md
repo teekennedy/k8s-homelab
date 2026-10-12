@@ -131,6 +131,7 @@ docker build -t forgejo-resources:local files/forgejo-resources
 Mount `config.yaml` at `/config/config.yaml` and provide `FORGEJO_HOST`,
 `FORGEJO_USER`, and `FORGEJO_PASSWORD`. Kubernetes reconciliation also needs
 in-cluster credentials. The image includes the static binary and CA certificates.
-The chart continues to build the source at runtime until the published image
-is adopted. Source releases use `forgejo-resources-<version>` starting at 1.0.0;
+The chart runs the published image pinned by tag and digest in
+`forgejoResources.image`, with an init container waiting for Forgejo readiness.
+Source releases use `forgejo-resources-<version>` starting at 1.0.0;
 release notes use `files/forgejo-resources/cliff.toml`.

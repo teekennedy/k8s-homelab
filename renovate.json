@@ -222,6 +222,24 @@
   },
   "packageRules": [
     {
+      "description": "Update homelab packages immediately after publication",
+      "matchPackageNames": [
+        "ghcr.io/teekennedy/k8s-homelab",
+        "ghcr.io/teekennedy/k8s-homelab/**",
+        "github.com/teekennedy/k8s-homelab",
+        "github.com/teekennedy/k8s-homelab/**",
+        "teekennedy/k8s-homelab"
+      ],
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Version homelab images within their artifact tag prefix",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/teekennedy/k8s-homelab"],
+      "versioning": "regex:^(?<compatibility>devenv-ci|devenv-shell|forgejo-resources)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+      "pinDigests": true
+    },
+    {
       "description": "Skip FlakeHub inputs: Renovate's nix manager only supports the git-refs datasource (git ls-remote), and flakehub.com is HTTP-only (tarball + REST API), so it can never resolve. Transitive deps that point to FlakeHub will still update.",
       "matchManagers": [
         "nix"
