@@ -50,6 +50,9 @@ func helmfileFixture(nonce string) repo {
 
 		// A library chart: mounted into every release, never one itself.
 		"k8s/charts/shared/Chart.yaml": chart("shared"),
+
+		// Read by the Polaris audit only, so it is in no release's mount.
+		polarisConfigPath: "checks: {} # " + nonce + "\n",
 	}
 }
 
@@ -165,8 +168,8 @@ func validatePolarisCheck() check {
 		wantUnitArgv: func(unit string) []string {
 			return []string{
 				helmfileTemplateArgv(unit),
-				"polaris audit --audit-path /rendered.yaml --format pretty --only-show-failed-tests true" +
-					" --set-exit-code-on-danger --config /polaris.yaml --merge-config",
+				"polaris audit --audit-path /rendered.yaml --format pretty --only-show-failed-tests" +
+					" --set-exit-code-below-score 100 --config /polaris.yaml",
 			}
 		},
 		wantUnitFiles: helmfileUnitFiles,
@@ -331,7 +334,15 @@ func helmfileScenarios() []scenario {
 // audit reads to the shared table: editing it re-runs that chart's audit and
 // no other.
 func polarisScenarios() []scenario {
-	return append(helmfileScenarios(), chartConfigScenario("k8s/apps/alpha/polaris.yaml", "exemptions: []\n"))
+	return append(helmfileScenarios(),
+		chartConfigScenario("k8s/apps/alpha/polaris.yaml", "exemptions: []\n"),
+		scenario{
+			// Expected: the repo-wide config is part of every release's audit.
+			name:  "editing the repo-wide polaris config invalidates every release",
+			edit:  edit(polarisConfigPath, "checks: {} # edited\n"),
+			rerun: helmfileUnits,
+		},
+	)
 }
 
 func kubeconformScenarios() []scenario {

@@ -1,2 +1,5 @@
-# purposely left empty
 # defaults: https://github.com/kubernetes-csi/csi-driver-smb/blob/master/charts/v1.17.0/csi-driver-smb/values.yaml
+csi-driver-smb:
+  # No Windows nodes; its DaemonSet runs host-process containers.
+  windows:
+    enabled: false

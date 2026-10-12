@@ -80,7 +80,7 @@ spec:
           containers:
             - name: rollout
               image: {{ $rollout.image }}
-              imagePullPolicy: Always
+              imagePullPolicy: IfNotPresent
               command: ["/scripts/nixos-rollout.sh"]
               env:
                 - name: SSH_USER

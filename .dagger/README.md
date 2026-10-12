@@ -190,7 +190,7 @@ Discovered automatically from `pyproject.toml` files.
 #### helmfileRelease
 One chart in one helmfile environment; charts are discovered from `Chart.yaml` files under `k8s/`.
 - `Template(container)` / `Validate(container)` - `helmfile template` / `helmfile lint`
-- `Polaris(container)` / `Kubeconform(container)` - Audit the rendered manifests
+- `Polaris(container, baseConfig)` / `Kubeconform(container)` - Audit the rendered manifests
 
 #### TerraformModule
 Discovered automatically from `.tf` files under `terraform/`.
@@ -241,6 +241,12 @@ environment's `env.json`, its own chart and `k8s/charts`, so results cache per c
 environment. A release's render is the only exec that touches the network; `ValidateHelmfile`
 lints on top of it with `--skip-deps`. `ValidatePolaris` and `ValidateKubeconform` audit the same
 render, so it is shared by all four checks.
+
+`ValidatePolaris` takes its checks from `k8s/polaris.yaml`, which replaces Polaris's built-in
+config: every check is listed there, and none of the built-in exemptions apply. A chart's own
+`polaris.yaml` is appended to it and may only set `exemptions`. Any failing check fails the
+audit, whatever its severity (`--set-exit-code-below-score 100`). All failing releases are
+reported in one run, each under its chart path.
 
 #### Test Checks
 - `TestGo(source, paths)` - Run Go tests (delegates to GoModule.Test)

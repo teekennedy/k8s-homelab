@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    "security:openssf-scorecard"
+    "security:openssf-scorecard",
+    "docker:pinDigests"
   ],
   "bumpVersion": "patch",
   "timezone": "America/Denver",
@@ -580,12 +581,15 @@
       }
     },
     {
-      "description": "Automerge all non-major (minor/patch) updates.",
+      "description": "Automerge all non-major (minor/patch) updates, and digest pins and their updates.",
       "automerge": true,
       "automergeType": "pr",
       "matchUpdateTypes": [
         "minor",
-        "patch"
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
       ],
       "matchPackageNames": [
         "*"

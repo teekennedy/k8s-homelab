@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"dagger/homelab/internal/dagger"
 
@@ -170,17 +171,23 @@ func (m *Homelab) forEachHelmfileRelease(
 		container = m.ciContainer()
 	}
 
-	g := new(errgroup.Group)
-	for _, env := range environments {
-		for _, chartPath := range chartPaths {
+	// Every release runs to completion and every failure is reported, so one
+	// run shows all the releases that need fixing.
+	errs := make([]error, len(environments)*len(chartPaths))
+
+	var wg sync.WaitGroup
+	for i, env := range environments {
+		for j, chartPath := range chartPaths {
 			release := newHelmfileRelease(source, chartPath, env)
-			g.Go(func() error {
-				return fn(ctx, release, container)
+			wg.Go(func() {
+				errs[i*len(chartPaths)+j] = fn(ctx, release, container)
 			})
 		}
 	}
-	if err := g.Wait(); err != nil {
-		return 0, fmt.Errorf("%s failed: %w", action, err)
+	wg.Wait()
+
+	if err := errors.Join(errs...); err != nil {
+		return 0, fmt.Errorf("%s failed:\n%w", action, err)
 	}
 	return len(environments) * len(chartPaths), nil
 }

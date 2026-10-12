@@ -20,7 +20,7 @@ spec:
         command: 
           - /generic-cdi-plugin
           - /var/run/cdi/nvidia-container-toolkit.json
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
         tty: true

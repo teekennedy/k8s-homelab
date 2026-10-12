@@ -1,0 +1,100 @@
+# Polaris checks for every helmfile release. This replaces Polaris's built-in
+# config rather than merging with it, so every check is listed here and none of
+# the built-in exemptions apply.
+#
+# A chart's own polaris.yaml is appended to this file, and may only set
+# `exemptions`.
+#
+# Any failing check fails the audit, whatever its severity.
+checks:
+  # reliability
+  tagNotSpecified: danger
+  pdbDisruptionsIsZero: warning
+  hpaMaxAvailability: warning
+  hpaMinAvailability: warning
+  pdbMinAvailableGreaterThanHPAMinReplicas: warning
+  # One replica is normal here, and a PDB on a single replica blocks node drains.
+  deploymentMissingReplicas: ignore
+  missingPodDisruptionBudget: ignore
+  topologySpreadConstraint: ignore
+  # Wants a class on every pod, including upstream charts'.
+  priorityClassNotSet: ignore
+  # Wants app.kubernetes.io/instance to equal the resource name; Helm sets it
+  # to the release name.
+  metadataAndInstanceMismatched: ignore
+  # Images are pinned by digest, so re-pulling is wasted work. Replaced by
+  # pullPolicyAlways.
+  pullPolicyNotAlways: ignore
+  pullPolicyAlways: danger
+
+  # efficiency
+  # CPU limits throttle; requests are what scheduling needs.
+  cpuLimitsMissing: ignore
+
+  # security
+  hostIPCSet: danger
+  hostPIDSet: danger
+  hostNetworkSet: danger
+  hostPortSet: warning
+  procMount: warning
+  hostProcess: warning
+  privilegeEscalationAllowed: danger
+  runAsRootAllowed: danger
+  runAsPrivileged: danger
+  dangerousCapabilities: danger
+  tlsSettingsMissing: warning
+  sensitiveContainerEnvVar: danger
+  sensitiveConfigmapContent: danger
+  clusterrolePodExecAttach: danger
+  rolePodExecAttach: danger
+  clusterrolebindingPodExecAttach: danger
+  rolebindingClusterRolePodExecAttach: danger
+  rolebindingRolePodExecAttach: danger
+  clusterrolebindingClusterAdmin: danger
+  rolebindingClusterAdminClusterRole: danger
+  rolebindingClusterAdminRole: danger
+  # Only passes when a NetworkPolicy selects exactly one of the pod's labels,
+  # and fails a deny-all egress or a namespace-wide selector.
+  missingNetworkPolicy: ignore
+
+  # Pending: wanted, but releases still fail them. Enable one at a time as the
+  # failures are fixed or exempted.
+  hostPathSet: ignore # warning
+  readinessProbeMissing: ignore # warning
+  livenessProbeMissing: ignore # warning
+  cpuRequestsMissing: ignore # warning
+  memoryRequestsMissing: ignore # warning
+  memoryLimitsMissing: ignore # warning
+  linuxHardening: ignore # warning
+  insecureCapabilities: ignore # warning
+  automountServiceAccountToken: ignore # warning
+  notReadOnlyRootFilesystem: ignore # warning
+  imageDigestMissing: ignore # danger
+
+customChecks:
+  pullPolicyAlways:
+    successMessage: Image pull policy is not "Always"
+    failureMessage: Image pull policy should not be "Always"
+    category: Efficiency
+    target: Container
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      properties:
+        imagePullPolicy:
+          not:
+            const: Always
+  imageDigestMissing:
+    successMessage: Image is pinned by digest
+    failureMessage: Image should be pinned by digest (@sha256:...)
+    category: Security
+    target: Container
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      required:
+        - image
+      properties:
+        image:
+          type: string
+          pattern: '@sha256:[a-f0-9]{64}$'

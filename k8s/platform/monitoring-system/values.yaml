@@ -189,6 +189,9 @@ kube-prometheus-stack:
     upgradeJob:
       enabled: true
       forceConflicts: true
+      # The chart omits the pod template's metadata entirely when this is unset.
+      podLabels:
+        app.kubernetes.io/component: crds-upgrade
       image:
         busybox:
           tag: "1.37.0"

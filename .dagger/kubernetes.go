@@ -9,38 +9,39 @@ import (
 	"dagger/homelab/internal/dagger"
 )
 
-// Polaris runs Fairwinds Polaris audit on this release's rendered manifests.
-// Exits non-zero when any danger-level checks fail.
-// If the chart directory contains a polaris.yaml, it is used as the Polaris config
-// (supports per-chart exemptions for expected RBAC or privilege requirements).
-func (r *helmfileRelease) Polaris(ctx context.Context, toolchain *dagger.Container) error {
-	audit := r.polarisContainer(ctx, toolchain)
+// polarisConfigPath is the repo-wide Polaris config: which checks run, and the
+// custom ones.
+const polarisConfigPath = "k8s/polaris.yaml"
 
+// Polaris runs Fairwinds Polaris audit on this release's rendered manifests.
+// Exits non-zero when any enabled check fails, whatever its severity.
+// baseConfig is the contents of polarisConfigPath. If the chart directory
+// contains a polaris.yaml, its exemptions are added to it (for expected RBAC or
+// privilege requirements).
+func (r *helmfileRelease) Polaris(ctx context.Context, toolchain *dagger.Container, baseConfig string) error {
 	args := []string{
 		"polaris", "audit",
 		"--audit-path", "/rendered.yaml",
 		"--format", "pretty",
-		"--only-show-failed-tests", "true",
-		"--set-exit-code-on-danger",
+		"--only-show-failed-tests",
+		"--set-exit-code-below-score", "100",
 		"--config", "/polaris.yaml",
-		"--merge-config",
 	}
 
-	if _, err := audit.WithExec(args).Sync(ctx); err != nil {
+	if _, err := r.polarisContainer(ctx, toolchain, baseConfig).WithExec(args).Sync(ctx); err != nil {
 		return fmt.Errorf("polaris failed for %s (%s): %w", r.Path, r.Environment, withExecOutput(err))
 	}
 	return nil
 }
 
-// polarisContainer returns the render container with a merged polaris config at /polaris.yaml. The config always disables
-// missingNetworkPolicy and linuxHardening, which crash polaris 10.x with a nil pointer
-// when pod templates have no labels/annotations (polaris bug in their Go template renderer).
-// Per-chart exemptions from polaris.yaml are appended when present.
-func (r *helmfileRelease) polarisContainer(ctx context.Context, toolchain *dagger.Container) *dagger.Container {
-	cfg := "checks:\n  missingNetworkPolicy: ignore\n  linuxHardening: ignore\n"
-
+// polarisContainer returns the render container with this release's Polaris
+// config at /polaris.yaml: baseConfig, followed by the chart's polaris.yaml
+// when it has one. The two are concatenated, so they must not share a top-level
+// key.
+func (r *helmfileRelease) polarisContainer(ctx context.Context, toolchain *dagger.Container, baseConfig string) *dagger.Container {
+	cfg := baseConfig
 	if chartCfg, err := r.Source.File(path.Join(r.Path, "polaris.yaml")).Contents(ctx); err == nil && chartCfg != "" {
-		cfg += chartCfg
+		cfg = strings.TrimRight(cfg, "\n") + "\n" + chartCfg
 	}
 
 	return r.rendered(toolchain).WithNewFile("/polaris.yaml", cfg)
@@ -134,9 +135,14 @@ func (m *Homelab) ValidatePolaris(ctx context.Context,
 	// +optional
 	container *dagger.Container,
 ) (string, error) {
+	baseConfig, err := source.File(polarisConfigPath).Contents(ctx)
+	if err != nil {
+		return "", fmt.Errorf("reading %s: %w", polarisConfigPath, err)
+	}
+
 	n, err := m.forEachHelmfileRelease(ctx, source, environments, paths, container, "polaris validation",
 		func(ctx context.Context, r *helmfileRelease, c *dagger.Container) error {
-			return r.Polaris(ctx, c)
+			return r.Polaris(ctx, c, baseConfig)
 		})
 	if err != nil {
 		return "", err
