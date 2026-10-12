@@ -7,7 +7,7 @@ image:
   repository: ghcr.io/openhands/agent-canvas
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "@sha256:ce4526401c08b47d74fd0be5ebf97e8219d6a02955cb6710e8cc3335f01291a6"
 
 nameOverride: ""
 fullnameOverride: ""
@@ -118,7 +118,7 @@ remoteControl:
   # renovate: datasource=npm depName=@anthropic-ai/claude-code
   cliVersion: "2.1.273"
   # renovate: datasource=docker depName=node
-  nodeImage: node:24-slim
+  nodeImage: node:24-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
   # HOME for the session, on the volume below: the checkout, the trust record
   # and the CLI's own state all live here, so a restart resumes rather than
   # starts over.
@@ -222,7 +222,7 @@ appServer:
   # The python-flavoured tag ships an interpreter, so a pod start only fetches
   # the locked dependencies in files/app-server/uv.lock.
   # renovate: datasource=docker depName=ghcr.io/astral-sh/uv
-  image: ghcr.io/astral-sh/uv:python3.13-alpine
+  image: ghcr.io/astral-sh/uv:python3.13-alpine@sha256:266908266118b7de9d6ece62b11f5a83917a19c13e711379dfaa74d4994bc1ff
   port: 8080
   # Sandbox webhooks only. A port of its own so the NetworkPolicy can admit
   # sandbox pods to it and to nothing else on this server.
@@ -344,7 +344,7 @@ sandboxSpecs:
   # tag (Renovate bumps that, not this) and adds kubectl, the dagger CLI and the Claude
   # Code adapter.
   # Rebuild, push and bump this tag together.
-  image: ghcr.io/teekennedy/openhands-sandbox:1.53.0-python-3
+  image: ghcr.io/teekennedy/openhands-sandbox:1.53.0-python-3@sha256:10de8d46e42dc5b2789c5fdb3cec4949290cdc293d531a5bbd2ed7bd8ac33578
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:
@@ -441,7 +441,7 @@ oauth2ProxyInstance:
 # oauth2-proxy's session store: one Valkey, in memory. See
 # templates/auth-sessions.yaml.
 authSessions:
-  image: valkey/valkey:9-alpine
+  image: valkey/valkey:9-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
   resources:
     requests:
       cpu: 10m
