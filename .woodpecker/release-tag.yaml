@@ -1,7 +1,6 @@
 # https://woodpecker-ci.org/docs/usage/workflow-syntax
 #
-# Tags a devenv release when main gains releasable changes; the tag pipeline in
-# devenv-release.yaml publishes it.
+# Tags releases for all projects; release.yaml publishes each artifact.
 when:
   - event: push
     branch: main
@@ -11,6 +10,10 @@ when:
         - devenv.yaml
         - devenv.lock
         - "cmd/lab/**"
+        - "k8s/platform/forgejo/files/forgejo-resources/**"
+        - cliff.toml
+        - .dagger/releases.json
+        - scripts/release.sh
 
 # Tags are needed to find the last release and the full history, trees included,
 # to find what changed. A partial or shallow clone would make git lazily fetch
@@ -38,4 +41,4 @@ steps:
     commands:
       - apk add --no-cache curl jq git-cliff
       - git config --global --add safe.directory "$CI_WORKSPACE"
-      - scripts/release-devenv.sh
+      - scripts/release.sh

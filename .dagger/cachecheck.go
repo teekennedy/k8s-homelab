@@ -34,7 +34,7 @@ func (m *Homelab) VerifyCacheGranularity(
 	// package will not build inside the container. .golangci.yaml is here
 	// because golang_lint_test.go reads the repo's real config rather than a
 	// stand-in, so the behaviour tests exercise the config the gate runs with.
-	// +ignore=["*", "!.dagger/**/*.go", "!.dagger/go.mod", "!.dagger/go.sum", "!.dagger/scripts/*.sh", "!.golangci.yaml"]
+	// +ignore=["*", "!.dagger/**/*.go", "!.dagger/go.mod", "!.dagger/go.sum", "!.dagger/scripts/*.sh", "!.dagger/releases.json", "!.golangci.yaml"]
 	source *dagger.Directory,
 	// Run only tests matching this regexp, as `go test -run`. Defaults to all
 	// of them, which covers the fake-backed tests too.

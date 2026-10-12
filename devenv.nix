@@ -93,6 +93,10 @@ in {
     # Tools for driving the cluster and the lab hosts by hand. None of this is
     # reachable from a Dagger check.
     interactive.module = {
+      scripts.build-containers.exec = ''
+        ${dagger}/bin/dagger call build-dockerfiles "$@"
+      '';
+
       packages = with pkgs; [
         age
         argocd

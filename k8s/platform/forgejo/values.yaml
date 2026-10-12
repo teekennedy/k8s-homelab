@@ -174,7 +174,7 @@ forgejo-resources:
             - write:issue
             - read:misc
             - read:organization
-    # Tags devenv releases from Woodpecker (.woodpecker/devenv-release-tag.yaml).
+    # Tags container releases from Woodpecker (.woodpecker/release-tag.yaml).
     # Creating a release needs nothing beyond repository write.
     - name: release-bot
       fullName: Release Bot

@@ -1,7 +1,7 @@
 # woodpecker-resources
 
 Reconciles declarative configuration into the running Woodpecker server, the
-way [`forgejo-resources`](../../../forgejo/files/config) does for Forgejo. Its
+way [`forgejo-resources`](../../../forgejo/files/forgejo-resources) does for Forgejo. Its
 input is the `woodpecker-resources` key of `k8s/platform/woodpecker/values.yaml`,
 rendered into `config.yaml` beside this source in a ConfigMap and run with
 `go run .` by the Job in `templates/woodpecker-resources.yaml`.

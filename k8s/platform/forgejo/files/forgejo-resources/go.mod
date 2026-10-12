@@ -1,4 +1,4 @@
-module git.msng.to/teekennedy/k8s-homelab/forgejo/config
+module git.msng.to/teekennedy/k8s-homelab/forgejo/forgejo-resources
 
 go 1.26.1
 

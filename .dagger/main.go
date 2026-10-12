@@ -16,7 +16,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"regexp"
 	"runtime"
 	"strings"
 
@@ -360,36 +359,6 @@ func (m *Homelab) DevenvContainer(
 	})
 
 	return devenvShell(source, nixDaemon, profiles)
-}
-
-// devenvTagPattern matches the release tags created by scripts/release-devenv.sh.
-var devenvTagPattern = regexp.MustCompile(`^devenv-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
-
-// PublishDevenv builds and pushes a versioned devenv image to GHCR.
-func (m *Homelab) PublishDevenv(
-	ctx context.Context,
-	ws dagger.Workspace,
-	// Release tag, e.g. devenv-1.2.3. Becomes the image tag.
-	tag string,
-	// GHCR username.
-	username string,
-	// GHCR access token.
-	token *dagger.Secret,
-	// devenv profiles to build into the image. See DevenvContainer.
-	// +optional
-	// +default=["ci"]
-	profiles []string,
-) (string, error) {
-	if !devenvTagPattern.MatchString(tag) {
-		return "", fmt.Errorf("invalid devenv release tag: %q", tag)
-	}
-	address, err := m.DevenvContainer(ws, nil, profiles).
-		WithRegistryAuth("ghcr.io", username, token).
-		Publish(ctx, "ghcr.io/teekennedy/k8s-homelab:"+tag)
-	if err != nil {
-		return "", fmt.Errorf("publish devenv: %w", err)
-	}
-	return address, nil
 }
 
 // devenvShell builds the devenv shell for the given profiles as a minimal

@@ -37,10 +37,10 @@ func goFixture(nonce string) repo {
 		"cmd/lab/go.mod": "module lab\n\ngo 1.26\n",
 		"cmd/lab/lab.go": body("main"),
 
-		"k8s/apps/homepage/files/secret-sync/go.mod":         "module secret-sync\n\ngo 1.26\n",
-		"k8s/apps/homepage/files/secret-sync/secretsync.go":  body("main"),
-		"k8s/platform/forgejo/files/config/go.mod":           "module config\n\ngo 1.26\n",
-		"k8s/platform/forgejo/files/config/forgejoconfig.go": body("main"),
+		"k8s/apps/homepage/files/secret-sync/go.mod":                    "module secret-sync\n\ngo 1.26\n",
+		"k8s/apps/homepage/files/secret-sync/secretsync.go":             body("main"),
+		"k8s/platform/forgejo/files/forgejo-resources/go.mod":           "module config\n\ngo 1.26\n",
+		"k8s/platform/forgejo/files/forgejo-resources/forgejoconfig.go": body("main"),
 
 		// Vendored: a go.mod, but not one of the repo's own modules.
 		"cmd/lab/vendor/example.com/dep/go.mod": "module example.com/dep\n",
@@ -174,7 +174,7 @@ func goScenarios() []scenario {
 			// that guards the DevenvSource scoping in New(): a Go file under
 			// k8s/ must not reach the toolchain container.
 			name:   "editing a module outside cmd/lab keeps the toolchain cached",
-			edit:   edit("k8s/platform/forgejo/files/config/forgejoconfig.go", "package main\n\nfunc main() { _ = 1 }\n"),
+			edit:   edit("k8s/platform/forgejo/files/forgejo-resources/forgejoconfig.go", "package main\n\nfunc main() { _ = 1 }\n"),
 			rerun:  []string{forgejoUnit},
 			cached: []string{labUnit, secretSyncUnit},
 		},

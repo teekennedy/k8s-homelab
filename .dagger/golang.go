@@ -49,7 +49,7 @@ type GoModule struct {
 func (m *Homelab) GoModules(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.golangci.yaml"]
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.dagger/releases.json", "!.golangci.yaml"]
 	source *dagger.Directory,
 ) []*GoModule {
 	var modules []*GoModule
@@ -101,7 +101,7 @@ const (
 func (m *Homelab) LintGo(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.golangci.yaml"]
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.dagger/releases.json", "!.golangci.yaml"]
 	source *dagger.Directory,
 	// +optional
 	container *dagger.Container,
@@ -188,7 +188,7 @@ func (m *Homelab) TestGo(
 	// +defaultPath="/"
 	// scripts/*.sh is here because .dagger/gomodhash.go go:embeds it; without
 	// it that module does not build and `go test` fails at setup.
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh"]
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/scripts/*.sh", "!.dagger/releases.json"]
 	source *dagger.Directory,
 	// +optional
 	container *dagger.Container,

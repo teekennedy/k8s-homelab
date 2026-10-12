@@ -95,8 +95,8 @@ data:
     `go run .` ignores them, but there is no reason to mount the job's source
     with them in it. Glob has no negation, hence the explicit filter.
   */}}
-  {{- range $path, $_ := .Files.Glob "files/config/*" }}
-  {{- if not (hasSuffix "_test.go" $path) }}
+  {{- range $path, $_ := .Files.Glob "files/forgejo-resources/*" }}
+  {{- if and (not (hasSuffix "_test.go" $path)) (or (hasSuffix ".go" $path) (hasSuffix "/go.mod" $path) (hasSuffix "/go.sum" $path)) }}
   {{ base $path }}: |
 {{ $.Files.Get $path | indent 4 }}
   {{- end }}

@@ -1,0 +1,15 @@
+{
+  "devenv": {
+    "directory": ".",
+    "config": "cliff.toml",
+    "artifacts": [
+      {"prefix": "devenv-ci", "profiles": ["ci"]},
+      {"prefix": "devenv-shell", "profiles": ["ci", "interactive"]}
+    ]
+  },
+  "forgejo-resources": {
+    "directory": "k8s/platform/forgejo/files/forgejo-resources",
+    "config": "cliff.toml",
+    "artifacts": [{"prefix": "forgejo-resources"}]
+  }
+}

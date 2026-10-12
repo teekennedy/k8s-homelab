@@ -195,7 +195,7 @@ woodpecker-resources:
           - openhands
       secrets:
         # Can push to main, so it is only handed to push pipelines, e.g.
-        # .woodpecker/devenv-release-tag.yaml
+        # .woodpecker/release-tag.yaml
         - name: release_bot_token
           events:
             - push

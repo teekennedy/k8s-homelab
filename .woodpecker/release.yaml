@@ -1,9 +1,12 @@
 when:
   - event: tag
-    ref: refs/tags/devenv-*
+    ref:
+      - refs/tags/devenv-ci-*
+      - refs/tags/devenv-shell-*
+      - refs/tags/forgejo-resources-*
 
 steps:
-  - name: publish-devenv
+  - name: publish-release
     image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     environment:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"
@@ -16,4 +19,4 @@ steps:
     commands:
       - apk add --no-cache curl kubectl jq
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin DAGGER_VERSION="$(jq -re .engineVersion dagger.json)" sh
-      - dagger call publish-devenv --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env:GHCR_ACCESS_TOKEN
+      - dagger call publish-release --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env:GHCR_ACCESS_TOKEN

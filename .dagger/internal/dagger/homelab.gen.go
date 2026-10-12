@@ -213,11 +213,13 @@ type Homelab struct { // homelab (../../../.dagger/main.go:29:6)
 
 	buildCli                  *string
 	buildCliGo                *string
+	buildDockerfiles          *string
 	buildHelmfile             *string
 	id                        *ID
 	lintHelmfile              *string
 	lintTerraform             *string
 	lintYaml                  *string
+	publishRelease            *string
 	testGo                    *string
 	testKubernetesIntegration *string
 	testPython                *string
@@ -279,6 +281,30 @@ func (r *Homelab) BuildCliGo(ctx context.Context, opts ...HomelabBuildCliGoOpts)
 		return *r.buildCliGo, nil
 	}
 	q := r.query.Select("buildCliGo")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `source` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Source) {
+			q = q.Arg("source", opts[i].Source)
+		}
+	}
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// HomelabBuildDockerfilesOpts contains options for Homelab.BuildDockerfiles
+type HomelabBuildDockerfilesOpts struct {
+	Source *Directory // homelab (../../../.dagger/releases.go:74:2)
+}
+
+// BuildDockerfiles builds every Dockerfile using its containing directory as the build context.
+func (r *Homelab) BuildDockerfiles(ctx context.Context, opts ...HomelabBuildDockerfilesOpts) (string, error) { // homelab (../../../.dagger/releases.go:71:1)
+	if r.buildDockerfiles != nil {
+		return *r.buildDockerfiles, nil
+	}
+	q := r.query.Select("buildDockerfiles")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Source) {
@@ -1009,6 +1035,34 @@ func (r *Homelab) LockTerraform(opts ...HomelabLockTerraformOpts) *Changeset { /
 	return &Changeset{
 		query: q,
 	}
+}
+
+// HomelabPublishReleaseOpts contains options for Homelab.PublishRelease
+type HomelabPublishReleaseOpts struct {
+	Ws *Workspace // homelab (../../../.dagger/releases.go:50:2)
+}
+
+// PublishRelease selects the container and profiles from the release tag and pushes to GHCR.
+func (r *Homelab) PublishRelease(ctx context.Context, tag string, username string, token *Secret, opts ...HomelabPublishReleaseOpts) (string, error) { // homelab (../../../.dagger/releases.go:48:1)
+	assertNotNil("token", token)
+	if r.publishRelease != nil {
+		return *r.publishRelease, nil
+	}
+	q := r.query.Select("publishRelease")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `ws` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Ws) {
+			q = q.Arg("ws", opts[i].Ws)
+		}
+	}
+	q = q.Arg("tag", tag)
+	q = q.Arg("username", username)
+	q = q.Arg("token", token)
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
 }
 
 // HomelabPythonProjectsOpts contains options for Homelab.PythonProjects
