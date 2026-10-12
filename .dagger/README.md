@@ -856,7 +856,8 @@ Terraform errors with `|| true`.
 ## Container releases
 
 `.dagger/releases.json` maps each project to its working directory, git-cliff
-config, and artifact prefixes. The first artifact is the canonical version
+config, and artifact prefixes. Release path filters include the image inputs and
+shared metadata code/config. The first artifact is the canonical version
 stream; a single bump creates every artifact tag at the same commit. Root
 `cliff.toml` includes historical `devenv-*` tags to preserve existing versions.
 Devenv publishes `devenv-ci-<version>` with `ci` and
@@ -874,3 +875,32 @@ When adding projects, also extend the push path and tag ref filters in
 its containing directory as context. It runs in `dagger check` and is also
 available as `build-containers` in devenv. Each directory retains an independent
 build cache.
+
+### Image metadata
+
+All images label their title, description, source, URL, documentation, license,
+version, and revision. The source is the public GitHub mirror and the license is
+MIT. Local Dockerfile builds default to version `dev` and revision `unknown`;
+set the `VERSION` and `REVISION` build arguments for manual releases.
+
+The tag publishing pipeline runs `scripts/release-metadata.sh <tag>` in a full
+clone, then supplies the JSON to `publish-release --metadata=<file>`. Metadata
+contains the exact tagged commit, its committer timestamp (for reproducible
+`org.opencontainers.image.created` values), and git-cliff notes for that release.
+Both devenv artifacts use the canonical CI tag's notes. The script rejects a
+checkout that does not match the requested tag and its canonical sibling.
+
+GitHub renders `org.opencontainers.image.description` as plain text and limits
+it to 512 characters. Released images include the base description plus a
+truncated plain-text changelog preview. The complete notes remain in
+`io.github.teekennedy.homelab.changelog`, and
+`org.opencontainers.image.documentation` links to the Forgejo release. Standard
+OCI keys are also emitted as manifest annotations by Dagger.
+
+Inspect a release's metadata without publishing:
+
+```sh
+scripts/release-metadata.sh "$TAG" > /tmp/release-metadata.json
+dagger call release-container --tag="$TAG" --metadata=/tmp/release-metadata.json \
+  label --name=org.opencontainers.image.description
+```

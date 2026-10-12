@@ -13,6 +13,9 @@ when:
         - "k8s/platform/forgejo/files/forgejo-resources/**"
         - cliff.toml
         - .dagger/releases.json
+        - .dagger/main.go
+        - .dagger/releases.go
+        - scripts/release-metadata.sh
         - scripts/release.sh
 
 # Tags are needed to find the last release and the full history, trees included,

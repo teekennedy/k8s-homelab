@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"time"
 
 	"dagger/homelab/internal/dagger"
 	"golang.org/x/sync/errgroup"
@@ -17,8 +19,81 @@ import (
 var releaseManifest []byte
 
 type releaseArtifact struct {
-	Prefix   string   `json:"prefix"`
-	Profiles []string `json:"profiles"`
+	Prefix      string   `json:"prefix"`
+	Profiles    []string `json:"profiles"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+}
+
+const imageSource = "https://github.com/teekennedy/k8s-homelab"
+
+type releaseMetadata struct {
+	Tag       string `json:"tag"`
+	Revision  string `json:"revision"`
+	Created   string `json:"created"`
+	Changelog string `json:"changelog"`
+}
+
+func imageLabels(title, description, documentation string) map[string]string {
+	return map[string]string{
+		"org.opencontainers.image.title":         title,
+		"org.opencontainers.image.description":   description,
+		"org.opencontainers.image.source":        imageSource,
+		"org.opencontainers.image.url":           imageSource,
+		"org.opencontainers.image.documentation": documentation,
+		"org.opencontainers.image.licenses":      "MIT",
+		"org.opencontainers.image.version":       "dev",
+		"org.opencontainers.image.revision":      "unknown",
+	}
+}
+
+func withImageLabels(container *dagger.Container, labels map[string]string) *dagger.Container {
+	keys := make([]string, 0, len(labels))
+	for key := range labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		container = container.WithLabel(key, labels[key])
+		if strings.HasPrefix(key, "org.opencontainers.image.") {
+			container = container.WithAnnotation(key, labels[key])
+		}
+	}
+	return container
+}
+
+// GitHub displays plain text descriptions with a maximum of 512 characters.
+func releaseDescription(description, changelog string) string {
+	var lines []string
+	for line := range strings.SplitSeq(changelog, "\n") {
+		line = strings.TrimLeft(strings.TrimSpace(line), "#- ")
+		line = strings.NewReplacer("**", "", "`", "").Replace(line)
+		if line != "" {
+			lines = append(lines, strings.Join(strings.Fields(line), " "))
+		}
+	}
+	if len(lines) > 0 {
+		description += "\n\n" + strings.Join(lines, " ")
+	}
+	runes := []rune(description)
+	if len(runes) > 512 {
+		return strings.TrimSpace(string(runes[:511])) + "…"
+	}
+	return description
+}
+
+func releaseLabels(artifact releaseArtifact, tag string, metadata releaseMetadata) map[string]string {
+	labels := imageLabels(artifact.Title, releaseDescription(artifact.Description, metadata.Changelog),
+		"https://git.msng.to/ops/k8s-homelab/releases/tag/"+tag)
+	labels["org.opencontainers.image.version"] = strings.TrimPrefix(tag, artifact.Prefix+"-")
+	if metadata.Revision != "" {
+		labels["org.opencontainers.image.revision"] = metadata.Revision
+		labels["org.opencontainers.image.created"] = metadata.Created
+	}
+	if metadata.Changelog != "" {
+		labels["io.github.teekennedy.homelab.changelog"] = metadata.Changelog
+	}
+	return labels
 }
 
 type releaseProject struct {
@@ -44,6 +119,47 @@ func artifactForTag(tag string) (releaseProject, releaseArtifact, error) {
 	return releaseProject{}, releaseArtifact{}, fmt.Errorf("invalid container release tag: %q", tag)
 }
 
+// ReleaseContainer builds a tagged container with OCI metadata, without publishing it.
+func (m *Homelab) ReleaseContainer(
+	ctx context.Context,
+	ws dagger.Workspace,
+	tag string,
+	// JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.
+	// +optional
+	metadata *dagger.File,
+) (*dagger.Container, error) {
+	project, artifact, err := artifactForTag(tag)
+	if err != nil {
+		return nil, err
+	}
+	var release releaseMetadata
+	if metadata != nil {
+		contents, err := metadata.Contents(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read release metadata: %w", err)
+		}
+		if err := json.Unmarshal([]byte(contents), &release); err != nil {
+			return nil, fmt.Errorf("parse release metadata: %w", err)
+		}
+		if release.Tag != tag {
+			return nil, fmt.Errorf("metadata tag %q does not match %q", release.Tag, tag)
+		}
+		if !regexp.MustCompile(`^[a-f0-9]{40}([a-f0-9]{24})?$`).MatchString(release.Revision) {
+			return nil, fmt.Errorf("invalid release revision %q", release.Revision)
+		}
+		if _, err := time.Parse(time.RFC3339, release.Created); err != nil {
+			return nil, fmt.Errorf("invalid release creation time: %w", err)
+		}
+	}
+	var container *dagger.Container
+	if len(artifact.Profiles) > 0 {
+		container = m.DevenvContainer(ws, nil, artifact.Profiles)
+	} else {
+		container = ws.Directory(project.Directory, dagger.WorkspaceDirectoryOpts{Gitignore: true}).DockerBuild()
+	}
+	return withImageLabels(container, releaseLabels(artifact, tag, release)), nil
+}
+
 // PublishRelease selects the container and profiles from the release tag and pushes to GHCR.
 func (m *Homelab) PublishRelease(
 	ctx context.Context,
@@ -51,16 +167,13 @@ func (m *Homelab) PublishRelease(
 	tag string,
 	username string,
 	token *dagger.Secret,
+	// JSON emitted by scripts/release-metadata.sh.
+	// +optional
+	metadata *dagger.File,
 ) (string, error) {
-	project, artifact, err := artifactForTag(tag)
+	container, err := m.ReleaseContainer(ctx, ws, tag, metadata)
 	if err != nil {
 		return "", err
-	}
-	var container *dagger.Container
-	if len(artifact.Profiles) > 0 {
-		container = m.DevenvContainer(ws, nil, artifact.Profiles)
-	} else {
-		container = ws.Directory(project.Directory, dagger.WorkspaceDirectoryOpts{Gitignore: true}).DockerBuild()
 	}
 	address, err := container.WithRegistryAuth("ghcr.io", username, token).
 		Publish(ctx, "ghcr.io/"+username+"/k8s-homelab:"+tag)

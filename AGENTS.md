@@ -26,7 +26,7 @@ In-cluster secrets, such OIDC client secrets or an admin password for an in-clus
 
 ## Release Automation
 - Container releases share `.dagger/releases.json`, `scripts/release.sh`, and `.woodpecker/release-{tag,}.yaml`. Each project defines a working directory, git-cliff config, and artifact tag prefixes. `dagger call publish-release` selects the build from that manifest.
-- Devenv uses root `cliff.toml`, including historical `devenv-*` tags. One semver bump creates `devenv-ci-<version>` (ci) and `devenv-shell-<version>` (ci + interactive). Keep include paths in sync with `DevenvContainer`.
+- Devenv uses root `cliff.toml`, including historical `devenv-*` tags. One semver bump creates `devenv-ci-<version>` (ci) and `devenv-shell-<version>` (ci + interactive). Include the `DevenvContainer` Nix inputs and shared image metadata code/config in release paths.
 - Forgejo resources uses `k8s/platform/forgejo/files/forgejo-resources/cliff.toml` and publishes `forgejo-resources-<version>`, starting at 1.0.0. The first release includes source history from before the directory rename.
 - The `release-bot` Forgejo user (in the Bots team) and its push-only Woodpecker secret `release_bot_token` are declarative in the Forgejo and Woodpecker chart values. The secret is restricted to the `alpine/git` image so no other step can use it; don't reuse that image elsewhere. Deploy Forgejo resources before Woodpecker resources.
 - `dagger call publish-release --tag=devenv-ci-1.2.3 --username=teekennedy --token=env:GHCR_ACCESS_TOKEN` builds and pushes through Dagger. `build-containers` (or `dagger call build-dockerfiles`) builds all Dockerfiles, also included in `dagger check`. `export-image` only exports to the host image store.

@@ -20,9 +20,12 @@ trim = true
 conventional_commits = true
 filter_unconventional = true
 tag_pattern = "^devenv-(ci-)?[0-9]+\\.[0-9]+\\.[0-9]+$"
-# Only changes to what DevenvContainer builds count towards a release; keep in
-# sync with its Include list in .dagger/main.go.
-include_paths = ["devenv.nix", "devenv.yaml", "devenv.lock", "cmd/lab/**"]
+# Include the Nix closure inputs and the code/config that adds image metadata.
+include_paths = [
+  "devenv.nix", "devenv.yaml", "devenv.lock", "cmd/lab/**",
+  ".dagger/main.go", ".dagger/releases.go", ".dagger/releases.json",
+  "scripts/release-metadata.sh", "cliff.toml",
+]
 # Any conventional commit touching those paths releases at least a patch, so a
 # Renovate `chore(deps)` lockfile bump publishes a refreshed image.
 sort_commits = "oldest"

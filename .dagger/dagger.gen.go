@@ -898,7 +898,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg token", err))
 				}
 			}
-			return (*Homelab).PublishRelease(&parent, ctx, ws, tag, username, token)
+			var metadata *dagger.File
+			if inputArgs["metadata"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["metadata"]), &metadata)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg metadata", err))
+				}
+			}
+			return (*Homelab).PublishRelease(&parent, ctx, ws, tag, username, token, metadata)
 		case "PythonProjects":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -913,6 +920,34 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).PythonProjects(&parent, ctx, source), nil
+		case "ReleaseContainer":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var ws dagger.Workspace
+			if inputArgs["ws"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
+				}
+			}
+			var tag string
+			if inputArgs["tag"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["tag"]), &tag)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg tag", err))
+				}
+			}
+			var metadata *dagger.File
+			if inputArgs["metadata"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["metadata"]), &metadata)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg metadata", err))
+				}
+			}
+			return (*Homelab).ReleaseContainer(&parent, ctx, ws, tag, metadata)
 		case "RunKubernetesIntegration":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)

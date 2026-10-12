@@ -3,13 +3,34 @@
     "directory": ".",
     "config": "cliff.toml",
     "artifacts": [
-      {"prefix": "devenv-ci", "profiles": ["ci"]},
-      {"prefix": "devenv-shell", "profiles": ["ci", "interactive"]}
+      {
+        "prefix": "devenv-ci",
+        "profiles": [
+          "ci"
+        ],
+        "title": "Devenv shell CI",
+        "description": "Devenv shell CI profile"
+      },
+      {
+        "prefix": "devenv-shell",
+        "profiles": [
+          "ci",
+          "interactive"
+        ],
+        "title": "Devenv shell",
+        "description": "Devenv shell CI and interactive profiles"
+      }
     ]
   },
   "forgejo-resources": {
     "directory": "k8s/platform/forgejo/files/forgejo-resources",
     "config": "cliff.toml",
-    "artifacts": [{"prefix": "forgejo-resources"}]
+    "artifacts": [
+      {
+        "prefix": "forgejo-resources",
+        "title": "Forgejo resources",
+        "description": "Reconcile Forgejo users, organizations, teams, access tokens, and repositories."
+      }
+    ]
   }
 }

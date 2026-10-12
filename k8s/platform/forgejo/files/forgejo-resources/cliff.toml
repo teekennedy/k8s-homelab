@@ -16,7 +16,11 @@ conventional_commits = true
 filter_unconventional = true
 tag_pattern = "^forgejo-resources-[0-9]+\\.[0-9]+\\.[0-9]+$"
 # Source changes count towards a release, including history before the rename.
-include_paths = ["k8s/platform/forgejo/files/forgejo-resources/**", "k8s/platform/forgejo/files/config/**"]
+include_paths = [
+  "k8s/platform/forgejo/files/forgejo-resources/**",
+  "k8s/platform/forgejo/files/config/**",
+  ".dagger/releases.go", ".dagger/releases.json", "scripts/release-metadata.sh",
+]
 # Any conventional commit touching those paths releases at least a patch, so a
 # Renovate `chore(deps)` lockfile bump publishes a refreshed image.
 sort_commits = "oldest"

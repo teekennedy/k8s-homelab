@@ -3,6 +3,7 @@
 #   docker build -t <registry>/redteam-session:<tag> -f files/Dockerfile files/
 FROM debian:bookworm-slim
 
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl wget git jq tmux \
       nmap netcat-openbsd dnsutils iputils-ping python3 python3-pip python3-venv \
@@ -28,3 +29,14 @@ USER 1000
 ENV HOME=/home/agent
 WORKDIR /work
 # ANTHROPIC_API_KEY (or OAuth) is injected from the redteam-anthropic Secret.
+
+ARG VERSION=dev
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="Red-team session" \
+      org.opencontainers.image.description="Claude Code, kubectl, and reconnaissance tools for homelab red-team sessions." \
+      org.opencontainers.image.source="https://github.com/teekennedy/k8s-homelab" \
+      org.opencontainers.image.url="https://github.com/teekennedy/k8s-homelab" \
+      org.opencontainers.image.documentation="https://github.com/teekennedy/k8s-homelab/tree/main/k8s/apps/redteam" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="$VERSION" \
+      org.opencontainers.image.revision="$REVISION"

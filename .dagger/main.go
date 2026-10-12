@@ -358,7 +358,13 @@ func (m *Homelab) DevenvContainer(
 		Include:   []string{"devenv.nix", "devenv.yaml", "devenv.lock", "cmd/lab/**"},
 	})
 
-	return devenvShell(source, nixDaemon, profiles)
+	description := "Devenv shell profiles: " + strings.Join(profiles, ", ")
+	if len(profiles) == 1 && profiles[0] == "ci" {
+		description = "Devenv shell CI profile"
+	} else if len(profiles) == 0 {
+		description = "Devenv shell"
+	}
+	return withImageLabels(devenvShell(source, nixDaemon, profiles), imageLabels("Devenv shell", description, imageSource))
 }
 
 // devenvShell builds the devenv shell for the given profiles as a minimal

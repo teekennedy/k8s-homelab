@@ -7,6 +7,7 @@
 #   docker buildx build --platform linux/amd64 -t ghcr.io/teekennedy/openhands-sandbox:<tag> --push files/sandbox
 FROM ghcr.io/openhands/agent-server:1.54.0-python
 
+
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 ARG KUBECTL_VERSION=v1.37.1
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
@@ -31,3 +32,14 @@ RUN set -eux; \
     grep -q "\"version\": \"${CLAUDE_ADAPTER_VERSION}\"" \
       /acp-node/lib/node_modules/@agentclientprotocol/claude-agent-acp/package.json
 USER 10001
+
+ARG VERSION=dev
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="OpenHands sandbox" \
+      org.opencontainers.image.description="OpenHands agent server with kubectl, Dagger, and the Claude Code ACP adapter." \
+      org.opencontainers.image.source="https://github.com/teekennedy/k8s-homelab" \
+      org.opencontainers.image.url="https://github.com/teekennedy/k8s-homelab" \
+      org.opencontainers.image.documentation="https://github.com/teekennedy/k8s-homelab/tree/main/k8s/apps/openhands" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="$VERSION" \
+      org.opencontainers.image.revision="$REVISION"

@@ -296,11 +296,11 @@ func (r *Homelab) BuildCliGo(ctx context.Context, opts ...HomelabBuildCliGoOpts)
 
 // HomelabBuildDockerfilesOpts contains options for Homelab.BuildDockerfiles
 type HomelabBuildDockerfilesOpts struct {
-	Source *Directory // homelab (../../../.dagger/releases.go:74:2)
+	Source *Directory // homelab (../../../.dagger/releases.go:188:2)
 }
 
 // BuildDockerfiles builds every Dockerfile using its containing directory as the build context.
-func (r *Homelab) BuildDockerfiles(ctx context.Context, opts ...HomelabBuildDockerfilesOpts) (string, error) { // homelab (../../../.dagger/releases.go:71:1)
+func (r *Homelab) BuildDockerfiles(ctx context.Context, opts ...HomelabBuildDockerfilesOpts) (string, error) { // homelab (../../../.dagger/releases.go:185:1)
 	if r.buildDockerfiles != nil {
 		return *r.buildDockerfiles, nil
 	}
@@ -413,7 +413,7 @@ func (r *Homelab) CliNix(opts ...HomelabCliNixOpts) *File { // homelab (../../..
 }
 
 // DebugDir returns the given dir. Useful for inspecting directory contents for debugging.
-func (r *Homelab) DebugDir(dir *Directory) *Directory { // homelab (../../../.dagger/main.go:414:1)
+func (r *Homelab) DebugDir(dir *Directory) *Directory { // homelab (../../../.dagger/main.go:420:1)
 	assertNotNil("dir", dir)
 	q := r.query.Select("debugDir")
 	q = q.Arg("dir", dir)
@@ -1039,11 +1039,15 @@ func (r *Homelab) LockTerraform(opts ...HomelabLockTerraformOpts) *Changeset { /
 
 // HomelabPublishReleaseOpts contains options for Homelab.PublishRelease
 type HomelabPublishReleaseOpts struct {
-	Ws *Workspace // homelab (../../../.dagger/releases.go:50:2)
+	Ws *Workspace // homelab (../../../.dagger/releases.go:163:2)
+	//
+	// JSON emitted by scripts/release-metadata.sh.
+	//
+	Metadata *File // homelab (../../../.dagger/releases.go:169:2)
 }
 
 // PublishRelease selects the container and profiles from the release tag and pushes to GHCR.
-func (r *Homelab) PublishRelease(ctx context.Context, tag string, username string, token *Secret, opts ...HomelabPublishReleaseOpts) (string, error) { // homelab (../../../.dagger/releases.go:48:1)
+func (r *Homelab) PublishRelease(ctx context.Context, tag string, username string, token *Secret, opts ...HomelabPublishReleaseOpts) (string, error) { // homelab (../../../.dagger/releases.go:161:1)
 	assertNotNil("token", token)
 	if r.publishRelease != nil {
 		return *r.publishRelease, nil
@@ -1053,6 +1057,10 @@ func (r *Homelab) PublishRelease(ctx context.Context, tag string, username strin
 		// `ws` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Ws) {
 			q = q.Arg("ws", opts[i].Ws)
+		}
+		// `metadata` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Metadata) {
+			q = q.Arg("metadata", opts[i].Metadata)
 		}
 	}
 	q = q.Arg("tag", tag)
@@ -1108,6 +1116,35 @@ func (r *Homelab) PythonProjects(ctx context.Context, opts ...HomelabPythonProje
 	}
 
 	return convert(response), nil
+}
+
+// HomelabReleaseContainerOpts contains options for Homelab.ReleaseContainer
+type HomelabReleaseContainerOpts struct {
+	Ws *Workspace // homelab (../../../.dagger/releases.go:122:2)
+	//
+	// JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.
+	//
+	Metadata *File // homelab (../../../.dagger/releases.go:126:2)
+}
+
+// ReleaseContainer builds a tagged container with OCI metadata, without publishing it.
+func (r *Homelab) ReleaseContainer(tag string, opts ...HomelabReleaseContainerOpts) *Container { // homelab (../../../.dagger/releases.go:120:1)
+	q := r.query.Select("releaseContainer")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `ws` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Ws) {
+			q = q.Arg("ws", opts[i].Ws)
+		}
+		// `metadata` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Metadata) {
+			q = q.Arg("metadata", opts[i].Metadata)
+		}
+	}
+	q = q.Arg("tag", tag)
+
+	return &Container{
+		query: q,
+	}
 }
 
 // HomelabRunKubernetesIntegrationOpts contains options for Homelab.RunKubernetesIntegration
