@@ -1,14 +1,14 @@
 configRollout:
   # Deliberately in values.yaml (not templates/config-rollout.yaml) so that
   # renovate can pick it up.
-  kubectlImage: alpine/kubectl:1.37.0
+  kubectlImage: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
 
 # https://github.com/M0NsTeRRR/helm-charts/tree/main/charts/homepage
 homepage:
   image:
     registry: ghcr.io
     repository: gethomepage/homepage
-    tag: "v2.5.0"
+    tag: "v2.5.0@sha256:57c4a0531937889c0b968b120fe9c2560bbe036b5c9e18c49a9e2479de9975d1"
   # Homepage owns the apex msng.to Ingress and gates it with OIDC login.
   ingress:
     enabled: true
@@ -95,7 +95,7 @@ secret-sync:
   enabled: true
   image:
     repository: golang
-    tag: 1.27.1-alpine
+    tag: 1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414
   rollout:
     enabled: true
     namespace: homepage
