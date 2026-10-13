@@ -44,7 +44,19 @@ class ReleaseTests(unittest.TestCase):
         curl = self.bin / "curl"
         curl.write_text(
             "#!/usr/bin/env python3\n"
-            "import json, subprocess, sys\n"
+            "import json, os, subprocess, sys\n"
+            "url = next(a for a in sys.argv[1:] if a.startswith('https://'))\n"
+            "if 'api.github.com' in url:\n"
+            "    seen = open('github.jsonl').read() if os.path.exists('github.jsonl') else ''\n"
+            "    if 'POST' in sys.argv:\n"
+            "        with open('github.jsonl', 'a') as f: f.write(json.dumps(dict(json.load(sys.stdin), url=url)) + '\\n')\n"
+            "        code = '201'\n"
+            "    elif '/commits/' in url:\n"
+            "        code = '200' if os.path.exists('mirrored') else '404'\n"
+            "    else:\n"
+            "        code = '200' if json.dumps(url.rsplit('/', 1)[1]) in seen else '404'\n"
+            "    print(code, end='')\n"
+            "    sys.exit()\n"
             "p = json.load(sys.stdin)\n"
             "with open('releases.jsonl', 'a') as f: f.write(json.dumps(p) + '\\n')\n"
             "subprocess.run(['git', 'tag', p['tag_name'], p['target_commitish']], check=True)\n"
@@ -59,7 +71,7 @@ class ReleaseTests(unittest.TestCase):
         self.git("add", "devenv.nix", str(RESOURCES), ".dagger")
         self.git("commit", "-qm", message)
 
-    def release(self, unchanged=()):
+    def release(self, unchanged=(), **extra):
         """Runs release.sh, with a plan listing the unchanged prefixes."""
         env = dict(
             os.environ,
@@ -80,6 +92,8 @@ class ReleaseTests(unittest.TestCase):
                 )
             )
             env["RELEASE_PLAN"] = str(plan)
+        env.pop("GITHUB_TOKEN", None)
+        env.update(extra)
         subprocess.run(
             [str(ROOT / "scripts/release.sh")], cwd=self.repo, env=env, check=True
         )
@@ -206,6 +220,34 @@ class ReleaseTests(unittest.TestCase):
                 self.assertEqual(releases[-1]["tag_name"], tag)
                 self.assertEqual(self.metadata(tag)["changelog"], releases[-1]["body"])
         self.assertEqual(len(releases), 4)
+
+    def test_github_mirror_releases(self):
+        github = dict(
+            GITHUB_TOKEN="test", GITHUB_REPOSITORY="test/mirror", GITHUB_MIRROR_WAIT="0"
+        )
+        # Leave the baseline's devenv tags behind, so only one project releases.
+        (self.repo / RESOURCES / "main.go").write_text("package main\n// fixed\n")
+        self.commit("fix(forgejo-resources): repair reconcile")
+        # The commit never reaches the mirror: no release, and the run fails.
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.release(**github)
+        self.assertFalse((self.repo / "github.jsonl").exists())
+        # The retry finds the Forgejo release in place and completes GitHub's.
+        (self.repo / "mirrored").touch()
+        releases = self.release(**github)
+        mirrored = [
+            json.loads(line)
+            for line in (self.repo / "github.jsonl").read_text().splitlines()
+        ]
+        self.assertEqual(len(releases), 1)
+        self.assertEqual(len(mirrored), 1)
+        self.assertEqual(
+            mirrored[0]["url"], "https://api.github.com/repos/test/mirror/releases"
+        )
+        for field in ["tag_name", "target_commitish", "name", "body"]:
+            self.assertEqual(mirrored[0][field], releases[0][field])
+        self.release(**github)  # idempotent
+        self.assertEqual(len((self.repo / "github.jsonl").read_text().splitlines()), 1)
 
     def test_retry_completes_artifact_pair(self):
         (self.repo / "devenv.nix").write_text("{ fixed = true; }\n")

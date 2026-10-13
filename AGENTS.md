@@ -29,5 +29,6 @@ In-cluster secrets, such OIDC client secrets or an admin password for an in-clus
 - Forgejo resources uses `k8s/platform/forgejo/files/forgejo-resources/cliff.toml` and publishes `forgejo-resources-<version>`, starting at 1.0.0. The first release includes source history from before the directory rename.
 - The OpenHands sandbox uses `k8s/apps/openhands/files/sandbox/cliff.toml` and publishes `openhands-sandbox-<version>`, starting at 0.2.0.
 - The wake word trainer uses `k8s/apps/wake-word-trainer/files/image/cliff.toml` and publishes `wake-word-trainer-<version>`, starting at 0.1.0.
+- Each release is also created on the GitHub mirror, with the Woodpecker secret `github_release_token` (mirrored from the hand-provisioned `github-release-token` Secret).
 - The `release-bot` Forgejo user (in the Bots team) and its Woodpecker secret `release_bot_token` (push and tag pipelines only) are declarative in the Forgejo and Woodpecker chart values. Deploy Forgejo resources before Woodpecker resources.
 - `dagger api call release publish --tag=devenv-ci-1.2.3 --username=teekennedy --token=env://GHCR_ACCESS_TOKEN` builds and pushes through Dagger. `build-containers` (or `dagger api call release build`) builds all Dockerfiles, also included in `dagger check`. `export-image` only exports to the host image store.

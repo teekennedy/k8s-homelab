@@ -66,6 +66,9 @@ steps:
     environment:
       FORGEJO_TOKEN:
         from_secret: release_bot_token
+      GITHUB_REPOSITORY: teekennedy/k8s-homelab
+      GITHUB_TOKEN:
+        from_secret: github_release_token
     commands:
       - apk add --no-cache curl jq git-cliff
       - git config --global --add safe.directory "$CI_WORKSPACE"

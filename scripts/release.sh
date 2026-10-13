@@ -3,6 +3,8 @@
 # Needs git-cliff, curl, jq, git, FORGEJO_TOKEN and Woodpecker CI_* variables.
 # RELEASE_PLAN optionally names scripts/release-plan.sh's output: an artifact
 # it lists as unchanged is not tagged.
+# With GITHUB_TOKEN and GITHUB_REPOSITORY (owner/name), each release is also
+# created on that GitHub repository.
 set -eu
 
 root=$(git rev-parse --show-toplevel)
@@ -33,6 +35,44 @@ create_release() {
     exit 1
   fi
   echo "Created $tag at $CI_COMMIT_SHA"
+}
+
+github() {
+  curl -sS -o "$response" -w '%{http_code}' \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H 'Accept: application/vnd.github+json' "$@"
+}
+
+# Forgejo's push mirror carries commits and tags to GitHub, but not releases.
+github_release() {
+  tag=$1
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    return
+  fi
+  github_api="https://api.github.com/repos/$GITHUB_REPOSITORY"
+  if [ "$(github "$github_api/releases/tags/$tag")" = 200 ]; then
+    echo "GitHub release $tag already exists"
+    return
+  fi
+  # GitHub creates the tag itself if the mirror has not pushed it yet, but
+  # only at a commit it already has.
+  attempts=0
+  until [ "$(github "$github_api/commits/$CI_COMMIT_SHA")" = 200 ]; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 30 ]; then
+      echo "$CI_COMMIT_SHA never reached $GITHUB_REPOSITORY" >&2
+      exit 1
+    fi
+    sleep "${GITHUB_MIRROR_WAIT:-10}"
+  done
+  status=$(jq -n --arg tag "$tag" --arg sha "$CI_COMMIT_SHA" --arg body "$notes" \
+    '{tag_name: $tag, target_commitish: $sha, name: $tag, body: $body}' |
+    github -X POST "$github_api/releases" --data @-)
+  if [ "$status" != 201 ]; then
+    echo "Creating GitHub release $tag returned HTTP $status: $(cat "$response")" >&2
+    exit 1
+  fi
+  echo "Created GitHub release $tag at $CI_COMMIT_SHA"
 }
 
 for project in $(jq -r 'keys[]' "$manifest"); do
@@ -89,5 +129,6 @@ for project in $(jq -r 'keys[]' "$manifest"); do
       continue
     fi
     create_release "$prefix-$version"
+    github_release "$prefix-$version"
   done
 done

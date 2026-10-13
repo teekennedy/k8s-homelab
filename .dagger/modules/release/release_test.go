@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"unicode/utf8"
 
 	// Sets DAGGER_SESSION_PORT/TOKEN before internal/dagger's init() reads
 	// them. Without it this test binary panics at startup.
@@ -47,10 +46,11 @@ func TestReleaseLabels(t *testing.T) {
 	metadata := releaseMetadata{
 		Revision:  strings.Repeat("a", 40),
 		Created:   "2026-10-11T12:00:00Z",
-		Changelog: "### Features\n- **ci:** Add tooling\n" + strings.Repeat("é", 600),
+		Changelog: "### Features\n- **ci:** Add tooling\n",
 	}
 	labels := releaseLabels(artifact, "devenv-ci-1.2.3", metadata, nil)
 	for key, want := range map[string]string{
+		"org.opencontainers.image.description":   "Devenv shell CI profile",
 		"org.opencontainers.image.source":        imageSource,
 		"org.opencontainers.image.licenses":      "MIT",
 		"org.opencontainers.image.version":       "1.2.3",
@@ -62,16 +62,6 @@ func TestReleaseLabels(t *testing.T) {
 		if labels[key] != want {
 			t.Errorf("%s: got %q, want %q", key, labels[key], want)
 		}
-	}
-	description := labels["org.opencontainers.image.description"]
-	if !strings.HasPrefix(description, "Devenv shell CI profile\n\nFeatures ci: Add tooling") {
-		t.Errorf("description lacks profile and plain-text changelog: %q", description)
-	}
-	if !utf8.ValidString(description) || len(description) > 512 || !strings.HasSuffix(description, "…") {
-		t.Errorf("description exceeds GitHub's limit or has invalid truncation: %q", description)
-	}
-	if got := releaseDescription("Basic description", ""); got != "Basic description" {
-		t.Errorf("empty changelog: %q", got)
 	}
 }
 
@@ -99,8 +89,6 @@ func TestReleaseLabelsPreserveImageMetadata(t *testing.T) {
 	labels := releaseLabels(artifact, "forgejo-resources-1.0.4", metadata, existing)
 	for key, want := range existing {
 		switch key {
-		case "org.opencontainers.image.description":
-			want += "\n\nBug Fixes Fix title label"
 		case "org.opencontainers.image.version":
 			want = "1.0.4"
 		case "org.opencontainers.image.revision":
@@ -116,30 +104,5 @@ func TestReleaseLabelsPreserveImageMetadata(t *testing.T) {
 	labels = releaseLabels(artifact, "forgejo-resources-1.0.4", metadata, existing)
 	if labels["org.opencontainers.image.title"] != artifact.Title {
 		t.Error("missing title did not fall back to the manifest")
-	}
-}
-
-func TestReleaseDescriptionByteLimit(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{"ascii at limit", strings.Repeat("a", 512), strings.Repeat("a", 512)},
-		{"ascii overflow", strings.Repeat("a", 513), strings.Repeat("a", 509) + "…"},
-		{"unicode at limit", strings.Repeat("é", 256), strings.Repeat("é", 256)},
-		{"unicode overflow", strings.Repeat("é", 257), strings.Repeat("é", 254) + "…"},
-		{"emoji overflow", strings.Repeat("🙂", 129), strings.Repeat("🙂", 127) + "…"},
-		{"mixed boundary", strings.Repeat("a", 508) + "🙂tail", strings.Repeat("a", 508) + "…"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got := releaseDescription(tc.input, "")
-			if got != tc.want {
-				t.Errorf("got %q, want %q", got, tc.want)
-			}
-			if !utf8.ValidString(got) || len(got) > 512 {
-				t.Errorf("invalid UTF-8 or oversized description: %q (%d bytes)", got, len(got))
-			}
-		})
 	}
 }

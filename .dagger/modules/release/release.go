@@ -14,7 +14,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"dagger/release/internal/dagger"
 
@@ -54,30 +53,6 @@ func imageLabels(title, description, documentation string) map[string]string {
 	}
 }
 
-// Keep plain-text descriptions within 512 UTF-8 bytes, including the ellipsis.
-func releaseDescription(description, changelog string) string {
-	var lines []string
-	for line := range strings.SplitSeq(changelog, "\n") {
-		line = strings.TrimLeft(strings.TrimSpace(line), "#- ")
-		line = strings.NewReplacer("**", "", "`", "").Replace(line)
-		if line != "" {
-			lines = append(lines, strings.Join(strings.Fields(line), " "))
-		}
-	}
-	if len(lines) > 0 {
-		description += "\n\n" + strings.Join(lines, " ")
-	}
-	if len(description) > 512 {
-		const ellipsis = "…"
-		end := 512 - len(ellipsis)
-		for !utf8.RuneStart(description[end]) {
-			end--
-		}
-		return strings.TrimSpace(description[:end]) + ellipsis
-	}
-	return description
-}
-
 // authoredLabelFields are the OCI labels an image may set itself.
 var authoredLabelFields = []string{"title", "description", "source", "url", "documentation", "licenses"}
 
@@ -91,7 +66,6 @@ func releaseLabels(artifact releaseArtifact, tag string, metadata releaseMetadat
 			labels[key] = value
 		}
 	}
-	labels["org.opencontainers.image.description"] = releaseDescription(labels["org.opencontainers.image.description"], metadata.Changelog)
 	labels["org.opencontainers.image.version"] = strings.TrimPrefix(tag, artifact.Prefix+"-")
 	if metadata.Revision != "" {
 		labels["org.opencontainers.image.revision"] = metadata.Revision

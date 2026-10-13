@@ -27,7 +27,11 @@ Devenv publishes `devenv-ci-<version>` with `ci` and
 at `forgejo-resources-1.0.0` and uses its own cliff.toml. The OpenHands sandbox
 starts at `openhands-sandbox-0.2.0`, likewise with its own cliff.toml.
 
-`scripts/release.sh` creates Forgejo releases on main pushes. The shared tag
+`scripts/release.sh` creates Forgejo releases on main pushes, and the same
+release on the GitHub mirror: Forgejo's push mirror carries tags there but not
+releases. That needs the Woodpecker secret `github_release_token`, mirrored
+from the `github-release-token` Secret in the `woodpecker` namespace (key
+`token`): a GitHub token with `contents: write` on the mirror. The shared tag
 pipeline invokes `dagger api call release publish --tag=<tag> --username=teekennedy
 --token=env://GHCR_ACCESS_TOKEN`, selecting profiles or a Dockerfile build from
 the manifest. Images use `ghcr.io/teekennedy/k8s-homelab:<tag>`.
@@ -89,24 +93,18 @@ any artifact, as `release.sh` finds it, to the requested commit. It also
 supports existing tags with no relevant commits (an empty changelog). The script
 rejects a checkout that does not match the requested tag.
 
-Publishing preserves existing title, source, URL, documentation, and license
-labels, using defaults only for missing labels. An existing description supplies
-the base text for the release-note preview. Version, revision, creation time,
-and changelog labels describe the release.
-
-GitHub renders `org.opencontainers.image.description` as plain text and limits
-it to 512 characters. Released images use a stricter 512-byte UTF-8 budget,
-including the ellipsis, for the base description and truncated plain-text
-changelog preview. The complete notes remain in
+Publishing preserves existing title, description, source, URL, documentation,
+and license labels, using defaults only for missing labels. Version, revision,
+creation time, and changelog labels describe the release. The notes are in
 `io.github.teekennedy.homelab.changelog`, and
 `org.opencontainers.image.documentation` defaults to the Forgejo release when
-the image has no documentation label. Standard
-OCI keys are also emitted as manifest annotations by Dagger.
+the image has no documentation label. Standard OCI keys are also emitted as
+manifest annotations by Dagger.
 
 Inspect a release's metadata without publishing:
 
 ```sh
 scripts/release-metadata.sh "$TAG" > /tmp/release-metadata.json
 dagger api call release image --tag="$TAG" --metadata=/tmp/release-metadata.json \
-  label --name=org.opencontainers.image.description
+  label --name=io.github.teekennedy.homelab.changelog
 ```
