@@ -144,7 +144,7 @@ func validateHelmfileCheck() check {
 			env, release, _ := strings.Cut(unit, ".")
 			return []string{
 				helmfileTemplateArgv(unit),
-				"helmfile --environment " + env + " --selector name=" + release + " lint --skip-deps",
+				"helmfile --quiet --environment " + env + " --selector name=" + release + " lint --skip-deps",
 			}
 		},
 		wantUnitFiles: helmfileUnitFiles,
@@ -208,7 +208,7 @@ func validateKubeconformCheck() check {
 // helmfileTemplateArgv is the render every helmfile unit starts with.
 func helmfileTemplateArgv(unit string) string {
 	env, release, _ := strings.Cut(unit, ".")
-	return `sh -c exec "$@" > /rendered.yaml -- helmfile --environment ` + env +
+	return `sh -c exec "$@" > /rendered.yaml -- helmfile --quiet --environment ` + env +
 		" --selector name=" + release + " template --include-crds"
 }
 

@@ -23,7 +23,7 @@ func (m *Homelab) TestScripts(
 	_, err := container.
 		WithMountedDirectory("/repo", source).
 		WithWorkdir("/repo/scripts/tests").
-		WithExec([]string{"uv", "run", "--frozen", "--link-mode", "copy", "pytest", "-v"}).
+		WithExec([]string{"uv", "run", "--frozen", "--link-mode", "copy", "pytest"}).
 		Sync(ctx)
 	if err != nil {
 		return "", fmt.Errorf("script tests failed: %w", withExecOutput(err))

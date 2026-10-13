@@ -83,6 +83,7 @@ func helmfileContainer(toolchain *dagger.Container, source *dagger.Directory) *d
 func (r *helmfileRelease) args(command ...string) []string {
 	return append([]string{
 		"helmfile",
+		"--quiet",
 		"--environment", r.Environment,
 		"--selector", "name=" + r.Name,
 	}, command...)

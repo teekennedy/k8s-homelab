@@ -54,7 +54,7 @@ func (m *Homelab) VerifyCacheGranularity(
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/.dagger").
 		WithExec(
-			[]string{"go", "test", "-count=1", "-v", "-run", run, "./..."},
+			[]string{"go", "test", "-count=1", "-run", run, "./..."},
 			dagger.ContainerWithExecOpts{
 				// Gives the exec its own Dagger session, so cacheprobe steps
 				// aside and the engine-backed tests run for real. Their fixtures

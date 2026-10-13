@@ -111,7 +111,7 @@ func (pp *PythonProject) Test(ctx context.Context, container *dagger.Container) 
 	_, err := container.
 		WithMountedDirectory("/src", pp.Source).
 		WithWorkdir("/src").
-		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest", "-v"}).
+		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest"}).
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {

@@ -19,4 +19,4 @@ steps:
       # A warm run takes ~18m; a cold engine cache with other runs in flight can
       # take far longer. Kept well under the pipeline timeout so a check that
       # drifts this slow still fails loudly.
-      - timeout 40m dagger check
+      - timeout 40m dagger check --progress=report

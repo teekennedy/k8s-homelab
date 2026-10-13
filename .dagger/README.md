@@ -90,6 +90,10 @@ dagger develop
 # Run all checks
 dagger check
 
+# Print one line per check, plus the failing exec's output and error for any
+# that fail (what CI uses; non-TTY output otherwise dumps every API call)
+dagger check --progress=report
+
 # Run checks by category
 dagger check 'lint*'
 dagger check 'build*'
