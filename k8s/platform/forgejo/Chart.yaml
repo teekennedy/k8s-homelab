@@ -1,8 +1,8 @@
 apiVersion: v2
 name: forgejo
-version: 0.0.6
+version: 0.0.7
 appVersion: 16.0.5
 dependencies:
   - name: forgejo
-    version: 17.2.0
+    version: 17.3.0
     repository: oci://code.forgejo.org/forgejo-helm
