@@ -5,8 +5,9 @@ gpgBootstrap:
 
 renovate:
   cronjob:
-    # Runs at 5am every day, but with static random offset (22m)
-    schedule: '22 5 * * *'
+    # Hourly, at a static random offset (22m). A run takes a few minutes; a
+    # ticked Dependency Dashboard box or a new release waits at most an hour.
+    schedule: '22 * * * *'
     ttlSecondsAfterFinished: 259200 # 3 days
     concurrencyPolicy: Forbid
     # Exponential pod-retry backoff (10s, 20s, 40s, 80s) must outlast a
