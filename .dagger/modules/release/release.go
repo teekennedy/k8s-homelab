@@ -33,10 +33,9 @@ type releaseArtifact struct {
 }
 
 type releaseMetadata struct {
-	Tag       string `json:"tag"`
-	Revision  string `json:"revision"`
-	Created   string `json:"created"`
-	Changelog string `json:"changelog"`
+	Tag      string `json:"tag"`
+	Revision string `json:"revision"`
+	Created  string `json:"created"`
 }
 
 // imageLabels are the OCI labels every published image carries.
@@ -70,9 +69,6 @@ func releaseLabels(artifact releaseArtifact, tag string, metadata releaseMetadat
 	if metadata.Revision != "" {
 		labels["org.opencontainers.image.revision"] = metadata.Revision
 		labels["org.opencontainers.image.created"] = metadata.Created
-	}
-	if metadata.Changelog != "" {
-		labels["io.github.teekennedy.homelab.changelog"] = metadata.Changelog
 	}
 	return labels
 }

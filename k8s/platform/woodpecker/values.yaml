@@ -232,8 +232,6 @@ woodpecker-resources:
         - name: github_release_token
           events:
             - push
-          images:
-            - alpine/git
           mirrorSecret:
             name: github-release-token
             namespace: woodpecker

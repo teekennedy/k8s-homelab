@@ -95,8 +95,8 @@ rejects a checkout that does not match the requested tag.
 
 Publishing preserves existing title, description, source, URL, documentation,
 and license labels, using defaults only for missing labels. Version, revision,
-creation time, and changelog labels describe the release. The notes are in
-`io.github.teekennedy.homelab.changelog`, and
+and creation time labels describe the release. The notes are not in the image:
+they are the body of the Forgejo and GitHub releases of the same tag.
 `org.opencontainers.image.documentation` defaults to the Forgejo release when
 the image has no documentation label. Standard OCI keys are also emitted as
 manifest annotations by Dagger.
@@ -106,5 +106,5 @@ Inspect a release's metadata without publishing:
 ```sh
 scripts/release-metadata.sh "$TAG" > /tmp/release-metadata.json
 dagger api call release image --tag="$TAG" --metadata=/tmp/release-metadata.json \
-  label --name=io.github.teekennedy.homelab.changelog
+  label --name=org.opencontainers.image.version
 ```

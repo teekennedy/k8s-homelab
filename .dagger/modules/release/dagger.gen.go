@@ -352,27 +352,27 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Build",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Builds every Dockerfile in the repo.\n\nEach builds with its own directory as the context, so each keeps an\nindependent build cache.").
-							WithSourceMap(dag.SourceMap("release.go", 229, 1)).
+							WithSourceMap(dag.SourceMap("release.go", 199, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 232, 2), DefaultPath: "/"})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 202, 2), DefaultPath: "/"})).
 					WithFunction(
 						dag.Function("Image",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("Image builds a tagged container with OCI metadata, without publishing it.").
-							WithSourceMap(dag.SourceMap("release.go", 161, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 163, 2)}).
-							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 164, 2)}).
-							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.", SourceMap: dag.SourceMap("release.go", 167, 2)})).
+							WithSourceMap(dag.SourceMap("release.go", 131, 1)).
+							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 133, 2)}).
+							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 134, 2)}).
+							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.", SourceMap: dag.SourceMap("release.go", 137, 2)})).
 					WithFunction(
 						dag.Function("Publish",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
 							WithDescription("Publish selects the container and profiles from the release tag and pushes to GHCR.").
-							WithSourceMap(dag.SourceMap("release.go", 202, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 204, 2)}).
-							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 205, 2)}).
-							WithArg("username", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 206, 2)}).
-							WithArg("token", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 207, 2)}).
-							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh.", SourceMap: dag.SourceMap("release.go", 210, 2)})).
+							WithSourceMap(dag.SourceMap("release.go", 172, 1)).
+							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 174, 2)}).
+							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 175, 2)}).
+							WithArg("username", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 176, 2)}).
+							WithArg("token", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 177, 2)}).
+							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh.", SourceMap: dag.SourceMap("release.go", 180, 2)})).
 					WithFunction(
 						dag.Function("Test",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).

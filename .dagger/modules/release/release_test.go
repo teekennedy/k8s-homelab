@@ -44,9 +44,8 @@ func TestReleaseLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	metadata := releaseMetadata{
-		Revision:  strings.Repeat("a", 40),
-		Created:   "2026-10-11T12:00:00Z",
-		Changelog: "### Features\n- **ci:** Add tooling\n",
+		Revision: strings.Repeat("a", 40),
+		Created:  "2026-10-11T12:00:00Z",
 	}
 	labels := releaseLabels(artifact, "devenv-ci-1.2.3", metadata, nil)
 	for key, want := range map[string]string{
@@ -57,7 +56,6 @@ func TestReleaseLabels(t *testing.T) {
 		"org.opencontainers.image.revision":      metadata.Revision,
 		"org.opencontainers.image.created":       metadata.Created,
 		"org.opencontainers.image.documentation": "https://git.msng.to/ops/k8s-homelab/releases/tag/devenv-ci-1.2.3",
-		"io.github.teekennedy.homelab.changelog": metadata.Changelog,
 	} {
 		if labels[key] != want {
 			t.Errorf("%s: got %q, want %q", key, labels[key], want)
@@ -82,9 +80,8 @@ func TestReleaseLabelsPreserveImageMetadata(t *testing.T) {
 		"org.opencontainers.image.created":       "old timestamp",
 	}
 	metadata := releaseMetadata{
-		Revision:  strings.Repeat("a", 40),
-		Created:   "2026-10-11T12:00:00Z",
-		Changelog: "### Bug Fixes\n- Fix title label\n",
+		Revision: strings.Repeat("a", 40),
+		Created:  "2026-10-11T12:00:00Z",
 	}
 	labels := releaseLabels(artifact, "forgejo-resources-1.0.4", metadata, existing)
 	for key, want := range existing {
