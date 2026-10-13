@@ -41,7 +41,7 @@ The combination means:
 | `helm.go` | Chart discovery and path matching shared by the helmfile checks |
 | `helmfile.go` | Per-release helmfile Template/Validate and the shared render, aggregate BuildHelmfile/ValidateHelmfile/LintHelmfile |
 | `kubernetes.go` | Per-release Polaris/Kubeconform on the helmfile render, aggregate ValidatePolaris/ValidateKubeconform |
-| `k3s.go` | k3sCluster: starting, reaching, verifying and destroying an ephemeral k3s cluster |
+| `k3s.go` | k3sCluster: starting, reaching, verifying and destroying a k3s cluster, and the named dev clusters that persist |
 | `integration.go` | The Kubernetes integration workflow: plan, deploy with helmfile, wait, verify, run each release's pytest suite |
 | `junit.go` | Parsing pytest's JUnit XML into a summary |
 | `terraform.go` | TerraformModule struct, per-module Validate, aggregate ValidateTerraform |
@@ -540,6 +540,97 @@ in loading the module and planning.
 - `k3sImage` is pinned to the production cluster's Kubernetes minor version, so
   the tests run against the version it does.
 
+## Dev clusters
+
+The integration workflow creates a cluster and destroys it in the same call. A
+dev cluster is the same k3s server kept running under a name, for deploying to
+and poking at by hand before anything is committed:
+
+```bash
+scripts/dev-cluster.sh up dev1             # start it, or resume it
+eval "$(scripts/dev-cluster.sh env dev1)"  # point this shell at it
+kubectl get nodes
+helmfile --environment dev --kube-context dev1 --selector name=reflector sync
+
+scripts/dev-cluster.sh test dev1 --releases=reflector   # deploy and test on it
+scripts/dev-cluster.sh down dev1           # stop it, keeping its state
+scripts/dev-cluster.sh destroy dev1        # stop it and delete its state
+```
+
+Several can run side by side under different names.
+
+### Lifetime
+
+A Dagger service lives exactly as long as the session that started it, so a
+cluster cannot outlive its `dagger call`. `up` therefore leaves one running in
+the background — `dagger call dev-cluster ... up --ports <port>:6443`, which
+also publishes the API server on the host's loopback — and `down` stops it.
+
+What makes a stopped cluster the same cluster when it is started again is its
+state: `DevCluster` mounts all of `/var/lib/rancher/k3s` (the datastore and
+certificates, the pulled images, the local-path provisioner's volumes) from a
+cache volume named after the cluster. The node name is pinned to the cluster's
+name too, since the default is the container's hostname and that is new on
+every start.
+
+The container's address is also new on every start, and kube-proxy exits when
+it sees a node's addresses change, which in k3s takes the whole server with it.
+The entrypoint starts k3s again when that happens, as a service manager would;
+the next start finds the new address already recorded. `up` waits for the node
+to stay Ready across that restart before it returns.
+
+### Kubeconfigs
+
+`up` writes `$DEVENV_STATE/kube/<name>.yaml`, with the context named after the
+cluster. Each file holds one cluster and nothing else, and a cluster is selected
+by pointing `KUBECONFIG` at its file:
+
+```bash
+eval "$(scripts/dev-cluster.sh env dev1)"
+```
+
+That is deliberate. `KUBECONFIG` is the one selection every tool honours —
+kubectl, helm, helmfile, k9s — and it belongs to the shell: nothing another
+terminal does can change which cluster this one talks to, and a command pulled
+out of history runs against the cluster the shell was pointed at or fails. A
+shell pointed at a dev cluster holds no production credentials at all.
+Switching contexts inside one shared kubeconfig is the opposite on both counts:
+`kubectl config use-context` rewrites a file every shell reads.
+
+The admin credential is a token generated on the first `up` and kept beside the
+cluster's port in `$DEVENV_STATE/dev-clusters/<name>/`, so the kubeconfig stays
+valid when the cluster is resumed. The CA comes from `/cacerts`, fetched over
+the loopback tunnel.
+
+### Testing an existing cluster
+
+`TestKubernetesIntegration` takes `--cluster` and `--kubeconfig` to deploy to
+and test a cluster that is already running instead of creating one:
+
+```bash
+dagger call test-kubernetes-integration \
+  --cluster=tcp://localhost:<port> --kubeconfig=file:<kubeconfig>
+```
+
+`scripts/dev-cluster.sh test <name>` fills both in. The kubeconfig names the API
+server as the host reaches it, so the workflow rewrites its copy to the
+service's alias on the same port; the certificate already carries that name.
+The cluster is left running, with whatever was deployed to it.
+
+A run against an existing cluster is never cached. It is run in place rather
+than through the module's own API, and its execs carry a random run id: a
+verdict about a cluster that outlives the run says nothing about the next one.
+
+### Limitations
+
+- The state lives in a Dagger cache volume, which the engine may prune when it
+  is short of disk. A dev cluster is for work in progress, not for anything
+  that has to survive.
+- Pods lose their `emptyDir` contents when the cluster is stopped, as they would
+  across a node reboot.
+- The API server is published on the loopback interface only, and the admin
+  token is stored unencrypted under `$DEVENV_STATE`.
+
 ## Caching & Performance
 
 ### Two-Layer Caching Model
@@ -847,7 +938,7 @@ Terraform errors with `|| true`.
 - `helm.go` - Chart discovery and path matching
 - `helmfile.go` - helmfileRelease struct and helmfile functions
 - `kubernetes.go` - Polaris and Kubeconform on rendered releases
-- `k3s.go` - Ephemeral k3s cluster lifecycle for the integration workflow
+- `k3s.go` - k3s cluster lifecycle for the integration workflow and for dev clusters
 - `integration.go` - The Kubernetes integration workflow
 - `junit.go` - pytest JUnit XML parsing
 - `terraform.go` - TerraformModule struct and Terraform-specific functions

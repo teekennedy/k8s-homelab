@@ -215,6 +215,7 @@ type Homelab struct { // homelab (../../../.dagger/main.go:29:6)
 	buildCliGo                *string
 	buildDockerfiles          *string
 	buildHelmfile             *string
+	deleteDevCluster          *string
 	id                        *ID
 	lintHelmfile              *string
 	lintTerraform             *string
@@ -223,6 +224,7 @@ type Homelab struct { // homelab (../../../.dagger/main.go:29:6)
 	testGo                    *string
 	testKubernetesIntegration *string
 	testPython                *string
+	testScripts               *string
 	validateHelmfile          *string
 	validateKubeconform       *string
 	validateNix               *string
@@ -296,11 +298,11 @@ func (r *Homelab) BuildCliGo(ctx context.Context, opts ...HomelabBuildCliGoOpts)
 
 // HomelabBuildDockerfilesOpts contains options for Homelab.BuildDockerfiles
 type HomelabBuildDockerfilesOpts struct {
-	Source *Directory // homelab (../../../.dagger/releases.go:188:2)
+	Source *Directory // homelab (../../../.dagger/releases.go:224:2)
 }
 
 // BuildDockerfiles builds every Dockerfile using its containing directory as the build context.
-func (r *Homelab) BuildDockerfiles(ctx context.Context, opts ...HomelabBuildDockerfilesOpts) (string, error) { // homelab (../../../.dagger/releases.go:185:1)
+func (r *Homelab) BuildDockerfiles(ctx context.Context, opts ...HomelabBuildDockerfilesOpts) (string, error) { // homelab (../../../.dagger/releases.go:221:1)
 	if r.buildDockerfiles != nil {
 		return *r.buildDockerfiles, nil
 	}
@@ -324,24 +326,24 @@ type HomelabBuildHelmfileOpts struct {
 	// charts/*.tgz are built dependencies; they are gitignored, so leaving them
 	// out makes a local run resolve dependencies the way a clean checkout does.
 	//
-	Source *Directory // homelab (../../../.dagger/helmfile.go:198:2)
+	Source *Directory // homelab (../../../.dagger/helmfile.go:205:2)
 	//
 	// Helmfile environments to render with.
 	//
 	//
 	// Default: ["production"]
-	Environments []string // homelab (../../../.dagger/helmfile.go:202:2)
+	Environments []string // homelab (../../../.dagger/helmfile.go:209:2)
 
-	Paths []string // homelab (../../../.dagger/helmfile.go:204:2)
+	Paths []string // homelab (../../../.dagger/helmfile.go:211:2)
 
-	Container *Container // homelab (../../../.dagger/helmfile.go:206:2)
+	Container *Container // homelab (../../../.dagger/helmfile.go:213:2)
 }
 
 // BuildHelmfile renders every chart with `helmfile template`, once per
 // environment. Each release is rendered from a scoped source directory so that
 // a change to one chart doesn't invalidate the cache for the others.
 // When paths are provided, only charts matching the paths are rendered.
-func (r *Homelab) BuildHelmfile(ctx context.Context, opts ...HomelabBuildHelmfileOpts) (string, error) { // homelab (../../../.dagger/helmfile.go:193:1)
+func (r *Homelab) BuildHelmfile(ctx context.Context, opts ...HomelabBuildHelmfileOpts) (string, error) { // homelab (../../../.dagger/helmfile.go:200:1)
 	if r.buildHelmfile != nil {
 		return *r.buildHelmfile, nil
 	}
@@ -419,6 +421,43 @@ func (r *Homelab) DebugDir(dir *Directory) *Directory { // homelab (../../../.da
 	q = q.Arg("dir", dir)
 
 	return &Directory{
+		query: q,
+	}
+}
+
+// DeleteDevCluster deletes a dev cluster's state. The cluster must be stopped:
+// a running one holds its state volume, and this waits for it.
+//
+//	dagger call delete-dev-cluster --name=dev
+func (r *Homelab) DeleteDevCluster(ctx context.Context, name string) (string, error) { // homelab (../../../.dagger/k3s.go:538:1)
+	if r.deleteDevCluster != nil {
+		return *r.deleteDevCluster, nil
+	}
+	q := r.query.Select("deleteDevCluster")
+	q = q.Arg("name", name)
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// DevCluster is a k3s cluster that keeps its state between runs: starting a
+// cluster of the same name again resumes it, with its releases and volumes.
+// It runs for as long as the call that started it does, so it is used with
+// `up`, which also publishes the API server on the host:
+//
+//	dagger call dev-cluster --name=dev --token=file:./token up --ports=6443:6443
+//
+// scripts/dev-cluster.sh wraps this, and writes the kubeconfig. See "Dev
+// clusters" in README.md.
+func (r *Homelab) DevCluster(name string, token *Secret) *Service { // homelab (../../../.dagger/k3s.go:521:1)
+	assertNotNil("token", token)
+	q := r.query.Select("devCluster")
+	q = q.Arg("name", name)
+	q = q.Arg("token", token)
+
+	return &Service{
 		query: q,
 	}
 }
@@ -795,13 +834,13 @@ func (r *Homelab) UnmarshalJSON(bs []byte) error {
 
 // HomelabKubernetesIntegrationReportsOpts contains options for Homelab.KubernetesIntegrationReports
 type HomelabKubernetesIntegrationReportsOpts struct {
-	Source *Directory // homelab (../../../.dagger/integration.go:118:2)
+	Source *Directory // homelab (../../../.dagger/integration.go:149:2)
 
-	Releases []string // homelab (../../../.dagger/integration.go:120:2)
+	Releases []string // homelab (../../../.dagger/integration.go:151:2)
 
-	RepeatSync bool // homelab (../../../.dagger/integration.go:122:2)
+	RepeatSync bool // homelab (../../../.dagger/integration.go:153:2)
 
-	Container *Container // homelab (../../../.dagger/integration.go:124:2)
+	Container *Container // homelab (../../../.dagger/integration.go:155:2)
 }
 
 // KubernetesIntegrationReports runs the same workflow and returns the JUnit XML
@@ -809,7 +848,7 @@ type HomelabKubernetesIntegrationReportsOpts struct {
 // cluster that never came up, or a release that never became healthy, is.
 //
 //	dagger call kubernetes-integration-reports export --path=./reports
-func (r *Homelab) KubernetesIntegrationReports(opts ...HomelabKubernetesIntegrationReportsOpts) *Directory { // homelab (../../../.dagger/integration.go:115:1)
+func (r *Homelab) KubernetesIntegrationReports(opts ...HomelabKubernetesIntegrationReportsOpts) *Directory { // homelab (../../../.dagger/integration.go:146:1)
 	q := r.query.Select("kubernetesIntegrationReports")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
@@ -869,21 +908,21 @@ type HomelabLintHelmfileOpts struct {
 	//
 	// Only Chart.yaml is needed from k8s/, to know which charts exist.
 	//
-	Source *Directory // homelab (../../../.dagger/helmfile.go:259:2)
+	Source *Directory // homelab (../../../.dagger/helmfile.go:266:2)
 	//
 	// Helmfile environments to lint.
 	//
 	//
 	// Default: ["production"]
-	Environments []string // homelab (../../../.dagger/helmfile.go:263:2)
+	Environments []string // homelab (../../../.dagger/helmfile.go:270:2)
 
-	Container *Container // homelab (../../../.dagger/helmfile.go:265:2)
+	Container *Container // homelab (../../../.dagger/helmfile.go:272:2)
 }
 
 // LintHelmfile checks the helmfile state itself, once per environment: that it
 // renders (`helmfile build`), and that its releases, the chart directories and
 // the environment's app list agree with each other.
-func (r *Homelab) LintHelmfile(ctx context.Context, opts ...HomelabLintHelmfileOpts) (string, error) { // homelab (../../../.dagger/helmfile.go:255:1)
+func (r *Homelab) LintHelmfile(ctx context.Context, opts ...HomelabLintHelmfileOpts) (string, error) { // homelab (../../../.dagger/helmfile.go:262:1)
 	if r.lintHelmfile != nil {
 		return *r.lintHelmfile, nil
 	}
@@ -1039,15 +1078,15 @@ func (r *Homelab) LockTerraform(opts ...HomelabLockTerraformOpts) *Changeset { /
 
 // HomelabPublishReleaseOpts contains options for Homelab.PublishRelease
 type HomelabPublishReleaseOpts struct {
-	Ws *Workspace // homelab (../../../.dagger/releases.go:163:2)
+	Ws *Workspace // homelab (../../../.dagger/releases.go:199:2)
 	//
 	// JSON emitted by scripts/release-metadata.sh.
 	//
-	Metadata *File // homelab (../../../.dagger/releases.go:169:2)
+	Metadata *File // homelab (../../../.dagger/releases.go:205:2)
 }
 
 // PublishRelease selects the container and profiles from the release tag and pushes to GHCR.
-func (r *Homelab) PublishRelease(ctx context.Context, tag string, username string, token *Secret, opts ...HomelabPublishReleaseOpts) (string, error) { // homelab (../../../.dagger/releases.go:161:1)
+func (r *Homelab) PublishRelease(ctx context.Context, tag string, username string, token *Secret, opts ...HomelabPublishReleaseOpts) (string, error) { // homelab (../../../.dagger/releases.go:197:1)
 	assertNotNil("token", token)
 	if r.publishRelease != nil {
 		return *r.publishRelease, nil
@@ -1120,15 +1159,15 @@ func (r *Homelab) PythonProjects(ctx context.Context, opts ...HomelabPythonProje
 
 // HomelabReleaseContainerOpts contains options for Homelab.ReleaseContainer
 type HomelabReleaseContainerOpts struct {
-	Ws *Workspace // homelab (../../../.dagger/releases.go:122:2)
+	Ws *Workspace // homelab (../../../.dagger/releases.go:158:2)
 	//
 	// JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.
 	//
-	Metadata *File // homelab (../../../.dagger/releases.go:126:2)
+	Metadata *File // homelab (../../../.dagger/releases.go:162:2)
 }
 
 // ReleaseContainer builds a tagged container with OCI metadata, without publishing it.
-func (r *Homelab) ReleaseContainer(tag string, opts ...HomelabReleaseContainerOpts) *Container { // homelab (../../../.dagger/releases.go:120:1)
+func (r *Homelab) ReleaseContainer(tag string, opts ...HomelabReleaseContainerOpts) *Container { // homelab (../../../.dagger/releases.go:156:1)
 	q := r.query.Select("releaseContainer")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `ws` optional argument
@@ -1149,9 +1188,9 @@ func (r *Homelab) ReleaseContainer(tag string, opts ...HomelabReleaseContainerOp
 
 // HomelabRunKubernetesIntegrationOpts contains options for Homelab.RunKubernetesIntegration
 type HomelabRunKubernetesIntegrationOpts struct {
-	RepeatSync bool // homelab (../../../.dagger/integration.go:204:2)
+	RepeatSync bool // homelab (../../../.dagger/integration.go:235:2)
 
-	Container *Container // homelab (../../../.dagger/integration.go:206:2)
+	Container *Container // homelab (../../../.dagger/integration.go:237:2)
 }
 
 // RunKubernetesIntegration is the workflow itself: plan, create, deploy, wait,
@@ -1160,7 +1199,7 @@ type HomelabRunKubernetesIntegrationOpts struct {
 // invoke those instead.
 //
 // source is the layout integrationSource builds, not the whole repo.
-func (r *Homelab) RunKubernetesIntegration(source *Directory, releases []string, opts ...HomelabRunKubernetesIntegrationOpts) *HomelabKubernetesIntegrationRun { // homelab (../../../.dagger/integration.go:200:1)
+func (r *Homelab) RunKubernetesIntegration(source *Directory, releases []string, opts ...HomelabRunKubernetesIntegrationOpts) *HomelabKubernetesIntegrationRun { // homelab (../../../.dagger/integration.go:231:1)
 	assertNotNil("source", source)
 	q := r.query.Select("runKubernetesIntegration")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -1232,6 +1271,15 @@ type HomelabTestKubernetesIntegrationOpts struct {
 	RepeatSync bool // homelab (../../../.dagger/integration.go:87:2)
 
 	Container *Container // homelab (../../../.dagger/integration.go:89:2)
+	//
+	// API server of a cluster that is already running, to deploy to and test
+	// instead of creating one. It is left running. Needs --kubeconfig.
+	//
+	Cluster *Service // homelab (../../../.dagger/integration.go:93:2)
+	//
+	// Admin kubeconfig for --cluster.
+	//
+	Kubeconfig *Secret // homelab (../../../.dagger/integration.go:96:2)
 }
 
 // TestKubernetesIntegration deploys releases to a throwaway k3s cluster and runs
@@ -1264,6 +1312,14 @@ func (r *Homelab) TestKubernetesIntegration(ctx context.Context, opts ...Homelab
 		if !querybuilder.IsZeroValue(opts[i].Container) {
 			q = q.Arg("container", opts[i].Container)
 		}
+		// `cluster` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Cluster) {
+			q = q.Arg("cluster", opts[i].Cluster)
+		}
+		// `kubeconfig` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Kubeconfig) {
+			q = q.Arg("kubeconfig", opts[i].Kubeconfig)
+		}
 	}
 
 	var response string
@@ -1295,6 +1351,36 @@ func (r *Homelab) TestPython(ctx context.Context, opts ...HomelabTestPythonOpts)
 		// `paths` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Paths) {
 			q = q.Arg("paths", opts[i].Paths)
+		}
+		// `container` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Container) {
+			q = q.Arg("container", opts[i].Container)
+		}
+	}
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// HomelabTestScriptsOpts contains options for Homelab.TestScripts
+type HomelabTestScriptsOpts struct {
+	Source *Directory // homelab (../../../.dagger/scripts.go:16:2)
+
+	Container *Container // homelab (../../../.dagger/scripts.go:18:2)
+}
+
+// TestScripts runs the script regression tests with their repository inputs.
+func (r *Homelab) TestScripts(ctx context.Context, opts ...HomelabTestScriptsOpts) (string, error) { // homelab (../../../.dagger/scripts.go:12:1)
+	if r.testScripts != nil {
+		return *r.testScripts, nil
+	}
+	q := r.query.Select("testScripts")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `source` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Source) {
+			q = q.Arg("source", opts[i].Source)
 		}
 		// `container` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Container) {
@@ -1395,23 +1481,23 @@ func (r *Homelab) UpdateGoVendorHash(opts ...HomelabUpdateGoVendorHashOpts) *Cha
 
 // HomelabValidateHelmfileOpts contains options for Homelab.ValidateHelmfile
 type HomelabValidateHelmfileOpts struct {
-	Source *Directory // homelab (../../../.dagger/helmfile.go:228:2)
+	Source *Directory // homelab (../../../.dagger/helmfile.go:235:2)
 	//
 	// Helmfile environments to lint with.
 	//
 	//
 	// Default: ["production"]
-	Environments []string // homelab (../../../.dagger/helmfile.go:232:2)
+	Environments []string // homelab (../../../.dagger/helmfile.go:239:2)
 
-	Paths []string // homelab (../../../.dagger/helmfile.go:234:2)
+	Paths []string // homelab (../../../.dagger/helmfile.go:241:2)
 
-	Container *Container // homelab (../../../.dagger/helmfile.go:236:2)
+	Container *Container // homelab (../../../.dagger/helmfile.go:243:2)
 }
 
 // ValidateHelmfile runs `helmfile lint` on every chart, once per environment.
 // It lints each chart with the values helmfile would deploy it with.
 // When paths are provided, only charts matching the paths are linted.
-func (r *Homelab) ValidateHelmfile(ctx context.Context, opts ...HomelabValidateHelmfileOpts) (string, error) { // homelab (../../../.dagger/helmfile.go:225:1)
+func (r *Homelab) ValidateHelmfile(ctx context.Context, opts ...HomelabValidateHelmfileOpts) (string, error) { // homelab (../../../.dagger/helmfile.go:232:1)
 	if r.validateHelmfile != nil {
 		return *r.validateHelmfile, nil
 	}
@@ -1443,23 +1529,23 @@ func (r *Homelab) ValidateHelmfile(ctx context.Context, opts ...HomelabValidateH
 
 // HomelabValidateKubeconformOpts contains options for Homelab.ValidateKubeconform
 type HomelabValidateKubeconformOpts struct {
-	Source *Directory // homelab (../../../.dagger/kubernetes.go:157:2)
+	Source *Directory // homelab (../../../.dagger/kubernetes.go:163:2)
 	//
 	// Helmfile environments to render with.
 	//
 	//
 	// Default: ["production"]
-	Environments []string // homelab (../../../.dagger/kubernetes.go:161:2)
+	Environments []string // homelab (../../../.dagger/kubernetes.go:167:2)
 
-	Paths []string // homelab (../../../.dagger/kubernetes.go:163:2)
+	Paths []string // homelab (../../../.dagger/kubernetes.go:169:2)
 
-	Container *Container // homelab (../../../.dagger/kubernetes.go:165:2)
+	Container *Container // homelab (../../../.dagger/kubernetes.go:171:2)
 }
 
 // ValidateKubeconform runs kubeconform in strict mode across all Helm charts,
 // once per environment, on the manifests helmfile renders.
 // When paths are provided, only matching charts are validated.
-func (r *Homelab) ValidateKubeconform(ctx context.Context, opts ...HomelabValidateKubeconformOpts) (string, error) { // homelab (../../../.dagger/kubernetes.go:154:1)
+func (r *Homelab) ValidateKubeconform(ctx context.Context, opts ...HomelabValidateKubeconformOpts) (string, error) { // homelab (../../../.dagger/kubernetes.go:160:1)
 	if r.validateKubeconform != nil {
 		return *r.validateKubeconform, nil
 	}
@@ -1553,23 +1639,23 @@ func (r *Homelab) ValidateNixBuildMetrics(ctx context.Context, opts ...HomelabVa
 
 // HomelabValidatePolarisOpts contains options for Homelab.ValidatePolaris
 type HomelabValidatePolarisOpts struct {
-	Source *Directory // homelab (../../../.dagger/kubernetes.go:127:2)
+	Source *Directory // homelab (../../../.dagger/kubernetes.go:128:2)
 	//
 	// Helmfile environments to render with.
 	//
 	//
 	// Default: ["production"]
-	Environments []string // homelab (../../../.dagger/kubernetes.go:131:2)
+	Environments []string // homelab (../../../.dagger/kubernetes.go:132:2)
 
-	Paths []string // homelab (../../../.dagger/kubernetes.go:133:2)
+	Paths []string // homelab (../../../.dagger/kubernetes.go:134:2)
 
-	Container *Container // homelab (../../../.dagger/kubernetes.go:135:2)
+	Container *Container // homelab (../../../.dagger/kubernetes.go:136:2)
 }
 
 // ValidatePolaris runs Polaris audit across all Helm charts, once per
 // environment, on the manifests helmfile renders.
 // When paths are provided, only matching charts are validated.
-func (r *Homelab) ValidatePolaris(ctx context.Context, opts ...HomelabValidatePolarisOpts) (string, error) { // homelab (../../../.dagger/kubernetes.go:124:1)
+func (r *Homelab) ValidatePolaris(ctx context.Context, opts ...HomelabValidatePolarisOpts) (string, error) { // homelab (../../../.dagger/kubernetes.go:125:1)
 	if r.validatePolaris != nil {
 		return *r.validatePolaris, nil
 	}

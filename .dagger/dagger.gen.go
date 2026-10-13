@@ -507,6 +507,41 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).DebugDir(&parent, ctx, dir), nil
+		case "DeleteDevCluster":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var name string
+			if inputArgs["name"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["name"]), &name)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg name", err))
+				}
+			}
+			return (*Homelab).DeleteDevCluster(&parent, ctx, name)
+		case "DevCluster":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var name string
+			if inputArgs["name"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["name"]), &name)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg name", err))
+				}
+			}
+			var token *dagger.Secret
+			if inputArgs["token"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["token"]), &token)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg token", err))
+				}
+			}
+			return (*Homelab).DevCluster(&parent, ctx, name, token)
 		case "DevenvContainer":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -1038,7 +1073,21 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
 				}
 			}
-			return (*Homelab).TestKubernetesIntegration(&parent, ctx, source, releases, repeatSync, container)
+			var cluster *dagger.Service
+			if inputArgs["cluster"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["cluster"]), &cluster)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg cluster", err))
+				}
+			}
+			var kubeconfig *dagger.Secret
+			if inputArgs["kubeconfig"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["kubeconfig"]), &kubeconfig)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg kubeconfig", err))
+				}
+			}
+			return (*Homelab).TestKubernetesIntegration(&parent, ctx, source, releases, repeatSync, container, cluster, kubeconfig)
 		case "TestPython":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -1067,6 +1116,27 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Homelab).TestPython(&parent, ctx, source, paths, container)
+		case "TestScripts":
+			var parent Homelab
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var source *dagger.Directory
+			if inputArgs["source"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
+				}
+			}
+			var container *dagger.Container
+			if inputArgs["container"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
+				}
+			}
+			return (*Homelab).TestScripts(&parent, ctx, source, container)
 		case "TrimCue":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)

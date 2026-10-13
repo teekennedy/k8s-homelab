@@ -87,18 +87,49 @@ func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 	repeatSync bool,
 	// +optional
 	container *dagger.Container,
+	// API server of a cluster that is already running, to deploy to and test
+	// instead of creating one. It is left running. Needs --kubeconfig.
+	// +optional
+	cluster *dagger.Service,
+	// Admin kubeconfig for --cluster.
+	// +optional
+	kubeconfig *dagger.Secret,
 ) (string, error) {
-	run, err := m.scopedIntegrationRun(ctx, source, releases, repeatSync, container)
-	if err != nil {
-		return "", err
+	if (cluster == nil) != (kubeconfig == nil) {
+		return "", errors.New("--cluster and --kubeconfig name one existing cluster between them; pass both or neither")
 	}
-	summary, err := run.Summary(ctx)
-	if err != nil {
-		return "", fmt.Errorf("running the Kubernetes integration tests: %w", err)
-	}
-	failed, err := run.Failed(ctx)
-	if err != nil {
-		return "", fmt.Errorf("reading which releases failed: %w", err)
+	var (
+		summary string
+		failed  []string
+	)
+	if cluster != nil {
+		// Run in place rather than through the module's API: that call exists to
+		// be cached, and a verdict on a cluster that outlives the run must not be.
+		if container == nil {
+			container = m.integrationContainer()
+		}
+		attached, err := attachK3sCluster(helmfileContainer(container, source), cluster, kubeconfig)
+		if err != nil {
+			return "", err
+		}
+		run, err := runKubernetesIntegration(ctx, source, releases, repeatSync, container, attached)
+		if err != nil {
+			return "", err
+		}
+		summary, failed = run.Summary, run.Failed
+	} else {
+		run, err := m.scopedIntegrationRun(ctx, source, releases, repeatSync, container)
+		if err != nil {
+			return "", err
+		}
+		summary, err = run.Summary(ctx)
+		if err != nil {
+			return "", fmt.Errorf("running the Kubernetes integration tests: %w", err)
+		}
+		failed, err = run.Failed(ctx)
+		if err != nil {
+			return "", fmt.Errorf("reading which releases failed: %w", err)
+		}
 	}
 	if len(failed) > 0 {
 		return "", fmt.Errorf("integration tests failed for %s:\n%s",
@@ -208,15 +239,26 @@ func (m *Homelab) RunKubernetesIntegration(ctx context.Context,
 	if container == nil {
 		container = m.integrationContainer()
 	}
-	toolchain := helmfileContainer(container, source)
-
-	// Planned before anything is created, so a typo in --releases costs nothing.
-	plan, err := integrationPlan(ctx, source, toolchain, releases)
+	cluster, err := newK3sCluster(helmfileContainer(container, source))
 	if err != nil {
 		return nil, err
 	}
+	return runKubernetesIntegration(ctx, source, releases, repeatSync, container, cluster)
+}
 
-	cluster, err := newK3sCluster(toolchain)
+// runKubernetesIntegration runs the workflow on cluster, which it creates and
+// closes: for a cluster that was attached to, those connect to it and leave it
+// running.
+func runKubernetesIntegration(
+	ctx context.Context,
+	source *dagger.Directory,
+	releases []string,
+	repeatSync bool,
+	container *dagger.Container,
+	cluster *k3sCluster,
+) (run *KubernetesIntegrationRun, err error) {
+	// Planned before anything is created, so a typo in --releases costs nothing.
+	plan, err := integrationPlan(ctx, source, cluster.Toolchain, releases)
 	if err != nil {
 		return nil, err
 	}
