@@ -350,7 +350,7 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger --progress=plain call update-devenv -y"
+          "dagger --progress=report call update-devenv -y"
         ],
         "fileFilters": [
           "devenv.lock"
@@ -496,7 +496,7 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger --progress=plain generate homelab:lock-terraform -y"
+          "dagger --progress=report generate homelab:lock-terraform -y"
         ],
         "fileFilters": [
           "**/.terraform.lock.hcl"
@@ -540,7 +540,7 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger --progress=plain generate homelab:lint-go -y"
+          "dagger --progress=report generate homelab:lint-go -y"
         ],
         "fileFilters": [
           "**/go.mod",
@@ -557,8 +557,8 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger --progress=plain generate homelab:lint-go -y",
-          "dagger --progress=plain generate homelab:update-go-vendor-hash -y"
+          "dagger --progress=report generate homelab:lint-go -y",
+          "dagger --progress=report generate homelab:update-go-vendor-hash -y"
         ],
         "fileFilters": [
           "cmd/lab/**",
@@ -576,9 +576,9 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger --progress=plain develop",
-          "dagger --progress=plain generate homelab:lint-go -y",
-          "dagger --progress=plain generate homelab:export-cue homelab:fix-cue homelab:format-cue homelab:format-nix homelab:format-python -y"
+          "dagger --progress=report develop",
+          "dagger --progress=report generate homelab:lint-go -y",
+          "dagger --progress=report generate homelab:export-cue homelab:fix-cue homelab:format-cue homelab:format-nix homelab:format-python -y"
         ],
         "fileFilters": [
           ".dagger/**",
