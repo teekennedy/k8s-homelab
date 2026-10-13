@@ -5,9 +5,12 @@ production: #Environment & _clusterDefaults & _productionApps & {
 	name: "production"
 
 	cluster: {
-		domain: "k8s.localhost"
+		domain:        "k8s.localhost"
+		public_domain: "msng.to"
 		networks: host_cidr: "10.69.80.0/25"
 	}
+
+	certificates: acme_server: "https://acme-v02.api.letsencrypt.org/directory"
 
 	hosts: [
 		{

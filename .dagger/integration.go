@@ -17,12 +17,12 @@ import (
 // The Kubernetes integration workflow: a throwaway k3s cluster, the releases
 // under test deployed onto it with the repo's own helmfile, and each release's
 // pytest suite run against the result. A release joins by being enabled in the
-// ephemeral environment and having a tests/ directory next to its chart.
+// dev environment and having a tests/ directory next to its chart.
 
 const (
-	// ephemeralEnvironment is the helmfile environment the workflow deploys
+	// devEnvironment is the helmfile environment the workflow deploys
 	// with. Its generated values are what decide which releases are installed.
-	ephemeralEnvironment = "ephemeral"
+	devEnvironment = "dev"
 	// kubernetesTestsDir is where a release's integration tests live, relative
 	// to its chart directory.
 	kubernetesTestsDir = "tests"
@@ -75,9 +75,9 @@ type KubernetesIntegrationReport struct {
 //	dagger call test-kubernetes-integration --releases=<name>
 func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/ephemeral/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/dev/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
-	// Helmfile releases to deploy and test, narrowing the set the ephemeral
+	// Helmfile releases to deploy and test, narrowing the set the dev
 	// environment enables. Empty means all of them.
 	// +optional
 	releases []string,
@@ -114,7 +114,7 @@ func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 //	dagger call kubernetes-integration-reports export --path=./reports
 func (m *Homelab) KubernetesIntegrationReports(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/ephemeral/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/dev/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
 	source *dagger.Directory,
 	// +optional
 	releases []string,
@@ -180,10 +180,10 @@ func (m *Homelab) scopedIntegrationRun(
 }
 
 // integrationSource is what helmfile and the tests read for the planned
-// releases: the state file, the ephemeral values, the shared charts and each
+// releases: the state file, the dev values, the shared charts and each
 // release's chart directory, tests included.
 func integrationSource(source *dagger.Directory, plan []*integrationRelease) *dagger.Directory {
-	scoped := helmfileStateSource(source, ephemeralEnvironment).
+	scoped := helmfileStateSource(source, devEnvironment).
 		WithDirectory(sharedChartsPath, source.Directory(sharedChartsPath))
 	for _, r := range plan {
 		scoped = scoped.WithDirectory(r.Chart, source.Directory(r.Chart))
@@ -276,7 +276,7 @@ func deployForTesting(
 // integrationPlan works out which releases to deploy, the namespace helmfile
 // puts each in, and where its tests are.
 //
-// The default is every release the ephemeral environment enables, since that
+// The default is every release the dev environment enables, since that
 // map is what the state file's installedTemplate reads. `releases` can narrow
 // that set, but a --selector cannot turn a release on.
 func integrationPlan(
@@ -285,7 +285,7 @@ func integrationPlan(
 	toolchain *dagger.Container,
 	releases []string,
 ) ([]*integrationRelease, error) {
-	apps, err := helmfileEnvApps(ctx, source, ephemeralEnvironment)
+	apps, err := helmfileEnvApps(ctx, source, devEnvironment)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func integrationPlan(
 		return nil, err
 	}
 
-	entries, err := helmfileReleases(ctx, source, ephemeralEnvironment, toolchain)
+	entries, err := helmfileReleases(ctx, source, devEnvironment, toolchain)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +313,7 @@ func integrationPlan(
 			return nil, fmt.Errorf("%s has no release named %q", helmfilePath, name)
 		}
 		if entry.Namespace == "" {
-			return nil, fmt.Errorf("release %q has no namespace in the %s environment", name, ephemeralEnvironment)
+			return nil, fmt.Errorf("release %q has no namespace in the %s environment", name, devEnvironment)
 		}
 		testsPath := path.Join(entry.Chart, kubernetesTestsDir)
 		projects := pythonProjects(ctx, source, []string{path.Join(testsPath, "pyproject.toml")})
@@ -366,7 +366,7 @@ func checkEnabled(enabled, requested []string) error {
 	sort.Strings(missing)
 	return fmt.Errorf("the %s environment does not enable %s, so helmfile would not install "+
 		"them (edit config/%s.cue, then run `dagger call export-cue --auto-apply`); it enables %s",
-		ephemeralEnvironment, strings.Join(missing, ", "), ephemeralEnvironment,
+		devEnvironment, strings.Join(missing, ", "), devEnvironment,
 		strings.Join(enabled, ", "))
 }
 
@@ -374,8 +374,8 @@ func checkEnabled(enabled, requested []string) error {
 func syncReleases(ctx context.Context, cluster *k3sCluster, plan []*integrationRelease, attempt int) error {
 	args := []string{
 		"helmfile",
-		"--environment", ephemeralEnvironment,
-		// A kubeconfig that is not the ephemeral cluster's has no context by this
+		"--environment", devEnvironment,
+		// A kubeconfig that is not this run's cluster has no context by this
 		// name, so helmfile fails rather than deploying somewhere else.
 		"--kube-context", cluster.Context(),
 	}
@@ -392,7 +392,7 @@ func syncReleases(ctx context.Context, cluster *k3sCluster, plan []*integrationR
 
 	if _, err := ctr.WithExec(args).Sync(ctx); err != nil {
 		return fmt.Errorf("helmfile sync (attempt %d) failed for %s in the %s environment: %w",
-			attempt, strings.Join(releaseNames(plan), ", "), ephemeralEnvironment, withExecOutput(err))
+			attempt, strings.Join(releaseNames(plan), ", "), devEnvironment, withExecOutput(err))
 	}
 	return nil
 }

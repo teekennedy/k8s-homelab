@@ -1,0 +1,5 @@
+# Values taken from the environment's config; plain Helm ignores this file.
+cert-manager:
+  prometheus:
+    servicemonitor:
+      enabled: {{ index .Values.apps.platform "monitoring-system" }}

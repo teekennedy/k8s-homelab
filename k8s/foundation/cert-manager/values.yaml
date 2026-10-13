@@ -1,0 +1,36 @@
+cert-manager:
+  crds:
+    enabled: true
+  prometheus:
+    enabled: true
+    servicemonitor:
+      # Set by values.yaml.gotmpl: the ServiceMonitor CRD only exists where
+      # monitoring-system is installed.
+      enabled: false
+  resources:
+    requests:
+      cpu: 10m
+      memory: 192Mi
+    limits:
+      memory: 256Mi
+  cainjector:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+  webhook:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 96Mi
+      limits:
+        memory: 192Mi
+  startupapicheck:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 96Mi
+      limits:
+        memory: 192Mi

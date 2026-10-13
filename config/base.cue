@@ -16,6 +16,8 @@ _productionApps: {
 	apps: {
 		foundation: {
 			"argocd":                   true
+			"cert-bundles":             true
+			"cert-manager":             true
 			"cert-system":              true
 			"cnpg-system":              true
 			"external-dns":             true
@@ -30,6 +32,7 @@ _productionApps: {
 			"reflector":                true
 			"s3-proxy":                 true
 			"secret-system":            true
+			"storage-aliases":          false
 			"traefik":                  true
 		}
 		platform: {
@@ -79,13 +82,15 @@ _appsDisabled: {
 	}
 }
 
-// _stagingApps is a minimal application stack for staging/ephemeral environments.
+// _stagingApps is a minimal application stack for staging/dev environments.
 // All known releases are listed so --include-transitive-needs can resolve deps;
 // set to false to exclude from the environment.
 _stagingApps: {
 	apps: {
 		foundation: {
 			"argocd":                   false
+			"cert-bundles":             true
+			"cert-manager":             true
 			"cert-system":              true
 			"cnpg-system":              true
 			"external-dns":             false
@@ -100,6 +105,7 @@ _stagingApps: {
 			"reflector":                false
 			"s3-proxy":                 false
 			"secret-system":            true
+			"storage-aliases":          true
 			"traefik":                  true
 		}
 		platform: {

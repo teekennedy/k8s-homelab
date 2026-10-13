@@ -1,12 +1,16 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/cert-manager.io/clusterissuer_v1.json
+# The issuer for certificates that clients outside the cluster have to trust.
+# Without an ACME server it signs with the internal CA instead, under the same
+# name, so the Certificates that reference it are the same in every environment.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt-prod
   namespace: {{ .Release.Namespace }}
 spec:
+  {{- if .Values.acmeServer }}
   acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
+    server: {{ .Values.acmeServer }}
     privateKeySecretRef:
       name: letsencrypt-prod
     solvers:
@@ -15,3 +19,7 @@ spec:
           apiTokenSecretRef:
             name: cloudflare-api-token
             key: api-token
+  {{- else }}
+  ca:
+    secretName: internal-ca-cert
+  {{- end }}

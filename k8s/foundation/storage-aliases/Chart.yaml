@@ -1,0 +1,4 @@
+apiVersion: v2
+name: storage-aliases
+description: The cluster's storage class names, backed by the k3s local-path provisioner
+version: 0.1.0

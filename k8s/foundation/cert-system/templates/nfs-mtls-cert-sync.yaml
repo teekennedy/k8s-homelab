@@ -8,6 +8,7 @@
 #   - Kubelet auto-updates mounted Secret volumes within ~60s of cert-manager renewal.
 #   - A polling loop (60s) detects changes and copies files + reloads tlshd via nsenter.
 #   - No RBAC needed: kubelet handles Secret volume mounts using its own credentials.
+{{- if .Values.hosts }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -137,3 +138,4 @@ spec:
               memory: 16Mi
             limits:
               memory: 32Mi
+{{- end }}

@@ -1221,7 +1221,7 @@ func (r *Homelab) TestGo(ctx context.Context, opts ...HomelabTestGoOpts) (string
 type HomelabTestKubernetesIntegrationOpts struct {
 	Source *Directory // homelab (../../../.dagger/integration.go:79:2)
 	//
-	// Helmfile releases to deploy and test, narrowing the set the ephemeral
+	// Helmfile releases to deploy and test, narrowing the set the dev
 	// environment enables. Empty means all of them.
 	//
 	Releases []string // homelab (../../../.dagger/integration.go:83:2)

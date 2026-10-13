@@ -1,0 +1,14 @@
+{{- range .Values.storageClasses }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ . }}
+  labels:
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+provisioner: rancher.io/local-path
+# Every alias deletes with its claim, whatever the class it stands in for does:
+# nothing on a cluster that uses these is meant to outlive it.
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+{{- end }}

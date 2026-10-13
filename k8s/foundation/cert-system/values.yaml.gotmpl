@@ -1,0 +1,11 @@
+# Values taken from the environment's config; plain Helm ignores this file.
+publicDomain: {{ .Values.cluster.public_domain }}
+acmeServer: {{ .Values | get "certificates.acme_server" "" | quote }}
+hosts:
+  {{- range .Values.hosts }}
+  - name: {{ .name }}
+    ip: {{ .ip }}
+  {{- end }}
+
+deploybotSshCa:
+  enabled: {{ .Values.apps.platform.woodpecker }}

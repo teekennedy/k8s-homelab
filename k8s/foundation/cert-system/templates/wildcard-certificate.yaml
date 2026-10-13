@@ -8,8 +8,8 @@ metadata:
 spec:
   secretName: wildcard-tls-certificate
   dnsNames:
-    - "*.msng.to"
-    - "msng.to"
+    - "*.{{ .Values.publicDomain }}"
+    - "{{ .Values.publicDomain }}"
   issuerRef:
     group: cert-manager.io
     kind: ClusterIssuer

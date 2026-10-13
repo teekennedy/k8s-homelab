@@ -5,9 +5,9 @@ environments:
   staging:
     values:
       - config/gen/staging/env.json
-  ephemeral:
+  dev:
     values:
-      - config/gen/ephemeral/env.json
+      - config/gen/dev/env.json
 ---
 # Chart dependency repositories. Every release is a local chart, and helmfile
 # builds a local chart's dependencies with `helm dependency build`, which
@@ -63,14 +63,13 @@ templates:
     installedTemplate: '{{`{{ .Values | get (print "apps.foundation." .Release.Name) false }}`}}'
     labels:
       tier: foundation
-    # Only the foundation template has an optional per-environment overlay
-    # (k8s/foundation/*/{{`{{ .Environment.Name }}`}}.yaml, e.g. production.yaml)
-    # that doesn't exist for every release, so the lenient handler is scoped
-    # here rather than set file-wide.
+    # values.yaml.gotmpl is where a chart takes values from the environment's
+    # config. Most charts have none, so the lenient handler is scoped here
+    # rather than set file-wide.
     missingFileHandler: Warn
     values:
       - 'k8s/foundation/{{`{{ .Release.Name }}`}}/values.yaml'
-      - 'k8s/foundation/{{`{{ .Release.Name }}`}}/{{`{{ .Environment.Name }}`}}.yaml'
+      - 'k8s/foundation/{{`{{ .Release.Name }}`}}/values.yaml.gotmpl'
 
   platform:
     chart: 'k8s/platform/{{`{{ .Release.Name }}`}}'
@@ -103,9 +102,27 @@ releases:
       - cert-system/cert-system
       - secret-system/secret-system
 
+  # cert-manager, then the issuers, then the bundles: each layer's resources
+  # are validated by a webhook the layer before it serves, so they cannot
+  # share a release.
+  - name: cert-bundles
+    namespace: cert-system
+    inherit:
+      - template: foundation
+    needs:
+      - cert-system/cert-system
+
+  - name: cert-manager
+    namespace: cert-system
+    inherit:
+      - template: foundation
+
   - name: cert-system
     inherit:
       - template: foundation
+    needs:
+      - cert-system/cert-manager
+
   - name: cnpg-system
     inherit:
       - template: foundation
@@ -162,6 +179,13 @@ releases:
     inherit:
       - template: foundation
 
+  # No namespace of its own: storage classes are cluster-scoped, and this is
+  # where the provisioner behind them runs.
+  - name: storage-aliases
+    namespace: kube-system
+    inherit:
+      - template: foundation
+
   - name: traefik
     # This application is deployed to kube-system namespace for ease of transition from the k3s packaged traefik
     namespace: kube-system
@@ -205,6 +229,7 @@ releases:
     inherit:
       - template: platform
     needs:
+      - cert-system/cert-bundles
       - cert-system/cert-system
       - secret-system/secret-system
       - cnpg-system/cnpg-system
@@ -262,6 +287,7 @@ releases:
     inherit:
       - template: apps
     needs:
+      - cert-system/cert-bundles
       - cert-system/cert-system
       - secret-system/secret-system
 

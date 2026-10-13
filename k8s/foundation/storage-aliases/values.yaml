@@ -1,0 +1,17 @@
+# Names of the storage classes the storage releases (longhorn-system,
+# csi-driver-nfs, csi-driver-smb) provide where they are installed. Each one is
+# created here on the local-path provisioner instead, so that a chart naming
+# one installs unchanged on a cluster without those releases.
+#
+# The local-path provisioner only provisions ReadWriteOnce volumes, so a
+# ReadWriteMany claim against one of these stays Pending.
+storageClasses:
+  - longhorn
+  - longhorn-rc1
+  - longhorn-rc2
+  - longhorn-strict-local
+  - longhorn-tmp
+  - nfs
+  - nfs-backups
+  - smb
+  - smb-backups

@@ -11,6 +11,7 @@
 # This must be a standalone server block. k3s also injects a hosts plugin for
 # NodeHosts into the main .:53 block, and CoreDNS allows only one hosts plugin
 # per server block.
+{{- if .Values.hosts }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -18,13 +19,13 @@ metadata:
   namespace: kube-system
 data:
   borg-nodes.server: |
-    msng.to:53 {
+    {{ .Values.publicDomain }}:53 {
       hosts {
-        10.69.80.10 borg-0.msng.to
-        10.69.80.11 borg-1.msng.to
-        10.69.80.12 borg-2.msng.to
-        10.69.80.13 borg-3.msng.to
+        {{- range .Values.hosts }}
+        {{ .ip }} {{ .name }}.{{ $.Values.publicDomain }}
+        {{- end }}
         fallthrough
       }
       forward . /etc/resolv.conf
     }
+{{- end }}

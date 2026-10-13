@@ -19,9 +19,19 @@ package homelab
 
 // Cluster represents cluster-wide settings
 #Cluster: {
-	domain:   #Domain
-	timezone: string | *"America/Denver"
-	networks: #Networks
+	domain: #Domain
+	// public_domain is the DNS zone services are published under.
+	public_domain: #Domain
+	timezone:      string | *"America/Denver"
+	networks:      #Networks
+}
+
+// Certificates describes where publicly trusted certificates come from
+#Certificates: {
+	// acme_server is the ACME directory URL the public issuer requests
+	// certificates from. Leave it unset where nothing can answer an ACME
+	// challenge; the public issuer then signs with the internal CA instead.
+	acme_server?: string
 }
 
 // K3sHost represents k3s-specific host configuration
@@ -49,9 +59,10 @@ package homelab
 
 // Environment represents a complete environment configuration
 #Environment: {
-	name:      string
-	inherits?: string
-	cluster:   #Cluster
+	name:         string
+	inherits?:    string
+	cluster:      #Cluster
+	certificates: #Certificates
 	hosts: [...#Host]
 	apps: #Apps
 

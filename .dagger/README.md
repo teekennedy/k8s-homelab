@@ -287,7 +287,7 @@ this repo's own helmfile, waits for them to become healthy, and runs each
 release's pytest suite against the result — then destroys the cluster.
 
 ```bash
-# Deploy and test everything the ephemeral environment enables
+# Deploy and test everything the dev environment enables
 dagger call test-kubernetes-integration
 
 # Narrow that to specific releases
@@ -378,9 +378,9 @@ mounted at `/run/k3s/kubeconfig` in the containers that need it. Concretely:
 ### Deploying with the existing helmfile
 
 There is no separate state file for development clusters. The workflow runs
-`helmfile sync` against `helmfile.yaml.gotmpl` with `--environment ephemeral`,
-whose values come from `config/ephemeral.cue` by way of
-`config/gen/ephemeral/env.json` like every other environment.
+`helmfile sync` against `helmfile.yaml.gotmpl` with `--environment dev`,
+whose values come from `config/dev.cue` by way of
+`config/gen/dev/env.json` like every other environment.
 
 Release enablement is the `apps` map in those values, read by the helmfile
 templates' `installedTemplate`. A `--selector` can narrow what a sync touches
@@ -389,11 +389,11 @@ of truth — so that is where the workflow gets its release set from, and
 `--releases` only narrows it. Asking for a release the environment disables is an
 error naming the file to edit, rather than a sync that silently installs nothing.
 
-`ephemeral` therefore disables everything by default (`_appsDisabled` in
+`dev` therefore disables everything by default (`_appsDisabled` in
 `config/base.cue`, derived from the full production list) and enables only what
 has tests.
 
-Helmfile is given the ephemeral kubeconfig through `KUBECONFIG` *and* the
+Helmfile is given the cluster's kubeconfig through `KUBECONFIG` *and* the
 cluster's own context through `--kube-context`. Between them there is nothing
 left for an ambient current-context to decide: a kubeconfig that is not this
 cluster's has no context by that name, and helmfile fails rather than deploying
@@ -459,13 +459,13 @@ running is a failure.
 2. Mark every test `@pytest.mark.kubernetes`.
 3. Add `tests/` to the chart's `.helmignore`, so test files stay out of the
    packaged chart.
-4. Enable the release in `config/ephemeral.cue`, then
+4. Enable the release in `config/dev.cue`, then
    `dagger call export-cue --auto-apply`.
 5. `dagger call test-kubernetes-integration --releases=<release>`.
 
 Nothing in `.dagger` needs changing, and step 4 is what adds the release to the
 default run: with no `--releases`, the workflow deploys and tests everything the
-ephemeral environment enables. The workflow finds the test directory from the
+dev environment enables. The workflow finds the test directory from the
 release's chart path, deploys the release, waits on its namespace and runs
 pytest; what to assert is entirely the test project's business.
 
@@ -477,7 +477,7 @@ do its job.
 1. **The outer function call.** Dagger caches a function's result on its
    arguments. `source` is a content-addressed directory filtered by the
    `+ignore` list, so re-running with nothing changed in
-   `helmfile.yaml.gotmpl`, the ephemeral environment's values or anything under
+   `helmfile.yaml.gotmpl`, the dev environment's values or anything under
    `k8s/` returns the earlier verdict without starting a cluster. Editing
    anything outside that list (`README.md`, `.woodpecker/`, `nix/`) is also a
    hit. The filter is coarse — it cannot know which releases a run will deploy —
@@ -486,7 +486,7 @@ do its job.
 2. **The inner function call.** `TestKubernetesIntegration` and
    `KubernetesIntegrationReports` plan against the whole source, then pass
    `RunKubernetesIntegration` only what the run reads: the state file, the
-   ephemeral values, the shared charts and the chosen releases' charts (tests
+   dev values, the shared charts and the chosen releases' charts (tests
    included). It is called through the module's own API, which needs the
    experimental self-calls capability (`dagger develop --with-self-calls`, kept
    in `dagger.json`). The workflow itself therefore re-runs only when something

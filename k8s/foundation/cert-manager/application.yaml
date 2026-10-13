@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: cert-manager
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: cert-system
+  ignoreDifferences:
+    - jsonPointers:
+        - /spec/volumeName
+        - /spec/storageClassName
+        # Longhorn stores the expanded capacity in bytes (e.g. 10737418240) rather
+        # than the human-readable form (e.g. 10Gi), causing ArgoCD to see a diff
+        # and attempt a patch that Kubernetes rejects as reducing the storage request.
+        - /spec/resources/requests/storage
+      kind: PersistentVolumeClaim
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+  project: default
+  source:
+    path: k8s/foundation/cert-manager
+    repoURL: https://git.msng.to/ops/k8s-homelab
+    targetRevision: main
+    # Render with `helmfile template` instead of ArgoCD's native Helm support.
+    plugin:
+      name: helmfile
+  syncPolicy:
+    automated:
+      prune: true
+      # selfHeal: false
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true

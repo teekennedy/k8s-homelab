@@ -1,0 +1,133 @@
+{{- $check := .Values.trustManagerStartupApiCheck }}
+# Holds the release open until trust-manager's webhook answers, the way
+# cert-manager's own startupapicheck does for cert-manager. A Ready pod is not
+# enough: the webhook is only usable once the Service routes to it, and a
+# Bundle created before then is rejected.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trust-manager-startupapicheck
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: trust-manager-startupapicheck
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  # A server-side dry run is authorized as the create it stands in for.
+  - apiGroups: ["trust.cert-manager.io"]
+    resources: ["bundles"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: trust-manager-startupapicheck
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: trust-manager-startupapicheck
+subjects:
+  - kind: ServiceAccount
+    name: trust-manager-startupapicheck
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: trust-manager-startupapicheck
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ $check.timeoutSeconds }}
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: trust-manager-startupapicheck
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: startupapicheck
+          image: {{ $check.image }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              # Nothing is created: a dry run goes through admission, which is
+              # the part being waited for, and stops there.
+              until kubectl create --dry-run=server --filename /check/bundle.yaml; do
+                sleep 2
+              done
+          env:
+            # kubectl caches API discovery under $HOME.
+            - name: HOME
+              value: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: check
+              mountPath: /check
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: check
+          configMap:
+            name: trust-manager-startupapicheck
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trust-manager-startupapicheck
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  bundle.yaml: |
+    apiVersion: trust.cert-manager.io/v1alpha1
+    kind: Bundle
+    metadata:
+      name: trust-manager-startupapicheck
+    spec:
+      sources:
+        - useDefaultCAs: true
+      target:
+        configMap:
+          key: ca-certificates.crt

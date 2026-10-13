@@ -11,6 +11,7 @@
 # nix/modules/selfupdate/deploybot_user_ca.pub by scripts/setup-ssh-ca.sh. It
 # never rotates, so rotating the leaf costs the hosts nothing -- no sync
 # DaemonSet, and no window where a host trusts the wrong key.
+{{- if $ca.enabled }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -182,3 +183,4 @@ spec:
                   memory: 32Mi
                 limits:
                   memory: 128Mi
+{{- end }}

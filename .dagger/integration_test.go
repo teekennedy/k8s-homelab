@@ -165,7 +165,7 @@ func TestReleaseVerdict(t *testing.T) {
 func integrationFixture() repo {
 	return repo{
 		helmfilePath:                      "releases: []\n",
-		"config/gen/ephemeral/env.json":   "{\"name\": \"ephemeral\"}\n",
+		"config/gen/dev/env.json":         "{\"name\": \"dev\"}\n",
 		"config/gen/production/env.json":  "{\"name\": \"production\"}\n",
 		"k8s/charts/shared/Chart.yaml":    "name: shared\n",
 		"k8s/foundation/alpha/Chart.yaml": "name: alpha\n",
@@ -205,7 +205,7 @@ func TestIntegrationSourceCacheGranularity(t *testing.T) {
 		{"a deployed release's test", edit("k8s/foundation/alpha/tests/t.py", "x\n"), []string{alpha}, true},
 		{"the shared charts", edit("k8s/charts/shared/Chart.yaml", "name: shared2\n"), []string{alpha}, true},
 		{"the state file", edit(helmfilePath, "releases: [x]\n"), []string{alpha}, true},
-		{"the ephemeral values", edit("config/gen/ephemeral/env.json", "{}\n"), []string{alpha}, true},
+		{"the dev values", edit("config/gen/dev/env.json", "{}\n"), []string{alpha}, true},
 		{
 			"a chart once it is deployed too",
 			edit("k8s/foundation/beta/Chart.yaml", "name: beta2\n"),

@@ -41,17 +41,6 @@ exemptions:
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
-  # The chart has no probe settings for the cainjector.
-  - controllerNames:
-      - cert-system-cert-manager-cainjector
-    rules:
-      - readinessProbeMissing
-      - livenessProbeMissing
-  # The chart only offers a liveness probe for the controller.
-  - controllerNames:
-      - cert-system-cert-manager
-    rules:
-      - readinessProbeMissing
   # The chart only offers a readiness probe.
   - controllerNames:
       - trust-manager
