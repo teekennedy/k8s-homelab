@@ -83,55 +83,24 @@ _appsDisabled: {
 }
 
 // _stagingApps is a minimal application stack for staging/dev environments.
-// All known releases are listed so --include-transitive-needs can resolve deps;
-// set to false to exclude from the environment.
-_stagingApps: {
+// Every known release stays listed, disabled, so --include-transitive-needs can
+// resolve deps.
+_stagingApps: _appsDisabled & {
 	apps: {
 		foundation: {
-			"argocd":                   false
-			"cert-bundles":             true
-			"cert-manager":             true
-			"cert-system":              true
-			"cnpg-system":              true
-			"external-dns":             false
-			"external-dns-internal":    false
-			"generic-cdi-plugin":       false
-			"intel-device-plugins-gpu": false
-			"kured":                    false
-			"kyverno":                  false
-			"longhorn-system":          false
-			"metallb":                  true
-			"node-feature-discovery":   false
-			"reflector":                false
-			"s3-proxy":                 false
-			"secret-system":            true
-			"storage-aliases":          true
-			"traefik":                  true
+			"cert-bundles":    true
+			"cert-manager":    true
+			"cert-system":     true
+			"cnpg-system":     true
+			"metallb":         true
+			"secret-system":   true
+			"storage-aliases": true
+			"traefik":         true
 		}
 		platform: {
-			"auth-system":       true
-			"crowdsec":          false
-			"csi-driver-nfs":    false
-			"csi-driver-smb":    false
-			"dagger-engine":     false
-			"forgejo":           true
-			"monitoring-system": false
-			"oauth2-proxy":      false
-			"renovate":          false
-			"victoria-metrics":  false
-			"woodpecker":        false
+			"auth-system": true
+			"forgejo":     true
 		}
-		apps: {
-			"copyparty": false
-			"freshrss":  false
-			"homepage":  true
-			"jellyfin":  false
-			"joplin":    false
-			"openhands": false
-			"redteam":   false
-			"spoolman":  false
-			"syncthing": false
-			"terraria":  false
-		}
+		apps: "homepage": true
 	}
 }

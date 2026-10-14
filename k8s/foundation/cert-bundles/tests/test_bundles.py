@@ -88,12 +88,6 @@ def await_certificate(
     return await_result(issued, description)
 
 
-def dns_names(certificate: x509.Certificate) -> list[str]:
-    """The DNS names in a certificate's subject alternative name extension."""
-    names = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-    return names.value.get_values_for_type(x509.DNSName)
-
-
 @pytest.mark.kubernetes
 def test_internal_certificate_verifies_against_the_namespace_bundle(
     core_v1: client.CoreV1Api,

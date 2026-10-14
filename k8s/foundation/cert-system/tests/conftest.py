@@ -1,9 +1,8 @@
 """Fixtures for the cert-system integration tests.
 
-These tests treat cert-manager and trust-manager as black boxes: they request
-a Certificate and look for what the two are supposed to produce. Nothing here
-knows how either was deployed, so the same suite works against any cluster
-KUBECONFIG names.
+These tests treat the cluster's issuers as black boxes: they check that each is
+ready and request a Certificate from it. Nothing here knows how the issuers
+were deployed, so the same suite works against any cluster KUBECONFIG names.
 
 The suite does not try to work out for itself whether the cluster it has been
 pointed at is safe to write to — the `kubernetes` marker is what keeps it from

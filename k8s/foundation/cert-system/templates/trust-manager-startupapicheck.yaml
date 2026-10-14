@@ -79,7 +79,19 @@ spec:
             - |
               # Nothing is created: a dry run goes through admission, which is
               # the part being waited for, and stops there.
-              until kubectl create --dry-run=server --filename /check/bundle.yaml; do
+              until kubectl create --dry-run=server --filename - <<'EOF'
+              apiVersion: trust.cert-manager.io/v1alpha1
+              kind: Bundle
+              metadata:
+                name: trust-manager-startupapicheck
+              spec:
+                sources:
+                  - useDefaultCAs: true
+                target:
+                  configMap:
+                    key: ca-certificates.crt
+              EOF
+              do
                 sleep 2
               done
           env:
@@ -99,35 +111,8 @@ spec:
             limits:
               memory: 128Mi
           volumeMounts:
-            - name: check
-              mountPath: /check
             - name: tmp
               mountPath: /tmp
       volumes:
-        - name: check
-          configMap:
-            name: trust-manager-startupapicheck
         - name: tmp
           emptyDir: {}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: trust-manager-startupapicheck
-  namespace: {{ .Release.Namespace }}
-  annotations:
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "-5"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
-data:
-  bundle.yaml: |
-    apiVersion: trust.cert-manager.io/v1alpha1
-    kind: Bundle
-    metadata:
-      name: trust-manager-startupapicheck
-    spec:
-      sources:
-        - useDefaultCAs: true
-      target:
-        configMap:
-          key: ca-certificates.crt

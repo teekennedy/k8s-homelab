@@ -105,9 +105,7 @@ func (m *Homelab) TestKubernetesIntegration(ctx context.Context,
 	if cluster != nil {
 		// Run in place rather than through the module's API: that call exists to
 		// be cached, and a verdict on a cluster that outlives the run must not be.
-		if container == nil {
-			container = m.integrationContainer()
-		}
+		container = m.integrationToolchain(container)
 		attached, err := attachK3sCluster(helmfileContainer(container, source), cluster, kubeconfig)
 		if err != nil {
 			return "", err
@@ -187,11 +185,7 @@ func (m *Homelab) scopedIntegrationRun(
 	repeatSync bool,
 	container *dagger.Container,
 ) (*dagger.HomelabKubernetesIntegrationRun, error) {
-	toolchain := container
-	if toolchain == nil {
-		toolchain = m.integrationContainer()
-	}
-	plan, err := integrationPlan(ctx, source, toolchain, releases)
+	plan, err := integrationPlan(ctx, source, m.integrationToolchain(container), releases)
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +202,14 @@ func (m *Homelab) scopedIntegrationRun(
 			RepeatSync: repeatSync,
 			Container:  container,
 		}), nil
+}
+
+// integrationToolchain is container, or the default one when it is nil.
+func (m *Homelab) integrationToolchain(container *dagger.Container) *dagger.Container {
+	if container == nil {
+		return m.integrationContainer()
+	}
+	return container
 }
 
 // integrationSource is what helmfile and the tests read for the planned
@@ -236,9 +238,7 @@ func (m *Homelab) RunKubernetesIntegration(ctx context.Context,
 	// +optional
 	container *dagger.Container,
 ) (run *KubernetesIntegrationRun, err error) {
-	if container == nil {
-		container = m.integrationContainer()
-	}
+	container = m.integrationToolchain(container)
 	cluster, err := newK3sCluster(helmfileContainer(container, source))
 	if err != nil {
 		return nil, err
@@ -258,7 +258,9 @@ func runKubernetesIntegration(
 	cluster *k3sCluster,
 ) (run *KubernetesIntegrationRun, err error) {
 	// Planned before anything is created, so a typo in --releases costs nothing.
-	plan, err := integrationPlan(ctx, source, cluster.Toolchain, releases)
+	// On the bare toolchain: cluster.Toolchain has all of source mounted, which
+	// would key the plan on every file in it.
+	plan, err := integrationPlan(ctx, source, container, releases)
 	if err != nil {
 		return nil, err
 	}

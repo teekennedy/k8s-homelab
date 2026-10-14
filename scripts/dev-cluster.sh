@@ -185,8 +185,8 @@ cmd_destroy() {
   dir=$(cluster_dir "$name")
   cmd_down "$name"
   (cd "$repo_root" && dagger call --progress plain delete-dev-cluster --name "$name")
-  rm -f "$(kubeconfig_path "$name")" "$dir/token" "$dir/port" "$dir/log" "$dir/ca.crt"
-  rmdir "$dir" 2>/dev/null || true
+  rm -f "$(kubeconfig_path "$name")"
+  rm -rf "$dir"
 }
 
 cmd_env() {

@@ -47,6 +47,9 @@ const (
 	devClusterStarts = "3"
 	// closeTimeout bounds Close, which runs on a detached context.
 	closeTimeout = time.Minute
+	// k3sRunEnv is the variable that makes an exec unique to one run; see
+	// Caching in README.md.
+	k3sRunEnv = "HOMELAB_K3S_CLUSTER"
 )
 
 // k3sEntrypoint nests cgroups before handing over to k3s, which only does that
@@ -88,6 +91,20 @@ done
 // devClusterName is what a dev cluster may be called. The name ends up in a
 // cache volume's key and in a kubeconfig context.
 var devClusterName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
+
+// checkDevClusterName fails unless name is one a dev cluster may have.
+func checkDevClusterName(name string) error {
+	if !devClusterName.MatchString(name) {
+		return fmt.Errorf("dev cluster name %q must match %s", name, devClusterName)
+	}
+	return nil
+}
+
+// devClusterState is the cache volume the dev cluster called name keeps its
+// state in.
+func devClusterState(name string) *dagger.CacheVolume {
+	return dag.CacheVolume("homelab-k3s-dev-" + name)
+}
 
 // k3sCluster is one k3s cluster.
 type k3sCluster struct {
@@ -154,8 +171,8 @@ func newK3sCluster(toolchain *dagger.Container) (*k3sCluster, error) {
 // admin token chosen by the caller so that a kubeconfig written for it stays
 // valid when it is started again. It starts nothing.
 func newDevCluster(ctx context.Context, name string, token *dagger.Secret) (*k3sCluster, error) {
-	if !devClusterName.MatchString(name) {
-		return nil, fmt.Errorf("dev cluster name %q must match %s", name, devClusterName)
+	if err := checkDevClusterName(name); err != nil {
+		return nil, err
 	}
 	plaintext, err := token.Plaintext(ctx)
 	if err != nil {
@@ -169,12 +186,9 @@ func newDevCluster(ctx context.Context, name string, token *dagger.Secret) (*k3s
 	}
 	return &k3sCluster{
 		Name:       name,
-		Port:       k3sAPIPort,
 		APIHost:    k3sAlias,
 		Persistent: true,
-		token:      token,
 		tokenAuth:  dag.SetSecret("k3s-token-auth-"+name, tokenAuthLine(plaintext)),
-		run:        name,
 	}, nil
 }
 
@@ -233,11 +247,6 @@ func (c *k3sCluster) serverArgs() []string {
 	return args
 }
 
-// stateVolume is the cache volume a persistent cluster keeps its state in.
-func (c *k3sCluster) stateVolume() *dagger.CacheVolume {
-	return dag.CacheVolume("homelab-k3s-dev-" + c.Name)
-}
-
 // service is the k3s server. A cluster created for one run keeps only its
 // containerd root, in a PRIVATE cache volume keyed on the k3s image; see
 // Limitations in README.md. A persistent one keeps all of its state, in a
@@ -253,7 +262,7 @@ func (c *k3sCluster) service() *dagger.Service {
 	if c.Persistent {
 		ctr = ctr.
 			WithEnvVariable("K3S_STARTS", devClusterStarts).
-			WithMountedCache(k3sStatePath, c.stateVolume(),
+			WithMountedCache(k3sStatePath, devClusterState(c.Name),
 				dagger.ContainerWithMountedCacheOpts{Sharing: dagger.CacheSharingModeLocked},
 			)
 	} else {
@@ -281,7 +290,7 @@ func (c *k3sCluster) service() *dagger.Service {
 func (c *k3sCluster) withService(ctr *dagger.Container) *dagger.Container {
 	return ctr.
 		WithServiceBinding(c.APIHost, c.server).
-		WithEnvVariable("HOMELAB_K3S_CLUSTER", c.run)
+		WithEnvVariable(k3sRunEnv, c.run)
 }
 
 // WithCluster returns ctr able to talk to the cluster: the admin kubeconfig
@@ -336,12 +345,7 @@ printf 'uid=%s\n' "$(kubectl --kubeconfig "$kubeconfig" get namespace kube-syste
 	if err != nil {
 		return fmt.Errorf("attaching to the cluster the supplied kubeconfig names: %w", withExecOutput(err))
 	}
-	identity := map[string]string{}
-	for _, line := range strings.Split(out, "\n") {
-		if key, value, ok := strings.Cut(strings.TrimSpace(line), "="); ok {
-			identity[key] = value
-		}
-	}
+	identity := parseProbe(out)
 	if _, err := fmt.Sscanf(identity["port"], "%d", &c.Port); err != nil {
 		return fmt.Errorf("reading the API server port of the attached cluster: %w", err)
 	}
@@ -444,15 +448,21 @@ printf 'uid=%s\n' "$(kubectl get namespace kube-system --output 'jsonpath={.meta
 	return c.checkIdentity(out)
 }
 
+// parseProbe reads the key=value lines a probe exec prints.
+func parseProbe(out string) map[string]string {
+	probe := map[string]string{}
+	for _, line := range strings.Split(out, "\n") {
+		if key, value, ok := strings.Cut(strings.TrimSpace(line), "="); ok {
+			probe[key] = value
+		}
+	}
+	return probe
+}
+
 // checkIdentity compares Verify's key=value probe output with this cluster's
 // identity.
 func (c *k3sCluster) checkIdentity(probe string) error {
-	got := map[string]string{}
-	for _, line := range strings.Split(probe, "\n") {
-		if key, value, ok := strings.Cut(strings.TrimSpace(line), "="); ok {
-			got[key] = value
-		}
-	}
+	got := parseProbe(probe)
 
 	var problems []string
 	for _, check := range []struct {
@@ -566,8 +576,8 @@ func (m *Homelab) DevCluster(ctx context.Context,
 func (m *Homelab) DeleteDevCluster(ctx context.Context,
 	name string,
 ) (string, error) {
-	if !devClusterName.MatchString(name) {
-		return "", fmt.Errorf("dev cluster name %q must match %s", name, devClusterName)
+	if err := checkDevClusterName(name); err != nil {
+		return "", err
 	}
 	// A cache volume cannot be deleted, only emptied. The run is in the
 	// environment because an exec that only touches a cache volume is otherwise
@@ -576,13 +586,12 @@ func (m *Homelab) DeleteDevCluster(ctx context.Context,
 	if err != nil {
 		return "", err
 	}
-	cluster := &k3sCluster{Name: name}
 	_, err = dag.Container().
 		From(k3sImage).
-		WithMountedCache("/state", cluster.stateVolume(),
+		WithMountedCache("/state", devClusterState(name),
 			dagger.ContainerWithMountedCacheOpts{Sharing: dagger.CacheSharingModeLocked},
 		).
-		WithEnvVariable("HOMELAB_K3S_CLUSTER", run).
+		WithEnvVariable(k3sRunEnv, run).
 		WithExec([]string{"find", "/state", "-mindepth", "1", "-delete"}).
 		Sync(ctx)
 	if err != nil {

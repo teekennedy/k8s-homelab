@@ -9,8 +9,7 @@ dev: #Environment & _clusterDefaults & _appsDisabled & {
 	name: "dev"
 
 	cluster: {
-		domain:        "dev.localhost"
-		public_domain: "dev.localhost"
+		domain: "dev.localhost"
 		networks: host_cidr: "172.19.0.0/16" // Distinct from staging's Kind network
 	}
 

@@ -53,9 +53,9 @@ def core_v1() -> client.CoreV1Api:
     return api
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def namespace(core_v1: client.CoreV1Api) -> str:
-    """Create a namespace, and delete it afterwards.
+    """Create a namespace for a test module, and delete it afterwards.
 
     The name carries a random suffix so concurrent runs — or a previous run
     whose namespace is still terminating — cannot collide.

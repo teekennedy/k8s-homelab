@@ -21,7 +21,7 @@ package homelab
 #Cluster: {
 	domain: #Domain
 	// public_domain is the DNS zone services are published under.
-	public_domain: #Domain
+	public_domain: #Domain | *domain
 	timezone:      string | *"America/Denver"
 	networks:      #Networks
 }

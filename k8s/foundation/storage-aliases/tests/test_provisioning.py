@@ -45,12 +45,13 @@ def consumer(name: str, claim: str) -> client.V1Pod:
     )
 
 
-def await_bound(core_v1: client.CoreV1Api, namespace: str, claim: str) -> None:
+def await_bound(
+    core_v1: client.CoreV1Api, namespace: str, claim: str, deadline: float
+) -> None:
     """Poll until the claim is Bound, or fail with the phase it was left in.
 
     This is the assertion, not a prelude to one.
     """
-    deadline = time.monotonic() + PROVISION_TIMEOUT
     while True:
         phase = core_v1.read_namespaced_persistent_volume_claim(
             name=claim, namespace=namespace
@@ -65,25 +66,36 @@ def await_bound(core_v1: client.CoreV1Api, namespace: str, claim: str) -> None:
         time.sleep(POLL_INTERVAL)
 
 
+@pytest.fixture(scope="module")
+def deadline(core_v1: client.CoreV1Api, namespace: str) -> float:
+    """Claim a volume from every class, and return when they are all due.
+
+    Claimed together so the classes provision side by side and the waits
+    overlap, instead of each test paying for its own.
+    """
+    for storage_class in STORAGE_CLASSES:
+        core_v1.create_namespaced_persistent_volume_claim(
+            namespace=namespace,
+            body=client.V1PersistentVolumeClaim(
+                metadata=client.V1ObjectMeta(name=storage_class),
+                spec=client.V1PersistentVolumeClaimSpec(
+                    storage_class_name=storage_class,
+                    access_modes=["ReadWriteOnce"],
+                    resources=client.V1VolumeResourceRequirements(
+                        requests={"storage": "16Mi"}
+                    ),
+                ),
+            ),
+        )
+        core_v1.create_namespaced_pod(
+            namespace=namespace, body=consumer(storage_class, storage_class)
+        )
+    return time.monotonic() + PROVISION_TIMEOUT
+
+
 @pytest.mark.kubernetes
 @pytest.mark.parametrize("storage_class", STORAGE_CLASSES)
 def test_claim_is_provisioned(
-    core_v1: client.CoreV1Api, namespace: str, storage_class: str
+    core_v1: client.CoreV1Api, namespace: str, deadline: float, storage_class: str
 ) -> None:
-    claim = "data"
-    core_v1.create_namespaced_persistent_volume_claim(
-        namespace=namespace,
-        body=client.V1PersistentVolumeClaim(
-            metadata=client.V1ObjectMeta(name=claim),
-            spec=client.V1PersistentVolumeClaimSpec(
-                storage_class_name=storage_class,
-                access_modes=["ReadWriteOnce"],
-                resources=client.V1VolumeResourceRequirements(
-                    requests={"storage": "16Mi"}
-                ),
-            ),
-        ),
-    )
-    core_v1.create_namespaced_pod(namespace=namespace, body=consumer("consumer", claim))
-
-    await_bound(core_v1, namespace, claim)
+    await_bound(core_v1, namespace, storage_class, deadline)
