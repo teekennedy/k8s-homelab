@@ -1,0 +1,14 @@
+[project]
+name = "homelab-testlib"
+version = "1.0.0"
+description = "Fixtures and helpers shared by the releases' Kubernetes integration tests"
+requires-python = ">=3.11"
+# Imported from the test projects by path rather than installed, so each of
+# them declares what its own imports from here need.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "black>=24.0.0",
+    "pytest>=8.0.0",
+]

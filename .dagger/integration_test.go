@@ -168,6 +168,7 @@ func integrationFixture() repo {
 		"config/gen/dev/env.json":         "{\"name\": \"dev\"}\n",
 		"config/gen/production/env.json":  "{\"name\": \"production\"}\n",
 		"k8s/charts/shared/Chart.yaml":    "name: shared\n",
+		"k8s/testlib/lib/fixtures.py":     "import pytest\n",
 		"k8s/foundation/alpha/Chart.yaml": "name: alpha\n",
 		"k8s/foundation/alpha/tests/t.py": "def test_a(): ...\n",
 		"k8s/foundation/beta/Chart.yaml":  "name: beta\n",
@@ -204,6 +205,7 @@ func TestIntegrationSourceCacheGranularity(t *testing.T) {
 		{"a deployed chart", edit("k8s/foundation/alpha/Chart.yaml", "name: alpha2\n"), []string{alpha}, true},
 		{"a deployed release's test", edit("k8s/foundation/alpha/tests/t.py", "x\n"), []string{alpha}, true},
 		{"the shared charts", edit("k8s/charts/shared/Chart.yaml", "name: shared2\n"), []string{alpha}, true},
+		{"the shared test library", edit("k8s/testlib/lib/fixtures.py", "import os\n"), []string{alpha}, true},
 		{"the state file", edit(helmfilePath, "releases: [x]\n"), []string{alpha}, true},
 		{"the dev values", edit("config/gen/dev/env.json", "{}\n"), []string{alpha}, true},
 		{
@@ -239,16 +241,21 @@ func TestIntegrationSourceDependsOnChosenReleases(t *testing.T) {
 func TestKubernetesEnvCacheGranularity(t *testing.T) {
 	project := func() repo {
 		return repo{
-			"pyproject.toml": "[project]\nname = \"t\"\n",
-			"uv.lock":        "version = 1\n",
-			"test_a.py":      "def test_a(): ...\n",
-			"conftest.py":    "\n",
+			"tests/pyproject.toml": "[project]\nname = \"t\"\n",
+			"tests/uv.lock":        "version = 1\n",
+			"tests/test_a.py":      "def test_a(): ...\n",
+			"tests/conftest.py":    "\n",
+			"testlib/lib.py":       "\n",
 		}
 	}
 	installKey := func(t *testing.T, files repo) string {
 		t.Helper()
 		engine := fakeEngine(t)
-		pp := &PythonProject{Path: "tests", Source: files.directory()}
+		pp := &PythonProject{
+			Path:    "tests",
+			Source:  files.directory().Directory("tests"),
+			Testlib: files.directory().Directory("testlib"),
+		}
 		if _, err := pp.kubernetesEnv(dag.Container().From("toolchain")).Sync(context.Background()); err != nil {
 			t.Fatalf("kubernetesEnv: %v", err)
 		}
@@ -266,11 +273,12 @@ func TestKubernetesEnvCacheGranularity(t *testing.T) {
 		edit        func(*testing.T, repo) repo
 		wantChanged bool
 	}{
-		{"a test", edit("test_a.py", "def test_a(): pass\n"), false},
-		{"the fixtures", edit("conftest.py", "import os\n"), false},
-		{"a new test file", addFiles(map[string]string{"test_b.py": "x\n"}), false},
-		{"the lock file", edit("uv.lock", "version = 2\n"), true},
-		{"the project metadata", edit("pyproject.toml", "[project]\nname = \"u\"\n"), true},
+		{"a test", edit("tests/test_a.py", "def test_a(): pass\n"), false},
+		{"the fixtures", edit("tests/conftest.py", "import os\n"), false},
+		{"the shared test library", edit("testlib/lib.py", "import os\n"), false},
+		{"a new test file", addFiles(map[string]string{"tests/test_b.py": "x\n"}), false},
+		{"the lock file", edit("tests/uv.lock", "version = 2\n"), true},
+		{"the project metadata", edit("tests/pyproject.toml", "[project]\nname = \"u\"\n"), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

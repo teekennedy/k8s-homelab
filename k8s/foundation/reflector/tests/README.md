@@ -7,7 +7,7 @@ whichever one `KUBECONFIG` names.
 
 | File | Contents |
 |---|---|
-| `conftest.py` | Loading `KUBECONFIG`, and the pair of throwaway namespaces each test gets |
+| `conftest.py` | The fixtures shared through `k8s/testlib/`, and the pair of throwaway namespaces each test gets |
 | `test_reflection.py` | The reflector annotations, bounded polling, and the two tests |
 
 ## Running them

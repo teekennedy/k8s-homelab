@@ -213,11 +213,12 @@ func (m *Homelab) integrationToolchain(container *dagger.Container) *dagger.Cont
 }
 
 // integrationSource is what helmfile and the tests read for the planned
-// releases: the state file, the dev values, the shared charts and each
-// release's chart directory, tests included.
+// releases: the state file, the dev values, the shared charts, the library the
+// tests share and each release's chart directory, tests included.
 func integrationSource(source *dagger.Directory, plan []*integrationRelease) *dagger.Directory {
 	scoped := helmfileStateSource(source, devEnvironment).
-		WithDirectory(sharedChartsPath, source.Directory(sharedChartsPath))
+		WithDirectory(sharedChartsPath, source.Directory(sharedChartsPath)).
+		WithDirectory(kubernetesTestlibPath, source.Directory(kubernetesTestlibPath))
 	for _, r := range plan {
 		scoped = scoped.WithDirectory(r.Chart, source.Directory(r.Chart))
 	}

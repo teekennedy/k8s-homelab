@@ -37,6 +37,16 @@ const kubernetesMarker = "kubernetes"
 // cluster tests, say — produces it, and that is a pass rather than a failure.
 const pytestNoTestsExitCode = 5
 
+// kubernetesTestlibPath is the library the releases' integration test projects
+// share, relative to the repo root. They import it by relative path, so it has
+// to sit where that path leads wherever one of them is run.
+const kubernetesTestlibPath = "k8s/testlib"
+
+// pythonSrcRoot is where a project's slice of the repo is laid out in a
+// container: the project at its own Path beneath it, so that a relative path
+// out of the project resolves as it does in a checkout.
+const pythonSrcRoot = "/src"
+
 // PythonProject is one Python project — a directory with a pyproject.toml —
 // carrying only that project's files, so changing one project does not
 // invalidate the BuildKit cache for the others.
@@ -46,6 +56,21 @@ type PythonProject struct {
 	Path string
 	// Source is the project's scoped source directory.
 	Source *dagger.Directory
+	// Testlib is the shared integration test library, set only for the
+	// projects that import it.
+	Testlib *dagger.Directory
+}
+
+// usesTestlib reports whether the project at projPath is a release's
+// integration test project: k8s/<tier>/<release>/tests.
+func usesTestlib(projPath string) bool {
+	parts := strings.Split(projPath, "/")
+	return len(parts) == 4 && parts[0] == "k8s" && parts[3] == kubernetesTestsDir
+}
+
+// workdir is the project's directory in a container.
+func (pp *PythonProject) workdir() string {
+	return pythonSrcRoot + "/" + pp.Path
 }
 
 // usable reports why this project cannot be worked on, if it cannot. Source is
@@ -80,6 +105,9 @@ func pythonProjects(ctx context.Context, source *dagger.Directory, paths []strin
 	projects := make([]*PythonProject, len(projectPaths))
 	for i, projPath := range projectPaths {
 		projects[i] = &PythonProject{Path: projPath, Source: source.Directory(projPath)}
+		if usesTestlib(projPath) {
+			projects[i].Testlib = source.Directory(kubernetesTestlibPath)
+		}
 	}
 	return projects
 }
@@ -108,9 +136,14 @@ func (pp *PythonProject) Test(ctx context.Context, container *dagger.Container) 
 		return "", err
 	}
 
+	// The library is mounted even though these runs deselect the tests that
+	// use it: collecting them still imports their conftest.
+	container = container.WithMountedDirectory(pp.workdir(), pp.Source)
+	if pp.Testlib != nil {
+		container = container.WithMountedDirectory(pythonSrcRoot+"/"+kubernetesTestlibPath, pp.Testlib)
+	}
 	_, err := container.
-		WithMountedDirectory("/src", pp.Source).
-		WithWorkdir("/src").
+		WithWorkdir(pp.workdir()).
 		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest"}).
 		Sync(ctx)
 	if err != nil {
@@ -139,14 +172,19 @@ type pytestRun struct {
 // kubernetesEnv installs this project's locked dependencies into toolchain, and
 // puts its tests beside them. The install depends on pyproject.toml and uv.lock
 // only, so it stays cached when a test is edited. The project is copied rather
-// than mounted so the environment lands in the layer.
+// than mounted so the environment lands in the layer. The shared library is
+// imported by path, not installed, so it too arrives after the install.
 func (pp *PythonProject) kubernetesEnv(toolchain *dagger.Container) *dagger.Container {
-	return toolchain.
-		WithWorkdir("/src").
+	env := toolchain.
+		WithWorkdir(pp.workdir()).
 		WithFile("pyproject.toml", pp.Source.File("pyproject.toml")).
 		WithFile("uv.lock", pp.Source.File("uv.lock")).
 		WithExec([]string{"uv", "sync", "--frozen", "--no-install-project", "--link-mode", "copy"}).
-		WithDirectory("/src", pp.Source)
+		WithDirectory(".", pp.Source)
+	if pp.Testlib != nil {
+		env = env.WithDirectory(pythonSrcRoot+"/"+kubernetesTestlibPath, pp.Testlib)
+	}
+	return env
 }
 
 // testKubernetes runs this project's `kubernetes`-marked tests in container,

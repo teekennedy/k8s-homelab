@@ -16,7 +16,8 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+# The second entry is the library these suites share.
+pythonpath = [".", "../../../testlib"]
 markers = [
     "kubernetes: talks to a live cluster; runs only when selected with `-m kubernetes`",
 ]

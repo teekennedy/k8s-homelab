@@ -4,84 +4,19 @@ These tests treat cert-manager as a black box: they request a Certificate and
 look for the Secret it is supposed to produce. Nothing here knows how it was
 deployed, so the same suite works against any cluster KUBECONFIG names.
 
-The suite does not try to work out for itself whether the cluster it has been
-pointed at is safe to write to — the `kubernetes` marker is what keeps it from
-running where it wasn't asked to. Once it has been selected, not running is a
-failure: a missing kubeconfig, an unreachable API server or a rejected
-credential raises rather than skipping.
+The fixtures that reach the cluster, and the conditions under which they refuse
+to, are shared with the other releases' suites.
 """
 
-import os
-import uuid
-
 import pytest
-from kubernetes import client, config
-from kubernetes.client.rest import ApiException
+from homelab_testlib.namespaces import temporary_namespace
+from kubernetes import client
 
-
-def _kubeconfig_path() -> str:
-    """Return the kubeconfig KUBECONFIG names, or raise saying why it can't."""
-    path = os.environ.get("KUBECONFIG", "").strip()
-    if not path:
-        raise RuntimeError(
-            "KUBECONFIG is not set. These tests only talk to the cluster "
-            "KUBECONFIG names; there is deliberately no fallback to "
-            "~/.kube/config or to in-cluster credentials."
-        )
-    # KUBECONFIG is a path list, which the client merges itself. Only the first
-    # entry is checked here, so a typo fails with the path rather than with a
-    # parse error from deep inside the client.
-    first = path.split(os.pathsep)[0]
-    if not os.path.isfile(first):
-        raise RuntimeError(f"KUBECONFIG names {first}, which is not a file")
-    return path
-
-
-@pytest.fixture(scope="session")
-def core_v1() -> client.CoreV1Api:
-    """A CoreV1Api bound to KUBECONFIG, proven to reach the API server."""
-    kubeconfig = _kubeconfig_path()
-    config.load_kube_config(config_file=kubeconfig)
-    api = client.CoreV1Api()
-    try:
-        api.list_namespace(limit=1)
-    except Exception as exc:  # noqa: BLE001 - the cause is what matters here
-        raise RuntimeError(
-            f"cannot list namespaces with the credentials in {kubeconfig}: {exc}"
-        ) from exc
-    return api
-
-
-@pytest.fixture(scope="session")
-def custom_objects(core_v1: client.CoreV1Api) -> client.CustomObjectsApi:
-    """A CustomObjectsApi on the client configuration core_v1 loaded."""
-    return client.CustomObjectsApi()
+pytest_plugins = ["homelab_testlib.fixtures"]
 
 
 @pytest.fixture
 def namespace(core_v1: client.CoreV1Api) -> str:
-    """Create a namespace, and delete it afterwards.
-
-    The name carries a random suffix so concurrent runs — or a previous run
-    whose namespace is still terminating — cannot collide.
-    """
-    name = f"cert-manager-{uuid.uuid4().hex[:8]}"
-    core_v1.create_namespace(
-        client.V1Namespace(
-            metadata=client.V1ObjectMeta(
-                name=name,
-                labels={"app.kubernetes.io/managed-by": "cert-manager-tests"},
-            )
-        )
-    )
-    try:
+    """A namespace for one test, deleted afterwards whether or not it passed."""
+    with temporary_namespace(core_v1, "cert-manager", "cert-manager-tests") as name:
         yield name
-    finally:
-        # Teardown runs whether or not the assertions passed. Deletion is
-        # asynchronous; the namespace is left Terminating rather than waited
-        # on, because every run uses a fresh name.
-        try:
-            core_v1.delete_namespace(name)
-        except ApiException as exc:
-            if exc.status != 404:
-                raise

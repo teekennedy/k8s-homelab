@@ -9,7 +9,7 @@ the suite costs nothing against an ACME server.
 
 | File | Contents |
 |---|---|
-| `conftest.py` | Loading `KUBECONFIG`, and the throwaway namespace each test gets |
+| `conftest.py` | The fixtures shared through `k8s/testlib/`, and the throwaway namespace each test gets |
 | `test_issuers.py` | Bounded polling, and the tests |
 
 ## Running them

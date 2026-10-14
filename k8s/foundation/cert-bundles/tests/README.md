@@ -7,7 +7,7 @@ is whichever one `KUBECONFIG` names.
 
 | File | Contents |
 |---|---|
-| `conftest.py` | Loading `KUBECONFIG`, and the throwaway namespace each test gets |
+| `conftest.py` | The fixtures shared through `k8s/testlib/`, and the throwaway namespace each test gets |
 | `test_bundles.py` | Bounded polling, and the test |
 
 ## Running it

@@ -186,7 +186,9 @@ Discovered automatically from `go.mod` files. Each module gets a scoped source d
 - `Lint(configFile, container)` - `go mod tidy` + `golangci-lint run --fix`, returning a changeset
 
 #### PythonProject
-Discovered automatically from `pyproject.toml` files.
+Discovered automatically from `pyproject.toml` files. A release's integration
+test project (`k8s/<tier>/<release>/tests`) also carries the shared
+`k8s/testlib/`.
 - `Test(container)` - Run `pytest` for this project
 - `Lint(container)` - Run `black --check` for this project
 - `Format(container)` - Format with `black`, returning the formatted directory
@@ -455,7 +457,8 @@ running is a failure.
 1. Create `k8s/<tier>/<release>/tests/` as a Python project — copy the shape of
    `k8s/foundation/reflector/tests/`: a `pyproject.toml` registering the
    `kubernetes` marker and deselecting it by default, a `uv.lock`, a
-   `conftest.py` loading `KUBECONFIG`, and the tests themselves.
+   `conftest.py` that loads the shared fixtures from `k8s/testlib/` and
+   defines the suite's namespace fixture, and the tests themselves.
 2. Mark every test `@pytest.mark.kubernetes`.
 3. Add `tests/` to the chart's `.helmignore`, so test files stay out of the
    packaged chart.
@@ -486,8 +489,8 @@ do its job.
 2. **The inner function call.** `TestKubernetesIntegration` and
    `KubernetesIntegrationReports` plan against the whole source, then pass
    `RunKubernetesIntegration` only what the run reads: the state file, the
-   dev values, the shared charts and the chosen releases' charts (tests
-   included). It is called through the module's own API, which needs the
+   dev values, the shared charts, the shared test library (`k8s/testlib/`)
+   and the chosen releases' charts (tests included). It is called through the module's own API, which needs the
    experimental self-calls capability (`dagger develop --with-self-calls`, kept
    in `dagger.json`). The workflow itself therefore re-runs only when something
    it deploys or tests changes.
@@ -497,7 +500,8 @@ do its job.
    cached whatever the cluster looks like. The `uv sync` copies in only
    `pyproject.toml` and `uv.lock` before installing, and runs on the toolchain
    *without* the repo mounted — a mount is part of an exec's cache key — so
-   editing a test reinstalls nothing.
+   editing a test reinstalls nothing. The shared test library is imported by
+   path rather than installed, so editing it reinstalls nothing either.
 4. **Execs that do.** Everything from the first use of the service on is unique
    to the run, by design: `HOMELAB_K3S_CLUSTER=<random name>` is in its
    environment, and the kubeconfig it mounts carries a random token. Caching one

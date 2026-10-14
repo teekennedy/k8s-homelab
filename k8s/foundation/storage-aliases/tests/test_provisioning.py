@@ -9,7 +9,8 @@ from kubernetes import client
 STORAGE_CLASSES = ["longhorn", "longhorn-strict-local", "nfs", "smb"]
 
 # Provisioning runs a helper pod, so this has to cover an image pull on a
-# cluster that has never provisioned a volume before.
+# cluster that has never provisioned a volume before. Each class gets this long
+# from when its own test starts waiting, however long the classes before it took.
 PROVISION_TIMEOUT = 120.0
 POLL_INTERVAL = 1.0
 
@@ -45,13 +46,34 @@ def consumer(name: str, claim: str) -> client.V1Pod:
     )
 
 
+def claim(core_v1: client.CoreV1Api, namespace: str, storage_class: str) -> None:
+    """Claim a volume from storage_class, and start a pod that consumes it."""
+    core_v1.create_namespaced_persistent_volume_claim(
+        namespace=namespace,
+        body=client.V1PersistentVolumeClaim(
+            metadata=client.V1ObjectMeta(name=storage_class),
+            spec=client.V1PersistentVolumeClaimSpec(
+                storage_class_name=storage_class,
+                access_modes=["ReadWriteOnce"],
+                resources=client.V1VolumeResourceRequirements(
+                    requests={"storage": "16Mi"}
+                ),
+            ),
+        ),
+    )
+    core_v1.create_namespaced_pod(
+        namespace=namespace, body=consumer(storage_class, storage_class)
+    )
+
+
 def await_bound(
-    core_v1: client.CoreV1Api, namespace: str, claim: str, deadline: float
+    core_v1: client.CoreV1Api, namespace: str, claim: str, claimed_at: float
 ) -> None:
     """Poll until the claim is Bound, or fail with the phase it was left in.
 
     This is the assertion, not a prelude to one.
     """
+    deadline = time.monotonic() + PROVISION_TIMEOUT
     while True:
         phase = core_v1.read_namespaced_persistent_volume_claim(
             name=claim, namespace=namespace
@@ -60,42 +82,52 @@ def await_bound(
             return
         if time.monotonic() >= deadline:
             raise AssertionError(
-                f"timed out after {PROVISION_TIMEOUT:.0f}s waiting for {namespace}/"
-                f"{claim} to be Bound; it is {phase}"
+                f"{namespace}/{claim} is still {phase} "
+                f"{time.monotonic() - claimed_at:.0f}s after it was claimed"
             )
         time.sleep(POLL_INTERVAL)
 
 
 @pytest.fixture(scope="module")
-def deadline(core_v1: client.CoreV1Api, namespace: str) -> float:
-    """Claim a volume from every class, and return when they are all due.
+def claimed(
+    request: pytest.FixtureRequest, core_v1: client.CoreV1Api, namespace: str
+) -> dict[str, float | Exception]:
+    """Claim a volume from each class under test, and return when each was.
 
     Claimed together so the classes provision side by side and the waits
-    overlap, instead of each test paying for its own.
+    overlap, instead of each test paying for its own. A class that could not be
+    claimed maps to the error instead, so that it fails its own test and not
+    the others'.
     """
+    # Only the classes whose tests were selected, so `-k` provisions no more
+    # than it asked for.
+    selected = {
+        item.callspec.params["storage_class"]
+        for item in request.session.items
+        if item.module is request.module and hasattr(item, "callspec")
+    }
+    outcomes: dict[str, float | Exception] = {}
     for storage_class in STORAGE_CLASSES:
-        core_v1.create_namespaced_persistent_volume_claim(
-            namespace=namespace,
-            body=client.V1PersistentVolumeClaim(
-                metadata=client.V1ObjectMeta(name=storage_class),
-                spec=client.V1PersistentVolumeClaimSpec(
-                    storage_class_name=storage_class,
-                    access_modes=["ReadWriteOnce"],
-                    resources=client.V1VolumeResourceRequirements(
-                        requests={"storage": "16Mi"}
-                    ),
-                ),
-            ),
-        )
-        core_v1.create_namespaced_pod(
-            namespace=namespace, body=consumer(storage_class, storage_class)
-        )
-    return time.monotonic() + PROVISION_TIMEOUT
+        if storage_class not in selected:
+            continue
+        try:
+            claim(core_v1, namespace, storage_class)
+        except Exception as exc:  # noqa: BLE001 - re-raised by the class's test
+            outcomes[storage_class] = exc
+        else:
+            outcomes[storage_class] = time.monotonic()
+    return outcomes
 
 
 @pytest.mark.kubernetes
 @pytest.mark.parametrize("storage_class", STORAGE_CLASSES)
 def test_claim_is_provisioned(
-    core_v1: client.CoreV1Api, namespace: str, deadline: float, storage_class: str
+    core_v1: client.CoreV1Api,
+    namespace: str,
+    claimed: dict[str, float | Exception],
+    storage_class: str,
 ) -> None:
-    await_bound(core_v1, namespace, storage_class, deadline)
+    outcome = claimed[storage_class]
+    if isinstance(outcome, Exception):
+        raise outcome
+    await_bound(core_v1, namespace, storage_class, claimed_at=outcome)
