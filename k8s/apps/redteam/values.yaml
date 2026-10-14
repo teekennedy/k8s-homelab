@@ -5,7 +5,7 @@ wellknown:
   # Deliberately in values.yaml (not templates/wellknown.yaml) so that
   # renovate can pick them up.
   busyboxImage: busybox:stable@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
-  nginxImage: nginxinc/nginx-unprivileged:stable@sha256:8f18dedfceea3d7feb98792810c8c9925c985890ade257f2ec1b2f492b4eaebb
+  nginxImage: nginxinc/nginx-unprivileged:stable@sha256:455cebcadcac0b597cdeaab077d93fb8ad59a98f7ed001dcf8f8693154b5d3d3
 
 # Repo the internal session pre-clones (unauthenticated read; public via mirror).
 repoURL: "https://git.msng.to/ops/k8s-homelab"
