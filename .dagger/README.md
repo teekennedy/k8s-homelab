@@ -101,8 +101,11 @@ swaps the toolchain out, which is how the cache tests run checks against a
 cheap stand-in instead of a Nix build.
 
 The devenv module's own `+ignore` decides what invalidates the toolchain:
-`devenv.nix`, `devenv.yaml`, `devenv.lock` and `cmd/lab` (which devenv.yaml
-imports). Nothing a check passes can reach it.
+`devenv.nix`, `devenv.yaml`, `devenv.lock` and `cmd/lab/devenv.nix`, which
+devenv.yaml imports. Nothing a check passes can reach it. The lab CLI itself is
+only installed by the `interactive` profile, so editing its Go source leaves
+the toolchain cached; `devenv container`, which builds the published images and
+may include that profile, reads all of `cmd/lab` from a source of its own.
 
 The exceptions build with plain Nix rather than devenv: `nix:validate`,
 `nix:validate-build-metrics`'s probe, and `lab:build`, `lab:binary-nix` and
@@ -249,12 +252,5 @@ a `go get`-able Go module, not the Daggerverse.
 
 ## Known limitations
 
-- **Editing `cmd/lab` rebuilds the toolchain.** devenv.yaml imports `./cmd/lab`
-  as a devenv module, whose `default.nix` builds the CLI from `src = ./.`, and
-  its `devenv.nix` adds the result to `packages` unconditionally. So the ci
-  shell's closure contains a Nix build of every Go file under cmd/lab, and
-  editing one re-runs every check. Fixing it means moving `packages = [lab]`
-  into the interactive profile, then narrowing the devenv module's `+ignore` to
-  the Nix files under cmd/lab.
 - `kubernetes` needs an engine that allows privileged execs, so nothing in it is
   a check. See its README.

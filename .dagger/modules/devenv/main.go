@@ -22,12 +22,16 @@ const imageSource = "https://github.com/teekennedy/k8s-homelab"
 
 // Devenv builds containers from the repo's devenv definition.
 type Devenv struct {
-	// Source holds just the files devenv itself reads: devenv.nix,
-	// devenv.yaml, devenv.lock, and cmd/lab (which devenv.yaml imports).
-	// Scoped this tightly so a change to a chart or a Python file doesn't
-	// invalidate the toolchain container.
+	// Source holds the files devenv reads to build any profile: devenv.nix,
+	// devenv.yaml, devenv.lock, and all of cmd/lab, which devenv.yaml imports
+	// and whose CLI the interactive profile builds from source.
 	// +private
 	Source *dagger.Directory
+	// ToolchainSource is Source without the lab CLI's own source. The ci and
+	// integration profiles never build the CLI, so editing it must not
+	// invalidate the container every check runs in.
+	// +private
+	ToolchainSource *dagger.Directory
 }
 
 // Builds the devenv shell: the toolchain container every check runs in, and the published devenv images.
@@ -35,8 +39,14 @@ func New(
 	// +defaultPath="/"
 	// +ignore=["*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!cmd/lab/**", "cmd/lab/result", "cmd/lab/.direnv"]
 	source *dagger.Directory,
+	// Loaded separately rather than filtered out of source, so that it is
+	// content-addressed from the client filesystem: a directory derived from
+	// source would carry source's identity, Go files and all.
+	// +defaultPath="/"
+	// +ignore=["*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!cmd/lab/devenv.nix"]
+	toolchainSource *dagger.Directory,
 ) *Devenv {
-	return &Devenv{Source: source}
+	return &Devenv{Source: source, ToolchainSource: toolchainSource}
 }
 
 // Toolchain returns the devenv shell for profiles with the language toolchain
@@ -46,13 +56,16 @@ func New(
 // integration workflow adds "integration", which brings kubectl and curl; no
 // check runs with it, so `dagger check` keeps running in a container that
 // cannot reach a cluster even if something tried.
+//
+// It is built without the lab CLI's source, so it cannot build the
+// "interactive" profile, which installs the CLI; use Container for that.
 func (m *Devenv) Toolchain(
 	// devenv profiles to activate (https://devenv.sh/profiles/).
 	// +optional
 	// +default=["ci"]
 	profiles []string,
 ) *dagger.Container {
-	return withToolchainCaches(devenvShell(m.Source, nil, profiles))
+	return withToolchainCaches(devenvShell(m.ToolchainSource, nil, profiles))
 }
 
 // Container builds the devenv nix environment as a minimal "from scratch"

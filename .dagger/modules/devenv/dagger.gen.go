@@ -61,21 +61,25 @@ func convertSlice[I any, O any](in []I, f func(I) O) []O {
 
 func (r Devenv) MarshalJSON() ([]byte, error) {
 	var concrete struct {
-		Source *dagger.Directory
+		Source          *dagger.Directory
+		ToolchainSource *dagger.Directory
 	}
 	concrete.Source = r.Source
+	concrete.ToolchainSource = r.ToolchainSource
 	return json.Marshal(&concrete)
 }
 
 func (r *Devenv) UnmarshalJSON(bs []byte) error {
 	var concrete struct {
-		Source *dagger.Directory
+		Source          *dagger.Directory
+		ToolchainSource *dagger.Directory
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
 		return err
 	}
 	r.Source = concrete.Source
+	r.ToolchainSource = concrete.ToolchainSource
 	return nil
 }
 
@@ -298,7 +302,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return New(source), nil
+			var toolchainSource *dagger.Directory
+			if inputArgs["toolchainSource"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["toolchainSource"]), &toolchainSource)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg toolchainSource", err))
+				}
+			}
+			return New(source, toolchainSource), nil
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
