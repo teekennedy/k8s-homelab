@@ -17,6 +17,3 @@ type NixValidateOpts = core.NixValidateOpts
 
 // NixValidateBuildMetricsOpts contains options for Nix.ValidateBuildMetrics
 type NixValidateBuildMetricsOpts = core.NixValidateBuildMetricsOpts
-
-// NixOpts contains options for Query.Nix
-type NixOpts = core.NixOpts

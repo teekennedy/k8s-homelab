@@ -79,23 +79,57 @@ func (r *Go) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
+func (r Modules) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Paths     []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+	}
+	concrete.Paths = r.Paths
+	concrete.Source = r.Source
+	concrete.Container = r.Container
+	return json.Marshal(&concrete)
+}
+
+func (r *Modules) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Paths     []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Paths = concrete.Paths
+	r.Source = concrete.Source
+	r.Container = concrete.Container
+	return nil
+}
+
 func (r GoModule) MarshalJSON() ([]byte, error) {
 	var concrete struct {
-		Path     string
-		Source   *dagger.Directory
-		Replaces []*GoReplace
+		Path       string
+		Source     *dagger.Directory
+		Replaces   []*GoReplace
+		ConfigFile *dagger.File
+		Container  *dagger.Container
 	}
 	concrete.Path = r.Path
 	concrete.Source = r.Source
 	concrete.Replaces = r.Replaces
+	concrete.ConfigFile = r.ConfigFile
+	concrete.Container = r.Container
 	return json.Marshal(&concrete)
 }
 
 func (r *GoModule) UnmarshalJSON(bs []byte) error {
 	var concrete struct {
-		Path     string
-		Source   *dagger.Directory
-		Replaces []*GoReplace
+		Path       string
+		Source     *dagger.Directory
+		Replaces   []*GoReplace
+		ConfigFile *dagger.File
+		Container  *dagger.Container
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
@@ -104,30 +138,8 @@ func (r *GoModule) UnmarshalJSON(bs []byte) error {
 	r.Path = concrete.Path
 	r.Source = concrete.Source
 	r.Replaces = concrete.Replaces
-	return nil
-}
-
-func (r GoReplace) MarshalJSON() ([]byte, error) {
-	var concrete struct {
-		Mount  string
-		Source *dagger.Directory
-	}
-	concrete.Mount = r.Mount
-	concrete.Source = r.Source
-	return json.Marshal(&concrete)
-}
-
-func (r *GoReplace) UnmarshalJSON(bs []byte) error {
-	var concrete struct {
-		Mount  string
-		Source *dagger.Directory
-	}
-	err := json.Unmarshal(bs, &concrete)
-	if err != nil {
-		return err
-	}
-	r.Mount = concrete.Mount
-	r.Source = concrete.Source
+	r.ConfigFile = concrete.ConfigFile
+	r.Container = concrete.Container
 	return nil
 }
 
@@ -250,20 +262,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 	switch parentName {
 	case "Go":
 		switch fnName {
-		case "Lint":
-			var parent Go
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			return (*Go).Lint(&parent, ctx, source)
 		case "Modules":
 			var parent Go
 			err = json.Unmarshal(parentJSON, &parent)
@@ -278,20 +276,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Go).Modules(&parent, ctx, source)
-		case "Test":
-			var parent Go
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			return (*Go).Test(&parent, ctx, source)
 		case "":
 			var parent Go
 			err = json.Unmarshal(parentJSON, &parent)
@@ -317,35 +301,33 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var configFile *dagger.File
-			if inputArgs["configFile"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["configFile"]), &configFile)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg configFile", err))
-				}
-			}
-			var container *dagger.Container
-			if inputArgs["container"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
-				}
-			}
-			return (*GoModule).Lint(&parent, ctx, configFile, container)
+			return (*GoModule).Lint(&parent, ctx)
 		case "Test":
 			var parent GoModule
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var container *dagger.Container
-			if inputArgs["container"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
+			return nil, (*GoModule).Test(&parent, ctx)
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
+	case "Modules":
+		switch fnName {
+		case "Module":
+			var parent Modules
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var path string
+			if inputArgs["path"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["path"]), &path)
 				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg path", err))
 				}
 			}
-			return (*GoModule).Test(&parent, ctx, container)
+			return (*Modules).Module(&parent, ctx, path)
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
@@ -353,55 +335,46 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		return dag.Module().
 			WithDescription("Tests and lints every Go module in the repo, each in its own scoped\ncontainer so that a change to one module leaves the others cached.\n").
 			WithObject(
-				dag.TypeDef().WithObject("Go", dagger.TypeDefWithObjectOpts{Description: "Go runs Go checks over every module in the repo.", SourceMap: dag.SourceMap("main.go", 24, 6)}).
-					WithFunction(
-						dag.Function("Lint",
-							dag.TypeDef().WithObject("Changeset")).
-							WithDescription("Lint tidies go.mod/go.sum and applies golangci-lint's autofixes (including\nformatting) across all discovered Go modules.\nFails if issues remain that --fix cannot resolve (e.g. cyclop, gosec).\nReturns a changeset. Use `dagger generate go:lint -y` to apply.").
-							WithSourceMap(dag.SourceMap("main.go", 207, 1)).
-							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 211, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json", "!.golangci.yaml"}})).
+				dag.TypeDef().WithObject("Go", dagger.TypeDefWithObjectOpts{Description: "Go runs Go checks over every module in the repo.", SourceMap: dag.SourceMap("main.go", 31, 6)}).
 					WithFunction(
 						dag.Function("Modules",
-							dag.TypeDef().WithListOf(dag.TypeDef().WithObject("GoModule"))).
-							WithDescription("Modules returns all discovered Go modules with scoped source directories.\nEach module's Source is a subdirectory of the +defaultPath source, so\nDirectory IDs are stable across sessions and cache independently.").
-							WithSourceMap(dag.SourceMap("main.go", 98, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 102, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json", "!.golangci.yaml"}})).
-					WithFunction(
-						dag.Function("Test",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Test runs Go tests for all discovered Go modules.\nEach module is tested with a scoped source directory so that changes\nin one module don't invalidate the BuildKit cache for other modules.").
-							WithSourceMap(dag.SourceMap("main.go", 286, 1)).
-							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "The scripts and releases.json are here because Dagger modules go:embed\nthem; without them those modules do not build and `go test` fails at\nsetup.", SourceMap: dag.SourceMap("main.go", 293, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json"}})).
+							dag.TypeDef().WithObject("Modules")).
+							WithDescription("Modules returns every Go module in the repo, keyed by path. Vendored\nmodules are skipped.").
+							WithSourceMap(dag.SourceMap("main.go", 47, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "The scripts and releases.json are here because Dagger modules go:embed\nthem; without them those modules do not build.", SourceMap: dag.SourceMap("main.go", 53, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json", "!.golangci.yaml"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Go")).
 							WithDescription("Tests and lints every Go module in the repo.").
-							WithSourceMap(dag.SourceMap("main.go", 30, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs go and golangci-lint; defaults to the\ndevenv ci toolchain.", SourceMap: dag.SourceMap("main.go", 34, 2)}))).
+							WithSourceMap(dag.SourceMap("main.go", 37, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs go and golangci-lint. dagger.toml wires in\ndevenv's toolchain.", SourceMap: dag.SourceMap("main.go", 40, 2)}))).
 			WithObject(
-				dag.TypeDef().WithObject("GoModule", dagger.TypeDefWithObjectOpts{Description: "GoModule is a Go module with a scoped source directory.\nEach GoModule carries only the files for its module, enabling\nper-module caching: changing files in one module won't invalidate\nthe cache for other modules.", SourceMap: dag.SourceMap("main.go", 66, 6)}).
+				dag.TypeDef().WithObject("Modules", dagger.TypeDefWithObjectOpts{Description: "Modules are the repo's Go modules.", SourceMap: dag.SourceMap("main.go", 72, 6)}).
+					WithCollection().
+					WithFunction(
+						dag.Function("Module",
+							dag.TypeDef().WithObject("GoModule")).
+							WithDescription("Module returns the Go module at path, carrying only its own files and its\nlocal replace targets, so that it caches independently of the others.").
+							WithSourceMap(dag.SourceMap("main.go", 85, 1)).
+							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 85, 48)})).
+					WithCollectionGet("Module").
+					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the modules' directories relative to the repo root.", SourceMap: dag.SourceMap("main.go", 75, 2)}).
+					WithCollectionKeys("Paths")).
+			WithObject(
+				dag.TypeDef().WithObject("GoModule", dagger.TypeDefWithObjectOpts{Description: "GoModule is one Go module.", SourceMap: dag.SourceMap("main.go", 114, 6)}).
 					WithFunction(
 						dag.Function("Lint",
 							dag.TypeDef().WithObject("Changeset")).
-							WithDescription("Lint runs `go mod tidy` followed by `golangci-lint run --fix` on this module,\nreturning the resulting changes. Errors from either step (including unfixable\nlint issues that --fix leaves behind) are returned rather than swallowed, so\nGo.Lint fails when there's more to fix than autofixing can handle.").
-							WithSourceMap(dag.SourceMap("main.go", 245, 1)).
-							WithArg("configFile", dag.TypeDef().WithObject("File"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 245, 47)}).
-							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 245, 72)})).
+							WithDescription("Lint runs `go mod tidy` followed by `golangci-lint run --fix` on the module,\nreturning the resulting changes. It fails if issues remain that --fix cannot\nresolve (e.g. cyclop, gosec).").
+							WithSourceMap(dag.SourceMap("main.go", 211, 1)).
+							WithGenerator()).
 					WithFunction(
 						dag.Function("Test",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Test runs Go tests for this module.").
-							WithSourceMap(dag.SourceMap("main.go", 174, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 176, 2)})).
-					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root (e.g. \"cmd/lab\").", SourceMap: dag.SourceMap("main.go", 68, 2)}).
-					WithField("Source", dag.TypeDef().WithObject("Directory"), dagger.TypeDefWithFieldOpts{Description: "Source is the module's scoped source directory.\nWhen populated via Modules(), this is derived from aparent directory, so its ID is stable across sessions.", SourceMap: dag.SourceMap("main.go", 72, 2)}).
-					WithField("Replaces", dag.TypeDef().WithListOf(dag.TypeDef().WithObject("GoReplace")), dagger.TypeDefWithFieldOpts{Description: "Replaces are the modules its go.mod replaces with a local path, which\nhave to sit at that path relative to Source for it to build.", SourceMap: dag.SourceMap("main.go", 75, 2)})).
-			WithObject(
-				dag.TypeDef().WithObject("GoReplace", dagger.TypeDefWithObjectOpts{Description: "GoReplace is a local `replace` target, mounted where the module expects it.", SourceMap: dag.SourceMap("main.go", 79, 6)}).
-					WithField("Mount", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Mount is the target's absolute path in the module's container.", SourceMap: dag.SourceMap("main.go", 81, 2)}).
-					WithField("Source", dag.TypeDef().WithObject("Directory"), dagger.TypeDefWithFieldOpts{Description: "Source is the target's scoped source directory.", SourceMap: dag.SourceMap("main.go", 83, 2)})), nil
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Test runs the module's Go tests.").
+							WithSourceMap(dag.SourceMap("main.go", 197, 1)).
+							WithCheck()).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root (e.g. \"cmd/lab\").", SourceMap: dag.SourceMap("main.go", 116, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

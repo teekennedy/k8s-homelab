@@ -9,23 +9,13 @@ import (
 // Go runs Go checks over every module in the repo.
 type Go = core.Go
 
-// GoLintOpts contains options for Go.Lint
-type GoLintOpts = core.GoLintOpts
-
 // GoModulesOpts contains options for Go.Modules
 type GoModulesOpts = core.GoModulesOpts
 
-// GoTestOpts contains options for Go.Test
-type GoTestOpts = core.GoTestOpts
-
-// GoModule is a Go module with a scoped source directory.
-// Each GoModule carries only the files for its module, enabling
-// per-module caching: changing files in one module won't invalidate
-// the cache for other modules.
+// GoModule is one Go module.
 type GoModule = core.GoModule
 
-// GoReplace is a local `replace` target, mounted where the module expects it.
-type GoReplace = core.GoReplace
+// Modules are the repo's Go modules.
+type GoModules = core.GoModules
 
-// GoOpts contains options for Query.Go
-type GoOpts = core.GoOpts
+type WithGoModulesFunc = core.WithGoModulesFunc

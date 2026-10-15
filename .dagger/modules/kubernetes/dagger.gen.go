@@ -404,24 +404,24 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		return dag.Module().
 			WithDescription("Throwaway and long-lived k3s clusters, and the integration workflow that\ndeploys releases onto one with the repo's own helmfile and runs their pytest\nsuites against it.\n\nNothing here is a check: a k3s server needs an engine that allows privileged\nexecs, and `dagger check` runs whatever a PR contains. See \"Kubernetes\nintegration tests\" in README.md.\n").
 			WithObject(
-				dag.TypeDef().WithObject("Kubernetes", dagger.TypeDefWithObjectOpts{Description: "Kubernetes runs releases on k3s clusters.", SourceMap: dag.SourceMap("main.go", 19, 6)}).
+				dag.TypeDef().WithObject("Kubernetes", dagger.TypeDefWithObjectOpts{Description: "Kubernetes runs releases on k3s clusters.", SourceMap: dag.SourceMap("main.go", 15, 6)}).
 					WithFunction(
 						dag.Function("DevCluster",
 							dag.TypeDef().WithObject("Service")).
-							WithDescription("DevCluster is a k3s cluster that keeps its state between runs: starting a\ncluster of the same name again resumes it, with its releases and volumes.\nIt runs for as long as the call that started it does, so it is used with\n`up`, which also publishes the API server on the host:\n\n\tdagger call kubernetes dev-cluster --name=dev --token=file:./token up --ports=6443:6443\n\nscripts/dev-cluster.sh wraps this, and writes the kubeconfig. See \"Dev\nclusters\" in README.md.").
+							WithDescription("DevCluster is a k3s cluster that keeps its state between runs: starting a\ncluster of the same name again resumes it, with its releases and volumes.\nIt runs for as long as the call that started it does, so it is used with\n`up`, which also publishes the API server on the host:\n\n\tdagger api call kubernetes dev-cluster --name=dev --token=file:./token up --ports=6443:6443\n\nscripts/dev-cluster.sh wraps this, and writes the kubeconfig. See \"Dev\nclusters\" in README.md.").
 							WithSourceMap(dag.SourceMap("k3s.go", 565, 1)).
 							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{Description: "Names the cluster's state, and so which cluster this is.", SourceMap: dag.SourceMap("k3s.go", 567, 2)}).
 							WithArg("token", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{Description: "Admin token the API server accepts. Whoever holds it is cluster-admin.", SourceMap: dag.SourceMap("k3s.go", 569, 2)})).
 					WithFunction(
 						dag.Function("DevClusterDelete",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("DevClusterDelete deletes a dev cluster's state. The cluster must be stopped:\na running one holds its state volume, and this waits for it.\n\n\tdagger call kubernetes dev-cluster-delete --name=dev").
+							WithDescription("DevClusterDelete deletes a dev cluster's state. The cluster must be stopped:\na running one holds its state volume, and this waits for it.\n\n\tdagger api call kubernetes dev-cluster-delete --name=dev").
 							WithSourceMap(dag.SourceMap("k3s.go", 582, 1)).
 							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("k3s.go", 583, 2)})).
 					WithFunction(
 						dag.Function("IntegrationReports",
 							dag.TypeDef().WithObject("Directory")).
-							WithDescription("IntegrationReports runs the same workflow and returns the JUnit XML reports,\none file per release. A failing test is not an error here, but a cluster that\nnever came up, or a release that never became healthy, is.\n\n\tdagger call kubernetes integration-reports export --path=./reports").
+							WithDescription("IntegrationReports runs the same workflow and returns the JUnit XML reports,\none file per release. A failing test is not an error here, but a cluster that\nnever came up, or a release that never became healthy, is.\n\n\tdagger api call kubernetes integration-reports export --path=./reports").
 							WithSourceMap(dag.SourceMap("integration.go", 143, 1)).
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("integration.go", 146, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/dev/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
 							WithArg("releases", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("integration.go", 148, 2)}).
@@ -437,7 +437,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithFunction(
 						dag.Function("IntegrationTest",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("IntegrationTest deploys releases to a throwaway k3s cluster and runs their\nKubernetes integration tests against it.\n\nDeliberately not a `+check`: it needs an engine that allows privileged execs.\nSee \"Kubernetes integration tests\" in README.md.\n\n\tdagger call kubernetes integration-test\n\tdagger call kubernetes integration-test --releases=<name>").
+							WithDescription("IntegrationTest deploys releases to a throwaway k3s cluster and runs their\nKubernetes integration tests against it.\n\nDeliberately not a `+check`: it needs an engine that allows privileged execs.\nSee \"Kubernetes integration tests\" in README.md.\n\n\tdagger api call kubernetes integration-test\n\tdagger api call kubernetes integration-test --releases=<name>").
 							WithSourceMap(dag.SourceMap("integration.go", 77, 1)).
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("integration.go", 80, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/dev/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
 							WithArg("releases", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile releases to deploy and test, narrowing the set the dev\nenvironment enables. Empty means all of them.", SourceMap: dag.SourceMap("integration.go", 84, 2)}).
@@ -448,8 +448,8 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("New",
 							dag.TypeDef().WithObject("Kubernetes")).
 							WithDescription("Runs releases on throwaway or long-lived k3s clusters and tests them there.").
-							WithSourceMap(dag.SourceMap("main.go", 25, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run helmfile, kubectl and pytest in; defaults to the devenv\nci and integration profiles.", SourceMap: dag.SourceMap("main.go", 29, 2)}))).
+							WithSourceMap(dag.SourceMap("main.go", 21, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run helmfile, kubectl and pytest in. dagger.toml wires in\ndevenv's integration-toolchain: the ci profile plus kubectl and curl.", SourceMap: dag.SourceMap("main.go", 24, 2)}))).
 			WithObject(
 				dag.TypeDef().WithObject("KubernetesIntegrationRun", dagger.TypeDefWithObjectOpts{Description: "KubernetesIntegrationRun is the outcome of one workflow run that got as far\nas running tests. It is plain data, with no Directory, so that the call is\ncached; see Caching in README.md.", SourceMap: dag.SourceMap("integration.go", 50, 6)}).
 					WithField("Summary", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Summary is the per-release verdict, with pytest's output folded in for\nthe ones that failed.", SourceMap: dag.SourceMap("integration.go", 53, 2)}).

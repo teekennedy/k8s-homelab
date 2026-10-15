@@ -32,183 +32,35 @@ type Loadable[T any] = core.Loadable[T]
 
 type ExecError = core.ExecError
 
-// A unique identifier for an object.
-type AddressID = core.AddressID
-
-// A unique identifier for an object.
-type CacheVolumeID = core.CacheVolumeID
-
-// A unique identifier for an object.
-type ChangesetID = core.ChangesetID
-
-// A unique identifier for an object.
-type ClientFilesyncMirrorID = core.ClientFilesyncMirrorID
-
-// A unique identifier for an object.
-type CloudID = core.CloudID
-
-// A unique identifier for an object.
-type ContainerID = core.ContainerID
-
-// A unique identifier for an object.
-type CurrentModuleID = core.CurrentModuleID
-
-// A unique identifier for an object.
-type DiffStatID = core.DiffStatID
-
-// A unique identifier for an object.
-type DirectoryID = core.DirectoryID
-
-// A unique identifier for an object.
-type EnumTypeDefID = core.EnumTypeDefID
-
-// A unique identifier for an object.
-type EnumValueTypeDefID = core.EnumValueTypeDefID
-
-// A unique identifier for an object.
-type EnvFileID = core.EnvFileID
-
-// A unique identifier for an object.
-type EnvVariableID = core.EnvVariableID
-
-// A unique identifier for an object.
-type ErrorID = core.ErrorID
-
-// A unique identifier for an object.
-type ErrorValueID = core.ErrorValueID
-
-// A unique identifier for an object.
-type ExportableID = core.ExportableID
-
-// A unique identifier for an object.
-type FieldTypeDefID = core.FieldTypeDefID
-
-// A unique identifier for an object.
-type FileID = core.FileID
-
-// A unique identifier for an object.
-type FunctionArgID = core.FunctionArgID
-
-// A unique identifier for an object.
-type FunctionCallArgValueID = core.FunctionCallArgValueID
-
-// A unique identifier for an object.
-type FunctionCallID = core.FunctionCallID
-
-// A unique identifier for an object.
-type FunctionID = core.FunctionID
-
-// A unique identifier for an object.
-type GeneratedCodeID = core.GeneratedCodeID
-
-// A unique identifier for an object.
-type GitRefID = core.GitRefID
-
-// A unique identifier for an object.
-type GitRepositoryID = core.GitRepositoryID
-
-// A unique identifier for an object.
-type HTTPStateID = core.HTTPStateID
-
-// A unique identifier for an object.
-type HealthcheckConfigID = core.HealthcheckConfigID
+// Arbitrary binary data, represented as a base64-encoded string.
+type Bytes = core.Bytes
 
 // A unique identifier for an object.
 type ID = core.ID
 
-// A unique identifier for an object.
-type InputTypeDefID = core.InputTypeDefID
-
-// A unique identifier for an object.
-type InterfaceTypeDefID = core.InterfaceTypeDefID
-
 // An arbitrary JSON-encoded value.
 type JSON = core.JSON
-
-// A unique identifier for an object.
-type JSONValueID = core.JSONValueID
-
-// A unique identifier for an object.
-type LLMID = core.LLMID
-
-// A unique identifier for an object.
-type LLMTokenUsageID = core.LLMTokenUsageID
-
-// A unique identifier for an object.
-type LabelID = core.LabelID
-
-// A unique identifier for an object.
-type ListTypeDefID = core.ListTypeDefID
-
-// A unique identifier for an object.
-type ModuleConfigClientID = core.ModuleConfigClientID
-
-// A unique identifier for an object.
-type ModuleID = core.ModuleID
-
-// A unique identifier for an object.
-type ModuleSourceID = core.ModuleSourceID
-
-// A unique identifier for an object.
-type ObjectTypeDefID = core.ObjectTypeDefID
 
 // The platform config OS and architecture in a Container.
 //
 // The format is [os]/[platform]/[version] (e.g., "darwin/arm64/v7", "windows/amd64", "linux/arm64").
 type Platform = core.Platform
 
-// A unique identifier for an object.
-type PortID = core.PortID
-
-// A unique identifier for an object.
-type RemoteGitMirrorID = core.RemoteGitMirrorID
-
-// A unique identifier for an object.
-type SDKConfigID = core.SDKConfigID
-
-// A unique identifier for an object.
-type ScalarTypeDefID = core.ScalarTypeDefID
-
-// A unique identifier for an object.
-type SearchResultID = core.SearchResultID
-
-// A unique identifier for an object.
-type SearchSubmatchID = core.SearchSubmatchID
-
-// A unique identifier for an object.
-type SecretID = core.SecretID
-
-// A unique identifier for an object.
-type ServiceID = core.ServiceID
-
-// A unique identifier for an object.
-type SocketID = core.SocketID
-
-// A unique identifier for an object.
-type SourceMapID = core.SourceMapID
-
-// A unique identifier for an object.
-type StatID = core.StatID
-
-// A unique identifier for an object.
-type SyncerID = core.SyncerID
-
-// A unique identifier for an object.
-type TerminalID = core.TerminalID
-
-// A unique identifier for an object.
-type TypeDefID = core.TypeDefID
-
 // The absence of a value.
 //
 // A Null Void is used as a placeholder for resolvers that do not return anything.
 type Void = core.Void
 
-// A unique identifier for an object.
-type WorkspaceID = core.WorkspaceID
-
 // Key value object that represents a build argument.
 type BuildArg = core.BuildArg
+
+// A content block within an LLM message.
+type LLMContentBlockInput = core.LLMContentBlockInput
+
+// EXPERIMENTAL: Agent APIs are likely to change.
+//
+// The provenance of a message delivered through an agent mailbox.
+type LLMMessageOriginInput = core.LLMMessageOriginInput
 
 // Key value object that represents a pipeline label.
 type PipelineLabel = core.PipelineLabel
@@ -219,11 +71,80 @@ type PortForward = core.PortForward
 // A standardized address to load containers, directories, secrets, and other object types. Address format depends on the type, and is validated at type selection.
 type Address = core.Address
 
+// AddressContainerOpts contains options for Address.Container
+type AddressContainerOpts = core.AddressContainerOpts
+
 // AddressDirectoryOpts contains options for Address.Directory
 type AddressDirectoryOpts = core.AddressDirectoryOpts
 
 // AddressFileOpts contains options for Address.File
 type AddressFileOpts = core.AddressFileOpts
+
+// AddressGitRefOpts contains options for Address.GitRef
+type AddressGitRefOpts = core.AddressGitRefOpts
+
+// EXPERIMENTAL: Agent APIs are likely to change.
+//
+// A conversation loop running as an addressable, long-lived entity within the session. The conversation itself remains observable at any time as an immutable LLM value.
+type Agent = core.Agent
+
+// AgentNotifyOpts contains options for Agent.Notify
+type AgentNotifyOpts = core.AgentNotifyOpts
+
+// AgentPauseOpts contains options for Agent.Pause
+type AgentPauseOpts = core.AgentPauseOpts
+
+// AgentSendOpts contains options for Agent.Send
+type AgentSendOpts = core.AgentSendOpts
+
+// AgentStopOpts contains options for Agent.Stop
+type AgentStopOpts = core.AgentStopOpts
+
+// EXPERIMENTAL: Agent APIs are likely to change.
+//
+// A message delivered to an agent's mailbox.
+type AgentMessage = core.AgentMessage
+
+// One workspace value with a complete path and all required dimension keys. Reading metadata does not evaluate the value. Different addresses remain distinct even if they return the same object.
+type Artifact = core.Artifact
+
+// ArtifactURIOpts contains options for Artifact.URI
+type ArtifactURIOpts = core.ArtifactURIOpts
+
+// ArtifactValueOpts contains options for Artifact.Value
+type ArtifactValueOpts = core.ArtifactValueOpts
+
+type ArtifactDimension = core.ArtifactDimension
+
+type ArtifactDimensionKey = core.ArtifactDimensionKey
+
+// A schema path and its dimensions. The path can exist even when its collections have no runtime items.
+type ArtifactPath = core.ArtifactPath
+
+type ArtifactResult = core.ArtifactResult
+
+// An immutable selection of workspace artifacts. Listed types, dimensions, and keys use OR; chained filters use AND. Empty alternatives and unknown names match nothing. Filters never change addresses or dimension identifiers.
+type Artifacts = core.Artifacts
+
+type WithArtifactsFunc = core.WithArtifactsFunc
+
+// ArtifactsFilterDirectivesOpts contains options for Artifacts.FilterDirectives
+type ArtifactsFilterDirectivesOpts = core.ArtifactsFilterDirectivesOpts
+
+// ArtifactsFilterParentDirectivesOpts contains options for Artifacts.FilterParentDirectives
+type ArtifactsFilterParentDirectivesOpts = core.ArtifactsFilterParentDirectivesOpts
+
+// ArtifactsFilterParentTypesOpts contains options for Artifacts.FilterParentTypes
+type ArtifactsFilterParentTypesOpts = core.ArtifactsFilterParentTypesOpts
+
+// ArtifactsFilterTypesOpts contains options for Artifacts.FilterTypes
+type ArtifactsFilterTypesOpts = core.ArtifactsFilterTypesOpts
+
+// ArtifactsPathDefinitionsOpts contains options for Artifacts.PathDefinitions
+type ArtifactsPathDefinitionsOpts = core.ArtifactsPathDefinitionsOpts
+
+// ArtifactsValuesOpts contains options for Artifacts.Values
+type ArtifactsValuesOpts = core.ArtifactsValuesOpts
 
 // A directory whose contents persist across runs.
 type CacheVolume = core.CacheVolume
@@ -233,17 +154,32 @@ type Changeset = core.Changeset
 
 type WithChangesetFunc = core.WithChangesetFunc
 
+// ChangesetFilterOpts contains options for Changeset.Filter
+type ChangesetFilterOpts = core.ChangesetFilterOpts
+
 // ChangesetWithChangesetOpts contains options for Changeset.WithChangeset
 type ChangesetWithChangesetOpts = core.ChangesetWithChangesetOpts
 
 // ChangesetWithChangesetsOpts contains options for Changeset.WithChangesets
 type ChangesetWithChangesetsOpts = core.ChangesetWithChangesetsOpts
 
+// One deferred check. Reading pass, error, or sync runs it.
+type Check = core.Check
+
+type WithCheckFunc = core.WithCheckFunc
+
 // An internal persistent filesync mirror.
 type ClientFilesyncMirror = core.ClientFilesyncMirror
 
 // Dagger Cloud configuration and state
 type Cloud = core.Cloud
+
+type CollectionDelta = core.CollectionDelta
+
+type CollectionTypeDef = core.CollectionTypeDef
+
+// A command's arguments and execution settings.
+type Command = core.Command
 
 // An OCI-compatible container, also known as a Docker container.
 type Container = core.Container
@@ -277,8 +213,17 @@ type ContainerFromOpts = core.ContainerFromOpts
 // ContainerImportOpts contains options for Container.Import
 type ContainerImportOpts = core.ContainerImportOpts
 
+// ContainerLayerOpts contains options for Container.Layer
+type ContainerLayerOpts = core.ContainerLayerOpts
+
+// ContainerManifestOpts contains options for Container.Manifest
+type ContainerManifestOpts = core.ContainerManifestOpts
+
 // ContainerPublishOpts contains options for Container.Publish
 type ContainerPublishOpts = core.ContainerPublishOpts
+
+// ContainerShellOpts contains options for Container.Shell
+type ContainerShellOpts = core.ContainerShellOpts
 
 // ContainerStatOpts contains options for Container.Stat
 type ContainerStatOpts = core.ContainerStatOpts
@@ -331,8 +276,17 @@ type ContainerWithMountedSecretOpts = core.ContainerWithMountedSecretOpts
 // ContainerWithMountedTempOpts contains options for Container.WithMountedTemp
 type ContainerWithMountedTempOpts = core.ContainerWithMountedTempOpts
 
+// ContainerWithMountedVolumeOpts contains options for Container.WithMountedVolume
+type ContainerWithMountedVolumeOpts = core.ContainerWithMountedVolumeOpts
+
 // ContainerWithNewFileOpts contains options for Container.WithNewFile
 type ContainerWithNewFileOpts = core.ContainerWithNewFileOpts
+
+// ContainerWithRunOpts contains options for Container.WithRun
+type ContainerWithRunOpts = core.ContainerWithRunOpts
+
+// ContainerWithShellOpts contains options for Container.WithShell
+type ContainerWithShellOpts = core.ContainerWithShellOpts
 
 // ContainerWithSymlinkOpts contains options for Container.WithSymlink
 type ContainerWithSymlinkOpts = core.ContainerWithSymlinkOpts
@@ -383,6 +337,9 @@ type DirectoryAsModuleOpts = core.DirectoryAsModuleOpts
 // DirectoryAsModuleSourceOpts contains options for Directory.AsModuleSource
 type DirectoryAsModuleSourceOpts = core.DirectoryAsModuleSourceOpts
 
+// DirectoryAsWorkspaceOpts contains options for Directory.AsWorkspace
+type DirectoryAsWorkspaceOpts = core.DirectoryAsWorkspaceOpts
+
 // DirectoryDockerBuildOpts contains options for Directory.DockerBuild
 type DirectoryDockerBuildOpts = core.DirectoryDockerBuildOpts
 
@@ -422,6 +379,12 @@ type DirectoryWithNewDirectoryOpts = core.DirectoryWithNewDirectoryOpts
 // DirectoryWithNewFileOpts contains options for Directory.WithNewFile
 type DirectoryWithNewFileOpts = core.DirectoryWithNewFileOpts
 
+// DirectoryWithPatchOpts contains options for Directory.WithPatch
+type DirectoryWithPatchOpts = core.DirectoryWithPatchOpts
+
+// DirectoryWithPatchFileOpts contains options for Directory.WithPatchFile
+type DirectoryWithPatchFileOpts = core.DirectoryWithPatchFileOpts
+
 // A definition of a custom enum defined in a Module.
 type EnumTypeDef = core.EnumTypeDef
 
@@ -447,6 +410,9 @@ type Error = core.Error
 type WithErrorFunc = core.WithErrorFunc
 
 type ErrorValue = core.ErrorValue
+
+// An agent function that can modify a conversation.
+type Expertise = core.Expertise
 
 // A definition of a field on a custom object defined in a Module.
 //
@@ -508,22 +474,97 @@ type GeneratedCode = core.GeneratedCode
 
 type WithGeneratedCodeFunc = core.WithGeneratedCodeFunc
 
+// A generation function and its staleness check. Reading changeset runs the function.
+type Generator = core.Generator
+
+type WithGeneratorFunc = core.WithGeneratorFunc
+
+// A Git bundle: a self-describing container of refs and the objects needed to reconstruct them, optionally rooted at prerequisite commits.
+type GitBundle = core.GitBundle
+
+type WithGitBundleFunc = core.WithGitBundleFunc
+
+// A ref advertised by a Git bundle.
+type GitBundleRef = core.GitBundleRef
+
+// An immutable git commit.
+type GitCommit = core.GitCommit
+
+// GitCommitAncestorReleaseTagOpts contains options for GitCommit.AncestorReleaseTag
+type GitCommitAncestorReleaseTagOpts = core.GitCommitAncestorReleaseTagOpts
+
+// GitCommitChangesOpts contains options for GitCommit.Changes
+type GitCommitChangesOpts = core.GitCommitChangesOpts
+
+// GitCommitReleaseTagOpts contains options for GitCommit.ReleaseTag
+type GitCommitReleaseTagOpts = core.GitCommitReleaseTagOpts
+
+// GitCommitTreeOpts contains options for GitCommit.Tree
+type GitCommitTreeOpts = core.GitCommitTreeOpts
+
+// A receipt for a completed Git push. Reading or replaying the receipt does not push again.
+type GitPushResult = core.GitPushResult
+
 // A git ref (tag, branch, or commit).
 type GitRef = core.GitRef
 
 type WithGitRefFunc = core.WithGitRefFunc
 
+// GitRefAsWorkspaceOpts contains options for GitRef.AsWorkspace
+type GitRefAsWorkspaceOpts = core.GitRefAsWorkspaceOpts
+
+// GitRefLogOpts contains options for GitRef.Log
+type GitRefLogOpts = core.GitRefLogOpts
+
+// GitRefPushOpts contains options for GitRef.Push
+type GitRefPushOpts = core.GitRefPushOpts
+
 // GitRefTreeOpts contains options for GitRef.Tree
 type GitRefTreeOpts = core.GitRefTreeOpts
+
+// GitRefWithCommitOpts contains options for GitRef.WithCommit
+type GitRefWithCommitOpts = core.GitRefWithCommitOpts
+
+// A named reference to a remote Git repository.
+type GitRemote = core.GitRemote
 
 // A git repository.
 type GitRepository = core.GitRepository
 
+type WithGitRepositoryFunc = core.WithGitRepositoryFunc
+
+// GitRepositoryAsWorkspaceOpts contains options for GitRepository.AsWorkspace
+type GitRepositoryAsWorkspaceOpts = core.GitRepositoryAsWorkspaceOpts
+
+// GitRepositoryBranchOpts contains options for GitRepository.Branch
+type GitRepositoryBranchOpts = core.GitRepositoryBranchOpts
+
 // GitRepositoryBranchesOpts contains options for GitRepository.Branches
 type GitRepositoryBranchesOpts = core.GitRepositoryBranchesOpts
 
+// GitRepositoryBundleOpts contains options for GitRepository.Bundle
+type GitRepositoryBundleOpts = core.GitRepositoryBundleOpts
+
+// GitRepositoryHeadOpts contains options for GitRepository.Head
+type GitRepositoryHeadOpts = core.GitRepositoryHeadOpts
+
+// GitRepositoryLatestOpts contains options for GitRepository.Latest
+type GitRepositoryLatestOpts = core.GitRepositoryLatestOpts
+
+// GitRepositoryRefOpts contains options for GitRepository.Ref
+type GitRepositoryRefOpts = core.GitRepositoryRefOpts
+
+// GitRepositoryTagOpts contains options for GitRepository.Tag
+type GitRepositoryTagOpts = core.GitRepositoryTagOpts
+
 // GitRepositoryTagsOpts contains options for GitRepository.Tags
 type GitRepositoryTagsOpts = core.GitRepositoryTagsOpts
+
+// GitRepositoryWithBundleOpts contains options for GitRepository.WithBundle
+type GitRepositoryWithBundleOpts = core.GitRepositoryWithBundleOpts
+
+// GitRepositoryWithRemoteOpts contains options for GitRepository.WithRemote
+type GitRepositoryWithRemoteOpts = core.GitRepositoryWithRemoteOpts
 
 // An internal persistent HTTP state.
 type HTTPState = core.HTTPState
@@ -551,6 +592,61 @@ type JSONValueContentsOpts = core.JSONValueContentsOpts
 type LLM = core.LLM
 
 type WithLLMFunc = core.WithLLMFunc
+
+// LLMArtifactsOpts contains options for LLM.Artifacts
+type LLMArtifactsOpts = core.LLMArtifactsOpts
+
+// LLMLoopOpts contains options for LLM.Loop
+type LLMLoopOpts = core.LLMLoopOpts
+
+// LLMSpawnOpts contains options for LLM.Spawn
+type LLMSpawnOpts = core.LLMSpawnOpts
+
+// LLMStepOpts contains options for LLM.Step
+type LLMStepOpts = core.LLMStepOpts
+
+// LLMWithContentOpts contains options for LLM.WithContent
+type LLMWithContentOpts = core.LLMWithContentOpts
+
+// LLMWithContentFileOpts contains options for LLM.WithContentFile
+type LLMWithContentFileOpts = core.LLMWithContentFileOpts
+
+// LLMWithModelOpts contains options for LLM.WithModel
+type LLMWithModelOpts = core.LLMWithModelOpts
+
+// LLMWithPromptOpts contains options for LLM.WithPrompt
+type LLMWithPromptOpts = core.LLMWithPromptOpts
+
+// LLMWithResponseOpts contains options for LLM.WithResponse
+type LLMWithResponseOpts = core.LLMWithResponseOpts
+
+// LLMWithToolResultOpts contains options for LLM.WithToolResult
+type LLMWithToolResultOpts = core.LLMWithToolResultOpts
+
+// LLMWithToolsOpts contains options for LLM.WithTools
+type LLMWithToolsOpts = core.LLMWithToolsOpts
+
+// An ordered run of text and media content for a model to read, built outside any conversation.
+type LLMContent = core.LLMContent
+
+type WithLLMContentFunc = core.WithLLMContentFunc
+
+// LLMContentWithFileOpts contains options for LLMContent.WithFile
+type LLMContentWithFileOpts = core.LLMContentWithFileOpts
+
+// A single piece of content within an LLM message.
+type LLMContentBlock = core.LLMContentBlock
+
+// A single message in an LLM conversation.
+type LLMMessage = core.LLMMessage
+
+// EXPERIMENTAL: Agent APIs are likely to change.
+//
+// The recorded provenance of a message that arrived through an agent mailbox.
+type LLMMessageOrigin = core.LLMMessageOrigin
+
+// A skill available to a model: task-specific guidance discovered with ListSkills and read with ReadSkill.
+type LLMSkill = core.LLMSkill
 
 // A count of tokens consumed by LLM API calls.
 type LLMTokenUsage = core.LLMTokenUsage
@@ -586,6 +682,9 @@ type Port = core.Port
 // The root of the DAG.
 type Query = core.Query
 
+// BlobOpts contains options for Query.Blob
+type BlobOpts = core.BlobOpts
+
 // CacheVolumeOpts contains options for Query.CacheVolume
 type CacheVolumeOpts = core.CacheVolumeOpts
 
@@ -616,6 +715,9 @@ type ModuleSourceOpts = core.ModuleSourceOpts
 // SecretOpts contains options for Query.Secret
 type SecretOpts = core.SecretOpts
 
+// ServeModuleOpts contains options for Query.ServeModule
+type ServeModuleOpts = core.ServeModuleOpts
+
 // An internal persistent bare git mirror.
 type RemoteGitMirror = core.RemoteGitMirror
 
@@ -624,6 +726,11 @@ type SDKConfig = core.SDKConfig
 
 // A definition of a custom scalar defined in a Module.
 type ScalarTypeDef = core.ScalarTypeDef
+
+// A GraphQL introspection schema that can be inspected and merged.
+type Schema = core.Schema
+
+type WithSchemaFunc = core.WithSchemaFunc
 
 type SearchResult = core.SearchResult
 
@@ -639,6 +746,9 @@ type WithServiceFunc = core.WithServiceFunc
 
 // ServiceEndpointOpts contains options for Service.Endpoint
 type ServiceEndpointOpts = core.ServiceEndpointOpts
+
+// ServicePortsOpts contains options for Service.Ports
+type ServicePortsOpts = core.ServicePortsOpts
 
 // ServiceStopOpts contains options for Service.Stop
 type ServiceStopOpts = core.ServiceStopOpts
@@ -687,14 +797,127 @@ type TypeDefWithObjectOpts = core.TypeDefWithObjectOpts
 // TypeDefWithScalarOpts contains options for TypeDef.WithScalar
 type TypeDefWithScalarOpts = core.TypeDefWithScalarOpts
 
+// A filesystem volume that can be mounted into containers.
+type Volume = core.Volume
+
 // A Dagger workspace detected from the current working directory or constructed from a Directory.
 type Workspace = core.Workspace
+
+type WithWorkspaceFunc = core.WithWorkspaceFunc
+
+// WorkspaceArtifactsOpts contains options for Workspace.Artifacts
+type WorkspaceArtifactsOpts = core.WorkspaceArtifactsOpts
+
+// WorkspaceChangesOpts contains options for Workspace.Changes
+type WorkspaceChangesOpts = core.WorkspaceChangesOpts
+
+// WorkspaceCompareCommitsFromOpts contains options for Workspace.CompareCommitsFrom
+type WorkspaceCompareCommitsFromOpts = core.WorkspaceCompareCommitsFromOpts
+
+// WorkspaceConfigReadOpts contains options for Workspace.ConfigRead
+type WorkspaceConfigReadOpts = core.WorkspaceConfigReadOpts
 
 // WorkspaceDirectoryOpts contains options for Workspace.Directory
 type WorkspaceDirectoryOpts = core.WorkspaceDirectoryOpts
 
+// WorkspaceExportOpts contains options for Workspace.Export
+type WorkspaceExportOpts = core.WorkspaceExportOpts
+
+// WorkspaceFindRootsOpts contains options for Workspace.FindRoots
+type WorkspaceFindRootsOpts = core.WorkspaceFindRootsOpts
+
 // WorkspaceFindUpOpts contains options for Workspace.FindUp
 type WorkspaceFindUpOpts = core.WorkspaceFindUpOpts
+
+// WorkspaceMigrateOpts contains options for Workspace.Migrate
+type WorkspaceMigrateOpts = core.WorkspaceMigrateOpts
+
+// WorkspaceMigrateModuleOpts contains options for Workspace.MigrateModule
+type WorkspaceMigrateModuleOpts = core.WorkspaceMigrateModuleOpts
+
+// WorkspaceSearchOpts contains options for Workspace.Search
+type WorkspaceSearchOpts = core.WorkspaceSearchOpts
+
+// WorkspaceWithClientOpts contains options for Workspace.WithClient
+type WorkspaceWithClientOpts = core.WorkspaceWithClientOpts
+
+// WorkspaceWithCommitOpts contains options for Workspace.WithCommit
+type WorkspaceWithCommitOpts = core.WorkspaceWithCommitOpts
+
+// WorkspaceWithCommitsFromOpts contains options for Workspace.WithCommitsFrom
+type WorkspaceWithCommitsFromOpts = core.WorkspaceWithCommitsFromOpts
+
+// WorkspaceWithConfigEnvOpts contains options for Workspace.WithConfigEnv
+type WorkspaceWithConfigEnvOpts = core.WorkspaceWithConfigEnvOpts
+
+// WorkspaceWithConfigValueOpts contains options for Workspace.WithConfigValue
+type WorkspaceWithConfigValueOpts = core.WorkspaceWithConfigValueOpts
+
+// WorkspaceWithFileOpts contains options for Workspace.WithFile
+type WorkspaceWithFileOpts = core.WorkspaceWithFileOpts
+
+// WorkspaceWithInitModuleOpts contains options for Workspace.WithInitModule
+type WorkspaceWithInitModuleOpts = core.WorkspaceWithInitModuleOpts
+
+// WorkspaceWithModuleOpts contains options for Workspace.WithModule
+type WorkspaceWithModuleOpts = core.WorkspaceWithModuleOpts
+
+// WorkspaceWithNewFileOpts contains options for Workspace.WithNewFile
+type WorkspaceWithNewFileOpts = core.WorkspaceWithNewFileOpts
+
+// WorkspaceWithPatchFileOpts contains options for Workspace.WithPatchFile
+type WorkspaceWithPatchFileOpts = core.WorkspaceWithPatchFileOpts
+
+// WorkspaceWithResetOpts contains options for Workspace.WithReset
+type WorkspaceWithResetOpts = core.WorkspaceWithResetOpts
+
+// WorkspaceWithSDKOpts contains options for Workspace.WithSDK
+type WorkspaceWithSDKOpts = core.WorkspaceWithSDKOpts
+
+// WorkspaceWithUpdatedClientsOpts contains options for Workspace.WithUpdatedClients
+type WorkspaceWithUpdatedClientsOpts = core.WorkspaceWithUpdatedClientsOpts
+
+// WorkspaceWithUpdatedLockOpts contains options for Workspace.WithUpdatedLock
+type WorkspaceWithUpdatedLockOpts = core.WorkspaceWithUpdatedLockOpts
+
+// WorkspaceWithUpdatedModulesOpts contains options for Workspace.WithUpdatedModules
+type WorkspaceWithUpdatedModulesOpts = core.WorkspaceWithUpdatedModulesOpts
+
+// WorkspaceWithoutClientOpts contains options for Workspace.WithoutClient
+type WorkspaceWithoutClientOpts = core.WorkspaceWithoutClientOpts
+
+// WorkspaceWithoutConfigEnvOpts contains options for Workspace.WithoutConfigEnv
+type WorkspaceWithoutConfigEnvOpts = core.WorkspaceWithoutConfigEnvOpts
+
+// WorkspaceWithoutConfigValueOpts contains options for Workspace.WithoutConfigValue
+type WorkspaceWithoutConfigValueOpts = core.WorkspaceWithoutConfigValueOpts
+
+// WorkspaceWithoutModuleOpts contains options for Workspace.WithoutModule
+type WorkspaceWithoutModuleOpts = core.WorkspaceWithoutModuleOpts
+
+// WorkspaceWithoutSDKOpts contains options for Workspace.WithoutSDK
+type WorkspaceWithoutSDKOpts = core.WorkspaceWithoutSDKOpts
+
+// A source commit classified against the receiving workspace.
+type WorkspaceCommitPick = core.WorkspaceCommitPick
+
+// Local git state for a workspace.
+type WorkspaceGit = core.WorkspaceGit
+
+// A planned workspace migration.
+type WorkspaceMigration = core.WorkspaceMigration
+
+// A single logical part of a workspace migration.
+type WorkspaceMigrationStep = core.WorkspaceMigrationStep
+
+// A module entry in the workspace configuration.
+type WorkspaceModule = core.WorkspaceModule
+
+// A constructor-backed module setting.
+type WorkspaceModuleSetting = core.WorkspaceModuleSetting
+
+// An installed SDK: a module marked for scaffolding other modules and clients.
+type WorkspaceSDK = core.WorkspaceSDK
 
 // An object that can be exported to the host.
 //
@@ -714,6 +937,57 @@ type NodeClient = core.NodeClient
 type Syncer = core.Syncer
 
 type SyncerClient = core.SyncerClient
+
+// EXPERIMENTAL: Agent APIs are likely to change.
+//
+// How a message landed in an agent's evaluation.
+type AgentMessageDelivery = core.AgentMessageDelivery
+
+const (
+	// The message is queued: the agent is paused or failed, and a resume will drain it.
+	AgentMessageDeliveryQueued AgentMessageDelivery = core.AgentMessageDeliveryQueued
+
+	// The message opened a new turn: the agent was idle or newly started.
+	AgentMessageDeliveryStarted AgentMessageDelivery = core.AgentMessageDeliveryStarted
+
+	// The message was absorbed into the in-flight turn at a step boundary, steering it.
+	AgentMessageDeliverySteered AgentMessageDelivery = core.AgentMessageDeliverySteered
+)
+
+// EXPERIMENTAL: Agent APIs are likely to change.
+//
+// Computed lifecycle state of an agent.
+type AgentState = core.AgentState
+
+const (
+	// The loop failed; snapshot holds the completed prefix. Resume retries.
+	AgentStateFailed AgentState = core.AgentStateFailed
+
+	// Mailbox empty, turn complete; blocked in receive.
+	AgentStateIdle AgentState = core.AgentStateIdle
+
+	// Mailbox accepting but not draining, until resume.
+	AgentStatePaused AgentState = core.AgentStatePaused
+
+	// A model request or tool evaluation is in flight.
+	AgentStateRunning AgentState = core.AgentStateRunning
+
+	// Runtime released; snapshot remains readable.
+	AgentStateStopped AgentState = core.AgentStateStopped
+
+	// Blocked on input from the user.
+	AgentStateWaitingInput AgentState = core.AgentStateWaitingInput
+)
+
+type ArtifactDimensionKind = core.ArtifactDimensionKind
+
+const (
+	ArtifactDimensionKindCollection ArtifactDimensionKind = core.ArtifactDimensionKindCollection
+
+	ArtifactDimensionKindModule ArtifactDimensionKind = core.ArtifactDimensionKindModule
+
+	ArtifactDimensionKindType ArtifactDimensionKind = core.ArtifactDimensionKindType
+)
 
 // Sharing mode of the cache volume.
 type CacheSharingMode = core.CacheSharingMode
@@ -828,6 +1102,23 @@ const (
 	FunctionCachePolicyPerSession FunctionCachePolicy = core.FunctionCachePolicyPerSession
 )
 
+// How a Git push updated the remote ref.
+type GitPushDisposition = core.GitPushDisposition
+
+const (
+	// The remote ref was created.
+	GitPushDispositionCreated GitPushDisposition = core.GitPushDispositionCreated
+
+	// The remote ref was fast-forwarded.
+	GitPushDispositionFastForward GitPushDisposition = core.GitPushDispositionFastForward
+
+	// The remote ref was replaced under an explicit lease.
+	GitPushDispositionForced GitPushDisposition = core.GitPushDispositionForced
+
+	// The remote ref already pointed to this commit.
+	GitPushDispositionUpToDate GitPushDisposition = core.GitPushDispositionUpToDate
+)
+
 // Compression algorithm to use for image layers.
 type ImageLayerCompression = core.ImageLayerCompression
 
@@ -854,6 +1145,62 @@ const (
 	ImageMediaTypesOci ImageMediaTypes = core.ImageMediaTypesOci
 
 	ImageMediaTypesOcimediaTypes ImageMediaTypes = core.ImageMediaTypesOcimediaTypes
+)
+
+// The kind of content in a message block.
+type LLMContentBlockKind = core.LLMContentBlockKind
+
+const (
+	// Inline audio.
+	LLMContentBlockKindAudio LLMContentBlockKind = core.LLMContentBlockKindAudio
+
+	// An inline PDF document.
+	LLMContentBlockKindDocument LLMContentBlockKind = core.LLMContentBlockKindDocument
+
+	// An inline image.
+	LLMContentBlockKindImage LLMContentBlockKind = core.LLMContentBlockKindImage
+
+	// Plain text content.
+	LLMContentBlockKindText LLMContentBlockKind = core.LLMContentBlockKindText
+
+	// Model thinking/reasoning content (e.g. Anthropic extended thinking).
+	LLMContentBlockKindThinking LLMContentBlockKind = core.LLMContentBlockKindThinking
+
+	// A tool/function call from the model.
+	LLMContentBlockKindToolCall LLMContentBlockKind = core.LLMContentBlockKindToolCall
+
+	// A tool/function result.
+	LLMContentBlockKindToolResult LLMContentBlockKind = core.LLMContentBlockKindToolResult
+)
+
+// EXPERIMENTAL: Agent APIs are likely to change.
+//
+// Who put a message on the conversation record.
+type LLMMessageOriginKind = core.LLMMessageOriginKind
+
+const (
+	// Another agent: the message was sent from within that agent's turn.
+	LLMMessageOriginKindAgent LLMMessageOriginKind = core.LLMMessageOriginKindAgent
+
+	// The engine, reporting a subscribed agent's lifecycle transition.
+	LLMMessageOriginKindEvent LLMMessageOriginKind = core.LLMMessageOriginKindEvent
+
+	// The user: a prompt submitted by a client rather than sent by an agent.
+	LLMMessageOriginKindUser LLMMessageOriginKind = core.LLMMessageOriginKindUser
+)
+
+// The role that generated a message.
+type LLMMessageRole = core.LLMMessageRole
+
+const (
+	// A reply from the model.
+	LLMMessageRoleAssistant LLMMessageRole = core.LLMMessageRoleAssistant
+
+	// A system prompt.
+	LLMMessageRoleSystem LLMMessageRole = core.LLMMessageRoleSystem
+
+	// A user prompt or tool response.
+	LLMMessageRoleUser LLMMessageRole = core.LLMMessageRoleUser
 )
 
 // Experimental features of a module
@@ -888,6 +1235,26 @@ const (
 	NetworkProtocolTcp NetworkProtocol = core.NetworkProtocolTcp
 
 	NetworkProtocolUdp NetworkProtocol = core.NetworkProtocolUdp
+)
+
+// How to handle patch hunks that no longer apply to the target content.
+type PatchConflict = core.PatchConflict
+
+const (
+	// Fail the operation if any part of the patch does not apply.
+	PatchConflictFail PatchConflict = core.PatchConflictFail
+
+	// Apply the hunks that fit and insert conflict markers where hunks no longer match, instead of failing.
+	PatchConflictLeaveConflictMarkers PatchConflict = core.PatchConflictLeaveConflictMarkers
+)
+
+// Transport protocol to use for registry operations.
+type RegistryProtocol = core.RegistryProtocol
+
+const (
+	RegistryProtocolHttp RegistryProtocol = core.RegistryProtocolHttp
+
+	RegistryProtocolHttps RegistryProtocol = core.RegistryProtocolHttps
 )
 
 // Expected return type of an execution
@@ -993,6 +1360,37 @@ const (
 	//
 	// This is used for functions that have no return value. The outer TypeDef specifying this Kind is always Optional, as the Void is never actually represented.
 	TypeDefKindVoidKind TypeDefKind = core.TypeDefKindVoidKind
+)
+
+// Why a source commit cannot be pulled.
+type WorkspaceCommitPickReason = core.WorkspaceCommitPickReason
+
+const (
+	// The patch conflicts with committed content.
+	WorkspaceCommitPickReasonContent WorkspaceCommitPickReason = core.WorkspaceCommitPickReasonContent
+
+	// The commit touches uncommitted paths in the receiving workspace.
+	WorkspaceCommitPickReasonDirty WorkspaceCommitPickReason = core.WorkspaceCommitPickReasonDirty
+
+	// No conflict.
+	WorkspaceCommitPickReasonNone WorkspaceCommitPickReason = core.WorkspaceCommitPickReasonNone
+)
+
+// Whether a source commit can be pulled.
+type WorkspaceCommitPickStatus = core.WorkspaceCommitPickStatus
+
+const (
+	// The commit cannot be applied; see reason and conflictPaths.
+	WorkspaceCommitPickStatusConflict WorkspaceCommitPickStatus = core.WorkspaceCommitPickStatusConflict
+
+	// The commit can be applied.
+	WorkspaceCommitPickStatusPickable WorkspaceCommitPickStatus = core.WorkspaceCommitPickStatusPickable
+
+	// The commit is already present by hash or cherry-pick origin.
+	WorkspaceCommitPickStatusPicked WorkspaceCommitPickStatus = core.WorkspaceCommitPickStatusPicked
+
+	// The patch is already present, or applying it would be empty.
+	WorkspaceCommitPickStatusRedundant WorkspaceCommitPickStatus = core.WorkspaceCommitPickStatusRedundant
 )
 
 func Ref[T Loadable[T]](c *Client, id ID) T {

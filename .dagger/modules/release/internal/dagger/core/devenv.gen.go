@@ -12,6 +12,10 @@ import (
 // Devenv builds containers from the repo's devenv definition.
 type Devenv struct { // devenv (../../../../../.dagger/modules/devenv/main.go:24:6)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id *ID
 }
@@ -19,6 +23,9 @@ type Devenv struct { // devenv (../../../../../.dagger/modules/devenv/main.go:24
 func (r *Devenv) WithGraphQLQuery(q *querybuilder.Selection) *Devenv {
 	return &Devenv{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -32,7 +39,7 @@ type DevenvContainerOpts struct {
 	// (e.g. Linux-to-Linux). Does not work with macOS host daemons due to
 	// cross-platform path handling differences.
 	//
-	NixDaemon *Socket // devenv (../../../../../.dagger/modules/devenv/main.go:84:2)
+	NixDaemon *Socket // devenv (../../../../../.dagger/modules/devenv/main.go:91:2)
 	//
 	// devenv profiles to activate (https://devenv.sh/profiles/). Defaults to
 	// the "ci" profile, which holds exactly the toolchain the checks need. The
@@ -42,7 +49,7 @@ type DevenvContainerOpts struct {
 	//
 	//
 	// Default: ["ci"]
-	Profiles []string // devenv (../../../../../.dagger/modules/devenv/main.go:92:2)
+	Profiles []string // devenv (../../../../../.dagger/modules/devenv/main.go:99:2)
 }
 
 // Container builds the devenv nix environment as a minimal "from scratch"
@@ -50,7 +57,7 @@ type DevenvContainerOpts struct {
 // produce a minimal nix2container image containing only the runtime closure
 // (no build dependencies). The nix store is cached across runs so packages are
 // only built once.
-func (r *Devenv) Container(opts ...DevenvContainerOpts) *Container { // devenv (../../../../../.dagger/modules/devenv/main.go:76:1)
+func (r *Devenv) Container(opts ...DevenvContainerOpts) *Container { // devenv (../../../../../.dagger/modules/devenv/main.go:83:1)
 	q := r.query.Select("container")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `nixDaemon` optional argument
@@ -64,7 +71,8 @@ func (r *Devenv) Container(opts ...DevenvContainerOpts) *Container { // devenv (
 	}
 
 	return &Container{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -78,7 +86,13 @@ func (r *Devenv) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -115,6 +129,18 @@ func (r *Devenv) UnmarshalJSON(bs []byte) error {
 	}
 	*r = Devenv{query: selectNode(dag.QueryBuilder(), id, "Devenv")}
 	return nil
+}
+
+// IntegrationToolchain is Toolchain for the "ci" and "integration" profiles:
+// the container the Kubernetes integration workflow runs in. It takes no
+// arguments so that a dagger.toml setting can link to it.
+func (r *Devenv) IntegrationToolchain() *Container { // devenv (../../../../../.dagger/modules/devenv/main.go:74:1)
+	q := r.query.Select("integrationToolchain")
+
+	return &Container{
+		query:     q,
+		refetchID: r.refetchID,
+	}
 }
 
 // DevenvProjectsOpts contains options for Devenv.Projects
@@ -195,7 +221,8 @@ func (r *Devenv) Toolchain(opts ...DevenvToolchainOpts) *Container { // devenv (
 	}
 
 	return &Container{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -215,7 +242,7 @@ type DevenvUpdateOpts struct {
 // commit happens to be for each input right now, so running it twice in a
 // row can produce different output — it belongs to CI as a scheduled
 // "refresh" step, not as generated code to keep in sync.
-// Use `dagger call devenv update --auto-apply` to apply.
+// Use `dagger api call devenv update --auto-apply` to apply.
 func (r *Devenv) Update(opts ...DevenvUpdateOpts) *Changeset { // devenv (../../../../../.dagger/modules/devenv/projects.go:109:1)
 	q := r.query.Select("update")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -226,7 +253,8 @@ func (r *Devenv) Update(opts ...DevenvUpdateOpts) *Changeset { // devenv (../../
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -234,7 +262,8 @@ func (r *Devenv) Update(opts ...DevenvUpdateOpts) *Changeset { // devenv (../../
 // This is a local type conversion — no GraphQL call.
 func (r *Devenv) AsNode() Node {
 	return &NodeClient{
-		query: r.query,
+		query:     r.query,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -244,6 +273,10 @@ func (r *Devenv) AsNode() Node {
 // the cache for other projects.
 type DevenvProject struct { // devenv (../../../../../.dagger/modules/devenv/projects.go:49:6)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id   *ID
 	path *string
@@ -252,6 +285,9 @@ type DevenvProject struct { // devenv (../../../../../.dagger/modules/devenv/pro
 func (r *DevenvProject) WithGraphQLQuery(q *querybuilder.Selection) *DevenvProject {
 	return &DevenvProject{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -265,7 +301,13 @@ func (r *DevenvProject) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -322,7 +364,8 @@ func (r *DevenvProject) Source() *Directory { // devenv (../../../../../.dagger/
 	q := r.query.Select("source")
 
 	return &Directory{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -333,7 +376,8 @@ func (r *DevenvProject) Update() *Changeset { // devenv (../../../../../.dagger/
 	q := r.query.Select("update")
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -341,7 +385,8 @@ func (r *DevenvProject) Update() *Changeset { // devenv (../../../../../.dagger/
 // This is a local type conversion — no GraphQL call.
 func (r *DevenvProject) AsNode() Node {
 	return &NodeClient{
-		query: r.query,
+		query:     r.query,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -371,6 +416,7 @@ func (r *Query) Devenv(opts ...DevenvOpts) *Devenv { // devenv (../../../../../.
 	}
 
 	return &Devenv{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

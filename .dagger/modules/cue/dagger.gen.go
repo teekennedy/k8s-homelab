@@ -280,36 +280,36 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Export",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Export exports each CUE environment to config/gen/<env>/env.json.\nEnvironments are discovered dynamically from the package's exported top-level values.").
-							WithSourceMap(dag.SourceMap("main.go", 83, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 79, 1)).
 							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 87, 2), DefaultPath: "/", Ignore: []string{"*", "!config/**/*.cue", "!config/gen/**"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 83, 2), DefaultPath: "/", Ignore: []string{"*", "!config/**/*.cue", "!config/gen/**"}})).
 					WithFunction(
 						dag.Function("Fix",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Fix upgrades CUE syntax to the current language version using cue fix.").
-							WithSourceMap(dag.SourceMap("main.go", 56, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 52, 1)).
 							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 59, 2), DefaultPath: "/", Ignore: []string{"*", "!config/**/*.cue"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 55, 2), DefaultPath: "/", Ignore: []string{"*", "!config/**/*.cue"}})).
 					WithFunction(
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Format formats CUE files with cue fmt.").
-							WithSourceMap(dag.SourceMap("main.go", 43, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 39, 1)).
 							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 46, 2), DefaultPath: "/", Ignore: []string{"*", "!config/**/*.cue"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 42, 2), DefaultPath: "/", Ignore: []string{"*", "!config/**/*.cue"}})).
 					WithFunction(
 						dag.Function("Trim",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Trim removes redundant values implied by schema constraints using cue trim.").
-							WithSourceMap(dag.SourceMap("main.go", 69, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 65, 1)).
 							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 72, 2), DefaultPath: "/", Ignore: []string{"*", "!config/**/*.cue"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 68, 2), DefaultPath: "/", Ignore: []string{"*", "!config/**/*.cue"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Cue")).
 							WithDescription("Formats, upgrades, trims and exports the CUE configuration under config/.").
 							WithSourceMap(dag.SourceMap("main.go", 21, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs cue; defaults to the devenv ci toolchain.", SourceMap: dag.SourceMap("main.go", 24, 2)}))), nil
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs cue. dagger.toml wires in devenv's toolchain.", SourceMap: dag.SourceMap("main.go", 23, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

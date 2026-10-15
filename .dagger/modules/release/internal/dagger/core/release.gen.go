@@ -9,40 +9,37 @@ import (
 	"github.com/dagger/querybuilder"
 )
 
-// ReleaseOpts contains options for Query.Release
-type ReleaseOpts struct {
-	// Container to run the release script tests in. It needs uv, git, jq and
-	// git-cliff; defaults to the devenv ci toolchain.
-	Container *Container
-}
-
-func (r *Query) Release(opts ...ReleaseOpts) *Release { // release (../../../../../:0:0)
+func (r *Query) Release(container *Container) *Release { // release (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("release")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
+	q = q.Arg("container", container)
 
 	return &Release{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
 // Release builds and publishes the repo's container images.
 type Release struct { // release (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
-	buildDockerfiles *string
+	buildDockerfiles *Void
 	id               *ID
 	publish          *string
-	testScripts      *string
+	testScripts      *Void
 }
 
 func (r *Release) WithGraphQLQuery(q *querybuilder.Selection) *Release {
 	return &Release{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -53,9 +50,9 @@ type ReleaseBuildDockerfilesOpts struct {
 
 // BuildDockerfiles builds every Dockerfile using its containing directory as the build context.
 // Each directory keeps an independent build cache.
-func (r *Release) BuildDockerfiles(ctx context.Context, opts ...ReleaseBuildDockerfilesOpts) (string, error) {
+func (r *Release) BuildDockerfiles(ctx context.Context, opts ...ReleaseBuildDockerfilesOpts) error {
 	if r.buildDockerfiles != nil {
-		return *r.buildDockerfiles, nil
+		return nil
 	}
 	q := r.query.Select("buildDockerfiles")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -65,10 +62,7 @@ func (r *Release) BuildDockerfiles(ctx context.Context, opts ...ReleaseBuildDock
 		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }
 
 // A unique identifier for this Release.
@@ -81,7 +75,13 @@ func (r *Release) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -140,7 +140,8 @@ func (r *Release) Image(ws *Workspace, tag string, opts ...ReleaseImageOpts) *Co
 	q = q.Arg("tag", tag)
 
 	return &Container{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -182,9 +183,9 @@ type ReleaseTestScriptsOpts struct {
 
 // TestScripts runs the release script regression tests with their repository
 // inputs: the scripts, this module's releases.json and the cliff configs.
-func (r *Release) TestScripts(ctx context.Context, opts ...ReleaseTestScriptsOpts) (string, error) {
+func (r *Release) TestScripts(ctx context.Context, opts ...ReleaseTestScriptsOpts) error {
 	if r.testScripts != nil {
-		return *r.testScripts, nil
+		return nil
 	}
 	q := r.query.Select("testScripts")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -194,8 +195,5 @@ func (r *Release) TestScripts(ctx context.Context, opts ...ReleaseTestScriptsOpt
 		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }

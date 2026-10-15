@@ -12,6 +12,10 @@ import (
 // Cue runs CUE generators over config/.
 type Cue struct { // cue (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id *ID
 }
@@ -19,6 +23,9 @@ type Cue struct { // cue (../../../../../:0:0)
 func (r *Cue) WithGraphQLQuery(q *querybuilder.Selection) *Cue {
 	return &Cue{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -39,7 +46,8 @@ func (r *Cue) Export(opts ...CueExportOpts) *Changeset {
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -59,7 +67,8 @@ func (r *Cue) Fix(opts ...CueFixOpts) *Changeset {
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -79,7 +88,8 @@ func (r *Cue) Format(opts ...CueFormatOpts) *Changeset {
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -93,7 +103,13 @@ func (r *Cue) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -148,26 +164,18 @@ func (r *Cue) Trim(opts ...CueTrimOpts) *Changeset {
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
-// CueOpts contains options for Query.Cue
-type CueOpts struct {
-	// Container to run in. It needs cue; defaults to the devenv ci toolchain.
-	Container *Container
-}
-
-func (r *Query) Cue(opts ...CueOpts) *Cue { // cue (../../../../../:0:0)
+func (r *Query) Cue(container *Container) *Cue { // cue (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("cue")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
+	q = q.Arg("container", container)
 
 	return &Cue{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

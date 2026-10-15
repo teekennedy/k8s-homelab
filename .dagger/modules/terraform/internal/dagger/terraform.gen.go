@@ -18,8 +18,13 @@ type TerraformFormatOpts = core.TerraformFormatOpts
 // TerraformLintOpts contains options for Terraform.Lint
 type TerraformLintOpts = core.TerraformLintOpts
 
-// TerraformLockOpts contains options for Terraform.Lock
-type TerraformLockOpts = core.TerraformLockOpts
+// TerraformModulesOpts contains options for Terraform.Modules
+type TerraformModulesOpts = core.TerraformModulesOpts
 
-// TerraformValidateOpts contains options for Terraform.Validate
-type TerraformValidateOpts = core.TerraformValidateOpts
+// TerraformModule is one OpenTofu module.
+type TerraformModule = core.TerraformModule
+
+// Modules are the repo's OpenTofu modules.
+type TerraformModules = core.TerraformModules
+
+type WithTerraformModulesFunc = core.WithTerraformModulesFunc

@@ -68,6 +68,13 @@ func (m *Devenv) Toolchain(
 	return withToolchainCaches(devenvShell(m.ToolchainSource, nil, profiles))
 }
 
+// IntegrationToolchain is Toolchain for the "ci" and "integration" profiles:
+// the container the Kubernetes integration workflow runs in. It takes no
+// arguments so that a dagger.toml setting can link to it.
+func (m *Devenv) IntegrationToolchain() *dagger.Container {
+	return m.Toolchain([]string{"ci", "integration"})
+}
+
 // Container builds the devenv nix environment as a minimal "from scratch"
 // container, labelled for publishing. Uses `devenv container copy shell` to
 // produce a minimal nix2container image containing only the runtime closure

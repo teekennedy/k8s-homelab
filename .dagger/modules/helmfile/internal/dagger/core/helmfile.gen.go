@@ -12,62 +12,45 @@ import (
 // Helmfile runs helmfile checks over every chart.
 type Helmfile struct { // helmfile (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
-	build       *string
-	id          *ID
-	kubeconform *string
-	lint        *string
-	polaris     *string
-	validate    *string
+	id *ID
 }
 
 func (r *Helmfile) WithGraphQLQuery(q *querybuilder.Selection) *Helmfile {
 	return &Helmfile{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
-// HelmfileBuildOpts contains options for Helmfile.Build
-type HelmfileBuildOpts struct {
+// HelmfileEnvironmentsOpts contains options for Helmfile.Environments
+type HelmfileEnvironmentsOpts struct {
 	// charts/*.tgz are built dependencies; they are gitignored, so leaving them
 	// out makes a local run resolve dependencies the way a clean checkout does.
 	Source *Directory
-	// Helmfile environments to render with.
-	//
-	// Default: ["production"]
-	Environments []string
-
-	Paths []string
 }
 
-// Build renders every chart with `helmfile template`, once per
-// environment. Each release is rendered from a scoped source directory so that
-// a change to one chart doesn't invalidate the cache for the others.
-// When paths are provided, only charts matching the paths are rendered.
-func (r *Helmfile) Build(ctx context.Context, opts ...HelmfileBuildOpts) (string, error) {
-	if r.build != nil {
-		return *r.build, nil
-	}
-	q := r.query.Select("build")
+// Environments returns the helmfile environments the checks run in, keyed by
+// name.
+func (r *Helmfile) Environments(opts ...HelmfileEnvironmentsOpts) *HelmfileEnvironments {
+	q := r.query.Select("environments")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Source) {
 			q = q.Arg("source", opts[i].Source)
 		}
-		// `environments` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Environments) {
-			q = q.Arg("environments", opts[i].Environments)
-		}
-		// `paths` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Paths) {
-			q = q.Arg("paths", opts[i].Paths)
-		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return &HelmfileEnvironments{
+		query:     q,
+		refetchID: r.refetchID,
+	}
 }
 
 // A unique identifier for this Helmfile.
@@ -80,7 +63,13 @@ func (r *Helmfile) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -119,74 +108,101 @@ func (r *Helmfile) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-// HelmfileKubeconformOpts contains options for Helmfile.Kubeconform
-type HelmfileKubeconformOpts struct {
-	Source *Directory
-	// Helmfile environments to render with.
-	//
-	// Default: ["production"]
-	Environments []string
+// Environment is one helmfile environment.
+type HelmfileEnvironment struct { // helmfile (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
-	Paths []string
+	id   *ID
+	lint *Void
+	name *string
 }
 
-// Kubeconform runs kubeconform in strict mode across all Helm charts,
-// once per environment, on the manifests helmfile renders.
-// When paths are provided, only matching charts are validated.
-func (r *Helmfile) Kubeconform(ctx context.Context, opts ...HelmfileKubeconformOpts) (string, error) {
-	if r.kubeconform != nil {
-		return *r.kubeconform, nil
+func (r *HelmfileEnvironment) WithGraphQLQuery(q *querybuilder.Selection) *HelmfileEnvironment {
+	return &HelmfileEnvironment{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
-	q := r.query.Select("kubeconform")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-		// `environments` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Environments) {
-			q = q.Arg("environments", opts[i].Environments)
-		}
-		// `paths` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Paths) {
-			q = q.Arg("paths", opts[i].Paths)
-		}
-	}
+}
 
-	var response string
+// A unique identifier for this HelmfileEnvironment.
+func (r *HelmfileEnvironment) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
-// HelmfileLintOpts contains options for Helmfile.Lint
-type HelmfileLintOpts struct {
-	// Only Chart.yaml is needed from k8s/, to know which charts exist.
-	Source *Directory
-	// Helmfile environments to lint.
-	//
-	// Default: ["production"]
-	Environments []string
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *HelmfileEnvironment) XXX_GraphQLType() string {
+	return "HelmfileEnvironment"
 }
 
-// Lint checks the helmfile state itself, once per environment: that it
-// renders (`helmfile build`), and that its releases, the chart directories and
-// the environment's app list agree with each other.
-func (r *Helmfile) Lint(ctx context.Context, opts ...HelmfileLintOpts) (string, error) {
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *HelmfileEnvironment) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *HelmfileEnvironment) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *HelmfileEnvironment) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *HelmfileEnvironment) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = HelmfileEnvironment{query: selectNode(dag.QueryBuilder(), id, "HelmfileEnvironment")}
+	return nil
+}
+
+// Lint checks the helmfile state itself in this environment: that it renders
+// (`helmfile build`), and that its releases, the chart directories and the
+// environment's app list agree with each other.
+func (r *HelmfileEnvironment) Lint(ctx context.Context) error {
 	if r.lint != nil {
-		return *r.lint, nil
+		return nil
 	}
 	q := r.query.Select("lint")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-		// `environments` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Environments) {
-			q = q.Arg("environments", opts[i].Environments)
-		}
+
+	return q.Execute(ctx)
+}
+
+// Name is the environment's name, as helmfile's --environment takes it.
+func (r *HelmfileEnvironment) Name(ctx context.Context) (string, error) {
+	if r.name != nil {
+		return *r.name, nil
 	}
+	q := r.query.Select("name")
 
 	var response string
 
@@ -194,103 +210,499 @@ func (r *Helmfile) Lint(ctx context.Context, opts ...HelmfileLintOpts) (string, 
 	return response, q.Execute(ctx)
 }
 
-// HelmfilePolarisOpts contains options for Helmfile.Polaris
-type HelmfilePolarisOpts struct {
-	Source *Directory
-	// Helmfile environments to render with.
-	//
-	// Default: ["production"]
-	Environments []string
+// Releases returns every chart's release in this environment, keyed by
+// release name.
+func (r *HelmfileEnvironment) Releases() *HelmfileReleases {
+	q := r.query.Select("releases")
 
-	Paths []string
+	return &HelmfileReleases{
+		query:     q,
+		refetchID: r.refetchID,
+	}
 }
 
-// Polaris runs Polaris audit across all Helm charts, once per
-// environment, on the manifests helmfile renders.
-// When paths are provided, only matching charts are validated.
-func (r *Helmfile) Polaris(ctx context.Context, opts ...HelmfilePolarisOpts) (string, error) {
+// Environments are the helmfile environments the checks run in.
+type HelmfileEnvironments struct { // helmfile (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
+
+	id *ID
+}
+type WithHelmfileEnvironmentsFunc func(r *HelmfileEnvironments) *HelmfileEnvironments
+
+// With calls the provided function with current HelmfileEnvironments.
+//
+// This is useful for reusability and readability by not breaking the calling chain.
+func (r *HelmfileEnvironments) With(f WithHelmfileEnvironmentsFunc) *HelmfileEnvironments {
+	return f(r)
+}
+
+func (r *HelmfileEnvironments) WithGraphQLQuery(q *querybuilder.Selection) *HelmfileEnvironments {
+	return &HelmfileEnvironments{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
+	}
+}
+
+// Environment returns the helmfile environment called name.
+func (r *HelmfileEnvironments) Get(key string) *HelmfileEnvironment {
+	q := r.query.Select("get")
+	q = q.Arg("key", key)
+
+	return &HelmfileEnvironment{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// A unique identifier for this HelmfileEnvironments.
+func (r *HelmfileEnvironments) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
+
+	q = q.Bind(&response)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *HelmfileEnvironments) XXX_GraphQLType() string {
+	return "HelmfileEnvironments"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *HelmfileEnvironments) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *HelmfileEnvironments) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *HelmfileEnvironments) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *HelmfileEnvironments) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = HelmfileEnvironments{query: selectNode(dag.QueryBuilder(), id, "HelmfileEnvironments")}
+	return nil
+}
+
+func (r *HelmfileEnvironments) Keys(ctx context.Context) ([]string, error) {
+	q := r.query.Select("keys")
+
+	var response []string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+func (r *HelmfileEnvironments) List(ctx context.Context) ([]HelmfileEnvironment, error) {
+	q := r.query.Select("list")
+
+	q = q.Select("id")
+
+	type list struct {
+		Id ID
+	}
+
+	convert := func(fields []list) []HelmfileEnvironment {
+		out := []HelmfileEnvironment{}
+
+		for i := range fields {
+			val := HelmfileEnvironment{id: &fields[i].Id}
+			val.query = selectNode(q.Root(), fields[i].Id, "HelmfileEnvironment")
+			out = append(out, val)
+		}
+
+		return out
+	}
+	var response []list
+
+	q = q.Bind(&response)
+
+	err := q.Execute(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return convert(response), nil
+}
+
+func (r *HelmfileEnvironments) Subset(keys []string) *HelmfileEnvironments {
+	q := r.query.Select("subset")
+	q = q.Arg("keys", keys)
+
+	return &HelmfileEnvironments{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// Release is one release of the helmfile in one environment.
+type HelmfileRelease struct { // helmfile (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
+
+	build       *Void
+	environment *string
+	id          *ID
+	kubeconform *Void
+	name        *string
+	path        *string
+	polaris     *Void
+	validate    *Void
+}
+
+func (r *HelmfileRelease) WithGraphQLQuery(q *querybuilder.Selection) *HelmfileRelease {
+	return &HelmfileRelease{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
+	}
+}
+
+// Build runs `helmfile template` on this release to verify it renders.
+func (r *HelmfileRelease) Build(ctx context.Context) error {
+	if r.build != nil {
+		return nil
+	}
+	q := r.query.Select("build")
+
+	return q.Execute(ctx)
+}
+
+// Environment is the helmfile environment it renders with.
+func (r *HelmfileRelease) Environment(ctx context.Context) (string, error) {
+	if r.environment != nil {
+		return *r.environment, nil
+	}
+	q := r.query.Select("environment")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// A unique identifier for this HelmfileRelease.
+func (r *HelmfileRelease) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
+
+	q = q.Bind(&response)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *HelmfileRelease) XXX_GraphQLType() string {
+	return "HelmfileRelease"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *HelmfileRelease) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *HelmfileRelease) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *HelmfileRelease) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *HelmfileRelease) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = HelmfileRelease{query: selectNode(dag.QueryBuilder(), id, "HelmfileRelease")}
+	return nil
+}
+
+// Kubeconform validates this release's rendered manifests against JSON schemas in strict mode.
+// Uses the datreeio CRDs-catalog (baked into the container layer) to validate custom resources
+// in addition to built-in Kubernetes schemas. Unknown schemas not in the catalog are skipped.
+//
+// If the chart directory contains a kubeconform.yaml, its skipKinds list is filtered out of the
+// manifest before validation. Use this for kinds whose catalog schema is known to be stale.
+func (r *HelmfileRelease) Kubeconform(ctx context.Context) error {
+	if r.kubeconform != nil {
+		return nil
+	}
+	q := r.query.Select("kubeconform")
+
+	return q.Execute(ctx)
+}
+
+// Name is the release name.
+func (r *HelmfileRelease) Name(ctx context.Context) (string, error) {
+	if r.name != nil {
+		return *r.name, nil
+	}
+	q := r.query.Select("name")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// Path is the chart's directory relative to the repo root.
+func (r *HelmfileRelease) Path(ctx context.Context) (string, error) {
+	if r.path != nil {
+		return *r.path, nil
+	}
+	q := r.query.Select("path")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// Polaris runs Fairwinds Polaris audit on this release's rendered manifests.
+// Exits non-zero when any enabled check fails, whatever its severity. The
+// checks come from the repo-wide k8s/polaris.yaml; if the chart directory
+// contains a polaris.yaml, its exemptions are added to it (for expected RBAC or
+// privilege requirements).
+func (r *HelmfileRelease) Polaris(ctx context.Context) error {
 	if r.polaris != nil {
-		return *r.polaris, nil
+		return nil
 	}
 	q := r.query.Select("polaris")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-		// `environments` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Environments) {
-			q = q.Arg("environments", opts[i].Environments)
-		}
-		// `paths` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Paths) {
-			q = q.Arg("paths", opts[i].Paths)
-		}
-	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }
 
-// HelmfileValidateOpts contains options for Helmfile.Validate
-type HelmfileValidateOpts struct {
-	Source *Directory
-	// Helmfile environments to lint with.
-	//
-	// Default: ["production"]
-	Environments []string
-
-	Paths []string
-}
-
-// Validate runs `helmfile lint` on every chart, once per environment.
-// It lints each chart with the values helmfile would deploy it with.
-// When paths are provided, only charts matching the paths are linted.
-func (r *Helmfile) Validate(ctx context.Context, opts ...HelmfileValidateOpts) (string, error) {
+// Validate runs `helmfile lint` (helm lint with the release's merged values)
+// on this release, reusing the dependencies the render already built.
+func (r *HelmfileRelease) Validate(ctx context.Context) error {
 	if r.validate != nil {
-		return *r.validate, nil
+		return nil
 	}
 	q := r.query.Select("validate")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-		// `environments` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Environments) {
-			q = q.Arg("environments", opts[i].Environments)
-		}
-		// `paths` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Paths) {
-			q = q.Arg("paths", opts[i].Paths)
-		}
-	}
 
-	var response string
+	return q.Execute(ctx)
+}
+
+// Releases are one environment's releases.
+type HelmfileReleases struct { // helmfile (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
+
+	id *ID
+}
+type WithHelmfileReleasesFunc func(r *HelmfileReleases) *HelmfileReleases
+
+// With calls the provided function with current HelmfileReleases.
+//
+// This is useful for reusability and readability by not breaking the calling chain.
+func (r *HelmfileReleases) With(f WithHelmfileReleasesFunc) *HelmfileReleases {
+	return f(r)
+}
+
+func (r *HelmfileReleases) WithGraphQLQuery(q *querybuilder.Selection) *HelmfileReleases {
+	return &HelmfileReleases{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
+	}
+}
+
+// Release returns the release called name.
+func (r *HelmfileReleases) Get(key string) *HelmfileRelease {
+	q := r.query.Select("get")
+	q = q.Arg("key", key)
+
+	return &HelmfileRelease{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// A unique identifier for this HelmfileReleases.
+func (r *HelmfileReleases) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
+
+	q = q.Bind(&response)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *HelmfileReleases) XXX_GraphQLType() string {
+	return "HelmfileReleases"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *HelmfileReleases) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *HelmfileReleases) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *HelmfileReleases) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *HelmfileReleases) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = HelmfileReleases{query: selectNode(dag.QueryBuilder(), id, "HelmfileReleases")}
+	return nil
+}
+
+func (r *HelmfileReleases) Keys(ctx context.Context) ([]string, error) {
+	q := r.query.Select("keys")
+
+	var response []string
 
 	q = q.Bind(&response)
 	return response, q.Execute(ctx)
+}
+
+func (r *HelmfileReleases) List(ctx context.Context) ([]HelmfileRelease, error) {
+	q := r.query.Select("list")
+
+	q = q.Select("id")
+
+	type list struct {
+		Id ID
+	}
+
+	convert := func(fields []list) []HelmfileRelease {
+		out := []HelmfileRelease{}
+
+		for i := range fields {
+			val := HelmfileRelease{id: &fields[i].Id}
+			val.query = selectNode(q.Root(), fields[i].Id, "HelmfileRelease")
+			out = append(out, val)
+		}
+
+		return out
+	}
+	var response []list
+
+	q = q.Bind(&response)
+
+	err := q.Execute(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return convert(response), nil
+}
+
+func (r *HelmfileReleases) Subset(keys []string) *HelmfileReleases {
+	q := r.query.Select("subset")
+	q = q.Arg("keys", keys)
+
+	return &HelmfileReleases{
+		query:     q,
+		refetchID: r.refetchID,
+	}
 }
 
 // HelmfileOpts contains options for Query.Helmfile
 type HelmfileOpts struct {
-	// Container to run in. It needs helmfile, helm, polaris and kubeconform;
-	// defaults to the devenv ci toolchain.
-	Container *Container
+	// Helmfile environments to check every chart in.
+	//
+	// Default: ["production"]
+	Environments []string
 }
 
-func (r *Query) Helmfile(opts ...HelmfileOpts) *Helmfile { // helmfile (../../../../../:0:0)
+func (r *Query) Helmfile(container *Container, opts ...HelmfileOpts) *Helmfile { // helmfile (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("helmfile")
 	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
+		// `environments` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Environments) {
+			q = q.Arg("environments", opts[i].Environments)
 		}
 	}
+	q = q.Arg("container", container)
 
 	return &Helmfile{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

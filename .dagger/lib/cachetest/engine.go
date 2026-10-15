@@ -16,10 +16,10 @@ import (
 // scenario table as the fake, so daggerfake's model can be held against the
 // thing it models.
 //
-//	cd .dagger/modules/<module> && dagger run go test ./...
+//	cd .dagger/modules/<module> && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...
 //
-// Without a session these tests skip; a plain `go test ./...` only exercises
-// the fake. The ci toolchain's verify-cache-granularity runs them for you.
+// Without that opt-in and a session these tests skip; a plain `go test ./...`
+// only exercises the fake. ci:verify-cache-granularity runs them for you.
 //
 // # Two things the real engine forced on this design
 //
@@ -65,11 +65,22 @@ type engineBackend[D, C any] struct {
 	reads   int
 }
 
-// RequireEngine skips a test that cannot run without a Dagger session.
+// EngineTestsEnv opts a test run in to the tests that drive a real engine.
+//
+// A Dagger session alone is not enough to say so: every container Dagger runs
+// has one, so `go:test` would run them too, with only the module under test
+// mounted and twice over with ci:verify-cache-granularity.
+const EngineTestsEnv = "HOMELAB_ENGINE_TESTS"
+
+// RequireEngine skips a test that drives a real engine, unless the run opted in
+// with EngineTestsEnv=1 under a Dagger session.
 func RequireEngine(t *testing.T) {
 	t.Helper()
+	if os.Getenv(EngineTestsEnv) != "1" {
+		t.Skip(EngineTestsEnv + " is not set; run `dagger check ci:verify-cache-granularity` to exercise the real engine")
+	}
 	if !cacheprobe.RealSession() {
-		t.Skip("no Dagger session; run under `dagger run go test ./...` to exercise the real engine")
+		t.Skip("no Dagger session; run under `" + EngineTestsEnv + "=1 dagger run go test ./...`")
 	}
 }
 
@@ -139,9 +150,9 @@ const (
 //nolint:ireturn // C is the module's *dagger.Container, a concrete pointer type
 func (e *engineBackend[D, C]) shimContainer(c Check[D, C]) C {
 	shim := "#!/bin/sh\nm=" + c.ShimMarker + "\necho ran >> \"" + stampsPath + "/${m:-unknown}\"\nexit 0\n"
-	tools := map[string]string{}
-	for _, tool := range c.ShimTools {
-		tools["/usr/local/bin/"+tool] = shim
+	tools := make([]File, len(c.ShimTools))
+	for i, tool := range c.ShimTools {
+		tools[i] = File{Path: "/usr/local/bin/" + tool, Contents: shim}
 	}
 	return e.client.Container(shimImage, stampsPath, e.volume, tools)
 }

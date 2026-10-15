@@ -33,6 +33,10 @@ func (client) UseFake(t *testing.T, engine graphql.Client) {
 	t.Cleanup(func() { dag = previous })
 }
 
+func (client) Toolchain() *dagger.Container {
+	return dag.Container().From("devenv-toolchain")
+}
+
 func (client) Directory(files cachetest.Repo) *dagger.Directory {
 	d := dag.Directory()
 	for _, p := range slices.Sorted(maps.Keys(files)) {
@@ -49,10 +53,10 @@ func (client) HostDirectory(ctx context.Context, path string) (*dagger.Directory
 	return dir, nil
 }
 
-func (client) Container(image, mount, volume string, files map[string]string) *dagger.Container {
+func (client) Container(image, mount, volume string, files []cachetest.File) *dagger.Container {
 	ctr := dag.Container().From(image).WithMountedCache(mount, dag.CacheVolume(volume))
-	for p, c := range files {
-		ctr = ctr.WithNewFile(p, c, dagger.ContainerWithNewFileOpts{Permissions: 0o755})
+	for _, f := range files {
+		ctr = ctr.WithNewFile(f.Path, f.Contents, dagger.ContainerWithNewFileOpts{Permissions: 0o755})
 	}
 	return ctr
 }

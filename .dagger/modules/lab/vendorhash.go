@@ -40,7 +40,7 @@ func (m *Lab) UpdateVendorHash(
 	//
 	// Sync forces the exec here rather than when the caller evaluates the
 	// changeset, so a script failure surfaces with its output attached.
-	updated, err := dag.Nix().Image().
+	updated, err := m.Nix.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithNewFile("/go-vendor-hash.sh", goVendorHashScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).

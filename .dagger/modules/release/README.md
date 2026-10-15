@@ -26,13 +26,13 @@ at `forgejo-resources-1.0.0` and uses its own cliff.toml. The OpenHands sandbox
 starts at `openhands-sandbox-0.2.0`, likewise with its own cliff.toml.
 
 `scripts/release.sh` creates Forgejo releases on main pushes. The shared tag
-pipeline invokes `dagger call release publish --tag=<tag> --username=teekennedy
+pipeline invokes `dagger api call release publish --tag=<tag> --username=teekennedy
 --token=env:GHCR_ACCESS_TOKEN`, selecting profiles or a Dockerfile build from
 the manifest. Images use `ghcr.io/teekennedy/k8s-homelab:<tag>`.
 When adding projects, also extend the push path and tag ref filters in
 `.woodpecker/release-tag.yaml` and `.woodpecker/release.yaml`.
 
-`dagger call release build-dockerfiles` discovers every `Dockerfile` and builds it with
+`dagger api call release build-dockerfiles` discovers every `Dockerfile` and builds it with
 its containing directory as context. It runs in `dagger check` and is also
 available as `build-containers` in devenv. Each directory retains an independent
 build cache.
@@ -72,6 +72,6 @@ Inspect a release's metadata without publishing:
 
 ```sh
 scripts/release-metadata.sh "$TAG" > /tmp/release-metadata.json
-dagger call release image --tag="$TAG" --metadata=/tmp/release-metadata.json \
+dagger api call release image --tag="$TAG" --metadata=/tmp/release-metadata.json \
   label --name=org.opencontainers.image.description
 ```

@@ -294,34 +294,3 @@ func TestUnsupportedFieldIsAnError(t *testing.T) {
 		t.Errorf("error should name the offending field, got: %v", err)
 	}
 }
-
-// TestModuleCallsAreOpaqueAndKeyedByTheCall covers a dependency module: its
-// container is identified by the call alone, so the same call is the same
-// container and an exec on it keys on that, while a different argument is a
-// different container. An unregistered module is still an error.
-func TestModuleCallsAreOpaqueAndKeyedByTheCall(t *testing.T) {
-	ctr := func(e *Engine, args string) string {
-		return queryString(t, e, `{devenv{toolchain`+args+`{withExec(args:["go","test"]){id}}}}`)
-	}
-
-	e := New().Module("devenv")
-	first, repeat := ctr(e, ""), ctr(e, "")
-	other := ctr(e, `(profiles:["ci","integration"])`)
-	if first != repeat {
-		t.Error("the same module call produced different containers")
-	}
-	if first == other {
-		t.Error("a module call with different arguments produced the same container")
-	}
-	if calls := e.ModuleCalls(); len(calls) != 3 || calls[0] != calls[1] || calls[0] == calls[2] {
-		t.Errorf("module calls not recorded by call: %v", calls)
-	}
-
-	var data any
-	err := New().MakeRequest(context.Background(),
-		&graphql.Request{Query: `query Query {devenv{toolchain{id}}}`},
-		&graphql.Response{Data: &data})
-	if err == nil || !strings.Contains(err.Error(), "devenv") {
-		t.Errorf("want an error naming the unregistered module, got: %v", err)
-	}
-}

@@ -17,8 +17,7 @@ type Ci struct {
 
 // Checks on this repo's own Dagger modules.
 func New(
-	// Container to run in. It needs go; defaults to the devenv ci toolchain.
-	// +optional
+	// Container to run in. It needs go. dagger.toml wires in devenv's toolchain.
 	container *dagger.Container,
 ) *Ci {
 	return &Ci{Container: container}
@@ -28,14 +27,14 @@ func New(
 // that need a real engine.
 //
 // The go toolchain's test runs these too, but only against
-// dagger/lib/daggerfake's model of the engine: the engine-backed tests skip unless they inherit a Dagger
-// session, so they need either
+// dagger/lib/daggerfake's model of the engine: the engine-backed tests skip
+// unless a run opts in to them under a Dagger session, so they need either
 //
-//	cd .dagger/modules/<module> && dagger run go test ./...
+//	cd .dagger/modules/<module> && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...
 //
-// or this function, which gets the same thing by running the tests in an exec
-// with nesting enabled. Use it to confirm the fake still agrees with the engine
-// after a Dagger upgrade, or after teaching the fake a new API call.
+// or this function, which opts in, and whose exec gets a session of its own, as
+// every container does. Use it to confirm the fake still agrees with the engine after a Dagger
+// upgrade, or after teaching the fake a new API call.
 //
 // Its result caches on its inputs, like any other function here, and that is
 // the right behaviour: the two things that can change the verdict both bust it.
@@ -56,49 +55,45 @@ func (m *Ci) VerifyCacheGranularity(
 	// +optional
 	// +default="."
 	run string,
-) (string, error) {
+) error {
 	container := m.Container
-	if container == nil {
-		container = dag.Devenv().Toolchain()
-	}
 
-	// Every Go module under .dagger, so a module added later is covered
-	// without being listed here.
+	// The shared library and every module, so a module added later is covered
+	// without being listed here. Globs rather than find, which the toolchain
+	// does not have; a run that tests nothing is a failure, not a pass.
 	const script = `
 set -u
 status=0
-for mod in $(find . -name go.mod -not -path '*/vendor/*' | sort); do
+tested=0
+for mod in lib/go.mod modules/*/go.mod; do
+	[ -f "$mod" ] || continue
 	dir=$(dirname "$mod")
 	echo "=== $dir"
 	(cd "$dir" && go test -count=1 -run "$1" ./...) || status=1
+	tested=$((tested + 1))
 done
+if [ "$tested" -eq 0 ]; then
+	echo "no Go modules found under .dagger" >&2
+	exit 1
+fi
 exit $status
 `
 
 	out, err := container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/.dagger").
-		WithExec(
-			[]string{"sh", "-c", script, "--", run},
-			dagger.ContainerWithExecOpts{
-				// Gives the exec its own Dagger session, so cacheprobe steps
-				// aside and the engine-backed tests run for real. Their fixtures
-				// are planted in this container's temp dir and loaded back off
-				// its filesystem by the nested client.
-				ExperimentalPrivilegedNesting: true,
-			},
-		).
+		// The opt-in and the exec's own Dagger session are what make the
+		// engine-backed tests run for real. Their fixtures are planted in this
+		// container's temp dir and loaded back off its filesystem by the nested
+		// client.
+		WithEnvVariable("HOMELAB_ENGINE_TESTS", "1").
+		WithExec([]string{"sh", "-c", script, "--", run}).
 		Stdout(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return "", fmt.Errorf("cache granularity tests failed:\n%s%s", execErr.Stdout, execErr.Stderr)
+			return fmt.Errorf("cache granularity tests failed:\n%s%s", execErr.Stdout, execErr.Stderr)
 		}
-		return "", fmt.Errorf("cache granularity tests failed: %w\n%s", err, out)
+		return fmt.Errorf("cache granularity tests failed: %w\n%s", err, out)
 	}
-	return out, nil
-}
-
-// DebugDir returns the given dir. Useful for inspecting directory contents for debugging.
-func (m *Ci) DebugDir(dir *dagger.Directory) *dagger.Directory {
-	return dir
+	return nil
 }

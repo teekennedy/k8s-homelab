@@ -11,37 +11,47 @@ import (
 
 // TerraformOpts contains options for Query.Terraform
 type TerraformOpts struct {
-	// Container to run in. It needs tofu and trivy; defaults to the devenv ci
-	// toolchain.
-	Container *Container
+	// Platforms the lock generator computes provider hashes for.
+	//
+	// Default: ["linux_arm64","linux_amd64","darwin_arm64"]
+	Platforms []string
 }
 
-func (r *Query) Terraform(opts ...TerraformOpts) *Terraform { // terraform (../../../../../:0:0)
+func (r *Query) Terraform(container *Container, opts ...TerraformOpts) *Terraform { // terraform (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("terraform")
 	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
+		// `platforms` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Platforms) {
+			q = q.Arg("platforms", opts[i].Platforms)
 		}
 	}
+	q = q.Arg("container", container)
 
 	return &Terraform{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
 // Terraform runs OpenTofu checks over terraform/.
 type Terraform struct { // terraform (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
-	id       *ID
-	lint     *string
-	validate *string
+	id   *ID
+	lint *Void
 }
 
 func (r *Terraform) WithGraphQLQuery(q *querybuilder.Selection) *Terraform {
 	return &Terraform{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -66,7 +76,8 @@ func (r *Terraform) Format(opts ...TerraformFormatOpts) *Changeset {
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -80,7 +91,13 @@ func (r *Terraform) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -131,9 +148,9 @@ type TerraformLintOpts struct {
 // aquasecurity org, and tfsec is in maintenance-only mode), so this uses
 // trivy rather than tfsec directly. --skip-check-update and --skip-version-check
 // keep it network-independent and quiet.
-func (r *Terraform) Lint(ctx context.Context, opts ...TerraformLintOpts) (string, error) {
+func (r *Terraform) Lint(ctx context.Context, opts ...TerraformLintOpts) error {
 	if r.lint != nil {
-		return *r.lint, nil
+		return nil
 	}
 	q := r.query.Select("lint")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -143,72 +160,289 @@ func (r *Terraform) Lint(ctx context.Context, opts ...TerraformLintOpts) (string
 		}
 	}
 
-	var response string
+	return q.Execute(ctx)
+}
+
+// TerraformModulesOpts contains options for Terraform.Modules
+type TerraformModulesOpts struct {
+	Source *Directory
+}
+
+// Modules returns every OpenTofu module under terraform/ — every directory
+// with a .terraform.lock.hcl — keyed by path.
+func (r *Terraform) Modules(opts ...TerraformModulesOpts) *TerraformModules {
+	q := r.query.Select("modules")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `source` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Source) {
+			q = q.Arg("source", opts[i].Source)
+		}
+	}
+
+	return &TerraformModules{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// TerraformModule is one OpenTofu module.
+type TerraformModule struct { // terraform (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
+
+	id       *ID
+	path     *string
+	validate *Void
+}
+
+func (r *TerraformModule) WithGraphQLQuery(q *querybuilder.Selection) *TerraformModule {
+	return &TerraformModule{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
+	}
+}
+
+// A unique identifier for this TerraformModule.
+func (r *TerraformModule) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
-// TerraformLockOpts contains options for Terraform.Lock
-type TerraformLockOpts struct {
-	Source *Directory
-	// platforms to compute provider hashes for.
-	//
-	// Default: ["linux_arm64","linux_amd64","darwin_arm64"]
-	Platforms []string
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *TerraformModule) XXX_GraphQLType() string {
+	return "TerraformModule"
 }
 
-// Lock runs tofu providers lock for all Terraform/OpenTofu modules.
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *TerraformModule) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *TerraformModule) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *TerraformModule) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *TerraformModule) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = TerraformModule{query: selectNode(dag.QueryBuilder(), id, "TerraformModule")}
+	return nil
+}
+
+// Lock runs tofu providers lock for the module.
 //
 // Unlike `tofu init`, `tofu providers lock` computes provider hashes for the
 // given platforms deterministically, regardless of the platform it runs on.
 // This keeps .terraform.lock.hcl stable across different machines, which
 // `tofu init` cannot guarantee since it only records hashes for the host
 // platform it happens to run on.
-//
-// Returns a changeset. Use `dagger generate terraform:lock -y` to apply
-// lockfile changes produced by provider locking.
-func (r *Terraform) Lock(opts ...TerraformLockOpts) *Changeset {
+func (r *TerraformModule) Lock() *Changeset {
 	q := r.query.Select("lock")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-		// `platforms` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Platforms) {
-			q = q.Arg("platforms", opts[i].Platforms)
-		}
-	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
-// TerraformValidateOpts contains options for Terraform.Validate
-type TerraformValidateOpts struct {
-	Source *Directory
-}
-
-// Validate runs tofu init and tofu validate on all discovered Terraform modules.
-// Each module is validated independently for parallel execution and individual
-// error reporting.
-// When paths are provided, only matching modules are validated.
-func (r *Terraform) Validate(ctx context.Context, opts ...TerraformValidateOpts) (string, error) {
-	if r.validate != nil {
-		return *r.validate, nil
+// Path is the module's directory relative to the repo root.
+func (r *TerraformModule) Path(ctx context.Context) (string, error) {
+	if r.path != nil {
+		return *r.path, nil
 	}
-	q := r.query.Select("validate")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-	}
+	q := r.query.Select("path")
 
 	var response string
 
 	q = q.Bind(&response)
 	return response, q.Execute(ctx)
+}
+
+// Validate runs tofu init and tofu validate on the module.
+func (r *TerraformModule) Validate(ctx context.Context) error {
+	if r.validate != nil {
+		return nil
+	}
+	q := r.query.Select("validate")
+
+	return q.Execute(ctx)
+}
+
+// Modules are the repo's OpenTofu modules.
+type TerraformModules struct { // terraform (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
+
+	id *ID
+}
+type WithTerraformModulesFunc func(r *TerraformModules) *TerraformModules
+
+// With calls the provided function with current TerraformModules.
+//
+// This is useful for reusability and readability by not breaking the calling chain.
+func (r *TerraformModules) With(f WithTerraformModulesFunc) *TerraformModules {
+	return f(r)
+}
+
+func (r *TerraformModules) WithGraphQLQuery(q *querybuilder.Selection) *TerraformModules {
+	return &TerraformModules{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
+	}
+}
+
+// Module returns the OpenTofu module at path. It carries all of terraform/,
+// because modules reference their siblings by relative path.
+func (r *TerraformModules) Get(key string) *TerraformModule {
+	q := r.query.Select("get")
+	q = q.Arg("key", key)
+
+	return &TerraformModule{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// A unique identifier for this TerraformModules.
+func (r *TerraformModules) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
+
+	q = q.Bind(&response)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *TerraformModules) XXX_GraphQLType() string {
+	return "TerraformModules"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *TerraformModules) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *TerraformModules) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *TerraformModules) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *TerraformModules) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = TerraformModules{query: selectNode(dag.QueryBuilder(), id, "TerraformModules")}
+	return nil
+}
+
+func (r *TerraformModules) Keys(ctx context.Context) ([]string, error) {
+	q := r.query.Select("keys")
+
+	var response []string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+func (r *TerraformModules) List(ctx context.Context) ([]TerraformModule, error) {
+	q := r.query.Select("list")
+
+	q = q.Select("id")
+
+	type list struct {
+		Id ID
+	}
+
+	convert := func(fields []list) []TerraformModule {
+		out := []TerraformModule{}
+
+		for i := range fields {
+			val := TerraformModule{id: &fields[i].Id}
+			val.query = selectNode(q.Root(), fields[i].Id, "TerraformModule")
+			out = append(out, val)
+		}
+
+		return out
+	}
+	var response []list
+
+	q = q.Bind(&response)
+
+	err := q.Execute(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return convert(response), nil
+}
+
+func (r *TerraformModules) Subset(keys []string) *TerraformModules {
+	q := r.query.Select("subset")
+	q = q.Arg("keys", keys)
+
+	return &TerraformModules{
+		query:     q,
+		refetchID: r.refetchID,
+	}
 }

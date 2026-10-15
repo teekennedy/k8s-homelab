@@ -10,15 +10,22 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 
 	"dagger/go/internal/dagger"
-
-	"golang.org/x/sync/errgroup"
 )
 
-// srcRoot is where a module is mounted in its container.
-const srcRoot = "/src"
+const (
+	// repoRoot is where a module's slice of the repo is laid out in its
+	// container: the module and its local replace targets each at their own
+	// repo path beneath it, so a relative replace resolves as in a checkout
+	// without ever landing on a system directory.
+	repoRoot = "/repo"
+	// golangciLintConfigPath is where the repo-root golangci-lint config is
+	// mounted, outside of /src, so it's passed explicitly via --config instead of
+	// relying on golangci-lint's upward directory search
+	golangciLintConfigPath = "/golangci.yaml"
+	golangciCache          = "/cache/golangci-lint"
+)
 
 // Go runs Go checks over every module in the repo.
 type Go struct {
@@ -28,26 +35,27 @@ type Go struct {
 
 // Tests and lints every Go module in the repo.
 func New(
-	// Container to run in. It needs go and golangci-lint; defaults to the
-	// devenv ci toolchain.
-	// +optional
+	// Container to run in. It needs go and golangci-lint. dagger.toml wires in
+	// devenv's toolchain.
 	container *dagger.Container,
 ) *Go {
 	return &Go{Container: container}
 }
 
-func (m *Go) toolchain() *dagger.Container {
-	if m.Container != nil {
-		return m.Container
+// Modules returns every Go module in the repo, keyed by path. Vendored
+// modules are skipped.
+func (m *Go) Modules(
+	ctx context.Context,
+	// +defaultPath="/"
+	// The scripts and releases.json are here because Dagger modules go:embed
+	// them; without them those modules do not build.
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json", "!.golangci.yaml"]
+	source *dagger.Directory,
+) (*Modules, error) {
+	goModFiles, err := source.Glob(ctx, "**/go.mod")
+	if err != nil {
+		return nil, fmt.Errorf("discovering Go modules: %w", err)
 	}
-	return dag.Devenv().Toolchain()
-}
-
-// discoverGoModulePaths finds all Go module directories in source,
-// excluding vendored modules (which may be excluded by nested .gitignore
-// files not honored by +defaultPath).
-func discoverGoModulePaths(ctx context.Context, source *dagger.Directory) []string {
-	goModFiles, _ := source.Glob(ctx, "**/go.mod")
 	var paths []string
 	for _, f := range goModFiles {
 		if strings.Contains(f, "/vendor/") || strings.HasPrefix(f, "vendor/") {
@@ -56,23 +64,66 @@ func discoverGoModulePaths(ctx context.Context, source *dagger.Directory) []stri
 		paths = append(paths, filepath.Dir(f))
 	}
 	sort.Strings(paths)
-	return paths
+	return &Modules{Paths: paths, Source: source, Container: m.Container}, nil
 }
 
-// GoModule is a Go module with a scoped source directory.
-// Each GoModule carries only the files for its module, enabling
-// per-module caching: changing files in one module won't invalidate
-// the cache for other modules.
+// Modules are the repo's Go modules.
+// +collection
+type Modules struct {
+	// Paths are the modules' directories relative to the repo root.
+	// +keys
+	Paths []string
+	// +private
+	Source *dagger.Directory
+	// +private
+	Container *dagger.Container
+}
+
+// Module returns the Go module at path, carrying only its own files and its
+// local replace targets, so that it caches independently of the others.
+// +get
+func (ms *Modules) Module(ctx context.Context, path string) (*GoModule, error) {
+	return newModule(ctx, ms.Source, path, ms.Container)
+}
+
+func newModule(ctx context.Context, source *dagger.Directory, modPath string, container *dagger.Container) (*GoModule, error) {
+	gomod, err := source.File(path.Join(modPath, "go.mod")).Contents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s/go.mod: %w", modPath, err)
+	}
+	gm := &GoModule{
+		Path:       modPath,
+		Source:     source.Directory(modPath),
+		ConfigFile: source.File(".golangci.yaml"),
+		Container:  container,
+	}
+	for _, target := range localReplaces(gomod) {
+		repoPath := path.Join(modPath, target)
+		if strings.HasPrefix(repoPath, "../") {
+			return nil, fmt.Errorf("%s/go.mod replaces a module with %s, which is outside the repo", modPath, target)
+		}
+		gm.Replaces = append(gm.Replaces, &GoReplace{
+			Mount:  path.Join(repoRoot, repoPath),
+			Source: source.Directory(repoPath),
+		})
+	}
+	return gm, nil
+}
+
+// GoModule is one Go module.
 type GoModule struct {
 	// Path is the module's directory relative to the repo root (e.g. "cmd/lab").
 	Path string
-	// Source is the module's scoped source directory.
-	// When populated via Modules(), this is derived from a +defaultPath
-	// parent directory, so its ID is stable across sessions.
+	// +private
 	Source *dagger.Directory
 	// Replaces are the modules its go.mod replaces with a local path, which
 	// have to sit at that path relative to Source for it to build.
+	// +private
 	Replaces []*GoReplace
+	// +private
+	ConfigFile *dagger.File
+	// +private
+	Container *dagger.Container
 }
 
 // GoReplace is a local `replace` target, mounted where the module expects it.
@@ -83,48 +134,19 @@ type GoReplace struct {
 	Source *dagger.Directory
 }
 
-// withSource mounts the module and its local replace targets into container.
-func (gm *GoModule) withSource(container *dagger.Container) *dagger.Container {
-	container = container.WithMountedDirectory(srcRoot, gm.Source)
+// workdir is the module's directory in its container.
+func (gm *GoModule) workdir() string {
+	return path.Join(repoRoot, gm.Path)
+}
+
+// withSource mounts the module and its local replace targets into the
+// toolchain.
+func (gm *GoModule) withSource() *dagger.Container {
+	container := gm.Container.WithMountedDirectory(gm.workdir(), gm.Source)
 	for _, r := range gm.Replaces {
 		container = container.WithMountedDirectory(r.Mount, r.Source)
 	}
-	return container.WithWorkdir(srcRoot)
-}
-
-// Modules returns all discovered Go modules with scoped source directories.
-// Each module's Source is a subdirectory of the +defaultPath source, so
-// Directory IDs are stable across sessions and cache independently.
-func (m *Go) Modules(
-	ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json", "!.golangci.yaml"]
-	source *dagger.Directory,
-) ([]*GoModule, error) {
-	return goModules(ctx, source)
-}
-
-func goModules(ctx context.Context, source *dagger.Directory) ([]*GoModule, error) {
-	var modules []*GoModule
-	for _, modPath := range discoverGoModulePaths(ctx, source) {
-		gomod, err := source.File(path.Join(modPath, "go.mod")).Contents(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("reading %s/go.mod: %w", modPath, err)
-		}
-		gm := &GoModule{Path: modPath, Source: source.Directory(modPath)}
-		for _, target := range localReplaces(gomod) {
-			repoPath := path.Join(modPath, target)
-			if strings.HasPrefix(repoPath, "../") {
-				return nil, fmt.Errorf("%s/go.mod replaces a module with %s, which is outside the repo", modPath, target)
-			}
-			gm.Replaces = append(gm.Replaces, &GoReplace{
-				Mount:  path.Join(srcRoot, target),
-				Source: source.Directory(repoPath),
-			})
-		}
-		modules = append(modules, gm)
-	}
-	return modules, nil
+	return container.WithWorkdir(gm.workdir())
 }
 
 // localReplaces returns the filesystem paths a go.mod's replace directives
@@ -170,91 +192,28 @@ func localReplaceTarget(directive string) (string, bool) {
 	return "", false
 }
 
-// Test runs Go tests for this module.
-func (gm *GoModule) Test(
-	ctx context.Context,
-	container *dagger.Container,
-) (string, error) {
-	if gm.Source == nil {
-		return "", fmt.Errorf("GoModule %s has no source directory; call Modules() first", gm.Path)
-	}
-	if container == nil {
-		return "", fmt.Errorf("GoModule Test function called with nil container")
-	}
-
-	_, err := gm.withSource(container).
+// Test runs the module's Go tests.
+// +check
+func (gm *GoModule) Test(ctx context.Context) error {
+	_, err := gm.withSource().
 		WithExec([]string{"go", "test", "./..."}).
 		Sync(ctx)
 	if err != nil {
-		return "", fmt.Errorf("go test failed in %s: %w", gm.Path, err)
+		return fmt.Errorf("go test failed in %s: %w", gm.Path, err)
 	}
-	return fmt.Sprintf("Go tests passed in %s", gm.Path), nil
+	return nil
 }
 
-const (
-	// golangciLintConfigPath is where the repo-root golangci-lint config is
-	// mounted, outside of /src, so it's passed explicitly via --config instead of
-	// relying on golangci-lint's upward directory search
-	golangciLintConfigPath = "/golangci.yaml"
-	golangciCache          = "/cache/golangci-lint"
-)
-
-// Lint tidies go.mod/go.sum and applies golangci-lint's autofixes (including
-// formatting) across all discovered Go modules.
-// Fails if issues remain that --fix cannot resolve (e.g. cyclop, gosec).
-// Returns a changeset. Use `dagger generate go:lint -y` to apply.
+// Lint runs `go mod tidy` followed by `golangci-lint run --fix` on the module,
+// returning the resulting changes. It fails if issues remain that --fix cannot
+// resolve (e.g. cyclop, gosec).
 // +generate
-func (m *Go) Lint(
-	ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json", "!.golangci.yaml"]
-	source *dagger.Directory,
-) (*dagger.Changeset, error) {
-	goModules, err := goModules(ctx, source)
-	if err != nil {
-		return nil, err
-	}
-	if len(goModules) == 0 {
-		return dag.Changeset(), nil
-	}
-	container := m.toolchain()
-	configFile := source.File(".golangci.yaml")
-
-	changesets := make([]*dagger.Changeset, len(goModules))
-	errs := make([]error, len(goModules))
-
-	var wg sync.WaitGroup
-	for i, gm := range goModules {
-		wg.Go(func() {
-			changesets[i], errs[i] = gm.Lint(ctx, configFile, container)
-		})
-	}
-	wg.Wait()
-
-	if err := errors.Join(errs...); err != nil {
-		return nil, err
-	}
-
-	return dag.Changeset().WithChangesets(changesets), nil
-}
-
-// Lint runs `go mod tidy` followed by `golangci-lint run --fix` on this module,
-// returning the resulting changes. Errors from either step (including unfixable
-// lint issues that --fix leaves behind) are returned rather than swallowed, so
-// Go.Lint fails when there's more to fix than autofixing can handle.
-func (gm *GoModule) Lint(ctx context.Context, configFile *dagger.File, container *dagger.Container) (*dagger.Changeset, error) {
-	if gm.Source == nil {
-		return nil, fmt.Errorf("GoModule %s has no source directory; call Modules() first", gm.Path)
-	}
-	if container == nil {
-		return nil, fmt.Errorf("GoModule Lint function called with nil container")
-	}
-
-	fixed, err := gm.withSource(container).
+func (gm *GoModule) Lint(ctx context.Context) (*dagger.Changeset, error) {
+	fixed, err := gm.withSource().
 		WithExec([]string{"go", "mod", "tidy"}).
 		WithEnvVariable("GOLANGCI_LINT_CACHE", golangciCache).
 		WithMountedCache(golangciCache, dag.CacheVolume("homelab-golangci-lint-/"+gm.Path)).
-		WithMountedFile(golangciLintConfigPath, configFile).
+		WithMountedFile(golangciLintConfigPath, gm.ConfigFile).
 		WithExec([]string{"golangci-lint", "run", "--fix", "--config", golangciLintConfigPath, "./..."}).
 		Sync(ctx)
 	if err != nil {
@@ -274,44 +233,7 @@ func (gm *GoModule) Lint(ctx context.Context, configFile *dagger.File, container
 	// onto an empty tree at gm.Path restores the repo-relative paths without
 	// widening what the exec above had mounted.
 	before := dag.Directory().WithDirectory(gm.Path, gm.Source)
-	after := dag.Directory().WithDirectory(gm.Path, fixed.Directory(srcRoot))
+	after := dag.Directory().WithDirectory(gm.Path, fixed.Directory(gm.workdir()))
 
 	return after.Changes(before), nil
-}
-
-// Test runs Go tests for all discovered Go modules.
-// Each module is tested with a scoped source directory so that changes
-// in one module don't invalidate the BuildKit cache for other modules.
-// +check
-func (m *Go) Test(
-	ctx context.Context,
-	// +defaultPath="/"
-	// The scripts and releases.json are here because Dagger modules go:embed
-	// them; without them those modules do not build and `go test` fails at
-	// setup.
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json"]
-	source *dagger.Directory,
-) (string, error) {
-	goModules, err := goModules(ctx, source)
-	if err != nil {
-		return "", err
-	}
-	if len(goModules) == 0 {
-		return "Go tests skipped (no modules found)", nil
-	}
-
-	container := m.toolchain()
-	g := new(errgroup.Group)
-	for _, gm := range goModules {
-		g.Go(func() error {
-			_, err := gm.Test(ctx, container)
-			return err
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return "", fmt.Errorf("go test failed: %w", err)
-	}
-
-	return "Go tests passed", nil
 }

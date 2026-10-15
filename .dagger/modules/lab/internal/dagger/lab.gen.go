@@ -20,6 +20,3 @@ type LabBuildOpts = core.LabBuildOpts
 
 // LabUpdateVendorHashOpts contains options for Lab.UpdateVendorHash
 type LabUpdateVendorHashOpts = core.LabUpdateVendorHashOpts
-
-// LabOpts contains options for Query.Lab
-type LabOpts = core.LabOpts

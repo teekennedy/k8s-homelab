@@ -61,20 +61,164 @@ func convertSlice[I any, O any](in []I, f func(I) O) []O {
 
 func (r Helmfile) MarshalJSON() ([]byte, error) {
 	var concrete struct {
-		Container *dagger.Container
+		Container        *dagger.Container
+		EnvironmentNames []string
 	}
 	concrete.Container = r.Container
+	concrete.EnvironmentNames = r.EnvironmentNames
 	return json.Marshal(&concrete)
 }
 
 func (r *Helmfile) UnmarshalJSON(bs []byte) error {
 	var concrete struct {
+		Container        *dagger.Container
+		EnvironmentNames []string
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Container = concrete.Container
+	r.EnvironmentNames = concrete.EnvironmentNames
+	return nil
+}
+
+func (r Environments) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Names     []string
+		Charts    []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+	}
+	concrete.Names = r.Names
+	concrete.Charts = r.Charts
+	concrete.Source = r.Source
+	concrete.Container = r.Container
+	return json.Marshal(&concrete)
+}
+
+func (r *Environments) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Names     []string
+		Charts    []string
+		Source    *dagger.Directory
 		Container *dagger.Container
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
 		return err
 	}
+	r.Names = concrete.Names
+	r.Charts = concrete.Charts
+	r.Source = concrete.Source
+	r.Container = concrete.Container
+	return nil
+}
+
+func (r Environment) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Name      string
+		Charts    []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+	}
+	concrete.Name = r.Name
+	concrete.Charts = r.Charts
+	concrete.Source = r.Source
+	concrete.Container = r.Container
+	return json.Marshal(&concrete)
+}
+
+func (r *Environment) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Name      string
+		Charts    []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Name = concrete.Name
+	r.Charts = concrete.Charts
+	r.Source = concrete.Source
+	r.Container = concrete.Container
+	return nil
+}
+
+func (r Releases) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Names       []string
+		Charts      []string
+		Environment string
+		Source      *dagger.Directory
+		Container   *dagger.Container
+	}
+	concrete.Names = r.Names
+	concrete.Charts = r.Charts
+	concrete.Environment = r.Environment
+	concrete.Source = r.Source
+	concrete.Container = r.Container
+	return json.Marshal(&concrete)
+}
+
+func (r *Releases) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Names       []string
+		Charts      []string
+		Environment string
+		Source      *dagger.Directory
+		Container   *dagger.Container
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Names = concrete.Names
+	r.Charts = concrete.Charts
+	r.Environment = concrete.Environment
+	r.Source = concrete.Source
+	r.Container = concrete.Container
+	return nil
+}
+
+func (r Release) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Name          string
+		Path          string
+		Environment   string
+		Source        *dagger.Directory
+		PolarisConfig *dagger.File
+		Container     *dagger.Container
+	}
+	concrete.Name = r.Name
+	concrete.Path = r.Path
+	concrete.Environment = r.Environment
+	concrete.Source = r.Source
+	concrete.PolarisConfig = r.PolarisConfig
+	concrete.Container = r.Container
+	return json.Marshal(&concrete)
+}
+
+func (r *Release) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Name          string
+		Path          string
+		Environment   string
+		Source        *dagger.Directory
+		PolarisConfig *dagger.File
+		Container     *dagger.Container
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Name = concrete.Name
+	r.Path = concrete.Path
+	r.Environment = concrete.Environment
+	r.Source = concrete.Source
+	r.PolarisConfig = concrete.PolarisConfig
 	r.Container = concrete.Container
 	return nil
 }
@@ -196,9 +340,47 @@ func dispatch(ctx context.Context) (rerr error) {
 func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName string, inputArgs map[string][]byte) (_ any, err error) {
 	_ = inputArgs
 	switch parentName {
+	case "Environment":
+		switch fnName {
+		case "Lint":
+			var parent Environment
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Environment).Lint(&parent, ctx)
+		case "Releases":
+			var parent Environment
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return (*Environment).Releases(&parent), nil
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
+	case "Environments":
+		switch fnName {
+		case "Environment":
+			var parent Environments
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var name string
+			if inputArgs["name"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["name"]), &name)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg name", err))
+				}
+			}
+			return (*Environments).Environment(&parent, name), nil
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
 	case "Helmfile":
 		switch fnName {
-		case "Build":
+		case "Environments":
 			var parent Helmfile
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
@@ -211,126 +393,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			var environments []string
-			if inputArgs["environments"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["environments"]), &environments)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg environments", err))
-				}
-			}
-			var paths []string
-			if inputArgs["paths"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
-				}
-			}
-			return (*Helmfile).Build(&parent, ctx, source, environments, paths)
-		case "Kubeconform":
-			var parent Helmfile
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			var environments []string
-			if inputArgs["environments"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["environments"]), &environments)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg environments", err))
-				}
-			}
-			var paths []string
-			if inputArgs["paths"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
-				}
-			}
-			return (*Helmfile).Kubeconform(&parent, ctx, source, environments, paths)
-		case "Lint":
-			var parent Helmfile
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			var environments []string
-			if inputArgs["environments"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["environments"]), &environments)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg environments", err))
-				}
-			}
-			return (*Helmfile).Lint(&parent, ctx, source, environments)
-		case "Polaris":
-			var parent Helmfile
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			var environments []string
-			if inputArgs["environments"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["environments"]), &environments)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg environments", err))
-				}
-			}
-			var paths []string
-			if inputArgs["paths"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
-				}
-			}
-			return (*Helmfile).Polaris(&parent, ctx, source, environments, paths)
-		case "Validate":
-			var parent Helmfile
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			var environments []string
-			if inputArgs["environments"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["environments"]), &environments)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg environments", err))
-				}
-			}
-			var paths []string
-			if inputArgs["paths"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
-				}
-			}
-			return (*Helmfile).Validate(&parent, ctx, source, environments, paths)
+			return (*Helmfile).Environments(&parent, ctx, source)
 		case "":
 			var parent Helmfile
 			err = json.Unmarshal(parentJSON, &parent)
@@ -344,7 +407,66 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
 				}
 			}
-			return New(container), nil
+			var environments []string
+			if inputArgs["environments"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["environments"]), &environments)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg environments", err))
+				}
+			}
+			return New(container, environments), nil
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
+	case "Release":
+		switch fnName {
+		case "Build":
+			var parent Release
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Release).Build(&parent, ctx)
+		case "Kubeconform":
+			var parent Release
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Release).Kubeconform(&parent, ctx)
+		case "Polaris":
+			var parent Release
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Release).Polaris(&parent, ctx)
+		case "Validate":
+			var parent Release
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Release).Validate(&parent, ctx)
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
+	case "Releases":
+		switch fnName {
+		case "Release":
+			var parent Releases
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var name string
+			if inputArgs["name"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["name"]), &name)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg name", err))
+				}
+			}
+			return (*Releases).Release(&parent, name)
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
@@ -354,55 +476,85 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			WithObject(
 				dag.TypeDef().WithObject("Helmfile", dagger.TypeDefWithObjectOpts{Description: "Helmfile runs helmfile checks over every chart.", SourceMap: dag.SourceMap("main.go", 28, 6)}).
 					WithFunction(
-						dag.Function("Build",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Build renders every chart with `helmfile template`, once per\nenvironment. Each release is rendered from a scoped source directory so that\na change to one chart doesn't invalidate the cache for the others.\nWhen paths are provided, only charts matching the paths are rendered.").
-							WithSourceMap(dag.SourceMap("main.go", 221, 1)).
-							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "charts/*.tgz are built dependencies; they are gitignored, so leaving them\nout makes a local run resolve dependencies the way a clean checkout does.", SourceMap: dag.SourceMap("main.go", 226, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
-							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to render with.", SourceMap: dag.SourceMap("main.go", 230, 2), DefaultValue: dagger.JSON("[\"production\"]")}).
-							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 232, 2)})).
-					WithFunction(
-						dag.Function("Kubeconform",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Kubeconform runs kubeconform in strict mode across all Helm charts,\nonce per environment, on the manifests helmfile renders.\nWhen paths are provided, only matching charts are validated.").
-							WithSourceMap(dag.SourceMap("manifests.go", 158, 1)).
-							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("manifests.go", 161, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
-							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to render with.", SourceMap: dag.SourceMap("manifests.go", 165, 2), DefaultValue: dagger.JSON("[\"production\"]")}).
-							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("manifests.go", 167, 2)})).
-					WithFunction(
-						dag.Function("Lint",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Lint checks the helmfile state itself, once per environment: that it\nrenders (`helmfile build`), and that its releases, the chart directories and\nthe environment's app list agree with each other.").
-							WithSourceMap(dag.SourceMap("main.go", 279, 1)).
-							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Only Chart.yaml is needed from k8s/, to know which charts exist.", SourceMap: dag.SourceMap("main.go", 283, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/Chart.yaml"}}).
-							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to lint.", SourceMap: dag.SourceMap("main.go", 287, 2), DefaultValue: dagger.JSON("[\"production\"]")})).
-					WithFunction(
-						dag.Function("Polaris",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Polaris runs Polaris audit across all Helm charts, once per\nenvironment, on the manifests helmfile renders.\nWhen paths are provided, only matching charts are validated.").
-							WithSourceMap(dag.SourceMap("manifests.go", 125, 1)).
-							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("manifests.go", 128, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
-							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to render with.", SourceMap: dag.SourceMap("manifests.go", 132, 2), DefaultValue: dagger.JSON("[\"production\"]")}).
-							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("manifests.go", 134, 2)})).
-					WithFunction(
-						dag.Function("Validate",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Validate runs `helmfile lint` on every chart, once per environment.\nIt lints each chart with the values helmfile would deploy it with.\nWhen paths are provided, only charts matching the paths are linted.").
-							WithSourceMap(dag.SourceMap("main.go", 251, 1)).
-							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 254, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
-							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to lint with.", SourceMap: dag.SourceMap("main.go", 258, 2), DefaultValue: dagger.JSON("[\"production\"]")}).
-							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 260, 2)})).
+						dag.Function("Environments",
+							dag.TypeDef().WithObject("Environments")).
+							WithDescription("Environments returns the helmfile environments the checks run in, keyed by\nname.").
+							WithSourceMap(dag.SourceMap("main.go", 50, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "charts/*.tgz are built dependencies; they are gitignored, so leaving them\nout makes a local run resolve dependencies the way a clean checkout does.", SourceMap: dag.SourceMap("main.go", 56, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Helmfile")).
 							WithDescription("Renders, lints and audits every chart with the repo's helmfile.").
-							WithSourceMap(dag.SourceMap("main.go", 34, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs helmfile, helm, polaris and kubeconform;\ndefaults to the devenv ci toolchain.", SourceMap: dag.SourceMap("main.go", 38, 2)}))), nil
+							WithSourceMap(dag.SourceMap("main.go", 36, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs helmfile, helm, polaris and kubeconform.\ndagger.toml wires in devenv's toolchain.", SourceMap: dag.SourceMap("main.go", 39, 2)}).
+							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to check every chart in.", SourceMap: dag.SourceMap("main.go", 43, 2), DefaultValue: dagger.JSON("[\"production\"]")}))).
+			WithObject(
+				dag.TypeDef().WithObject("Environments", dagger.TypeDefWithObjectOpts{Description: "Environments are the helmfile environments the checks run in.", SourceMap: dag.SourceMap("main.go", 72, 6)}).
+					WithCollection().
+					WithFunction(
+						dag.Function("Environment",
+							dag.TypeDef().WithObject("Environment")).
+							WithDescription("Environment returns the helmfile environment called name.").
+							WithSourceMap(dag.SourceMap("main.go", 85, 1)).
+							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 85, 37)})).
+					WithCollectionGet("Environment").
+					WithField("Names", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{SourceMap: dag.SourceMap("main.go", 74, 2)}).
+					WithCollectionKeys("Names")).
+			WithObject(
+				dag.TypeDef().WithObject("Environment", dagger.TypeDefWithObjectOpts{Description: "Environment is one helmfile environment.", SourceMap: dag.SourceMap("main.go", 90, 6)}).
+					WithFunction(
+						dag.Function("Lint",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Lint checks the helmfile state itself in this environment: that it renders\n(`helmfile build`), and that its releases, the chart directories and the\nenvironment's app list agree with each other.").
+							WithSourceMap(dag.SourceMap("main.go", 105, 1)).
+							WithCheck()).
+					WithFunction(
+						dag.Function("Releases",
+							dag.TypeDef().WithObject("Releases")).
+							WithDescription("Releases returns every chart's release in this environment, keyed by\nrelease name.").
+							WithSourceMap(dag.SourceMap("main.go", 114, 1))).
+					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Name is the environment's name, as helmfile's --environment takes it.", SourceMap: dag.SourceMap("main.go", 92, 2)})).
+			WithObject(
+				dag.TypeDef().WithObject("Releases", dagger.TypeDefWithObjectOpts{Description: "Releases are one environment's releases.", SourceMap: dag.SourceMap("main.go", 130, 6)}).
+					WithCollection().
+					WithFunction(
+						dag.Function("Release",
+							dag.TypeDef().WithObject("Release")).
+							WithDescription("Release returns the release called name.").
+							WithSourceMap(dag.SourceMap("main.go", 147, 1)).
+							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 147, 29)})).
+					WithCollectionGet("Release").
+					WithField("Names", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Names are the release names. The helmfile templates derive a release's\nchart path from its name, so each is its chart directory's basename.", SourceMap: dag.SourceMap("main.go", 134, 2)}).
+					WithCollectionKeys("Names")).
+			WithObject(
+				dag.TypeDef().WithObject("Release", dagger.TypeDefWithObjectOpts{Description: "Release is one release of the helmfile in one environment.", SourceMap: dag.SourceMap("main.go", 157, 6)}).
+					WithFunction(
+						dag.Function("Build",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Build runs `helmfile template` on this release to verify it renders.").
+							WithSourceMap(dag.SourceMap("main.go", 239, 1)).
+							WithCheck()).
+					WithFunction(
+						dag.Function("Kubeconform",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Kubeconform validates this release's rendered manifests against JSON schemas in strict mode.\nUses the datreeio CRDs-catalog (baked into the container layer) to validate custom resources\nin addition to built-in Kubernetes schemas. Unknown schemas not in the catalog are skipped.\n\nIf the chart directory contains a kubeconform.yaml, its skipKinds list is filtered out of the\nmanifest before validation. Use this for kinds whose catalog schema is known to be stale.").
+							WithSourceMap(dag.SourceMap("manifests.go", 61, 1)).
+							WithCheck()).
+					WithFunction(
+						dag.Function("Polaris",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Polaris runs Fairwinds Polaris audit on this release's rendered manifests.\nExits non-zero when any enabled check fails, whatever its severity. The\nchecks come from the repo-wide k8s/polaris.yaml; if the chart directory\ncontains a polaris.yaml, its exemptions are added to it (for expected RBAC or\nprivilege requirements).").
+							WithSourceMap(dag.SourceMap("manifests.go", 18, 1)).
+							WithCheck()).
+					WithFunction(
+						dag.Function("Validate",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Validate runs `helmfile lint` (helm lint with the release's merged values)\non this release, reusing the dependencies the render already built.").
+							WithSourceMap(dag.SourceMap("main.go", 249, 1)).
+							WithCheck()).
+					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Name is the release name.", SourceMap: dag.SourceMap("main.go", 159, 2)}).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the chart's directory relative to the repo root.", SourceMap: dag.SourceMap("main.go", 161, 2)}).
+					WithField("Environment", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Environment is the helmfile environment it renders with.", SourceMap: dag.SourceMap("main.go", 163, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

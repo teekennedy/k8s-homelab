@@ -11,68 +11,172 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 
 	"dagger/helmfile/internal/dagger"
 	"dagger/lib/helmfile"
-
-	"golang.org/x/sync/errgroup"
 )
 
 const (
 	helmfilePath     = helmfile.StatePath
 	sharedChartsPath = helmfile.SharedChartsPath
+	// polarisConfigPath is the repo-wide Polaris config: which checks run, and
+	// the custom ones.
+	polarisConfigPath = "k8s/polaris.yaml"
 )
 
 // Helmfile runs helmfile checks over every chart.
 type Helmfile struct {
 	// +private
 	Container *dagger.Container
+	// +private
+	EnvironmentNames []string
 }
 
 // Renders, lints and audits every chart with the repo's helmfile.
 func New(
-	// Container to run in. It needs helmfile, helm, polaris and kubeconform;
-	// defaults to the devenv ci toolchain.
-	// +optional
+	// Container to run in. It needs helmfile, helm, polaris and kubeconform.
+	// dagger.toml wires in devenv's toolchain.
 	container *dagger.Container,
+	// Helmfile environments to check every chart in.
+	// +optional
+	// +default=["production"]
+	environments []string,
 ) *Helmfile {
-	return &Helmfile{Container: container}
+	return &Helmfile{Container: container, EnvironmentNames: environments}
 }
 
-func (m *Helmfile) toolchain() *dagger.Container {
-	if m.Container != nil {
-		return m.Container
+// Environments returns the helmfile environments the checks run in, keyed by
+// name.
+func (m *Helmfile) Environments(
+	ctx context.Context,
+	// +defaultPath="/"
+	// charts/*.tgz are built dependencies; they are gitignored, so leaving them
+	// out makes a local run resolve dependencies the way a clean checkout does.
+	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
+	source *dagger.Directory,
+) (*Environments, error) {
+	charts, err := discoverHelmChartPaths(ctx, source)
+	if err != nil {
+		return nil, err
 	}
-	return dag.Devenv().Toolchain()
+	return &Environments{
+		Names:     m.EnvironmentNames,
+		Charts:    charts,
+		Source:    source,
+		Container: m.Container,
+	}, nil
 }
 
-// defaultHelmfileEnvironments is used when a check is called without
-// environments (the +default on each check only applies to CLI calls).
-var defaultHelmfileEnvironments = []string{"production"}
+// Environments are the helmfile environments the checks run in.
+// +collection
+type Environments struct {
+	// +keys
+	Names []string
+	// +private
+	Charts []string
+	// +private
+	Source *dagger.Directory
+	// +private
+	Container *dagger.Container
+}
 
-// helmfileRelease is one release of the helmfile in one environment.
-//
-// Source holds only what helmfile reads to render that release: the state file,
-// the environment's values, the release's chart and the shared library charts.
-// That scoping is what makes the result cache per chart: a change to another
-// chart, or to another environment's values, leaves this release's execs
-// untouched.
-type helmfileRelease struct {
-	// Name is the release name. The helmfile templates derive a release's chart
-	// path from its name, so this is always the chart directory's basename.
+// Environment returns the helmfile environment called name.
+// +get
+func (es *Environments) Environment(name string) *Environment {
+	return &Environment{Name: name, Charts: es.Charts, Source: es.Source, Container: es.Container}
+}
+
+// Environment is one helmfile environment.
+type Environment struct {
+	// Name is the environment's name, as helmfile's --environment takes it.
+	Name string
+	// +private
+	Charts []string
+	// +private
+	Source *dagger.Directory
+	// +private
+	Container *dagger.Container
+}
+
+// Lint checks the helmfile state itself in this environment: that it renders
+// (`helmfile build`), and that its releases, the chart directories and the
+// environment's app list agree with each other.
+// +check
+func (e *Environment) Lint(ctx context.Context) error {
+	if err := lintHelmfileState(ctx, e.Source, e.Name, e.Charts, e.Container); err != nil {
+		return fmt.Errorf("helmfile lint failed: %w", err)
+	}
+	return nil
+}
+
+// Releases returns every chart's release in this environment, keyed by
+// release name.
+func (e *Environment) Releases() *Releases {
+	names := make([]string, len(e.Charts))
+	for i, chart := range e.Charts {
+		names[i] = filepath.Base(chart)
+	}
+	return &Releases{
+		Names:       names,
+		Charts:      e.Charts,
+		Environment: e.Name,
+		Source:      e.Source,
+		Container:   e.Container,
+	}
+}
+
+// Releases are one environment's releases.
+// +collection
+type Releases struct {
+	// Names are the release names. The helmfile templates derive a release's
+	// chart path from its name, so each is its chart directory's basename.
+	// +keys
+	Names []string
+	// +private
+	Charts []string
+	// +private
+	Environment string
+	// +private
+	Source *dagger.Directory
+	// +private
+	Container *dagger.Container
+}
+
+// Release returns the release called name.
+// +get
+func (rs *Releases) Release(name string) (*Release, error) {
+	for _, chart := range rs.Charts {
+		if filepath.Base(chart) == name {
+			return newRelease(rs.Source, chart, rs.Environment, rs.Container), nil
+		}
+	}
+	return nil, fmt.Errorf("no chart for release %q", name)
+}
+
+// Release is one release of the helmfile in one environment.
+type Release struct {
+	// Name is the release name.
 	Name string
 	// Path is the chart's directory relative to the repo root.
 	Path string
-	// Environment is the helmfile environment to render with.
+	// Environment is the helmfile environment it renders with.
 	Environment string
-	// Source is the scoped repo layout described above.
+	// Source holds only what helmfile reads to render this release: the state
+	// file, the environment's values, the release's chart and the shared
+	// library charts. That scoping is what makes the result cache per chart: a
+	// change to another chart, or to another environment's values, leaves this
+	// release's execs untouched.
+	// +private
 	Source *dagger.Directory
+	// +private
+	PolarisConfig *dagger.File
+	// +private
+	Container *dagger.Container
 }
 
-func newHelmfileRelease(source *dagger.Directory, chartPath, env string) *helmfileRelease {
+func newRelease(source *dagger.Directory, chartPath, env string, container *dagger.Container) *Release {
 	envValues := helmfile.EnvValuesPath(env)
-	return &helmfileRelease{
+	return &Release{
 		Name:        filepath.Base(chartPath),
 		Path:        chartPath,
 		Environment: env,
@@ -81,6 +185,8 @@ func newHelmfileRelease(source *dagger.Directory, chartPath, env string) *helmfi
 			WithFile(envValues, source.File(envValues)).
 			WithDirectory(chartPath, source.Directory(chartPath)).
 			WithDirectory(sharedChartsPath, source.Directory(sharedChartsPath)),
+		PolarisConfig: source.File(polarisConfigPath),
+		Container:     container,
 	}
 }
 
@@ -103,7 +209,7 @@ func helmfileContainer(toolchain *dagger.Container, source *dagger.Directory) *d
 }
 
 // args returns a helmfile invocation scoped to this release and environment.
-func (r *helmfileRelease) args(command ...string) []string {
+func (r *Release) args(command ...string) []string {
 	return append([]string{
 		"helmfile",
 		"--quiet",
@@ -115,22 +221,23 @@ func (r *helmfileRelease) args(command ...string) []string {
 // rendered runs `helmfile template` for this release, leaving the manifests in
 // /rendered.yaml and the chart's dependencies built under its charts/ dir.
 //
-// This is the only exec for a release that touches the network. Template and
-// Validate both start from it, so a release's repositories and dependencies are
+// This is the only exec for a release that touches the network. Every check on
+// a release starts from it, so a release's repositories and dependencies are
 // fetched once however many checks consume them. A chart directory with no
 // matching release fails here: helmfile exits non-zero when the selector
 // matches nothing.
-func (r *helmfileRelease) rendered(toolchain *dagger.Container) *dagger.Container {
+func (r *Release) rendered() *dagger.Container {
 	// Redirected in a shell rather than with RedirectStdout, which still echoes
 	// every rendered manifest into the check's log.
 	redirect := []string{"sh", "-c", `exec "$@" > /rendered.yaml`, "--"}
-	return helmfileContainer(toolchain, r.Source).
+	return helmfileContainer(r.Container, r.Source).
 		WithExec(append(redirect, r.args("template", "--include-crds")...))
 }
 
-// Template runs `helmfile template` on this release to verify it renders.
-func (r *helmfileRelease) Template(ctx context.Context, toolchain *dagger.Container) error {
-	if _, err := r.rendered(toolchain).Sync(ctx); err != nil {
+// Build runs `helmfile template` on this release to verify it renders.
+// +check
+func (r *Release) Build(ctx context.Context) error {
+	if _, err := r.rendered().Sync(ctx); err != nil {
 		return fmt.Errorf("helmfile template failed for %s (%s): %w", r.Path, r.Environment, withExecOutput(err))
 	}
 	return nil
@@ -138,8 +245,9 @@ func (r *helmfileRelease) Template(ctx context.Context, toolchain *dagger.Contai
 
 // Validate runs `helmfile lint` (helm lint with the release's merged values)
 // on this release, reusing the dependencies the render already built.
-func (r *helmfileRelease) Validate(ctx context.Context, toolchain *dagger.Container) error {
-	_, err := r.rendered(toolchain).
+// +check
+func (r *Release) Validate(ctx context.Context) error {
+	_, err := r.rendered().
 		WithExec(r.args("lint", "--skip-deps")).
 		Sync(ctx)
 	if err != nil {
@@ -155,154 +263,6 @@ func withExecOutput(err error) error {
 		return fmt.Errorf("%w\n%s%s", err, execErr.Stdout, execErr.Stderr)
 	}
 	return err
-}
-
-// matchHelmfilePaths returns the chart paths affected by the given file paths.
-// The state file, the environment config and the shared library charts feed
-// every release, so a change to any of them selects all charts.
-func matchHelmfilePaths(filePaths, chartPaths []string) []string {
-	for _, p := range filePaths {
-		if p == helmfilePath || strings.HasPrefix(p, "config/") || strings.HasPrefix(p, sharedChartsPath+"/") {
-			return chartPaths
-		}
-	}
-	return matchChartPaths(filePaths, chartPaths)
-}
-
-// forEachHelmfileRelease runs fn for every chart in every environment and
-// returns how many releases it covered. action names what fn does, for the
-// error returned when any of them fail.
-func (m *Helmfile) forEachHelmfileRelease(
-	ctx context.Context,
-	source *dagger.Directory,
-	environments []string,
-	paths []string,
-	action string,
-	fn func(context.Context, *helmfileRelease, *dagger.Container) error,
-) (int, error) {
-	chartPaths := discoverHelmChartPaths(ctx, source)
-	if len(paths) > 0 {
-		chartPaths = matchHelmfilePaths(paths, chartPaths)
-	}
-	if len(chartPaths) == 0 {
-		return 0, nil
-	}
-	if len(environments) == 0 {
-		environments = defaultHelmfileEnvironments
-	}
-	container := m.toolchain()
-
-	// Every release runs to completion and every failure is reported, so one
-	// run shows all the releases that need fixing.
-	errs := make([]error, len(environments)*len(chartPaths))
-
-	var wg sync.WaitGroup
-	for i, env := range environments {
-		for j, chartPath := range chartPaths {
-			release := newHelmfileRelease(source, chartPath, env)
-			wg.Go(func() {
-				errs[i*len(chartPaths)+j] = fn(ctx, release, container)
-			})
-		}
-	}
-	wg.Wait()
-
-	if err := errors.Join(errs...); err != nil {
-		return 0, fmt.Errorf("%s failed:\n%w", action, err)
-	}
-	return len(environments) * len(chartPaths), nil
-}
-
-// Build renders every chart with `helmfile template`, once per
-// environment. Each release is rendered from a scoped source directory so that
-// a change to one chart doesn't invalidate the cache for the others.
-// When paths are provided, only charts matching the paths are rendered.
-// +check
-func (m *Helmfile) Build(ctx context.Context,
-	// +defaultPath="/"
-	// charts/*.tgz are built dependencies; they are gitignored, so leaving them
-	// out makes a local run resolve dependencies the way a clean checkout does.
-	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
-	source *dagger.Directory,
-	// Helmfile environments to render with.
-	// +optional
-	// +default=["production"]
-	environments []string,
-	// +optional
-	paths []string,
-) (string, error) {
-	n, err := m.forEachHelmfileRelease(ctx, source, environments, paths, "helmfile template rendering",
-		func(ctx context.Context, r *helmfileRelease, c *dagger.Container) error {
-			return r.Template(ctx, c)
-		})
-	if err != nil {
-		return "", err
-	}
-	if n == 0 {
-		return "Helmfile template rendering skipped (no matching charts)", nil
-	}
-	return fmt.Sprintf("Helmfile template rendering passed (%d releases)", n), nil
-}
-
-// Validate runs `helmfile lint` on every chart, once per environment.
-// It lints each chart with the values helmfile would deploy it with.
-// When paths are provided, only charts matching the paths are linted.
-// +check
-func (m *Helmfile) Validate(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
-	source *dagger.Directory,
-	// Helmfile environments to lint with.
-	// +optional
-	// +default=["production"]
-	environments []string,
-	// +optional
-	paths []string,
-) (string, error) {
-	n, err := m.forEachHelmfileRelease(ctx, source, environments, paths, "helmfile validation",
-		func(ctx context.Context, r *helmfileRelease, c *dagger.Container) error {
-			return r.Validate(ctx, c)
-		})
-	if err != nil {
-		return "", err
-	}
-	if n == 0 {
-		return "Helmfile validation skipped (no matching charts)", nil
-	}
-	return fmt.Sprintf("Helmfile validation passed (%d releases)", n), nil
-}
-
-// Lint checks the helmfile state itself, once per environment: that it
-// renders (`helmfile build`), and that its releases, the chart directories and
-// the environment's app list agree with each other.
-// +check
-func (m *Helmfile) Lint(ctx context.Context,
-	// +defaultPath="/"
-	// Only Chart.yaml is needed from k8s/, to know which charts exist.
-	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/Chart.yaml"]
-	source *dagger.Directory,
-	// Helmfile environments to lint.
-	// +optional
-	// +default=["production"]
-	environments []string,
-) (string, error) {
-	if len(environments) == 0 {
-		environments = defaultHelmfileEnvironments
-	}
-	container := m.toolchain()
-	chartPaths := discoverHelmChartPaths(ctx, source)
-
-	g := new(errgroup.Group)
-	for _, env := range environments {
-		g.Go(func() error {
-			return lintHelmfileState(ctx, source, env, chartPaths, container)
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return "", fmt.Errorf("helmfile lint failed: %w", err)
-	}
-
-	return fmt.Sprintf("Helmfile lint passed (%s)", strings.Join(environments, ", ")), nil
 }
 
 // helmfileStateSource is the two files helmfile reads to resolve an

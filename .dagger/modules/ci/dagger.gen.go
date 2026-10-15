@@ -198,20 +198,6 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 	switch parentName {
 	case "Ci":
 		switch fnName {
-		case "DebugDir":
-			var parent Ci
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var dir *dagger.Directory
-			if inputArgs["dir"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["dir"]), &dir)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg dir", err))
-				}
-			}
-			return (*Ci).DebugDir(&parent, dir), nil
 		case "VerifyCacheGranularity":
 			var parent Ci
 			err = json.Unmarshal(parentJSON, &parent)
@@ -232,7 +218,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg run", err))
 				}
 			}
-			return (*Ci).VerifyCacheGranularity(&parent, ctx, source, run)
+			return nil, (*Ci).VerifyCacheGranularity(&parent, ctx, source, run)
 		case "":
 			var parent Ci
 			err = json.Unmarshal(parentJSON, &parent)
@@ -256,25 +242,19 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			WithObject(
 				dag.TypeDef().WithObject("Ci", dagger.TypeDefWithObjectOpts{Description: "Ci checks the Dagger modules under .dagger.", SourceMap: dag.SourceMap("main.go", 13, 6)}).
 					WithFunction(
-						dag.Function("DebugDir",
-							dag.TypeDef().WithObject("Directory")).
-							WithDescription("DebugDir returns the given dir. Useful for inspecting directory contents for debugging.").
-							WithSourceMap(dag.SourceMap("main.go", 102, 1)).
-							WithArg("dir", dag.TypeDef().WithObject("Directory"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 102, 23)})).
-					WithFunction(
 						dag.Function("VerifyCacheGranularity",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("VerifyCacheGranularity runs the Dagger modules' tests, including the ones\nthat need a real engine.\n\nThe go toolchain's test runs these too, but only against\ndagger/lib/daggerfake's model of the engine: the engine-backed tests skip unless they inherit a Dagger\nsession, so they need either\n\n\tcd .dagger/modules/<module> && dagger run go test ./...\n\nor this function, which gets the same thing by running the tests in an exec\nwith nesting enabled. Use it to confirm the fake still agrees with the engine\nafter a Dagger upgrade, or after teaching the fake a new API call.\n\nIts result caches on its inputs, like any other function here, and that is\nthe right behaviour: the two things that can change the verdict both bust it.\nEditing .dagger changes source, and upgrading Dagger means a new engine with\na new cache. To force a re-run anyway, vary run (`--run '.*'` is a different\nargument to the default `.` and so a different call).").
-							WithSourceMap(dag.SourceMap("main.go", 46, 1)).
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("VerifyCacheGranularity runs the Dagger modules' tests, including the ones\nthat need a real engine.\n\nThe go toolchain's test runs these too, but only against\ndagger/lib/daggerfake's model of the engine: the engine-backed tests skip\nunless a run opts in to them under a Dagger session, so they need either\n\n\tcd .dagger/modules/<module> && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...\n\nor this function, which opts in, and whose exec gets a session of its own, as\nevery container does. Use it to confirm the fake still agrees with the engine after a Dagger\nupgrade, or after teaching the fake a new API call.\n\nIts result caches on its inputs, like any other function here, and that is\nthe right behaviour: the two things that can change the verdict both bust it.\nEditing .dagger changes source, and upgrading Dagger means a new engine with\na new cache. To force a re-run anyway, vary run (`--run '.*'` is a different\nargument to the default `.` and so a different call).").
+							WithSourceMap(dag.SourceMap("main.go", 45, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: ".golangci.yaml is here because go's lint_test.go reads the repo's real\nconfig rather than a stand-in, so the behaviour tests exercise the\nconfig the gate runs with.", SourceMap: dag.SourceMap("main.go", 53, 2), DefaultPath: "/", Ignore: []string{"*", "!.dagger/**/*.go", "!.dagger/**/go.mod", "!.dagger/**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json", "!.golangci.yaml"}}).
-							WithArg("run", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Run only tests matching this regexp, as `go test -run`. Defaults to all\nof them, which covers the fake-backed tests too.", SourceMap: dag.SourceMap("main.go", 58, 2), DefaultValue: dagger.JSON("\".\"")})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: ".golangci.yaml is here because go's lint_test.go reads the repo's real\nconfig rather than a stand-in, so the behaviour tests exercise the\nconfig the gate runs with.", SourceMap: dag.SourceMap("main.go", 52, 2), DefaultPath: "/", Ignore: []string{"*", "!.dagger/**/*.go", "!.dagger/**/go.mod", "!.dagger/**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/release/releases.json", "!.golangci.yaml"}}).
+							WithArg("run", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Run only tests matching this regexp, as `go test -run`. Defaults to all\nof them, which covers the fake-backed tests too.", SourceMap: dag.SourceMap("main.go", 57, 2), DefaultValue: dagger.JSON("\".\"")})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Ci")).
 							WithDescription("Checks on this repo's own Dagger modules.").
 							WithSourceMap(dag.SourceMap("main.go", 19, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs go; defaults to the devenv ci toolchain.", SourceMap: dag.SourceMap("main.go", 22, 2)}))), nil
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs go. dagger.toml wires in devenv's toolchain.", SourceMap: dag.SourceMap("main.go", 21, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

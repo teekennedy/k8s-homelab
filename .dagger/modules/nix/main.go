@@ -29,19 +29,11 @@ type Nix struct {
 // Formats and validates the Nix flake and host configuration.
 func New(
 	// Container to run the formatters and the build-metrics tests in. It needs
-	// alejandra, deadnix and uv; defaults to the devenv ci toolchain. Flake
+	// alejandra, deadnix and uv. dagger.toml wires in devenv's toolchain. Flake
 	// evaluation and builds always use the plain Nix container instead.
-	// +optional
 	container *dagger.Container,
 ) *Nix {
 	return &Nix{Container: container}
-}
-
-func (m *Nix) toolchain() *dagger.Container {
-	if m.Container != nil {
-		return m.Container
-	}
-	return dag.Devenv().Toolchain()
 }
 
 // Image returns the plain Nix image, for evaluating and building flakes.
@@ -72,7 +64,7 @@ func (m *Nix) Format(
 // deadnix runs first: it removes code, which can leave formatting for
 // alejandra to clean up.
 func (m *Nix) nixFormat(source *dagger.Directory, paths []string) *dagger.Directory {
-	container := m.toolchain().
+	container := m.Container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src")
 
@@ -93,17 +85,17 @@ func (m *Nix) Validate(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"]
 	source *dagger.Directory,
-) (string, error) {
+) error {
 	_, err := m.Image().
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "flake", "check", "--no-build"}).
 		Sync(ctx)
 	if err != nil {
-		return "", fmt.Errorf("nix flake check failed: %w", err)
+		return fmt.Errorf("nix flake check failed: %w", err)
 	}
 
-	return "Nix flake validation passed", nil
+	return nil
 }
 
 // ValidateBuildMetrics runs a real Nix build through the selfupdate metrics
@@ -114,7 +106,7 @@ func (m *Nix) ValidateBuildMetrics(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!flake.lock", "!nix/modules/selfupdate/build-metrics/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
-) (string, error) {
+) error {
 	const project = "nix/modules/selfupdate/build-metrics"
 
 	probe := m.Image().
@@ -123,7 +115,7 @@ func (m *Nix) ValidateBuildMetrics(ctx context.Context,
 		WithNewFile("/probe.sh", nixBuildMetricsProbe, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
 		WithExec([]string{"/probe.sh"})
 
-	_, err := m.toolchain().
+	_, err := m.Container.
 		WithMountedDirectory("/src", source.Directory(project)).
 		WithMountedFile("/tmp/nix-log.json", probe.File("/out/nix-log.json")).
 		WithMountedFile("/tmp/timings.txt", probe.File("/out/timings.txt")).
@@ -134,10 +126,10 @@ func (m *Nix) ValidateBuildMetrics(ctx context.Context,
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return "", fmt.Errorf("nix build metrics parser failed:\n%s%s", execErr.Stdout, execErr.Stderr)
+			return fmt.Errorf("nix build metrics parser failed:\n%s%s", execErr.Stdout, execErr.Stderr)
 		}
-		return "", fmt.Errorf("nix build metrics parser failed: %w", err)
+		return fmt.Errorf("nix build metrics parser failed: %w", err)
 	}
 
-	return "Nix build metrics parser validated", nil
+	return nil
 }

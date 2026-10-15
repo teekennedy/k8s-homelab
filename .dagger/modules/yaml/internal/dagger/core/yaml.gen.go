@@ -9,38 +9,35 @@ import (
 	"github.com/dagger/querybuilder"
 )
 
-// YamlOpts contains options for Query.Yaml
-type YamlOpts struct {
-	// Container to run in. It needs yamllint; defaults to the devenv ci
-	// toolchain.
-	Container *Container
-}
-
-func (r *Query) Yaml(opts ...YamlOpts) *Yaml { // yaml (../../../../../:0:0)
+func (r *Query) Yaml(container *Container) *Yaml { // yaml (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("yaml")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
+	q = q.Arg("container", container)
 
 	return &Yaml{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
 // Yaml runs yamllint over the repo.
 type Yaml struct { // yaml (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id   *ID
-	lint *string
+	lint *Void
 }
 
 func (r *Yaml) WithGraphQLQuery(q *querybuilder.Selection) *Yaml {
 	return &Yaml{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -54,7 +51,13 @@ func (r *Yaml) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -110,9 +113,9 @@ type YamlLintOpts struct {
 // is a real gate: the previous implementation caught the exec error and
 // returned success with a "completed with warnings" string, so `dagger check`
 // could never fail on YAML while the local hook blocked the commit.
-func (r *Yaml) Lint(ctx context.Context, opts ...YamlLintOpts) (string, error) {
+func (r *Yaml) Lint(ctx context.Context, opts ...YamlLintOpts) error {
 	if r.lint != nil {
-		return *r.lint, nil
+		return nil
 	}
 	q := r.query.Select("lint")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -126,8 +129,5 @@ func (r *Yaml) Lint(ctx context.Context, opts ...YamlLintOpts) (string, error) {
 		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }

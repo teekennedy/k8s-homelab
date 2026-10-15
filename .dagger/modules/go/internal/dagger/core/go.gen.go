@@ -12,14 +12,20 @@ import (
 // Go runs Go checks over every module in the repo.
 type Go struct { // go (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
-	id   *ID
-	test *string
+	id *ID
 }
 
 func (r *Go) WithGraphQLQuery(q *querybuilder.Selection) *Go {
 	return &Go{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -33,7 +39,13 @@ func (r *Go) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -72,38 +84,16 @@ func (r *Go) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-// GoLintOpts contains options for Go.Lint
-type GoLintOpts struct {
-	Source *Directory
-}
-
-// Lint tidies go.mod/go.sum and applies golangci-lint's autofixes (including
-// formatting) across all discovered Go modules.
-// Fails if issues remain that --fix cannot resolve (e.g. cyclop, gosec).
-// Returns a changeset. Use `dagger generate go:lint -y` to apply.
-func (r *Go) Lint(opts ...GoLintOpts) *Changeset {
-	q := r.query.Select("lint")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-	}
-
-	return &Changeset{
-		query: q,
-	}
-}
-
 // GoModulesOpts contains options for Go.Modules
 type GoModulesOpts struct {
+	// The scripts and releases.json are here because Dagger modules go:embed
+	// them; without them those modules do not build.
 	Source *Directory
 }
 
-// Modules returns all discovered Go modules with scoped source directories.
-// Each module's Source is a subdirectory of the +defaultPath source, so
-// Directory IDs are stable across sessions and cache independently.
-func (r *Go) Modules(ctx context.Context, opts ...GoModulesOpts) ([]GoModule, error) {
+// Modules returns every Go module in the repo, keyed by path. Vendored
+// modules are skipped.
+func (r *Go) Modules(opts ...GoModulesOpts) *GoModules {
 	q := r.query.Select("modules")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
@@ -112,79 +102,31 @@ func (r *Go) Modules(ctx context.Context, opts ...GoModulesOpts) ([]GoModule, er
 		}
 	}
 
-	q = q.Select("id")
-
-	type modules struct {
-		Id ID
+	return &GoModules{
+		query:     q,
+		refetchID: r.refetchID,
 	}
-
-	convert := func(fields []modules) []GoModule {
-		out := []GoModule{}
-
-		for i := range fields {
-			val := GoModule{id: &fields[i].Id}
-			val.query = selectNode(q.Root(), fields[i].Id, "GoModule")
-			out = append(out, val)
-		}
-
-		return out
-	}
-	var response []modules
-
-	q = q.Bind(&response)
-
-	err := q.Execute(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert(response), nil
 }
 
-// GoTestOpts contains options for Go.Test
-type GoTestOpts struct {
-	// The scripts and releases.json are here because Dagger modules go:embed
-	// them; without them those modules do not build and `go test` fails at
-	// setup.
-	Source *Directory
-}
-
-// Test runs Go tests for all discovered Go modules.
-// Each module is tested with a scoped source directory so that changes
-// in one module don't invalidate the BuildKit cache for other modules.
-func (r *Go) Test(ctx context.Context, opts ...GoTestOpts) (string, error) {
-	if r.test != nil {
-		return *r.test, nil
-	}
-	q := r.query.Select("test")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-	}
-
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
-}
-
-// GoModule is a Go module with a scoped source directory.
-// Each GoModule carries only the files for its module, enabling
-// per-module caching: changing files in one module won't invalidate
-// the cache for other modules.
+// GoModule is one Go module.
 type GoModule struct { // go (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id   *ID
 	path *string
-	test *string
+	test *Void
 }
 
 func (r *GoModule) WithGraphQLQuery(q *querybuilder.Selection) *GoModule {
 	return &GoModule{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -198,7 +140,13 @@ func (r *GoModule) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -237,19 +185,15 @@ func (r *GoModule) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-// Lint runs `go mod tidy` followed by `golangci-lint run --fix` on this module,
-// returning the resulting changes. Errors from either step (including unfixable
-// lint issues that --fix leaves behind) are returned rather than swallowed, so
-// Go.Lint fails when there's more to fix than autofixing can handle.
-func (r *GoModule) Lint(configFile *File, container *Container) *Changeset {
-	assertNotNil("configFile", configFile)
-	assertNotNil("container", container)
+// Lint runs `go mod tidy` followed by `golangci-lint run --fix` on the module,
+// returning the resulting changes. It fails if issues remain that --fix cannot
+// resolve (e.g. cyclop, gosec).
+func (r *GoModule) Lint() *Changeset {
 	q := r.query.Select("lint")
-	q = q.Arg("configFile", configFile)
-	q = q.Arg("container", container)
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -266,29 +210,141 @@ func (r *GoModule) Path(ctx context.Context) (string, error) {
 	return response, q.Execute(ctx)
 }
 
-// Replaces are the modules its go.mod replaces with a local path, which
-// have to sit at that path relative to Source for it to build.
-func (r *GoModule) Replaces(ctx context.Context) ([]GoReplace, error) {
-	q := r.query.Select("replaces")
+// Test runs the module's Go tests.
+func (r *GoModule) Test(ctx context.Context) error {
+	if r.test != nil {
+		return nil
+	}
+	q := r.query.Select("test")
+
+	return q.Execute(ctx)
+}
+
+// Modules are the repo's Go modules.
+type GoModules struct { // go (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
+
+	id *ID
+}
+type WithGoModulesFunc func(r *GoModules) *GoModules
+
+// With calls the provided function with current GoModules.
+//
+// This is useful for reusability and readability by not breaking the calling chain.
+func (r *GoModules) With(f WithGoModulesFunc) *GoModules {
+	return f(r)
+}
+
+func (r *GoModules) WithGraphQLQuery(q *querybuilder.Selection) *GoModules {
+	return &GoModules{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
+	}
+}
+
+// Module returns the Go module at path, carrying only its own files and its
+// local replace targets, so that it caches independently of the others.
+func (r *GoModules) Get(key string) *GoModule {
+	q := r.query.Select("get")
+	q = q.Arg("key", key)
+
+	return &GoModule{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// A unique identifier for this GoModules.
+func (r *GoModules) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
+
+	q = q.Bind(&response)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *GoModules) XXX_GraphQLType() string {
+	return "GoModules"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *GoModules) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *GoModules) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *GoModules) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *GoModules) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = GoModules{query: selectNode(dag.QueryBuilder(), id, "GoModules")}
+	return nil
+}
+
+func (r *GoModules) Keys(ctx context.Context) ([]string, error) {
+	q := r.query.Select("keys")
+
+	var response []string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+func (r *GoModules) List(ctx context.Context) ([]GoModule, error) {
+	q := r.query.Select("list")
 
 	q = q.Select("id")
 
-	type replaces struct {
+	type list struct {
 		Id ID
 	}
 
-	convert := func(fields []replaces) []GoReplace {
-		out := []GoReplace{}
+	convert := func(fields []list) []GoModule {
+		out := []GoModule{}
 
 		for i := range fields {
-			val := GoReplace{id: &fields[i].Id}
-			val.query = selectNode(q.Root(), fields[i].Id, "GoReplace")
+			val := GoModule{id: &fields[i].Id}
+			val.query = selectNode(q.Root(), fields[i].Id, "GoModule")
 			out = append(out, val)
 		}
 
 		return out
 	}
-	var response []replaces
+	var response []list
 
 	q = q.Bind(&response)
 
@@ -300,133 +356,23 @@ func (r *GoModule) Replaces(ctx context.Context) ([]GoReplace, error) {
 	return convert(response), nil
 }
 
-// Source is the module's scoped source directory.
-// When populated via Modules(), this is derived from aparent directory, so its ID is stable across sessions.
-func (r *GoModule) Source() *Directory {
-	q := r.query.Select("source")
+func (r *GoModules) Subset(keys []string) *GoModules {
+	q := r.query.Select("subset")
+	q = q.Arg("keys", keys)
 
-	return &Directory{
-		query: q,
+	return &GoModules{
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
-// Test runs Go tests for this module.
-func (r *GoModule) Test(ctx context.Context, container *Container) (string, error) {
+func (r *Query) Go(container *Container) *Go { // go (../../../../../:0:0)
 	assertNotNil("container", container)
-	if r.test != nil {
-		return *r.test, nil
-	}
-	q := r.query.Select("test")
+	q := r.query.Select("go")
 	q = q.Arg("container", container)
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
-}
-
-// GoReplace is a local `replace` target, mounted where the module expects it.
-type GoReplace struct { // go (../../../../../:0:0)
-	query *querybuilder.Selection
-
-	id    *ID
-	mount *string
-}
-
-func (r *GoReplace) WithGraphQLQuery(q *querybuilder.Selection) *GoReplace {
-	return &GoReplace{
-		query: q,
-	}
-}
-
-// A unique identifier for this GoReplace.
-func (r *GoReplace) ID(ctx context.Context) (ID, error) {
-	if r.id != nil {
-		return *r.id, nil
-	}
-	q := r.query.Select("id")
-
-	var response ID
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
-}
-
-// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
-func (r *GoReplace) XXX_GraphQLType() string {
-	return "GoReplace"
-}
-
-// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
-func (r *GoReplace) XXX_GraphQLIDType() string {
-	return "ID"
-}
-
-// XXX_GraphQLID is an internal function. It returns the underlying type ID
-func (r *GoReplace) XXX_GraphQLID(ctx context.Context) (string, error) {
-	id, err := r.ID(ctx)
-	if err != nil {
-		return "", err
-	}
-	return string(id), nil
-}
-
-func (r *GoReplace) MarshalJSON() ([]byte, error) {
-	id, err := r.ID(marshalCtx)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(id)
-}
-func (r *GoReplace) UnmarshalJSON(bs []byte) error {
-	var id string
-	err := json.Unmarshal(bs, &id)
-	if err != nil {
-		return err
-	}
-	*r = GoReplace{query: selectNode(dag.QueryBuilder(), id, "GoReplace")}
-	return nil
-}
-
-// Mount is the target's absolute path in the module's container.
-func (r *GoReplace) Mount(ctx context.Context) (string, error) {
-	if r.mount != nil {
-		return *r.mount, nil
-	}
-	q := r.query.Select("mount")
-
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
-}
-
-// Source is the target's scoped source directory.
-func (r *GoReplace) Source() *Directory {
-	q := r.query.Select("source")
-
-	return &Directory{
-		query: q,
-	}
-}
-
-// GoOpts contains options for Query.Go
-type GoOpts struct {
-	// Container to run in. It needs go and golangci-lint; defaults to the
-	// devenv ci toolchain.
-	Container *Container
-}
-
-func (r *Query) Go(opts ...GoOpts) *Go { // go (../../../../../:0:0)
-	q := r.query.Select("go")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
-
 	return &Go{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

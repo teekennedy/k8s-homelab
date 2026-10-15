@@ -12,9 +12,10 @@ against it.
 | `dev-cluster` | A named cluster that keeps its state between runs |
 | `dev-cluster-delete` | Delete a stopped dev cluster's state |
 
-None of them is a check; see below for why. All take the toolchain through the
-constructor's `--container`, which defaults to the devenv `ci` and
-`integration` profiles: the ci toolchain plus kubectl and curl.
+None of them is a check; see below for why. All run in the constructor's
+`container`, which dagger.toml wires to `dag://devenv/integration-toolchain`:
+the devenv `ci` and `integration` profiles, the ci toolchain plus kubectl and
+curl.
 
 ## Integration tests
 
@@ -26,16 +27,16 @@ release's pytest suite against the result — then destroys the cluster.
 
 ```bash
 # Deploy and test everything the dev environment enables
-dagger call kubernetes integration-test
+dagger api call kubernetes integration-test
 
 # Narrow that to specific releases
-dagger call kubernetes integration-test --releases=reflector
+dagger api call kubernetes integration-test --releases=reflector
 
 # Same run, but keep the JUnit XML reports
-dagger call kubernetes integration-reports export --path=./reports
+dagger api call kubernetes integration-reports export --path=./reports
 
 # Sync twice before testing, to check that re-syncing an existing cluster works
-dagger call kubernetes integration-test --repeat-sync
+dagger api call kubernetes integration-test --repeat-sync
 ```
 
 The workflow is repeatable with no manual steps: every run gets a fresh cluster
@@ -69,7 +70,7 @@ is the usual answer:
 
 ```bash
 unset _EXPERIMENTAL_DAGGER_RUNNER_HOST   # don't use the in-cluster engine
-dagger call kubernetes integration-test
+dagger api call kubernetes integration-test
 ```
 
 There is no Docker daemon, k3d or `DOCKER_HOST` involved: nothing outside the
@@ -166,9 +167,9 @@ kubeconfig happens to be valid; they run because someone selected them.
   `pyproject.toml`.
 - That same `pyproject.toml` sets `addopts = "-m 'not kubernetes'"`. This is the
   mechanism — it covers a bare `pytest` in an editor or a shell as well as
-  `dagger check python:test`, and it is the only place that *can* cover the
+  `dagger check --python`, and it is the only place that *can* cover the
   former.
-- `python:test` deliberately passes **no** `-m`. A command-line `-m`
+- The python module's `test` deliberately passes **no** `-m`. A command-line `-m`
   replaces `addopts` rather than narrowing it, so one passed from the runner
   would re-enable the tests a project deselected for itself and deselect the ones
   a project runs on purpose — `jellyfin-exporter` registers `integration`
@@ -200,7 +201,7 @@ running is a failure.
    packaged chart.
 4. Enable the release in `config/dev.cue`, then
    `dagger generate cue:export -y`.
-5. `dagger call kubernetes integration-test --releases=<release>`.
+5. `dagger api call kubernetes integration-test --releases=<release>`.
 
 Nothing in `.dagger` needs changing, and step 4 is what adds the release to the
 default run: with no `--releases`, the workflow deploys and tests everything the
@@ -226,10 +227,10 @@ do its job.
    `integration-reports` plan against the whole source, then pass
    `integration-run` only what the run reads: the state file, the
    dev values, the shared charts, the shared test library (`k8s/testlib/`)
-   and the chosen releases' charts (tests included). It is called through the module's own API, which needs the
-   experimental self-calls capability (`SELF_CALLS`, kept in this module's
-   `dagger.json`). The workflow itself therefore re-runs only when something
-   it deploys or tests changes.
+   and the chosen releases' charts (tests included). It is called through the
+   module's own API, using the self-call bindings the 1.0 Go SDK always
+   generates. The workflow itself therefore re-runs only when something it
+   deploys or tests changes.
 3. **Execs that do not touch the cluster.** The toolchain, the helmfile planning
    (`helmfile build` and `list`) and each test project's `uv sync` are all built
    *before* anything cluster-specific is applied to the container, so they are
@@ -302,8 +303,8 @@ Several can run side by side under different names.
 ### Lifetime
 
 A Dagger service lives exactly as long as the session that started it, so a
-cluster cannot outlive its `dagger call`. `up` therefore leaves one running in
-the background — `dagger call kubernetes dev-cluster ... up --ports <port>:6443`, which
+cluster cannot outlive its `dagger api call`. `up` therefore leaves one running in
+the background — `dagger api call kubernetes dev-cluster ... up --ports <port>:6443`, which
 also publishes the API server on the host's loopback — and `down` stops it.
 
 What makes a stopped cluster the same cluster when it is started again is its
@@ -348,7 +349,7 @@ the loopback tunnel.
 and test a cluster that is already running instead of creating one:
 
 ```bash
-dagger call kubernetes integration-test \
+dagger api call kubernetes integration-test \
   --cluster=tcp://localhost:<port> --kubeconfig=file:<kubeconfig>
 ```
 

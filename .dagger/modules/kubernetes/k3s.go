@@ -558,7 +558,7 @@ func (c *k3sCluster) Close(ctx context.Context) error {
 // It runs for as long as the call that started it does, so it is used with
 // `up`, which also publishes the API server on the host:
 //
-//	dagger call kubernetes dev-cluster --name=dev --token=file:./token up --ports=6443:6443
+//	dagger api call kubernetes dev-cluster --name=dev --token=file:./token up --ports=6443:6443
 //
 // scripts/dev-cluster.sh wraps this, and writes the kubeconfig. See "Dev
 // clusters" in README.md.
@@ -578,7 +578,7 @@ func (m *Kubernetes) DevCluster(ctx context.Context,
 // DevClusterDelete deletes a dev cluster's state. The cluster must be stopped:
 // a running one holds its state volume, and this waits for it.
 //
-//	dagger call kubernetes dev-cluster-delete --name=dev
+//	dagger api call kubernetes dev-cluster-delete --name=dev
 func (m *Kubernetes) DevClusterDelete(ctx context.Context,
 	name string,
 ) (string, error) {

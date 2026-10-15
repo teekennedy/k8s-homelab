@@ -40,10 +40,6 @@
 //     is the exec.
 //   - Command semantics. An assertion that a check *passes* still needs a real
 //     engine; these tests only assert what would and would not be re-run.
-//   - Dependency modules. A module registered with Engine.Module answers every
-//     call with an opaque container named after the call, because its own
-//     `+defaultPath` arguments are loaded by the engine and never reach the
-//     caller's query. Only container-returning functions are modelled.
 package daggerfake
 
 import (
@@ -107,35 +103,14 @@ func (e Exec) MountsFile(mountPath, file string) bool {
 // It is safe for concurrent use: checks that fan out with an errgroup issue
 // overlapping requests.
 type Engine struct {
-	mu      sync.Mutex
-	objs    map[string]any
-	execs   []Exec
-	modules map[string]bool
-	calls   []string
+	mu    sync.Mutex
+	objs  map[string]any
+	execs []Exec
 }
 
 // New returns an Engine with an empty object registry and exec log.
 func New() *Engine {
-	return &Engine{objs: map[string]any{}, modules: map[string]bool{}}
-}
-
-// Module registers a dependency module by the Query field the SDK selects to
-// reach it (its name, lowerCamelCased). Without this a call into it fails as
-// an unsupported field.
-func (e *Engine) Module(field string) *Engine {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.modules[field] = true
-	return e
-}
-
-// ModuleCalls returns the digest of every dependency module call evaluated so
-// far, in order. A call's digest folds in its arguments, so two runs that made
-// the same calls report the same digests.
-func (e *Engine) ModuleCalls() []string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return append([]string(nil), e.calls...)
+	return &Engine{objs: map[string]any{}}
 }
 
 // Execs returns the execs recorded so far, in the order they were evaluated.
@@ -273,9 +248,6 @@ type ctrVal struct {
 // "after" side of an exec.
 type changesetVal struct{ pairs [][2]string }
 
-// modVal is a dependency module's object, named by the calls that reached it.
-type modVal struct{ path string }
-
 func digest(kind string, parts ...string) string {
 	h := sha256.New()
 	h.Write([]byte(kind))
@@ -389,8 +361,6 @@ func (e *Engine) apply(parent any, field string, args map[string]any) (any, erro
 		return e.applyLeaf(p, field)
 	case *changesetVal:
 		return e.applyChangeset(p, field, args)
-	case *modVal:
-		return e.applyModule(p, field, args)
 	default:
 		return nil, fmt.Errorf("cannot select %q on %T", field, parent)
 	}
@@ -457,10 +427,6 @@ func (e *Engine) changesetArg(raw any, what string) (*changesetVal, error) {
 	return cs, nil
 }
 
-// applyQuery is a flat dispatch over Query's GraphQL fields, on the same terms
-// as applyDirectory.
-//
-//nolint:cyclop // GraphQL field dispatch: one case per schema field
 func (e *Engine) applyQuery(field string, args map[string]any) (any, error) {
 	switch field {
 	case "directory":
@@ -481,33 +447,8 @@ func (e *Engine) applyQuery(field string, args map[string]any) (any, error) {
 	case "version":
 		return "daggerfake", nil
 	default:
-		if e.modules[field] {
-			return &modVal{path: field + callArgs(args)}, nil
-		}
 		return nil, fmt.Errorf("unsupported Query field %q", field)
 	}
-}
-
-// applyModule answers a function call on a dependency module with an opaque
-// container. Its identity is the call, which is what the engine's function
-// cache keys a module call on too.
-func (e *Engine) applyModule(m *modVal, field string, args map[string]any) (any, error) {
-	call := m.path + "." + field + callArgs(args)
-	ctr := newContainer().step("module " + call)
-	e.calls = append(e.calls, ctr.digest())
-	return ctr, nil
-}
-
-// callArgs renders a call's arguments in a stable order.
-func callArgs(args map[string]any) string {
-	if len(args) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(args))
-	for _, k := range slices.Sorted(maps.Keys(args)) {
-		parts = append(parts, fmt.Sprintf("%s=%v", k, args[k]))
-	}
-	return "(" + strings.Join(parts, ",") + ")"
 }
 
 // applyDirectory is a flat dispatch over Directory's GraphQL fields. It reads

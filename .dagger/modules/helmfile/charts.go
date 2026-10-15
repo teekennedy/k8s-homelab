@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -13,8 +14,11 @@ import (
 const helmRepoRoot = "/repo"
 
 // discoverHelmChartPaths finds all Helm chart directories in source.
-func discoverHelmChartPaths(ctx context.Context, source *dagger.Directory) []string {
-	chartFiles, _ := source.Glob(ctx, "k8s/**/Chart.yaml")
+func discoverHelmChartPaths(ctx context.Context, source *dagger.Directory) ([]string, error) {
+	chartFiles, err := source.Glob(ctx, "k8s/**/Chart.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("discovering charts: %w", err)
+	}
 	var paths []string
 	for _, f := range chartFiles {
 		if !strings.Contains(f, "/charts/") {
@@ -22,33 +26,5 @@ func discoverHelmChartPaths(ctx context.Context, source *dagger.Directory) []str
 		}
 	}
 	sort.Strings(paths)
-	return paths
-}
-
-// matchChartPaths returns chart paths that contain any of the given file paths.
-// CUE config changes cause all charts to be returned.
-func matchChartPaths(filePaths, chartPaths []string) []string {
-	// CUE changes affect all charts
-	for _, p := range filePaths {
-		if strings.HasPrefix(p, "config/") && strings.HasSuffix(p, ".cue") {
-			return chartPaths
-		}
-	}
-
-	matched := map[string]bool{}
-	for _, p := range filePaths {
-		for _, dir := range chartPaths {
-			if strings.HasPrefix(p, dir+"/") || p == dir {
-				matched[dir] = true
-			}
-		}
-	}
-
-	var result []string
-	for _, dir := range chartPaths {
-		if matched[dir] {
-			result = append(result, dir)
-		}
-	}
-	return result
+	return paths, nil
 }

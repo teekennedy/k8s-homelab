@@ -8,164 +8,167 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 
 	"dagger/terraform/internal/dagger"
 )
-
-// discoverTerraformModulePaths finds all Terraform module directories in source.
-func discoverTerraformModulePaths(ctx context.Context, source *dagger.Directory) []string {
-	tfFiles, _ := source.Glob(ctx, "terraform/**/.terraform.lock.hcl")
-	seen := map[string]bool{}
-	var paths []string
-	for _, f := range tfFiles {
-		dir := filepath.Dir(f)
-		if !seen[dir] {
-			seen[dir] = true
-			paths = append(paths, dir)
-		}
-	}
-	sort.Strings(paths)
-	return paths
-}
-
-func terraformModuleName(path string) string {
-	if path == "terraform" {
-		return "root"
-	}
-	name, _ := strings.CutPrefix(path, "terraform/")
-	return name
-}
 
 // Terraform runs OpenTofu checks over terraform/.
 type Terraform struct {
 	// +private
 	Container *dagger.Container
+	// +private
+	Platforms []string
 }
 
 // Formats, lints, locks and validates the OpenTofu modules under terraform/.
 func New(
-	// Container to run in. It needs tofu and trivy; defaults to the devenv ci
-	// toolchain.
-	// +optional
+	// Container to run in. It needs tofu and trivy. dagger.toml wires in
+	// devenv's toolchain.
 	container *dagger.Container,
+	// Platforms the lock generator computes provider hashes for.
+	// +optional
+	// +default=["linux_arm64", "linux_amd64", "darwin_arm64"]
+	platforms []string,
 ) *Terraform {
-	return &Terraform{Container: container}
-}
-
-func (m *Terraform) toolchain() *dagger.Container {
-	if m.Container != nil {
-		return m.Container
-	}
-	return dag.Devenv().Toolchain()
+	return &Terraform{Container: container, Platforms: platforms}
 }
 
 // terraformContainer returns the toolchain with terraform environment
 // variables and cache dirs.
-func (m *Terraform) terraformContainer() *dagger.Container {
+func terraformContainer(toolchain *dagger.Container) *dagger.Container {
 	const tfPluginCache = "/cache/terraform/plugins"
 
-	return m.toolchain().
+	return toolchain.
 		WithEnvVariable("TF_IN_AUTOMATION", "1").
 		WithEnvVariable("TF_PLUGIN_CACHE_DIR", tfPluginCache).
 		WithMountedCache(tfPluginCache, dag.CacheVolume("homelab-tf-plugins"))
 }
 
-// initTerraformModule runs tofu init against the module given by modPath and
-// returns a Changeset of files modified, as well as the initialized container.
-func (m *Terraform) initTerraformModule(ctx context.Context, source *dagger.Directory, container *dagger.Container, modPath string) (*dagger.Container, error) {
-	modWorkdir := "/src/" + modPath
+// Modules returns every OpenTofu module under terraform/ — every directory
+// with a .terraform.lock.hcl — keyed by path.
+func (m *Terraform) Modules(
+	ctx context.Context,
+	// +defaultPath="/"
+	// +ignore=["*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"]
+	source *dagger.Directory,
+) (*Modules, error) {
+	lockFiles, err := source.Glob(ctx, "terraform/**/.terraform.lock.hcl")
+	if err != nil {
+		return nil, fmt.Errorf("discovering terraform modules: %w", err)
+	}
+	paths := make([]string, len(lockFiles))
+	for i, f := range lockFiles {
+		paths[i] = filepath.Dir(f)
+	}
+	sort.Strings(paths)
+	return &Modules{Paths: paths, Source: source, Container: m.Container, Platforms: m.Platforms}, nil
+}
 
-	updated, err := container.
-		WithMountedDirectory("/src", source).
-		WithWorkdir(modWorkdir).
-		WithExec([]string{"echo", ("================ " + terraformModuleName(modPath) + " ================")}).
+// Modules are the repo's OpenTofu modules.
+// +collection
+type Modules struct {
+	// Paths are the modules' directories relative to the repo root.
+	// +keys
+	Paths []string
+	// +private
+	Source *dagger.Directory
+	// +private
+	Container *dagger.Container
+	// +private
+	Platforms []string
+}
+
+// Module returns the OpenTofu module at path. It carries all of terraform/,
+// because modules reference their siblings by relative path.
+// +get
+func (ms *Modules) Module(path string) *TerraformModule {
+	return &TerraformModule{Path: path, Source: ms.Source, Container: ms.Container, Platforms: ms.Platforms}
+}
+
+// TerraformModule is one OpenTofu module.
+type TerraformModule struct {
+	// Path is the module's directory relative to the repo root.
+	Path string
+	// +private
+	Source *dagger.Directory
+	// +private
+	Container *dagger.Container
+	// +private
+	Platforms []string
+}
+
+// name labels the module in logs: its path under terraform/, or "root".
+func (tm *TerraformModule) name() string {
+	if tm.Path == "terraform" {
+		return "root"
+	}
+	name, _ := strings.CutPrefix(tm.Path, "terraform/")
+	return name
+}
+
+// initialized runs tofu init in the module.
+func (tm *TerraformModule) initialized(ctx context.Context) (*dagger.Container, error) {
+	updated, err := terraformContainer(tm.Container).
+		WithMountedDirectory("/src", tm.Source).
+		WithWorkdir("/src/" + tm.Path).
+		WithExec([]string{"echo", "================ " + tm.name() + " ================"}).
 		WithExec([]string{"tofu", "init", "-backend=false", "-input=false"}).
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, fmt.Errorf("terraform module %s: init failed:\n%s", modPath, execErr.Stderr)
+			return nil, fmt.Errorf("terraform module %s: init failed:\n%s", tm.Path, execErr.Stderr)
 		}
-		return nil, fmt.Errorf("terraform module %s: init failed: %w", modPath, err)
+		return nil, fmt.Errorf("terraform module %s: init failed: %w", tm.Path, err)
 	}
-
 	return updated, nil
 }
 
-// lockTerraformModule runs tofu providers lock against the module given by
-// modPath for the given platforms, and returns a Changeset of files modified.
-func (m *Terraform) lockTerraformModule(ctx context.Context, source *dagger.Directory, container *dagger.Container, modPath string, platforms []string) (*dagger.Changeset, error) {
-	// module must be initialized first
-	initializedContainer, err := m.initTerraformModule(ctx, source, container, modPath)
+// Validate runs tofu init and tofu validate on the module.
+// +check
+func (tm *TerraformModule) Validate(ctx context.Context) error {
+	initialized, err := tm.initialized(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	modWorkdir := "/src/" + modPath
-
-	args := []string{"tofu", "providers", "lock"}
-	for _, platform := range platforms {
-		args = append(args, "-platform="+platform)
-	}
-
-	updated, err := initializedContainer.
-		WithExec(args).
-		Sync(ctx)
-	if err != nil {
+	if _, err := initialized.WithExec([]string{"tofu", "validate"}).Sync(ctx); err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, fmt.Errorf("terraform module %s: providers lock failed:\n%s", modPath, execErr.Stderr)
+			return fmt.Errorf("terraform module %s: validation failed:\n%s", tm.Path, execErr.Stderr)
 		}
-		return nil, fmt.Errorf("terraform module %s: providers lock failed: %w", modPath, err)
+		return fmt.Errorf("terraform module %s: validation failed: %w", tm.Path, err)
 	}
-
-	before := dag.Directory().WithDirectory(modPath, source.Directory(modPath))
-	after := dag.Directory().WithDirectory(modPath, updated.Directory(modWorkdir)).WithoutDirectory(modPath + "/.terraform")
-
-	return after.Changes(before), nil
+	return nil
 }
 
-// Lock runs tofu providers lock for all Terraform/OpenTofu modules.
+// Lock runs tofu providers lock for the module.
 //
 // Unlike `tofu init`, `tofu providers lock` computes provider hashes for the
 // given platforms deterministically, regardless of the platform it runs on.
 // This keeps .terraform.lock.hcl stable across different machines, which
 // `tofu init` cannot guarantee since it only records hashes for the host
 // platform it happens to run on.
-//
-// Returns a changeset. Use `dagger generate terraform:lock -y` to apply
-// lockfile changes produced by provider locking.
 // +generate
-func (m *Terraform) Lock(
-	ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"]
-	source *dagger.Directory,
-	// platforms to compute provider hashes for.
-	// +optional
-	// +default=["linux_arm64", "linux_amd64", "darwin_arm64"]
-	platforms []string,
-) (*dagger.Changeset, error) {
-	modulePaths := discoverTerraformModulePaths(ctx, source)
-	if len(modulePaths) == 0 {
-		return dag.Changeset(), nil
-	}
-	container := m.terraformContainer()
-
-	changesets := make([]*dagger.Changeset, len(modulePaths))
-	errs := make([]error, len(modulePaths))
-
-	var wg sync.WaitGroup
-	for i, modPath := range modulePaths {
-		wg.Go(func() {
-			changesets[i], errs[i] = m.lockTerraformModule(ctx, source, container, modPath, platforms)
-		})
-	}
-	wg.Wait()
-
-	if err := errors.Join(errs...); err != nil {
+func (tm *TerraformModule) Lock(ctx context.Context) (*dagger.Changeset, error) {
+	initialized, err := tm.initialized(ctx)
+	if err != nil {
 		return nil, err
 	}
+	args := []string{"tofu", "providers", "lock"}
+	for _, platform := range tm.Platforms {
+		args = append(args, "-platform="+platform)
+	}
+	updated, err := initialized.WithExec(args).Sync(ctx)
+	if err != nil {
+		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			return nil, fmt.Errorf("terraform module %s: providers lock failed:\n%s", tm.Path, execErr.Stderr)
+		}
+		return nil, fmt.Errorf("terraform module %s: providers lock failed: %w", tm.Path, err)
+	}
 
-	return dag.Changeset().WithChangesets(changesets), nil
+	before := dag.Directory().WithDirectory(tm.Path, tm.Source.Directory(tm.Path))
+	after := dag.Directory().
+		WithDirectory(tm.Path, updated.Directory("/src/"+tm.Path)).
+		WithoutDirectory(tm.Path + "/.terraform")
+	return after.Changes(before), nil
 }
 
 // Format formats Terraform/OpenTofu files with `tofu fmt`.
@@ -180,46 +183,13 @@ func (m *Terraform) Format(
 	// +ignore=["*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"]
 	source *dagger.Directory,
 ) *dagger.Changeset {
-	formatted := m.terraformContainer().
+	formatted := terraformContainer(m.Container).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"tofu", "fmt", "-recursive", "terraform"}).
 		Directory("/src")
 
 	return formatted.Changes(source)
-}
-
-// validateTerraform runs tofu init and tofu validate for this module, in the given
-// toolchain container.
-func (m *Terraform) validateTerraformModule(ctx context.Context, source *dagger.Directory, container *dagger.Container, modPath string) (*dagger.Changeset, error) {
-	if source == nil {
-		return nil, fmt.Errorf("terraform module %s: no source directory given", modPath)
-	}
-	if container == nil {
-		return nil, fmt.Errorf("terraform module %s: no toolchain container given", modPath)
-	}
-
-	modWorkdir := "/src/" + modPath
-
-	initializedContainer, err := m.initTerraformModule(ctx, source, container, modPath)
-	if err != nil {
-		return nil, err
-	}
-
-	fixed, err := initializedContainer.
-		WithExec([]string{"tofu", "validate"}).
-		Sync(ctx)
-	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, fmt.Errorf("terraform module %s: validation failed:\n%s", modPath, execErr.Stderr)
-		}
-		return nil, fmt.Errorf("terraform module %s: validation failed: %w", modPath, err)
-	}
-
-	before := dag.Directory().WithDirectory(modPath, source.Directory(modPath))
-	after := dag.Directory().WithDirectory(modPath, fixed.Directory(modWorkdir)).WithoutDirectory(modPath + "/.terraform")
-
-	return after.Changes(before), nil
 }
 
 // Lint runs trivy config against the Terraform/OpenTofu tree to catch
@@ -234,8 +204,8 @@ func (m *Terraform) Lint(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"]
 	source *dagger.Directory,
-) (string, error) {
-	out, err := m.toolchain().
+) error {
+	out, err := m.Container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{
@@ -249,43 +219,10 @@ func (m *Terraform) Lint(ctx context.Context,
 		Stdout(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return "", fmt.Errorf("trivy config failed:\n%s%s", execErr.Stdout, execErr.Stderr)
+			return fmt.Errorf("trivy config failed:\n%s%s", execErr.Stdout, execErr.Stderr)
 		}
-		return "", fmt.Errorf("trivy config failed: %w\n%s", err, out)
+		return fmt.Errorf("trivy config failed: %w\n%s", err, out)
 	}
 
-	return "Terraform linting passed", nil
-}
-
-// Validate runs tofu init and tofu validate on all discovered Terraform modules.
-// Each module is validated independently for parallel execution and individual
-// error reporting.
-// When paths are provided, only matching modules are validated.
-// +check
-func (m *Terraform) Validate(ctx context.Context,
-	// +defaultPath="/"
-	// +ignore=["*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"]
-	source *dagger.Directory,
-) (string, error) {
-	modulePaths := discoverTerraformModulePaths(ctx, source)
-	if len(modulePaths) == 0 {
-		return "No terraform modules found", nil
-	}
-	container := m.terraformContainer()
-
-	errs := make([]error, len(modulePaths))
-
-	var wg sync.WaitGroup
-	for i, modPath := range modulePaths {
-		wg.Go(func() {
-			_, errs[i] = m.validateTerraformModule(ctx, source, container, modPath)
-		})
-	}
-	wg.Wait()
-
-	if err := errors.Join(errs...); err != nil {
-		return "", err
-	}
-
-	return "Terraform validate passed", nil
+	return nil
 }

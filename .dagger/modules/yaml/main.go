@@ -17,9 +17,8 @@ type Yaml struct {
 
 // Lints every YAML file in the repo.
 func New(
-	// Container to run in. It needs yamllint; defaults to the devenv ci
-	// toolchain.
-	// +optional
+	// Container to run in. It needs yamllint. dagger.toml wires in
+	// devenv\'s toolchain.
 	container *dagger.Container,
 ) *Yaml {
 	return &Yaml{Container: container}
@@ -42,7 +41,7 @@ func (m *Yaml) Lint(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
-) (string, error) {
+) error {
 	args := []string{"yamllint", "--config-file", ".yamllint.yaml", "--format", "parsable", "--strict"}
 	if len(paths) > 0 {
 		args = append(args, paths...)
@@ -50,9 +49,6 @@ func (m *Yaml) Lint(ctx context.Context,
 		args = append(args, ".")
 	}
 	container := m.Container
-	if container == nil {
-		container = dag.Devenv().Toolchain()
-	}
 
 	out, err := container.
 		WithMountedDirectory("/src", source).
@@ -61,10 +57,10 @@ func (m *Yaml) Lint(ctx context.Context,
 		Stdout(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return "", fmt.Errorf("yamllint failed:\n%s%s", execErr.Stdout, execErr.Stderr)
+			return fmt.Errorf("yamllint failed:\n%s%s", execErr.Stdout, execErr.Stderr)
 		}
-		return "", fmt.Errorf("yamllint failed: %w\n%s", err, out)
+		return fmt.Errorf("yamllint failed: %w\n%s", err, out)
 	}
 
-	return "YAML linting passed", nil
+	return nil
 }

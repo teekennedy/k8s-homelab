@@ -12,6 +12,10 @@ import (
 // Kubernetes runs releases on k3s clusters.
 type Kubernetes struct { // kubernetes (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	devClusterDelete *string
 	id               *ID
@@ -21,6 +25,9 @@ type Kubernetes struct { // kubernetes (../../../../../:0:0)
 func (r *Kubernetes) WithGraphQLQuery(q *querybuilder.Selection) *Kubernetes {
 	return &Kubernetes{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -29,7 +36,7 @@ func (r *Kubernetes) WithGraphQLQuery(q *querybuilder.Selection) *Kubernetes {
 // It runs for as long as the call that started it does, so it is used with
 // `up`, which also publishes the API server on the host:
 //
-//	dagger call kubernetes dev-cluster --name=dev --token=file:./token up --ports=6443:6443
+//	dagger api call kubernetes dev-cluster --name=dev --token=file:./token up --ports=6443:6443
 //
 // scripts/dev-cluster.sh wraps this, and writes the kubeconfig. See "Dev
 // clusters" in README.md.
@@ -40,14 +47,15 @@ func (r *Kubernetes) DevCluster(name string, token *Secret) *Service {
 	q = q.Arg("token", token)
 
 	return &Service{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
 // DevClusterDelete deletes a dev cluster's state. The cluster must be stopped:
 // a running one holds its state volume, and this waits for it.
 //
-//	dagger call kubernetes dev-cluster-delete --name=dev
+//	dagger api call kubernetes dev-cluster-delete --name=dev
 func (r *Kubernetes) DevClusterDelete(ctx context.Context, name string) (string, error) {
 	if r.devClusterDelete != nil {
 		return *r.devClusterDelete, nil
@@ -71,7 +79,13 @@ func (r *Kubernetes) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -123,7 +137,7 @@ type KubernetesIntegrationReportsOpts struct {
 // one file per release. A failing test is not an error here, but a cluster that
 // never came up, or a release that never became healthy, is.
 //
-//	dagger call kubernetes integration-reports export --path=./reports
+//	dagger api call kubernetes integration-reports export --path=./reports
 func (r *Kubernetes) IntegrationReports(opts ...KubernetesIntegrationReportsOpts) *Directory {
 	q := r.query.Select("integrationReports")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -142,7 +156,8 @@ func (r *Kubernetes) IntegrationReports(opts ...KubernetesIntegrationReportsOpts
 	}
 
 	return &Directory{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -170,7 +185,8 @@ func (r *Kubernetes) IntegrationRun(source *Directory, releases []string, opts .
 	q = q.Arg("releases", releases)
 
 	return &KubernetesIntegrationRun{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -196,8 +212,8 @@ type KubernetesIntegrationTestOpts struct {
 // Deliberately not a `+check`: it needs an engine that allows privileged execs.
 // See "Kubernetes integration tests" in README.md.
 //
-//	dagger call kubernetes integration-test
-//	dagger call kubernetes integration-test --releases=<name>
+//	dagger api call kubernetes integration-test
+//	dagger api call kubernetes integration-test --releases=<name>
 func (r *Kubernetes) IntegrationTest(ctx context.Context, opts ...KubernetesIntegrationTestOpts) (string, error) {
 	if r.integrationTest != nil {
 		return *r.integrationTest, nil
@@ -235,6 +251,10 @@ func (r *Kubernetes) IntegrationTest(ctx context.Context, opts ...KubernetesInte
 // KubernetesIntegrationReport is one release's JUnit XML report.
 type KubernetesIntegrationReport struct { // kubernetes (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id      *ID
 	release *string
@@ -244,6 +264,9 @@ type KubernetesIntegrationReport struct { // kubernetes (../../../../../:0:0)
 func (r *KubernetesIntegrationReport) WithGraphQLQuery(q *querybuilder.Selection) *KubernetesIntegrationReport {
 	return &KubernetesIntegrationReport{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -257,7 +280,13 @@ func (r *KubernetesIntegrationReport) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -327,6 +356,10 @@ func (r *KubernetesIntegrationReport) XML(ctx context.Context) (string, error) {
 // cached; see Caching in README.md.
 type KubernetesIntegrationRun struct { // kubernetes (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id      *ID
 	summary *string
@@ -335,6 +368,9 @@ type KubernetesIntegrationRun struct { // kubernetes (../../../../../:0:0)
 func (r *KubernetesIntegrationRun) WithGraphQLQuery(q *querybuilder.Selection) *KubernetesIntegrationRun {
 	return &KubernetesIntegrationRun{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -359,7 +395,13 @@ func (r *KubernetesIntegrationRun) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -445,23 +487,13 @@ func (r *KubernetesIntegrationRun) Summary(ctx context.Context) (string, error) 
 	return response, q.Execute(ctx)
 }
 
-// KubernetesOpts contains options for Query.Kubernetes
-type KubernetesOpts struct {
-	// Container to run helmfile, kubectl and pytest in; defaults to the devenv
-	// ci and integration profiles.
-	Container *Container
-}
-
-func (r *Query) Kubernetes(opts ...KubernetesOpts) *Kubernetes { // kubernetes (../../../../../:0:0)
+func (r *Query) Kubernetes(container *Container) *Kubernetes { // kubernetes (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("kubernetes")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
+	q = q.Arg("container", container)
 
 	return &Kubernetes{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

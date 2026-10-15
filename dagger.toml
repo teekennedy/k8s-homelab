@@ -2,9 +2,15 @@
 source = ".dagger/modules/ci"
 legacy-default-path = true
 
+[modules.ci.settings]
+container = "dag://devenv/toolchain"
+
 [modules.cue]
 source = ".dagger/modules/cue"
 legacy-default-path = true
+
+[modules.cue.settings]
+container = "dag://devenv/toolchain"
 
 [modules.devenv]
 source = ".dagger/modules/devenv"
@@ -14,41 +20,72 @@ legacy-default-path = true
 source = ".dagger/modules/go"
 legacy-default-path = true
 
+[modules.go.settings]
+container = "dag://devenv/toolchain"
+
 [modules.helmfile]
 source = ".dagger/modules/helmfile"
 legacy-default-path = true
+
+[modules.helmfile.settings]
+container = "dag://devenv/toolchain"
 
 [modules.kubernetes]
 source = ".dagger/modules/kubernetes"
 legacy-default-path = true
 
+[modules.kubernetes.settings]
+container = "dag://devenv/integration-toolchain"
+
 [modules.lab]
 source = ".dagger/modules/lab"
 legacy-default-path = true
+
+[modules.lab.settings]
+container = "dag://devenv/toolchain"
+nix = "dag://nix/image"
 
 [modules.nix]
 source = ".dagger/modules/nix"
 legacy-default-path = true
 
+[modules.nix.settings]
+container = "dag://devenv/toolchain"
+
 [modules.python]
 source = ".dagger/modules/python"
 legacy-default-path = true
+
+[modules.python.settings]
+container = "dag://devenv/toolchain"
 
 [modules.release]
 source = ".dagger/modules/release"
 legacy-default-path = true
 
+[modules.release.settings]
+container = "dag://devenv/toolchain"
+
 [modules.terraform]
 source = ".dagger/modules/terraform"
 legacy-default-path = true
+
+[modules.terraform.settings]
+container = "dag://devenv/toolchain"
 
 [modules.woodpecker]
 source = ".dagger/modules/woodpecker"
 legacy-default-path = true
 
+[modules.woodpecker.settings]
+container = "dag://devenv/toolchain"
+
 [modules.yaml]
 source = ".dagger/modules/yaml"
 legacy-default-path = true
+
+[modules.yaml.settings]
+container = "dag://devenv/toolchain"
 
 [modules.dagger-go-sdk]
 source = "github.com/dagger/go-sdk"
@@ -57,38 +94,30 @@ source = "github.com/dagger/go-sdk"
 module = "dagger-go-sdk"
 
 [sdks.go.scopes.".dagger/modules/ci"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/cue"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/go"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/helmfile"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/kubernetes"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/lab"]
-clients = ["./.dagger/modules/devenv", "./.dagger/modules/nix"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/nix"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/python"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/release"]
@@ -96,13 +125,18 @@ clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/terraform"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/woodpecker"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
 
 [sdks.go.scopes.".dagger/modules/yaml"]
-clients = ["./.dagger/modules/devenv"]
 is-module = true
+
+# Only the lock generator: dependency vulnerabilities are Renovate's job.
+[modules.uv]
+source = "dagger.io/python/uv"
+check.skip = ["projects/audit"]
+
+[modules.uv.settings]
+base = "dag://devenv/toolchain"

@@ -9,20 +9,24 @@ import (
 // Helmfile runs helmfile checks over every chart.
 type Helmfile = core.Helmfile
 
-// HelmfileBuildOpts contains options for Helmfile.Build
-type HelmfileBuildOpts = core.HelmfileBuildOpts
+// HelmfileEnvironmentsOpts contains options for Helmfile.Environments
+type HelmfileEnvironmentsOpts = core.HelmfileEnvironmentsOpts
 
-// HelmfileKubeconformOpts contains options for Helmfile.Kubeconform
-type HelmfileKubeconformOpts = core.HelmfileKubeconformOpts
+// Environment is one helmfile environment.
+type HelmfileEnvironment = core.HelmfileEnvironment
 
-// HelmfileLintOpts contains options for Helmfile.Lint
-type HelmfileLintOpts = core.HelmfileLintOpts
+// Environments are the helmfile environments the checks run in.
+type HelmfileEnvironments = core.HelmfileEnvironments
 
-// HelmfilePolarisOpts contains options for Helmfile.Polaris
-type HelmfilePolarisOpts = core.HelmfilePolarisOpts
+type WithHelmfileEnvironmentsFunc = core.WithHelmfileEnvironmentsFunc
 
-// HelmfileValidateOpts contains options for Helmfile.Validate
-type HelmfileValidateOpts = core.HelmfileValidateOpts
+// Release is one release of the helmfile in one environment.
+type HelmfileRelease = core.HelmfileRelease
+
+// Releases are one environment's releases.
+type HelmfileReleases = core.HelmfileReleases
+
+type WithHelmfileReleasesFunc = core.WithHelmfileReleasesFunc
 
 // HelmfileOpts contains options for Query.Helmfile
 type HelmfileOpts = core.HelmfileOpts

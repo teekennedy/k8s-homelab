@@ -12,25 +12,21 @@ import (
 // Ci checks the Dagger modules under .dagger.
 type Ci struct { // ci (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id                     *ID
-	verifyCacheGranularity *string
+	verifyCacheGranularity *Void
 }
 
 func (r *Ci) WithGraphQLQuery(q *querybuilder.Selection) *Ci {
 	return &Ci{
 		query: q,
-	}
-}
-
-// DebugDir returns the given dir. Useful for inspecting directory contents for debugging.
-func (r *Ci) DebugDir(dir *Directory) *Directory {
-	assertNotNil("dir", dir)
-	q := r.query.Select("debugDir")
-	q = q.Arg("dir", dir)
-
-	return &Directory{
-		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -44,7 +40,13 @@ func (r *Ci) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -100,23 +102,23 @@ type CiVerifyCacheGranularityOpts struct {
 // that need a real engine.
 //
 // The go toolchain's test runs these too, but only against
-// dagger/lib/daggerfake's model of the engine: the engine-backed tests skip unless they inherit a Dagger
-// session, so they need either
+// dagger/lib/daggerfake's model of the engine: the engine-backed tests skip
+// unless a run opts in to them under a Dagger session, so they need either
 //
-//	cd .dagger/modules/<module> && dagger run go test ./...
+//	cd .dagger/modules/<module> && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...
 //
-// or this function, which gets the same thing by running the tests in an exec
-// with nesting enabled. Use it to confirm the fake still agrees with the engine
-// after a Dagger upgrade, or after teaching the fake a new API call.
+// or this function, which opts in, and whose exec gets a session of its own, as
+// every container does. Use it to confirm the fake still agrees with the engine after a Dagger
+// upgrade, or after teaching the fake a new API call.
 //
 // Its result caches on its inputs, like any other function here, and that is
 // the right behaviour: the two things that can change the verdict both bust it.
 // Editing .dagger changes source, and upgrading Dagger means a new engine with
 // a new cache. To force a re-run anyway, vary run (`--run '.*'` is a different
 // argument to the default `.` and so a different call).
-func (r *Ci) VerifyCacheGranularity(ctx context.Context, opts ...CiVerifyCacheGranularityOpts) (string, error) {
+func (r *Ci) VerifyCacheGranularity(ctx context.Context, opts ...CiVerifyCacheGranularityOpts) error {
 	if r.verifyCacheGranularity != nil {
-		return *r.verifyCacheGranularity, nil
+		return nil
 	}
 	q := r.query.Select("verifyCacheGranularity")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -130,28 +132,16 @@ func (r *Ci) VerifyCacheGranularity(ctx context.Context, opts ...CiVerifyCacheGr
 		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }
 
-// CiOpts contains options for Query.Ci
-type CiOpts struct {
-	// Container to run in. It needs go; defaults to the devenv ci toolchain.
-	Container *Container
-}
-
-func (r *Query) Ci(opts ...CiOpts) *Ci { // ci (../../../../../:0:0)
+func (r *Query) Ci(container *Container) *Ci { // ci (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("ci")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
+	q = q.Arg("container", container)
 
 	return &Ci{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

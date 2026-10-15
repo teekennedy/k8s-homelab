@@ -25,6 +25,3 @@ type KubernetesIntegrationReport = core.KubernetesIntegrationReport
 // as running tests. It is plain data, with no Directory, so that the call is
 // cached; see Caching in README.md.
 type KubernetesIntegrationRun = core.KubernetesIntegrationRun
-
-// KubernetesOpts contains options for Query.Kubernetes
-type KubernetesOpts = core.KubernetesOpts

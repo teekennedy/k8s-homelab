@@ -72,8 +72,8 @@ type KubernetesIntegrationReport struct {
 // Deliberately not a `+check`: it needs an engine that allows privileged execs.
 // See "Kubernetes integration tests" in README.md.
 //
-//	dagger call kubernetes integration-test
-//	dagger call kubernetes integration-test --releases=<name>
+//	dagger api call kubernetes integration-test
+//	dagger api call kubernetes integration-test --releases=<name>
 func (m *Kubernetes) IntegrationTest(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/dev/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
@@ -104,7 +104,7 @@ func (m *Kubernetes) IntegrationTest(ctx context.Context,
 	if cluster != nil {
 		// Run in place rather than through the module's API: that call exists to
 		// be cached, and a verdict on a cluster that outlives the run must not be.
-		container := m.toolchain()
+		container := m.Container
 		attached, err := attachK3sCluster(helmfileContainer(container, source), cluster, kubeconfig)
 		if err != nil {
 			return "", err
@@ -139,7 +139,7 @@ func (m *Kubernetes) IntegrationTest(ctx context.Context,
 // one file per release. A failing test is not an error here, but a cluster that
 // never came up, or a release that never became healthy, is.
 //
-//	dagger call kubernetes integration-reports export --path=./reports
+//	dagger api call kubernetes integration-reports export --path=./reports
 func (m *Kubernetes) IntegrationReports(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!helmfile.yaml.gotmpl", "!config/gen/dev/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"]
@@ -181,7 +181,7 @@ func (m *Kubernetes) scopedIntegrationRun(
 	releases []string,
 	repeatSync bool,
 ) (*dagger.KubernetesIntegrationRun, error) {
-	plan, err := integrationPlan(ctx, source, m.toolchain(), releases)
+	plan, err := integrationPlan(ctx, source, m.Container, releases)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (m *Kubernetes) scopedIntegrationRun(
 		return nil, fmt.Errorf("scoping the source to %s: %w", strings.Join(releaseNames(plan), ", "), err)
 	}
 
-	return dag.Kubernetes(dagger.KubernetesOpts{Container: m.Container}).
+	return dag.Kubernetes(m.Container).
 		IntegrationRun(scoped, releaseNames(plan), dagger.KubernetesIntegrationRunOpts{
 			RepeatSync: repeatSync,
 		}), nil
@@ -224,7 +224,7 @@ func (m *Kubernetes) IntegrationRun(ctx context.Context,
 	// +optional
 	repeatSync bool,
 ) (run *KubernetesIntegrationRun, err error) {
-	container := m.toolchain()
+	container := m.Container
 	cluster, err := newK3sCluster(helmfileContainer(container, source))
 	if err != nil {
 		return nil, err

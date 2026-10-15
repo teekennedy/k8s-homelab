@@ -105,7 +105,7 @@ func (p *DevenvProject) Update(ctx context.Context) (*dagger.Changeset, error) {
 // commit happens to be for each input right now, so running it twice in a
 // row can produce different output — it belongs to CI as a scheduled
 // "refresh" step, not as generated code to keep in sync.
-// Use `dagger call devenv update --auto-apply` to apply.
+// Use `dagger api call devenv update --auto-apply` to apply.
 func (m *Devenv) Update(
 	ctx context.Context,
 	// +defaultPath="/"

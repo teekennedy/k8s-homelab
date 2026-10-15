@@ -62,20 +62,88 @@ func convertSlice[I any, O any](in []I, f func(I) O) []O {
 func (r Terraform) MarshalJSON() ([]byte, error) {
 	var concrete struct {
 		Container *dagger.Container
+		Platforms []string
 	}
 	concrete.Container = r.Container
+	concrete.Platforms = r.Platforms
 	return json.Marshal(&concrete)
 }
 
 func (r *Terraform) UnmarshalJSON(bs []byte) error {
 	var concrete struct {
 		Container *dagger.Container
+		Platforms []string
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
 		return err
 	}
 	r.Container = concrete.Container
+	r.Platforms = concrete.Platforms
+	return nil
+}
+
+func (r Modules) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Paths     []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+		Platforms []string
+	}
+	concrete.Paths = r.Paths
+	concrete.Source = r.Source
+	concrete.Container = r.Container
+	concrete.Platforms = r.Platforms
+	return json.Marshal(&concrete)
+}
+
+func (r *Modules) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Paths     []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+		Platforms []string
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Paths = concrete.Paths
+	r.Source = concrete.Source
+	r.Container = concrete.Container
+	r.Platforms = concrete.Platforms
+	return nil
+}
+
+func (r TerraformModule) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Path      string
+		Source    *dagger.Directory
+		Container *dagger.Container
+		Platforms []string
+	}
+	concrete.Path = r.Path
+	concrete.Source = r.Source
+	concrete.Container = r.Container
+	concrete.Platforms = r.Platforms
+	return json.Marshal(&concrete)
+}
+
+func (r *TerraformModule) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Path      string
+		Source    *dagger.Directory
+		Container *dagger.Container
+		Platforms []string
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Path = concrete.Path
+	r.Source = concrete.Source
+	r.Container = concrete.Container
+	r.Platforms = concrete.Platforms
 	return nil
 }
 
@@ -196,6 +264,25 @@ func dispatch(ctx context.Context) (rerr error) {
 func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName string, inputArgs map[string][]byte) (_ any, err error) {
 	_ = inputArgs
 	switch parentName {
+	case "Modules":
+		switch fnName {
+		case "Module":
+			var parent Modules
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var path string
+			if inputArgs["path"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["path"]), &path)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg path", err))
+				}
+			}
+			return (*Modules).Module(&parent, path), nil
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
 	case "Terraform":
 		switch fnName {
 		case "Format":
@@ -225,8 +312,8 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Terraform).Lint(&parent, ctx, source)
-		case "Lock":
+			return nil, (*Terraform).Lint(&parent, ctx, source)
+		case "Modules":
 			var parent Terraform
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
@@ -239,28 +326,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			var platforms []string
-			if inputArgs["platforms"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["platforms"]), &platforms)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg platforms", err))
-				}
-			}
-			return (*Terraform).Lock(&parent, ctx, source, platforms)
-		case "Validate":
-			var parent Terraform
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			return (*Terraform).Validate(&parent, ctx, source)
+			return (*Terraform).Modules(&parent, ctx, source)
 		case "":
 			var parent Terraform
 			err = json.Unmarshal(parentJSON, &parent)
@@ -274,7 +340,33 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
 				}
 			}
-			return New(container), nil
+			var platforms []string
+			if inputArgs["platforms"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["platforms"]), &platforms)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg platforms", err))
+				}
+			}
+			return New(container, platforms), nil
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
+	case "TerraformModule":
+		switch fnName {
+		case "Lock":
+			var parent TerraformModule
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return (*TerraformModule).Lock(&parent, ctx)
+		case "Validate":
+			var parent TerraformModule
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*TerraformModule).Validate(&parent, ctx)
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
@@ -282,42 +374,61 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		return dag.Module().
 			WithDescription("Formats, lints, locks and validates the OpenTofu modules under terraform/.\n").
 			WithObject(
-				dag.TypeDef().WithObject("Terraform", dagger.TypeDefWithObjectOpts{Description: "Terraform runs OpenTofu checks over terraform/.", SourceMap: dag.SourceMap("main.go", 41, 6)}).
+				dag.TypeDef().WithObject("Terraform", dagger.TypeDefWithObjectOpts{Description: "Terraform runs OpenTofu checks over terraform/.", SourceMap: dag.SourceMap("main.go", 16, 6)}).
 					WithFunction(
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Format formats Terraform/OpenTofu files with `tofu fmt`.\n\n`tofu fmt -recursive` is run once over the whole terraform/ tree rather than\nper module, because unlike validate it needs no per-module init and the\nmodules already share a single source directory.\nReturns a changeset. Use `dagger generate terraform:format -y` to apply.").
-							WithSourceMap(dag.SourceMap("main.go", 178, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 181, 1)).
 							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 181, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 184, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
 					WithFunction(
 						dag.Function("Lint",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Lint runs trivy config against the Terraform/OpenTofu tree to catch\nmisconfigurations (unencrypted resources, over-permissive IAM, etc.).\n\nTrivy supersedes tfsec (the two tools' checks now live in the same\naquasecurity org, and tfsec is in maintenance-only mode), so this uses\ntrivy rather than tfsec directly. --skip-check-update and --skip-version-check\nkeep it network-independent and quiet.").
-							WithSourceMap(dag.SourceMap("main.go", 233, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 203, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 236, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 206, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
 					WithFunction(
-						dag.Function("Lock",
-							dag.TypeDef().WithObject("Changeset")).
-							WithDescription("Lock runs tofu providers lock for all Terraform/OpenTofu modules.\n\nUnlike `tofu init`, `tofu providers lock` computes provider hashes for the\ngiven platforms deterministically, regardless of the platform it runs on.\nThis keeps .terraform.lock.hcl stable across different machines, which\n`tofu init` cannot guarantee since it only records hashes for the host\nplatform it happens to run on.\n\nReturns a changeset. Use `dagger generate terraform:lock -y` to apply\nlockfile changes produced by provider locking.").
-							WithSourceMap(dag.SourceMap("main.go", 137, 1)).
-							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 141, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"}}).
-							WithArg("platforms", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "platforms to compute provider hashes for.", SourceMap: dag.SourceMap("main.go", 145, 2), DefaultValue: dagger.JSON("[\"linux_arm64\",\"linux_amd64\",\"darwin_arm64\"]")})).
-					WithFunction(
-						dag.Function("Validate",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Validate runs tofu init and tofu validate on all discovered Terraform modules.\nEach module is validated independently for parallel execution and individual\nerror reporting.\nWhen paths are provided, only matching modules are validated.").
-							WithSourceMap(dag.SourceMap("main.go", 265, 1)).
-							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 268, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"}})).
+						dag.Function("Modules",
+							dag.TypeDef().WithObject("Modules")).
+							WithDescription("Modules returns every OpenTofu module under terraform/ — every directory\nwith a .terraform.lock.hcl — keyed by path.").
+							WithSourceMap(dag.SourceMap("main.go", 49, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 53, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Terraform")).
 							WithDescription("Formats, lints, locks and validates the OpenTofu modules under terraform/.").
-							WithSourceMap(dag.SourceMap("main.go", 47, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs tofu and trivy; defaults to the devenv ci\ntoolchain.", SourceMap: dag.SourceMap("main.go", 51, 2)}))), nil
+							WithSourceMap(dag.SourceMap("main.go", 24, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs tofu and trivy. dagger.toml wires in\ndevenv's toolchain.", SourceMap: dag.SourceMap("main.go", 27, 2)}).
+							WithArg("platforms", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Platforms the lock generator computes provider hashes for.", SourceMap: dag.SourceMap("main.go", 31, 2), DefaultValue: dagger.JSON("[\"linux_arm64\",\"linux_amd64\",\"darwin_arm64\"]")}))).
+			WithObject(
+				dag.TypeDef().WithObject("Modules", dagger.TypeDefWithObjectOpts{Description: "Modules are the repo's OpenTofu modules.", SourceMap: dag.SourceMap("main.go", 69, 6)}).
+					WithCollection().
+					WithFunction(
+						dag.Function("Module",
+							dag.TypeDef().WithObject("TerraformModule")).
+							WithDescription("Module returns the OpenTofu module at path. It carries all of terraform/,\nbecause modules reference their siblings by relative path.").
+							WithSourceMap(dag.SourceMap("main.go", 84, 1)).
+							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 84, 27)})).
+					WithCollectionGet("Module").
+					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the modules' directories relative to the repo root.", SourceMap: dag.SourceMap("main.go", 72, 2)}).
+					WithCollectionKeys("Paths")).
+			WithObject(
+				dag.TypeDef().WithObject("TerraformModule", dagger.TypeDefWithObjectOpts{Description: "TerraformModule is one OpenTofu module.", SourceMap: dag.SourceMap("main.go", 89, 6)}).
+					WithFunction(
+						dag.Function("Lock",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Lock runs tofu providers lock for the module.\n\nUnlike `tofu init`, `tofu providers lock` computes provider hashes for the\ngiven platforms deterministically, regardless of the platform it runs on.\nThis keeps .terraform.lock.hcl stable across different machines, which\n`tofu init` cannot guarantee since it only records hashes for the host\nplatform it happens to run on.").
+							WithSourceMap(dag.SourceMap("main.go", 150, 1)).
+							WithGenerator()).
+					WithFunction(
+						dag.Function("Validate",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Validate runs tofu init and tofu validate on the module.").
+							WithSourceMap(dag.SourceMap("main.go", 128, 1)).
+							WithCheck()).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root.", SourceMap: dag.SourceMap("main.go", 91, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

@@ -11,7 +11,7 @@
 // The values are deliberately unusable: nothing in the test suite talks to a
 // real engine. The tests replace the package-level `dag` client with one backed
 // by internal/daggerfake, so the HTTP client this env builds is never dialled.
-// The guard means a real `dagger call` (where the CLI sets both variables) is
+// The guard means a real `dagger api call` (where the CLI sets both variables) is
 // unaffected, and because only _test.go files import this package it is never
 // linked into the module binary at all.
 //

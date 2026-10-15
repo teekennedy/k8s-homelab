@@ -12,15 +12,22 @@ import (
 // Nix runs Nix checks over the repo.
 type Nix struct { // nix (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id                   *ID
-	validate             *string
-	validateBuildMetrics *string
+	validate             *Void
+	validateBuildMetrics *Void
 }
 
 func (r *Nix) WithGraphQLQuery(q *querybuilder.Selection) *Nix {
 	return &Nix{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -47,7 +54,8 @@ func (r *Nix) Format(opts ...NixFormatOpts) *Changeset {
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -61,7 +69,13 @@ func (r *Nix) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -105,7 +119,8 @@ func (r *Nix) Image() *Container {
 	q := r.query.Select("image")
 
 	return &Container{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -115,9 +130,9 @@ type NixValidateOpts struct {
 }
 
 // Validate runs nix flake check.
-func (r *Nix) Validate(ctx context.Context, opts ...NixValidateOpts) (string, error) {
+func (r *Nix) Validate(ctx context.Context, opts ...NixValidateOpts) error {
 	if r.validate != nil {
-		return *r.validate, nil
+		return nil
 	}
 	q := r.query.Select("validate")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -127,10 +142,7 @@ func (r *Nix) Validate(ctx context.Context, opts ...NixValidateOpts) (string, er
 		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }
 
 // NixValidateBuildMetricsOpts contains options for Nix.ValidateBuildMetrics
@@ -141,9 +153,9 @@ type NixValidateBuildMetricsOpts struct {
 // ValidateBuildMetrics runs a real Nix build through the selfupdate metrics
 // parser's Python test suite, so a Nix upgrade that changes the internal-json
 // event stream (NixOS/nix#13935) is caught here instead of only on a host.
-func (r *Nix) ValidateBuildMetrics(ctx context.Context, opts ...NixValidateBuildMetricsOpts) (string, error) {
+func (r *Nix) ValidateBuildMetrics(ctx context.Context, opts ...NixValidateBuildMetricsOpts) error {
 	if r.validateBuildMetrics != nil {
-		return *r.validateBuildMetrics, nil
+		return nil
 	}
 	q := r.query.Select("validateBuildMetrics")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -153,30 +165,16 @@ func (r *Nix) ValidateBuildMetrics(ctx context.Context, opts ...NixValidateBuild
 		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }
 
-// NixOpts contains options for Query.Nix
-type NixOpts struct {
-	// Container to run the formatters and the build-metrics tests in. It needs
-	// alejandra, deadnix and uv; defaults to the devenv ci toolchain. Flake
-	// evaluation and builds always use the plain Nix container instead.
-	Container *Container
-}
-
-func (r *Query) Nix(opts ...NixOpts) *Nix { // nix (../../../../../:0:0)
+func (r *Query) Nix(container *Container) *Nix { // nix (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("nix")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
+	q = q.Arg("container", container)
 
 	return &Nix{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

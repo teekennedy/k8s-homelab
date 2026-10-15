@@ -12,41 +12,20 @@ import (
 // Python runs Python checks over every project in the repo.
 type Python struct { // python (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
-	id   *ID
-	test *string
+	id *ID
 }
 
 func (r *Python) WithGraphQLQuery(q *querybuilder.Selection) *Python {
 	return &Python{
 		query: q,
-	}
-}
-
-// PythonFormatOpts contains options for Python.Format
-type PythonFormatOpts struct {
-	Source *Directory
-
-	Paths []string
-}
-
-// Format formats Python files with black across all discovered projects.
-// Returns a changeset. Use `dagger generate python:format -y` to apply.
-func (r *Python) Format(opts ...PythonFormatOpts) *Changeset {
-	q := r.query.Select("format")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-		// `paths` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Paths) {
-			q = q.Arg("paths", opts[i].Paths)
-		}
-	}
-
-	return &Changeset{
-		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -60,7 +39,13 @@ func (r *Python) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -104,9 +89,9 @@ type PythonProjectsOpts struct {
 	Source *Directory
 }
 
-// Projects returns all discovered Python projects with scoped source
-// directories.
-func (r *Python) Projects(ctx context.Context, opts ...PythonProjectsOpts) ([]PythonProject, error) {
+// Projects returns every Python project in the repo — every directory with a
+// pyproject.toml — keyed by path.
+func (r *Python) Projects(opts ...PythonProjectsOpts) *PythonProjects {
 	q := r.query.Select("projects")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
@@ -115,93 +100,41 @@ func (r *Python) Projects(ctx context.Context, opts ...PythonProjectsOpts) ([]Py
 		}
 	}
 
-	q = q.Select("id")
-
-	type projects struct {
-		Id ID
+	return &PythonProjects{
+		query:     q,
+		refetchID: r.refetchID,
 	}
-
-	convert := func(fields []projects) []PythonProject {
-		out := []PythonProject{}
-
-		for i := range fields {
-			val := PythonProject{id: &fields[i].Id}
-			val.query = selectNode(q.Root(), fields[i].Id, "PythonProject")
-			out = append(out, val)
-		}
-
-		return out
-	}
-	var response []projects
-
-	q = q.Bind(&response)
-
-	err := q.Execute(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert(response), nil
 }
 
-// PythonTestOpts contains options for Python.Test
-type PythonTestOpts struct {
-	Source *Directory
-
-	Paths []string
-}
-
-// Test runs pytest for all discovered Python projects.
-//
-// The release script tests under scripts/tests are left to release:test-scripts,
-// which mounts the scripts and manifests they read.
-func (r *Python) Test(ctx context.Context, opts ...PythonTestOpts) (string, error) {
-	if r.test != nil {
-		return *r.test, nil
-	}
-	q := r.query.Select("test")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-		// `paths` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Paths) {
-			q = q.Arg("paths", opts[i].Paths)
-		}
-	}
-
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
-}
-
-// PythonProject is one Python project — a directory with a pyproject.toml —
-// carrying only that project's files, so changing one project does not
-// invalidate the BuildKit cache for the others.
+// Project is one Python project.
 type PythonProject struct { // python (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id   *ID
 	path *string
-	test *string
+	test *Void
 }
 
 func (r *PythonProject) WithGraphQLQuery(q *querybuilder.Selection) *PythonProject {
 	return &PythonProject{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
-// Format runs black on this project, returning the resulting changes.
-func (r *PythonProject) Format(container *Container) *Changeset {
-	assertNotNil("container", container)
+// Format runs black on the project, returning the resulting changes.
+func (r *PythonProject) Format() *Changeset {
 	q := r.query.Select("format")
-	q = q.Arg("container", container)
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -215,7 +148,13 @@ func (r *PythonProject) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -268,16 +207,7 @@ func (r *PythonProject) Path(ctx context.Context) (string, error) {
 	return response, q.Execute(ctx)
 }
 
-// Source is the project's scoped source directory.
-func (r *PythonProject) Source() *Directory {
-	q := r.query.Select("source")
-
-	return &Directory{
-		query: q,
-	}
-}
-
-// Test runs pytest for this Python project, in the given toolchain container.
+// Test runs pytest for the project.
 //
 // No -m here on purpose. Which markers an ordinary run excludes is a per-project
 // decision, declared in each pyproject.toml's addopts — and it has to be,
@@ -285,47 +215,168 @@ func (r *PythonProject) Source() *Directory {
 // one from here would re-enable the tests a project deselected for itself, and
 // deselect the ones a project runs deliberately: jellyfin-exporter registers
 // `integration` precisely so those tests run by default against its stub server.
-func (r *PythonProject) Test(ctx context.Context, container *Container) (string, error) {
-	assertNotNil("container", container)
+func (r *PythonProject) Test(ctx context.Context) error {
 	if r.test != nil {
-		return *r.test, nil
+		return nil
 	}
 	q := r.query.Select("test")
-	q = q.Arg("container", container)
 
-	var response string
+	return q.Execute(ctx)
+}
+
+// Projects are the repo's Python projects.
+type PythonProjects struct { // python (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
+
+	id *ID
+}
+type WithPythonProjectsFunc func(r *PythonProjects) *PythonProjects
+
+// With calls the provided function with current PythonProjects.
+//
+// This is useful for reusability and readability by not breaking the calling chain.
+func (r *PythonProjects) With(f WithPythonProjectsFunc) *PythonProjects {
+	return f(r)
+}
+
+func (r *PythonProjects) WithGraphQLQuery(q *querybuilder.Selection) *PythonProjects {
+	return &PythonProjects{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
+	}
+}
+
+// Project returns the Python project at path, carrying only its own files, so
+// that it caches independently of the others.
+func (r *PythonProjects) Get(key string) *PythonProject {
+	q := r.query.Select("get")
+	q = q.Arg("key", key)
+
+	return &PythonProject{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// A unique identifier for this PythonProjects.
+func (r *PythonProjects) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
+
+	q = q.Bind(&response)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *PythonProjects) XXX_GraphQLType() string {
+	return "PythonProjects"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *PythonProjects) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *PythonProjects) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *PythonProjects) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *PythonProjects) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = PythonProjects{query: selectNode(dag.QueryBuilder(), id, "PythonProjects")}
+	return nil
+}
+
+func (r *PythonProjects) Keys(ctx context.Context) ([]string, error) {
+	q := r.query.Select("keys")
+
+	var response []string
 
 	q = q.Bind(&response)
 	return response, q.Execute(ctx)
 }
 
-// Testlib is the shared integration test library, set only for the
-// projects that import it.
-func (r *PythonProject) Testlib() *Directory {
-	q := r.query.Select("testlib")
+func (r *PythonProjects) List(ctx context.Context) ([]PythonProject, error) {
+	q := r.query.Select("list")
 
-	return &Directory{
-		query: q,
+	q = q.Select("id")
+
+	type list struct {
+		Id ID
 	}
-}
 
-// PythonOpts contains options for Query.Python
-type PythonOpts struct {
-	// Container to run in. It needs uv and black; defaults to the devenv ci
-	// toolchain.
-	Container *Container
-}
+	convert := func(fields []list) []PythonProject {
+		out := []PythonProject{}
 
-func (r *Query) Python(opts ...PythonOpts) *Python { // python (../../../../../:0:0)
-	q := r.query.Select("python")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
+		for i := range fields {
+			val := PythonProject{id: &fields[i].Id}
+			val.query = selectNode(q.Root(), fields[i].Id, "PythonProject")
+			out = append(out, val)
 		}
+
+		return out
 	}
+	var response []list
+
+	q = q.Bind(&response)
+
+	err := q.Execute(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return convert(response), nil
+}
+
+func (r *PythonProjects) Subset(keys []string) *PythonProjects {
+	q := r.query.Select("subset")
+	q = q.Arg("keys", keys)
+
+	return &PythonProjects{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+func (r *Query) Python(container *Container) *Python { // python (../../../../../:0:0)
+	assertNotNil("container", container)
+	q := r.query.Select("python")
+	q = q.Arg("container", container)
 
 	return &Python{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

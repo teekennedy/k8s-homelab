@@ -79,23 +79,54 @@ func (r *Python) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-func (r PythonProject) MarshalJSON() ([]byte, error) {
+func (r Projects) MarshalJSON() ([]byte, error) {
 	var concrete struct {
-		Path    string
-		Source  *dagger.Directory
-		Testlib *dagger.Directory
+		Paths     []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+	}
+	concrete.Paths = r.Paths
+	concrete.Source = r.Source
+	concrete.Container = r.Container
+	return json.Marshal(&concrete)
+}
+
+func (r *Projects) UnmarshalJSON(bs []byte) error {
+	var concrete struct {
+		Paths     []string
+		Source    *dagger.Directory
+		Container *dagger.Container
+	}
+	err := json.Unmarshal(bs, &concrete)
+	if err != nil {
+		return err
+	}
+	r.Paths = concrete.Paths
+	r.Source = concrete.Source
+	r.Container = concrete.Container
+	return nil
+}
+
+func (r Project) MarshalJSON() ([]byte, error) {
+	var concrete struct {
+		Path      string
+		Source    *dagger.Directory
+		Testlib   *dagger.Directory
+		Container *dagger.Container
 	}
 	concrete.Path = r.Path
 	concrete.Source = r.Source
 	concrete.Testlib = r.Testlib
+	concrete.Container = r.Container
 	return json.Marshal(&concrete)
 }
 
-func (r *PythonProject) UnmarshalJSON(bs []byte) error {
+func (r *Project) UnmarshalJSON(bs []byte) error {
 	var concrete struct {
-		Path    string
-		Source  *dagger.Directory
-		Testlib *dagger.Directory
+		Path      string
+		Source    *dagger.Directory
+		Testlib   *dagger.Directory
+		Container *dagger.Container
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
@@ -104,6 +135,7 @@ func (r *PythonProject) UnmarshalJSON(bs []byte) error {
 	r.Path = concrete.Path
 	r.Source = concrete.Source
 	r.Testlib = concrete.Testlib
+	r.Container = concrete.Container
 	return nil
 }
 
@@ -224,29 +256,46 @@ func dispatch(ctx context.Context) (rerr error) {
 func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName string, inputArgs map[string][]byte) (_ any, err error) {
 	_ = inputArgs
 	switch parentName {
-	case "Python":
+	case "Project":
 		switch fnName {
 		case "Format":
-			var parent Python
+			var parent Project
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
+			return (*Project).Format(&parent, ctx)
+		case "Test":
+			var parent Project
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Project).Test(&parent, ctx)
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
+	case "Projects":
+		switch fnName {
+		case "Project":
+			var parent Projects
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var path string
+			if inputArgs["path"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["path"]), &path)
 				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg path", err))
 				}
 			}
-			var paths []string
-			if inputArgs["paths"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
-				}
-			}
-			return (*Python).Format(&parent, ctx, source, paths)
+			return (*Projects).Project(&parent, path), nil
+		default:
+			return nil, fmt.Errorf("unknown function %s", fnName)
+		}
+	case "Python":
+		switch fnName {
 		case "Projects":
 			var parent Python
 			err = json.Unmarshal(parentJSON, &parent)
@@ -260,28 +309,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Python).Projects(&parent, ctx, source), nil
-		case "Test":
-			var parent Python
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var source *dagger.Directory
-			if inputArgs["source"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
-				}
-			}
-			var paths []string
-			if inputArgs["paths"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["paths"]), &paths)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg paths", err))
-				}
-			}
-			return (*Python).Test(&parent, ctx, source, paths)
+			return (*Python).Projects(&parent, ctx, source)
 		case "":
 			var parent Python
 			err = json.Unmarshal(parentJSON, &parent)
@@ -299,89 +327,50 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
-	case "PythonProject":
-		switch fnName {
-		case "Format":
-			var parent PythonProject
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var container *dagger.Container
-			if inputArgs["container"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
-				}
-			}
-			return (*PythonProject).Format(&parent, ctx, container)
-		case "Test":
-			var parent PythonProject
-			err = json.Unmarshal(parentJSON, &parent)
-			if err != nil {
-				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var container *dagger.Container
-			if inputArgs["container"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["container"]), &container)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
-				}
-			}
-			return (*PythonProject).Test(&parent, ctx, container)
-		default:
-			return nil, fmt.Errorf("unknown function %s", fnName)
-		}
 	case "":
 		return dag.Module().
 			WithDescription("Tests and formats every Python project in the repo, each in its own scoped\ncontainer so that a change to one project leaves the others cached.\n").
 			WithObject(
-				dag.TypeDef().WithObject("Python", dagger.TypeDefWithObjectOpts{Description: "Python runs Python checks over every project in the repo.", SourceMap: dag.SourceMap("main.go", 20, 6)}).
-					WithFunction(
-						dag.Function("Format",
-							dag.TypeDef().WithObject("Changeset")).
-							WithDescription("Format formats Python files with black across all discovered projects.\nReturns a changeset. Use `dagger generate python:format -y` to apply.").
-							WithSourceMap(dag.SourceMap("main.go", 215, 1)).
-							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 219, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}).
-							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 221, 2)})).
+				dag.TypeDef().WithObject("Python", dagger.TypeDefWithObjectOpts{Description: "Python runs Python checks over every project in the repo.", SourceMap: dag.SourceMap("main.go", 43, 6)}).
 					WithFunction(
 						dag.Function("Projects",
-							dag.TypeDef().WithListOf(dag.TypeDef().WithObject("PythonProject"))).
-							WithDescription("Projects returns all discovered Python projects with scoped source\ndirectories.").
-							WithSourceMap(dag.SourceMap("main.go", 140, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 144, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
-					WithFunction(
-						dag.Function("Test",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Test runs pytest for all discovered Python projects.\n\nThe release script tests under scripts/tests are left to release:test-scripts,\nwhich mounts the scripts and manifests they read.").
-							WithSourceMap(dag.SourceMap("main.go", 252, 1)).
-							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 255, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "scripts/tests/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}).
-							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 257, 2)})).
+							dag.TypeDef().WithObject("Projects")).
+							WithDescription("Projects returns every Python project in the repo — every directory with a\npyproject.toml — keyed by path.").
+							WithSourceMap(dag.SourceMap("main.go", 69, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 73, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Python")).
 							WithDescription("Tests and formats every Python project in the repo.").
-							WithSourceMap(dag.SourceMap("main.go", 26, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs uv and black; defaults to the devenv ci\ntoolchain.", SourceMap: dag.SourceMap("main.go", 30, 2)}))).
+							WithSourceMap(dag.SourceMap("main.go", 49, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs uv and black. dagger.toml wires in\ndevenv's toolchain.", SourceMap: dag.SourceMap("main.go", 52, 2)}))).
 			WithObject(
-				dag.TypeDef().WithObject("PythonProject", dagger.TypeDefWithObjectOpts{Description: "PythonProject is one Python project — a directory with a pyproject.toml —\ncarrying only that project's files, so changing one project does not\ninvalidate the BuildKit cache for the others.", SourceMap: dag.SourceMap("main.go", 76, 6)}).
+				dag.TypeDef().WithObject("Projects", dagger.TypeDefWithObjectOpts{Description: "Projects are the repo's Python projects.", SourceMap: dag.SourceMap("main.go", 91, 6)}).
+					WithCollection().
+					WithFunction(
+						dag.Function("Project",
+							dag.TypeDef().WithObject("Project")).
+							WithDescription("Project returns the Python project at path, carrying only its own files, so\nthat it caches independently of the others.").
+							WithSourceMap(dag.SourceMap("main.go", 104, 1)).
+							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 104, 29)})).
+					WithCollectionGet("Project").
+					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the projects' directories relative to the repo root.", SourceMap: dag.SourceMap("main.go", 94, 2)}).
+					WithCollectionKeys("Paths")).
+			WithObject(
+				dag.TypeDef().WithObject("Project", dagger.TypeDefWithObjectOpts{Description: "Project is one Python project.", SourceMap: dag.SourceMap("main.go", 113, 6)}).
 					WithFunction(
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
-							WithDescription("Format runs black on this project, returning the resulting changes.").
-							WithSourceMap(dag.SourceMap("main.go", 185, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 185, 54)})).
+							WithDescription("Format runs black on the project, returning the resulting changes.").
+							WithSourceMap(dag.SourceMap("main.go", 173, 1)).
+							WithGenerator()).
 					WithFunction(
 						dag.Function("Test",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
-							WithDescription("Test runs pytest for this Python project, in the given toolchain container.\n\nNo -m here on purpose. Which markers an ordinary run excludes is a per-project\ndecision, declared in each pyproject.toml's addopts — and it has to be,\nbecause a command-line -m replaces addopts rather than narrowing it. Passing\none from here would re-enable the tests a project deselected for itself, and\ndeselect the ones a project runs deliberately: jellyfin-exporter registers\n`integration` precisely so those tests run by default against its stub server.").
-							WithSourceMap(dag.SourceMap("main.go", 157, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 157, 52)})).
-					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root\n(e.g. \"k8s/foundation/kured/files/kured-webhook\").", SourceMap: dag.SourceMap("main.go", 79, 2)}).
-					WithField("Source", dag.TypeDef().WithObject("Directory"), dagger.TypeDefWithFieldOpts{Description: "Source is the project's scoped source directory.", SourceMap: dag.SourceMap("main.go", 81, 2)}).
-					WithField("Testlib", dag.TypeDef().WithObject("Directory"), dagger.TypeDefWithFieldOpts{Description: "Testlib is the shared integration test library, set only for the\nprojects that import it.", SourceMap: dag.SourceMap("main.go", 84, 2)})), nil
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Test runs pytest for the project.\n\nNo -m here on purpose. Which markers an ordinary run excludes is a per-project\ndecision, declared in each pyproject.toml's addopts — and it has to be,\nbecause a command-line -m replaces addopts rather than narrowing it. Passing\none from here would re-enable the tests a project deselected for itself, and\ndeselect the ones a project runs deliberately: jellyfin-exporter registers\n`integration` precisely so those tests run by default against its stub server.").
+							WithSourceMap(dag.SourceMap("main.go", 143, 1)).
+							WithCheck()).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root\n(e.g. \"k8s/foundation/kured/files/kured-webhook\").", SourceMap: dag.SourceMap("main.go", 116, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

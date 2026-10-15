@@ -23,8 +23,29 @@ import (
 
 // TestCacheGranularity runs the helmfile checks through the cache harness.
 func TestCacheGranularity(t *testing.T) {
-	cachetest.Run(t, client{}, []string{"devenv"},
-		buildCheck(), validateCheck(), polarisCheck(), kubeconformCheck())
+	cachetest.Run(t, client{}, buildCheck(), validateCheck(), polarisCheck(), kubeconformCheck())
+}
+
+// eachRelease calls fn on every release in every environment, as
+// `dagger check` does when it expands the two collections.
+func eachRelease(ctx context.Context, source *dagger.Directory, ctr *dagger.Container, fn func(*Release) error) error {
+	envs, err := New(ctr, helmfileEnvironments).Environments(ctx, source)
+	if err != nil {
+		return err
+	}
+	for _, name := range envs.Names {
+		releases := envs.Environment(name).Releases()
+		for _, release := range releases.Names {
+			r, err := releases.Release(release)
+			if err != nil {
+				return err
+			}
+			if err := fn(r); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 type helmfileCheck = cachetest.Check[*dagger.Directory, *dagger.Container]
@@ -120,8 +141,7 @@ func buildCheck() helmfileCheck {
 		Fixture:   helmfileFixture,
 		Scenarios: helmfileScenarios,
 		Invoke: func(ctx context.Context, source *dagger.Directory, ctr *dagger.Container) error {
-			_, err := New(ctr).Build(ctx, source, helmfileEnvironments, nil)
-			return err
+			return eachRelease(ctx, source, ctr, func(r *Release) error { return r.Build(ctx) })
 		},
 		UnitOf: unitByHelmfileRelease,
 		Mount:  strings.TrimPrefix(helmRepoRoot, "/"),
@@ -140,8 +160,7 @@ func validateCheck() helmfileCheck {
 		Fixture:   helmfileFixture,
 		Scenarios: helmfileScenarios,
 		Invoke: func(ctx context.Context, source *dagger.Directory, ctr *dagger.Container) error {
-			_, err := New(ctr).Validate(ctx, source, helmfileEnvironments, nil)
-			return err
+			return eachRelease(ctx, source, ctr, func(r *Release) error { return r.Validate(ctx) })
 		},
 		UnitOf: unitByHelmfileRelease,
 		Mount:  strings.TrimPrefix(helmRepoRoot, "/"),
@@ -166,8 +185,7 @@ func polarisCheck() helmfileCheck {
 		Fixture:   helmfileFixture,
 		Scenarios: polarisScenarios,
 		Invoke: func(ctx context.Context, source *dagger.Directory, ctr *dagger.Container) error {
-			_, err := New(ctr).Polaris(ctx, source, helmfileEnvironments, nil)
-			return err
+			return eachRelease(ctx, source, ctr, func(r *Release) error { return r.Polaris(ctx) })
 		},
 		UnitOf: unitByHelmfileRelease,
 		Mount:  strings.TrimPrefix(helmRepoRoot, "/"),
@@ -191,8 +209,7 @@ func kubeconformCheck() helmfileCheck {
 		Fixture:   helmfileFixture,
 		Scenarios: kubeconformScenarios,
 		Invoke: func(ctx context.Context, source *dagger.Directory, ctr *dagger.Container) error {
-			_, err := New(ctr).Kubeconform(ctx, source, helmfileEnvironments, nil)
-			return err
+			return eachRelease(ctx, source, ctr, func(r *Release) error { return r.Kubeconform(ctx) })
 		},
 		UnitOf: unitByHelmfileRelease,
 		Mount:  strings.TrimPrefix(helmRepoRoot, "/"),
@@ -425,29 +442,6 @@ func TestHelmfileStateProblems(t *testing.T) {
 			got := helmfileStateProblems(tt.releases, tt.charts, tt.apps, envValues)
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("want %q\ngot  %q", tt.want, got)
-			}
-		})
-	}
-}
-
-func TestMatchHelmfilePaths(t *testing.T) {
-	charts := []string{"k8s/apps/alpha", "k8s/foundation/beta"}
-
-	tests := []struct {
-		name  string
-		paths []string
-		want  []string
-	}{
-		{"a file in one chart", []string{"k8s/apps/alpha/values.yaml"}, charts[:1]},
-		{"the state file", []string{helmfilePath}, charts},
-		{"generated environment values", []string{"config/gen/production/env.json"}, charts},
-		{"a library chart", []string{"k8s/charts/shared/Chart.yaml"}, charts},
-		{"an unrelated file", []string{"nix/hosts/common/default.nix"}, nil},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := matchHelmfilePaths(tt.paths, charts); !slices.Equal(got, tt.want) {
-				t.Errorf("want %v, got %v", tt.want, got)
 			}
 		})
 	}

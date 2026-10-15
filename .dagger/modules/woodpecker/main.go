@@ -16,9 +16,8 @@ type Woodpecker struct {
 
 // Lints the Woodpecker CI pipelines.
 func New(
-	// Container to run in. It needs woodpecker-cli; defaults to the devenv ci
-	// toolchain.
-	// +optional
+	// Container to run in. It needs woodpecker-cli. dagger.toml wires in
+	// devenv\'s toolchain.
 	container *dagger.Container,
 ) *Woodpecker {
 	return &Woodpecker{Container: container}
@@ -33,11 +32,8 @@ func (m *Woodpecker) Lint(ctx context.Context,
 	source *dagger.Directory,
 	// +optional
 	paths []string,
-) (string, error) {
+) error {
 	container := m.Container
-	if container == nil {
-		container = dag.Devenv().Toolchain()
-	}
 	container = container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src")
@@ -52,8 +48,8 @@ func (m *Woodpecker) Lint(ctx context.Context,
 
 	_, err := container.Sync(ctx)
 	if err != nil {
-		return "", fmt.Errorf("woodpecker lint failed: %w", err)
+		return fmt.Errorf("woodpecker lint failed: %w", err)
 	}
 
-	return "Woodpecker lint passed", nil
+	return nil
 }

@@ -16,7 +16,26 @@ import (
 
 // TestCacheGranularity runs the Go checks through the cache harness.
 func TestCacheGranularity(t *testing.T) {
-	cachetest.Run(t, client{}, []string{"devenv"}, testCheck(), lintCheck())
+	cachetest.Run(t, client{}, testCheck(), lintCheck())
+}
+
+// eachModule calls fn on every module the collection lists, as `dagger check`
+// does when it expands it.
+func eachModule(ctx context.Context, source *dagger.Directory, ctr *dagger.Container, fn func(*GoModule) error) error {
+	ms, err := New(ctr).Modules(ctx, source)
+	if err != nil {
+		return err
+	}
+	for _, p := range ms.Paths {
+		gm, err := ms.Module(ctx, p)
+		if err != nil {
+			return err
+		}
+		if err := fn(gm); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +97,7 @@ const (
 	secretSyncPath = "k8s/apps/homepage/files/secret-sync/secretsync.go"
 )
 
-// goUnitFiles is what each unit must have mounted at /src: its own files and
+// goUnitFiles is what each unit must have mounted: its own files and
 // nothing from its siblings. cmd/lab additionally carries its vendor tree,
 // which rides along inside the module directory by design.
 var goUnitFiles = map[string][]string{
@@ -103,11 +122,9 @@ func testCheck() goCheck {
 		Fixture:   goFixture,
 		Scenarios: goScenarios,
 		Invoke: func(ctx context.Context, source *dagger.Directory, ctr *dagger.Container) error {
-			_, err := New(ctr).Test(ctx, source)
-			return err
+			return eachModule(ctx, source, ctr, func(gm *GoModule) error { return gm.Test(ctx) })
 		},
 		UnitOf:        unitByScopedGoModule,
-		Mount:         srcMount,
 		WantUnitArgv:  cachetest.SameArgv("go test ./..."),
 		WantUnitFiles: goUnitFiles,
 		ShimTools:     []string{"go"},
@@ -121,20 +138,20 @@ func lintCheck() goCheck {
 		Fixture:   goFixture,
 		Scenarios: goScenarios,
 		Invoke: func(ctx context.Context, source *dagger.Directory, ctr *dagger.Container) error {
-			changes, err := New(ctr).Lint(ctx, source)
-			if err != nil {
-				return err
-			}
-			// The changeset is lazy, and merging it is the part of Lint that
-			// only reaches the engine when something is selected off it.
-			// IsEmpty is what forces that; Changeset.sync does not.
-			if _, err := changes.IsEmpty(ctx); err != nil {
-				return fmt.Errorf("forcing Lint's changeset: %w", err)
-			}
-			return nil
+			return eachModule(ctx, source, ctr, func(gm *GoModule) error {
+				changes, err := gm.Lint(ctx)
+				if err != nil {
+					return err
+				}
+				// The changeset is lazy; IsEmpty is what makes the engine run the
+				// execs behind it. Changeset.sync does not.
+				if _, err := changes.IsEmpty(ctx); err != nil {
+					return fmt.Errorf("forcing %s's changeset: %w", gm.Path, err)
+				}
+				return nil
+			})
 		},
 		UnitOf: unitByScopedGoModule,
-		Mount:  srcMount,
 		WantUnitArgv: cachetest.SameArgv(
 			"go mod tidy",
 			"golangci-lint run --fix --config "+golangciLintConfigPath+" ./...",
@@ -145,17 +162,14 @@ func lintCheck() goCheck {
 	}
 }
 
-// srcMount is where the Go checks mount the module they work on.
-const srcMount = "src"
-
-// markerFromMount is the engine backend's shimMarker for the Go checks. It
-// names the module by the one .go file at the root of what is mounted at /src
-// — how GoModule.Test and GoModule.Lint scope each module, and what
+// markerFromMount is the engine backend's ShimMarker for the Go checks. It
+// names the module by the one .go file at the root of its working directory —
+// where GoModule.Test and GoModule.Lint mount each module, and what
 // unitByScopedGoModule reads on the fake side.
-const markerFromMount = `$(basename "$(ls /src/*.go 2>/dev/null | head -1)")`
+const markerFromMount = `$(basename "$(ls "$PWD"/*.go 2>/dev/null | head -1)")`
 
 // unitByScopedGoModule names a Go check's unit by the one .go file sitting
-// directly in the module directory mounted at /src. That is how one module's
+// directly in the module directory mounted at its working directory. That is how one module's
 // work is told apart from another's: every module runs the same argv in the
 // same workdir, and only the mounted source differs.
 //
@@ -163,9 +177,9 @@ const markerFromMount = `$(basename "$(ls /src/*.go 2>/dev/null | head -1)")`
 // being mistaken for its unit name. Execs with no such file — anything
 // running on an earlier exec's output — are not
 // per-unit work and return "". The engine backend's shim applies the same rule
-// with `ls /src/*.go`, so both backends key their results identically.
+// with `ls "$PWD"/*.go`, so both backends key their results identically.
 func unitByScopedGoModule(e daggerfake.Exec) string {
-	for _, f := range e.Files[srcMount] {
+	for _, f := range e.Files[strings.TrimPrefix(e.Workdir, "/")] {
 		if !strings.Contains(f, "/") && strings.HasSuffix(f, ".go") {
 			return f
 		}

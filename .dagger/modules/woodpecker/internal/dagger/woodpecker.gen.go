@@ -6,9 +6,6 @@ import (
 	"dagger/woodpecker/internal/dagger/core"
 )
 
-// WoodpeckerOpts contains options for Query.Woodpecker
-type WoodpeckerOpts = core.WoodpeckerOpts
-
 // Woodpecker lints the repo's Woodpecker pipelines.
 type Woodpecker = core.Woodpecker
 

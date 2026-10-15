@@ -11,6 +11,3 @@ type Ci = core.Ci
 
 // CiVerifyCacheGranularityOpts contains options for Ci.VerifyCacheGranularity
 type CiVerifyCacheGranularityOpts = core.CiVerifyCacheGranularityOpts
-
-// CiOpts contains options for Query.Ci
-type CiOpts = core.CiOpts

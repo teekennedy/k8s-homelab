@@ -1,132 +1,142 @@
-# Dagger toolchains
+# Dagger modules
 
-CI for this repo is a set of Dagger [toolchains], one per language or platform,
-listed in the root `dagger.json`. `dagger check` runs every toolchain's checks,
-and fails on any generator that would change a file; `dagger generate -y`
-applies the generators.
+CI for this repo is a Dagger 1.0 workspace: one module per language or
+platform, installed in the root `dagger.toml`. `dagger check` runs every
+module's checks, and fails on any generator that would change a file;
+`dagger generate -y` applies the generators.
 
 ```bash
-dagger check                      # everything
-dagger check 'go:*'               # one toolchain
-dagger check '*:lint'             # one kind of check, across toolchains
-dagger check helmfile:build       # one check
-dagger check -l                   # list checks and generators
+dagger check                            # everything
+dagger check -l                         # list checks; --all lists every item
+dagger check --go                       # one module
+dagger check --go-module=cmd/lab        # one item of a collection
+dagger check --helmfile --helmfile-release=traefik
+dagger check nix:validate               # one check outside a collection
 
-dagger generate -y                # apply every generator
-dagger generate go:lint -y        # apply one
+dagger generate -y                      # apply every generator
+dagger generate --go -y                 # one module's generators
 
-dagger functions                  # list toolchains
-dagger call go --help             # a toolchain's functions
-dagger call kubernetes integration-test --releases=reflector
+dagger api functions                    # list modules
+dagger api call go --help               # a module's functions
+dagger api call kubernetes integration-test --releases=reflector
+dagger shell devenv/toolchain           # a shell in the container checks run in
 ```
 
-Checks and generators are named `<toolchain>:<function>`, and `dagger call`
-takes the toolchain as its first word, so a toolchain's functions are named for
-what they do (`test`, `lint`, `format`) without repeating the language.
-
-[toolchains]: https://docs.dagger.io/core-concepts/toolchains
+A module's functions are named for what they do (`test`, `lint`, `format`)
+without repeating the language, since the module name comes first.
 
 ## Layout
 
 ```
-dagger.json                 # SDK-less root: the toolchain list, nothing else
+dagger.toml                 # the workspace: installed modules and their settings
+dagger.lock                 # pinned versions of remote modules and the Go SDK
 .dagger/
   lib/                      # plain Go shared by modules (no Dagger types)
     cachetest/              # the cache-granularity test harness
     daggerfake/             # an in-process model of the engine, for that harness
     cacheprobe/             # lets a test binary import a generated SDK
     helmfile/               # helmfile state parsing for helmfile and kubernetes
-  modules/<toolchain>/      # one Dagger module (Go SDK) per toolchain
+  modules/<name>/           # one Dagger module (Go SDK) per language or platform
+    dagger-module.toml
 ```
 
-This follows the Dagger repo's own layout: an SDK-less root `dagger.json` that
-lists toolchains, one Go module per toolchain, sibling modules as
-`dependencies`, and plain Go shared through a `replace` plus an `include`.
-Dagger has since moved its modules from `toolchains/` to `.dagger/modules/`,
-which is where these live.
+Besides our own modules, the workspace installs the official
+[`dagger.io/python/uv`](https://github.com/dagger/python) module for its `lock`
+generator, which keeps every `uv.lock` in step with its `pyproject.toml`. It
+runs in our toolchain container, and its `audit` check is skipped: dependency
+vulnerabilities are Renovate's job.
 
-## Toolchains
+## Modules
 
-| Toolchain | Checks | Generators | Other functions |
-| --- | --- | --- | --- |
-| `ci` | `verify-cache-granularity` | | `debug-dir` |
-| `cue` | | `export`, `fix`, `format`, `trim` | |
-| `devenv` | | | `toolchain`, `container`, `projects`, `update` |
-| `go` | `test` | `lint` | `modules` |
-| `helmfile` | `build`, `kubeconform`, `lint`, `polaris`, `validate` | | |
-| `kubernetes` | | | `integration-test`, `integration-reports`, `dev-cluster`, `dev-cluster-delete` |
-| `lab` | `build` | `update-vendor-hash` | `binary`, `binary-nix` |
-| `nix` | `validate`, `validate-build-metrics` | `format` | `image` |
-| `python` | `test` | `format` | `projects` |
-| `release` | `build-dockerfiles`, `test-scripts` | | `image`, `publish` |
-| `terraform` | `lint`, `validate` | `format`, `lock` | |
-| `woodpecker` | `lint` | | |
-| `yaml` | `lint` | | |
+| Module | Collections | Checks | Generators | Other functions |
+| --- | --- | --- | --- | --- |
+| `ci` | | `verify-cache-granularity` | | |
+| `cue` | | | `export`, `fix`, `format`, `trim` | |
+| `devenv` | | | | `toolchain`, `integration-toolchain`, `container`, `projects`, `update` |
+| `go` | `modules` | per module: `test` | per module: `lint` | |
+| `helmfile` | `environments`, each with `releases` | per environment: `lint`; per release: `build`, `kubeconform`, `polaris`, `validate` | | |
+| `kubernetes` | | | | `integration-test`, `integration-reports`, `dev-cluster`, `dev-cluster-delete` |
+| `lab` | | `build` | `update-vendor-hash` | `binary`, `binary-nix` |
+| `nix` | | `validate`, `validate-build-metrics` | `format` | `image` |
+| `python` | `projects` | per project: `test` | per project: `format` | |
+| `release` | | `build-dockerfiles`, `test-scripts` | | `image`, `publish` |
+| `terraform` | `modules` | `lint`; per module: `validate` | `format`; per module: `lock` | |
+| `woodpecker` | | `lint` | | |
+| `yaml` | | `lint` | | |
 
-Each module's package doc says what it covers, and `dagger call <toolchain>
+Each module's package doc says what it covers, and `dagger api call <module>
 <function> --help` documents its arguments. The two with operating manuals of
 their own are [kubernetes](modules/kubernetes/README.md) (integration tests and
 dev clusters) and [release](modules/release/README.md) (container releases).
 
-## How a toolchain is put together
+## How a module is put together
 
 ### The toolchain container
 
 Every tool a check runs comes from devenv.lock, so a check runs the same
 alejandra, black or golangci-lint as a local `devenv shell`. The `devenv`
-toolchain builds that shell as a container — `dagger call devenv toolchain` —
-and every other toolchain depends on it:
+module builds that shell as a container, and `dagger.toml` wires it into every
+other module's constructor:
+
+```toml
+[modules.go.settings]
+container = "dag://devenv/toolchain"
+```
 
 ```go
-// New is what `dagger functions` shows as the toolchain's description.
+// New is what `dagger api functions` shows as the module's description.
 func New(
-	// Container to run in. Defaults to the devenv ci toolchain.
-	// +optional
+	// Container to run in. dagger.toml wires in devenv's toolchain.
 	container *dagger.Container,
 ) *Go {
 	return &Go{Container: container}
 }
-
-func (m *Go) toolchain() *dagger.Container {
-	if m.Container != nil {
-		return m.Container
-	}
-	return dag.Devenv().Toolchain()
-}
 ```
 
-The same shape as the upstream `go` module's `base` and the `pytest` module's
-`container`. Passing `--container` (`dagger call go --container=... test`)
-swaps the toolchain out, which is how the cache tests run checks against a
-cheap stand-in instead of a Nix build.
+The modules don't depend on devenv; the workspace connects them, the same way
+it hands our toolchain to the uv module as its `base`. `kubernetes` gets
+`dag://devenv/integration-toolchain` instead, which adds kubectl and curl, and
+`lab` also gets `dag://nix/image` for its Nix builds. Only `release` still
+depends on devenv directly, because it builds the published images with the
+profiles each release tag names. The cache tests pass the constructor a cheap
+stand-in instead of a Nix build.
 
 The devenv module's own `+ignore` decides what invalidates the toolchain:
 `devenv.nix`, `devenv.yaml`, `devenv.lock` and `cmd/lab/devenv.nix`, which
-devenv.yaml imports. Nothing a check passes can reach it. The lab CLI itself is
+devenv.yaml imports. Nothing a check reads can reach it. The lab CLI itself is
 only installed by the `interactive` profile, so editing its Go source leaves
 the toolchain cached; `devenv container`, which builds the published images and
 may include that profile, reads all of `cmd/lab` from a source of its own.
 
 The exceptions build with plain Nix rather than devenv: `nix:validate`,
-`nix:validate-build-metrics`'s probe, and `lab:build`, `lab:binary-nix` and
-`lab:update-vendor-hash`, which all use `dag.Nix().Image()`.
+`nix:validate-build-metrics`'s probe, and `lab:build`, `lab binary-nix` and
+`lab:update-vendor-hash`.
+
+### Collections
+
+A module that works on many units — Go modules, Python projects, Terraform
+modules, helmfile releases — returns them as a collection: a struct marked
+`+collection` whose `+keys` field lists the units, with a `+get` method that
+returns one. Checks and generators are methods on the unit, so Dagger runs one
+per unit, lists each in `dagger check -l --all`, and adds a selector flag per
+collection (`--go-module`, `--python-project`, `--terraform-module`,
+`--helmfile-environment`, `--helmfile-release`).
+
+Helmfile's environments come from the `environments` setting (by default
+`["production"]`), and each environment holds the releases of every chart.
 
 ### Source and cache scoping
 
 Every function that reads the repo takes it as a `+defaultPath="/"` directory
-filtered by `+ignore` down to the files it reads, so Dagger's function cache
-only re-runs it when one of those changes. Toolchains that fan out — Go modules,
-Python projects, helmfile releases, Terraform modules — then mount each unit's
-own slice of that directory into its own exec, so BuildKit re-runs only the
-units whose files changed:
+filtered by `+ignore` down to the files it reads, so the collection is only
+rebuilt when one of those changes. Each unit then carries only its own slice of
+that directory, so each unit's check caches on its own files:
 
 ```
-dagger check go:test
-├─ function cache hit? → cached result
-└─ miss → one exec per module, each with only its module mounted:
-   ├─ cmd/lab                       → exec cache hit (unchanged)
-   ├─ k8s/.../secret-sync           → re-runs (file changed)
-   └─ .dagger/modules/go (+ ../../lib, its local replace target)
+dagger check --go
+├─ go-module=cmd/lab                     → cached (unchanged)
+├─ go-module=k8s/.../secret-sync          → re-runs (file changed)
+└─ go-module=.dagger/modules/go (+ ../../lib, its local replace target)
 ```
 
 A changeset built from a scoped directory has paths relative to that scope, so
@@ -140,44 +150,57 @@ otherwise `dagger generate -y` would write to the repo root.
 | helmfile release | `helmfile.yaml.gotmpl`, one environment's `env.json`, its chart and `k8s/charts` |
 | Terraform module | All of `terraform/`: modules reference siblings by relative path |
 
+All modules set `legacy-default-path = true`, which keeps 0.x `+defaultPath`
+semantics. Moving to 1.0's Workspace API instead would let modules find units
+and load files lazily, but the scoping above, and the tests that hold it, rest
+on the current loading.
+
 ### Checks and generators
 
-A `+check` fails only by returning an error. Returning a changed directory or a
-non-empty changeset from a check passes silently, so a formatter is a
-`+generate` function returning a `*dagger.Changeset` instead: `dagger check`
-fails when it is non-empty and `dagger generate -y` applies it. When one
-generator runs several tools, the destructive one runs first (deadnix before
-alejandra).
+A `+check` returns only an error. A formatter is a `+generate` function
+returning a `*dagger.Changeset`: `dagger check` runs it as a staleness check
+that fails when the changeset is non-empty, and `dagger generate -y` applies
+it. When one generator runs several tools, the destructive one runs first
+(deadnix before alejandra).
+
+The `scripts/tests` project's `python` test is a deliberate no-op:
+`release:test-scripts` runs it, with the scripts and manifests it reads
+mounted beside it.
 
 `devenv update` is deliberately not a generator: it fetches whatever is latest,
-so it is not reproducible. Renovate runs it with `dagger call devenv update -y`.
+so it is not reproducible. Renovate runs it weekly with
+`dagger api call devenv update -y`, alongside `dagger lock update`.
 
 ### Generated code is committed
 
 Each module's `dagger.gen.go` and `internal/dagger` are checked in, and
-`codegen.automaticGitignore` is off, as in the Dagger repo. `go:test` and
-`go:lint` treat these modules like any other Go module, and a clean CI checkout
-has to compile them without running `dagger develop` first. After changing a
-module's API, or upgrading Dagger, regenerate:
+`codegen.automaticGitignore` is off. In 1.0 Dagger loads a module from its
+committed bindings, and `go:test` and `go:lint` compile these modules like any
+other Go module. SDK codegen is the `dagger-go-sdk` generator, so
+`dagger generate -y` keeps them current and `dagger check` fails when they are
+stale.
 
-```bash
-dagger develop --recursive   # from the repo root: every toolchain and its dependencies
-```
+After changing a module's API, the committed `dagger.gen.go` no longer
+compiles, and Dagger cannot load the module to list it. The generator
+regenerates it anyway: run `dagger generate --dagger-go-sdk -y` and ignore the
+load errors it reports for the stale modules, then run it again to confirm.
+When a module stops depending on another, delete the dependency's
+`internal/dagger/<dep>.gen.go` and `internal/dagger/core/<dep>.gen.go`; the
+generator leaves them behind.
 
-A bare `dagger develop` at the root fails, since the root has no SDK.
-
-`dagger develop` also bumps `engineVersion` to the CLI's version; keep it in
-step across the root and every module.
+Keep `engineVersion` in every `dagger-module.toml` at the engine's version
+(`k8s/platform/dagger-engine/values.yaml`), which is also the CLI that CI and
+Renovate install.
 
 ## The shared library
 
 `.dagger/lib` is a plain Go module, `dagger/lib`. A module that uses it lists
-`../../lib` under `include` in its `dagger.json`, so the engine uploads it with
-the module, and has `replace dagger/lib => ../../lib` in its go.mod. Code in it
-cannot use Dagger types: each module generates its own SDK package, so a
-`*dagger.Directory` from one is a different type from another's. That is why
-`lib/helmfile` only parses, and the helmfile and kubernetes modules each keep
-their own few lines of Dagger calls around it.
+`../../lib` under `include` in its `dagger-module.toml`, so the engine uploads
+it with the module, and has `replace dagger/lib => ../../lib` in its go.mod.
+Code in it cannot use Dagger types: each module generates its own SDK package,
+so a `*dagger.Directory` from one is a different type from another's. That is
+why `lib/helmfile` only parses, and the helmfile and kubernetes modules each
+keep their own few lines of Dagger calls around it.
 
 Only the modules that need it include it (go, helmfile, kubernetes, release),
 because a change to it changes the source of every module that does.
@@ -186,14 +209,12 @@ because a change to it changes the source of every module that does.
 
 `go`, `helmfile` and `kubernetes` assert that a source edit re-runs exactly the
 units it should — the property the scoping above exists for — with the harness
-in `lib/cachetest`. It runs each check twice, before and after an edit, and
-compares per-unit exec cache keys:
+in `lib/cachetest`. It runs each check over every unit twice, before and after
+an edit, and compares per-unit exec cache keys:
 
 - **Fake backend** (`go:test`, milliseconds): `lib/daggerfake` evaluates the
   check's GraphQL against a content-addressed model of the engine and records a
-  cache key per exec, without running anything. It models a call into a
-  dependency module as an opaque container keyed on the call, and the harness
-  asserts that the toolchain call never changes with an edit.
+  cache key per exec, without running anything.
 - **Engine backend** (`ci:verify-cache-granularity`): the same scenarios against
   a real engine, with the check's tools replaced by shims that count their runs.
   Without a Dagger session these tests skip.
@@ -202,53 +223,41 @@ A module adds coverage with a fixture, a scenario table and a
 `cachetest.Check`, plus a `client` adapting the harness to its generated SDK
 (copy `modules/go/client_test.go`). See the `cachetest` package doc.
 
-## Adding a toolchain
+## Adding a module
 
-1. Create `.dagger/modules/<name>/dagger.json`, with `devenv` as a dependency
-   if it runs in the toolchain container:
+1. `dagger module init go --name <name> -y`, which creates
+   `.dagger/modules/<name>` and installs it. Set
+   `codegen.automaticGitignore = false` in its `dagger-module.toml`, and add
+   `legacy-default-path = true` to its `[modules.<name>]` entry in
+   `dagger.toml`.
+2. Write `main.go` with the constructor above, and wire its container:
 
-   ```json
-   {
-     "name": "<name>",
-     "engineVersion": "v0.21.10",
-     "sdk": { "source": "go" },
-     "dependencies": [{ "name": "devenv", "source": "../devenv" }],
-     "codegen": { "automaticGitignore": false }
-   }
+   ```toml
+   [modules.<name>.settings]
+   container = "dag://devenv/toolchain"
    ```
 
-2. Write `main.go` with the constructor above. Its doc comment is the
-   toolchain's description in `dagger functions`.
-3. `cd .dagger/modules/<name> && dagger develop`.
-4. Add it to `toolchains` in the root `dagger.json`.
-5. `dagger check '<name>:*'`, then commit the generated code with it.
+3. `dagger generate --dagger-go-sdk -y`.
+4. `dagger check --<name>`, then commit the generated code with it.
 
 ## Publishing to the Daggerverse
 
-Not done, on purpose. The Daggerverse indexes public git repositories, and
-nothing has to be submitted: the first `dagger` call that loads a module from a
-public repo publishes it, so the public GitHub mirror would serve. A module in
-a monorepo is versioned by tagging with its subpath as a prefix
-(`<subpath>/v1.2.3`) — which a module under `.dagger/` cannot have, because git
-rejects a ref component that starts with a dot. These could only ever be
-referenced by branch or commit
-(`github.com/teekennedy/k8s-homelab/.dagger/modules/go@main`); a module meant
-for publishing would live outside `.dagger/`, as the Dagger repo's own
-published ones do under `modules/`.
+Not done, on purpose. A module in a monorepo is versioned by tagging with its
+subpath as a prefix (`<subpath>/v1.2.3`) — which a module under `.dagger/`
+cannot have, because git rejects a ref component that starts with a dot. These
+could only ever be referenced by branch or commit; a module meant for
+publishing would live outside `.dagger/`, as the Dagger repo's own published
+ones do under `modules/`.
 
 What would make one worth publishing is not true of any of these yet:
 
 - They hardcode this repo's layout (`k8s/<tier>/<chart>`, `config/gen`,
-  `cmd/lab`, `.golangci.yaml` at the root) rather than taking it as arguments.
+  `cmd/lab`, `.golangci.yaml` at the root) rather than discovering it.
 - They run in the devenv toolchain, which only exists for this repo.
-- Most of what they wrap already exists upstream: `github.com/dagger/go`,
-  `golangci-lint`, `helm` and `pytest`. Those pull their own tool versions
-  rather than devenv.lock's, which is why this repo doesn't use them: local and
-  CI runs would disagree.
 
 The best candidates are `lib/daggerfake` and `lib/cachetest`, which are generic,
 but they are Go test libraries rather than Dagger modules: publishing them means
-a `go get`-able Go module, not the Daggerverse.
+a `go get`-able Go module.
 
 ## Known limitations
 

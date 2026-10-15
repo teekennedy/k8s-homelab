@@ -20,6 +20,3 @@ type CueFormatOpts = core.CueFormatOpts
 
 // CueTrimOpts contains options for Cue.Trim
 type CueTrimOpts = core.CueTrimOpts
-
-// CueOpts contains options for Query.Cue
-type CueOpts = core.CueOpts

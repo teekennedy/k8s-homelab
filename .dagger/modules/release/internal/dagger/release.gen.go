@@ -6,9 +6,6 @@ import (
 	"dagger/release/internal/dagger/core"
 )
 
-// ReleaseOpts contains options for Query.Release
-type ReleaseOpts = core.ReleaseOpts
-
 // Release builds and publishes the repo's container images.
 type Release = core.Release
 

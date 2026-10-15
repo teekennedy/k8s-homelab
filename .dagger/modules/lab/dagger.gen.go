@@ -62,20 +62,24 @@ func convertSlice[I any, O any](in []I, f func(I) O) []O {
 func (r Lab) MarshalJSON() ([]byte, error) {
 	var concrete struct {
 		Container *dagger.Container
+		Nix       *dagger.Container
 	}
 	concrete.Container = r.Container
+	concrete.Nix = r.Nix
 	return json.Marshal(&concrete)
 }
 
 func (r *Lab) UnmarshalJSON(bs []byte) error {
 	var concrete struct {
 		Container *dagger.Container
+		Nix       *dagger.Container
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
 		return err
 	}
 	r.Container = concrete.Container
+	r.Nix = concrete.Nix
 	return nil
 }
 
@@ -246,7 +250,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			return (*Lab).Build(&parent, ctx, source)
+			return nil, (*Lab).Build(&parent, ctx, source)
 		case "UpdateVendorHash":
 			var parent Lab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -274,7 +278,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg container", err))
 				}
 			}
-			return New(container), nil
+			var nix *dagger.Container
+			if inputArgs["nix"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["nix"]), &nix)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg nix", err))
+				}
+			}
+			return New(container, nix), nil
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
@@ -287,22 +298,22 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Binary",
 							dag.TypeDef().WithObject("File")).
 							WithDescription("Binary returns the built lab CLI binary, built with Go for speed.").
-							WithSourceMap(dag.SourceMap("main.go", 59, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 62, 2), DefaultPath: "/", Ignore: []string{"*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum"}}).
-							WithArg("platform", dag.TypeDef().WithScalar("Platform").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Platform to build for. Defaults to the engine's.", SourceMap: dag.SourceMap("main.go", 65, 2)})).
+							WithSourceMap(dag.SourceMap("main.go", 55, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 58, 2), DefaultPath: "/", Ignore: []string{"*", "!cmd/lab/**/*.go", "!cmd/lab/go.mod", "!cmd/lab/go.sum"}}).
+							WithArg("platform", dag.TypeDef().WithScalar("Platform").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Platform to build for. Defaults to the engine's.", SourceMap: dag.SourceMap("main.go", 61, 2)})).
 					WithFunction(
 						dag.Function("BinaryNix",
 							dag.TypeDef().WithObject("File")).
 							WithDescription("BinaryNix returns the built lab CLI binary, built with Nix.").
-							WithSourceMap(dag.SourceMap("main.go", 96, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 99, 2), DefaultPath: "/", Ignore: []string{"*", "!cmd/lab/**/*"}})).
+							WithSourceMap(dag.SourceMap("main.go", 92, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 95, 2), DefaultPath: "/", Ignore: []string{"*", "!cmd/lab/**/*"}})).
 					WithFunction(
 						dag.Function("Build",
-							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Build builds the lab CLI binary using Nix.\nThis ensures the build uses the exact same process as production.").
-							WithSourceMap(dag.SourceMap("main.go", 41, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 37, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 44, 2), DefaultPath: "/", Ignore: []string{"*", "!cmd/lab/**/*"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 40, 2), DefaultPath: "/", Ignore: []string{"*", "!cmd/lab/**/*"}})).
 					WithFunction(
 						dag.Function("UpdateVendorHash",
 							dag.TypeDef().WithObject("Changeset")).
@@ -314,8 +325,9 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("New",
 							dag.TypeDef().WithObject("Lab")).
 							WithDescription("Builds the lab CLI and keeps its Nix vendorHash current.").
-							WithSourceMap(dag.SourceMap("main.go", 22, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run Go builds in. It needs go; defaults to the devenv ci\ntoolchain. Nix builds always use the plain Nix image.", SourceMap: dag.SourceMap("main.go", 26, 2)}))), nil
+							WithSourceMap(dag.SourceMap("main.go", 24, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run Go builds in. It needs go. dagger.toml wires in\ndevenv's toolchain.", SourceMap: dag.SourceMap("main.go", 27, 2)}).
+							WithArg("nix", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run Nix builds in. dagger.toml wires in nix's image.", SourceMap: dag.SourceMap("main.go", 29, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

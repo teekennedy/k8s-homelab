@@ -19,7 +19,7 @@ import (
 // That needs a real engine and a real toolchain, so they skip without a Dagger
 // session, exactly like the engine half of the cache harness:
 //
-//	cd .dagger/modules/go && dagger run go test ./...
+//	cd .dagger/modules/go && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...
 //
 // or via `dagger check ci:verify-cache-granularity`.
 //
@@ -158,7 +158,11 @@ func TestLintBehaviour(t *testing.T) {
 			ctx := context.Background()
 			files := lintFixture(config, c.module)
 
-			changes, err := New(lintToolchain()).Lint(ctx, client{}.Directory(files))
+			gm, err := newModule(ctx, client{}.Directory(files), lintModPath, lintToolchain())
+			if err != nil {
+				t.Fatalf("loading the fixture module: %v", err)
+			}
+			changes, err := gm.Lint(ctx)
 
 			if c.wantErr != "" {
 				switch {

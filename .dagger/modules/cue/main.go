@@ -19,8 +19,7 @@ type Cue struct {
 
 // Formats, upgrades, trims and exports the CUE configuration under config/.
 func New(
-	// Container to run in. It needs cue; defaults to the devenv ci toolchain.
-	// +optional
+	// Container to run in. It needs cue. dagger.toml wires in devenv's toolchain.
 	container *dagger.Container,
 ) *Cue {
 	return &Cue{Container: container}
@@ -30,9 +29,6 @@ func New(
 // working directory set to /src/config (the CUE package root).
 func (m *Cue) cueContainer(source *dagger.Directory) *dagger.Container {
 	container := m.Container
-	if container == nil {
-		container = dag.Devenv().Toolchain()
-	}
 	return container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/config")

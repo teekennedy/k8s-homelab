@@ -12,6 +12,10 @@ import (
 // Devenv builds containers from the repo's devenv definition.
 type Devenv struct { // devenv (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id *ID
 }
@@ -19,6 +23,9 @@ type Devenv struct { // devenv (../../../../../:0:0)
 func (r *Devenv) WithGraphQLQuery(q *querybuilder.Selection) *Devenv {
 	return &Devenv{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -60,7 +67,8 @@ func (r *Devenv) Container(opts ...DevenvContainerOpts) *Container {
 	}
 
 	return &Container{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -74,7 +82,13 @@ func (r *Devenv) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -111,6 +125,18 @@ func (r *Devenv) UnmarshalJSON(bs []byte) error {
 	}
 	*r = Devenv{query: selectNode(dag.QueryBuilder(), id, "Devenv")}
 	return nil
+}
+
+// IntegrationToolchain is Toolchain for the "ci" and "integration" profiles:
+// the container the Kubernetes integration workflow runs in. It takes no
+// arguments so that a dagger.toml setting can link to it.
+func (r *Devenv) IntegrationToolchain() *Container {
+	q := r.query.Select("integrationToolchain")
+
+	return &Container{
+		query:     q,
+		refetchID: r.refetchID,
+	}
 }
 
 // DevenvProjectsOpts contains options for Devenv.Projects
@@ -189,7 +215,8 @@ func (r *Devenv) Toolchain(opts ...DevenvToolchainOpts) *Container {
 	}
 
 	return &Container{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -209,7 +236,7 @@ type DevenvUpdateOpts struct {
 // commit happens to be for each input right now, so running it twice in a
 // row can produce different output — it belongs to CI as a scheduled
 // "refresh" step, not as generated code to keep in sync.
-// Use `dagger call devenv update --auto-apply` to apply.
+// Use `dagger api call devenv update --auto-apply` to apply.
 func (r *Devenv) Update(opts ...DevenvUpdateOpts) *Changeset {
 	q := r.query.Select("update")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -220,7 +247,8 @@ func (r *Devenv) Update(opts ...DevenvUpdateOpts) *Changeset {
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -230,6 +258,10 @@ func (r *Devenv) Update(opts ...DevenvUpdateOpts) *Changeset {
 // the cache for other projects.
 type DevenvProject struct { // devenv (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id   *ID
 	path *string
@@ -238,6 +270,9 @@ type DevenvProject struct { // devenv (../../../../../:0:0)
 func (r *DevenvProject) WithGraphQLQuery(q *querybuilder.Selection) *DevenvProject {
 	return &DevenvProject{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -251,7 +286,13 @@ func (r *DevenvProject) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -308,7 +349,8 @@ func (r *DevenvProject) Source() *Directory {
 	q := r.query.Select("source")
 
 	return &Directory{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -319,7 +361,8 @@ func (r *DevenvProject) Update() *Changeset {
 	q := r.query.Select("update")
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -346,6 +389,7 @@ func (r *Query) Devenv(opts ...DevenvOpts) *Devenv { // devenv (../../../../../:
 	}
 
 	return &Devenv{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

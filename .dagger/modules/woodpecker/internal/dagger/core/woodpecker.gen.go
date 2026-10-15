@@ -9,38 +9,35 @@ import (
 	"github.com/dagger/querybuilder"
 )
 
-// WoodpeckerOpts contains options for Query.Woodpecker
-type WoodpeckerOpts struct {
-	// Container to run in. It needs woodpecker-cli; defaults to the devenv ci
-	// toolchain.
-	Container *Container
-}
-
-func (r *Query) Woodpecker(opts ...WoodpeckerOpts) *Woodpecker { // woodpecker (../../../../../:0:0)
+func (r *Query) Woodpecker(container *Container) *Woodpecker { // woodpecker (../../../../../:0:0)
+	assertNotNil("container", container)
 	q := r.query.Select("woodpecker")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
+	q = q.Arg("container", container)
 
 	return &Woodpecker{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
 // Woodpecker lints the repo's Woodpecker pipelines.
 type Woodpecker struct { // woodpecker (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
 	id   *ID
-	lint *string
+	lint *Void
 }
 
 func (r *Woodpecker) WithGraphQLQuery(q *querybuilder.Selection) *Woodpecker {
 	return &Woodpecker{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -54,7 +51,13 @@ func (r *Woodpecker) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -102,9 +105,9 @@ type WoodpeckerLintOpts struct {
 
 // Lint lints Woodpecker CI pipeline configuration files.
 // When paths are provided, only matching files are linted.
-func (r *Woodpecker) Lint(ctx context.Context, opts ...WoodpeckerLintOpts) (string, error) {
+func (r *Woodpecker) Lint(ctx context.Context, opts ...WoodpeckerLintOpts) error {
 	if r.lint != nil {
-		return *r.lint, nil
+		return nil
 	}
 	q := r.query.Select("lint")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -118,8 +121,5 @@ func (r *Woodpecker) Lint(ctx context.Context, opts ...WoodpeckerLintOpts) (stri
 		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }

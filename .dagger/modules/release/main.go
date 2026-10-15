@@ -31,8 +31,7 @@ type Release struct {
 // Builds, labels and publishes the repo's container images.
 func New(
 	// Container to run the release script tests in. It needs uv, git, jq and
-	// git-cliff; defaults to the devenv ci toolchain.
-	// +optional
+	// git-cliff. dagger.toml wires in devenv's toolchain.
 	container *dagger.Container,
 ) *Release {
 	return &Release{Container: container}
@@ -242,10 +241,10 @@ func (m *Release) BuildDockerfiles(
 	ctx context.Context,
 	// +defaultPath="/"
 	source *dagger.Directory,
-) (string, error) {
+) error {
 	files, err := source.Glob(ctx, "**/Dockerfile")
 	if err != nil {
-		return "", fmt.Errorf("discover Dockerfiles: %w", err)
+		return fmt.Errorf("discover Dockerfiles: %w", err)
 	}
 	g := new(errgroup.Group)
 	for _, file := range files {
@@ -262,7 +261,7 @@ func (m *Release) BuildDockerfiles(
 		})
 	}
 	if err := g.Wait(); err != nil {
-		return "", fmt.Errorf("build Dockerfiles: %w", err)
+		return fmt.Errorf("build Dockerfiles: %w", err)
 	}
-	return fmt.Sprintf("Built %d Dockerfiles", len(files)), nil
+	return nil
 }

@@ -23,9 +23,9 @@
 //  3. A Check wiring the two together, passed to Run.
 //
 // Run drives every scenario through both backends, plus a shape test and the
-// engine control. The fake backend calls a check with a nil container, so the
-// check reaches for its default toolchain; the engine backend calls it with a
-// shim. That is why every check takes an optional toolchain container.
+// engine control. The toolchain a check runs in is a constructor argument,
+// wired from devenv in dagger.toml: the fake backend passes a stand-in for it,
+// and the engine backend a shim.
 //
 // # The two backends
 //
@@ -97,17 +97,26 @@ type Client[D, C any] interface {
 	// UseFake points the module's `dag` at engine until the test ends. `dag` is
 	// package-level state, so tests using it must not call t.Parallel().
 	UseFake(t *testing.T, engine graphql.Client)
+	// Toolchain returns a stand-in for the wired toolchain container.
+	Toolchain() C
 	// Directory builds files in-process with WithNewFile.
 	Directory(files Repo) D
 	// HostDirectory loads a host path the way the CLI loads a +defaultPath
 	// argument, forcing it so an unreadable path fails here.
 	HostDirectory(ctx context.Context, path string) (D, error)
-	// Container returns image with volume mounted at mount and each of files
-	// (path -> contents) written executable.
-	Container(image, mount, volume string, files map[string]string) C
+	// Container returns image with volume mounted at mount and files written
+	// executable, in order: the order is part of the container's identity, so
+	// it has to be the same from one run to the next.
+	Container(image, mount, volume string, files []File) C
 	// Stdout runs script in Container(image, mount, volume, nil) with env set
 	// to a fresh value, and returns its stdout.
 	Stdout(ctx context.Context, image, mount, volume, env, script string) (string, error)
+}
+
+// File is an executable file the engine backend writes into a container.
+type File struct {
+	Path     string
+	Contents string
 }
 
 // Check is one module function these tests can drive, together with everything
@@ -125,10 +134,9 @@ type Check[D, C any] struct {
 	// Scenarios are the cache-granularity questions to ask of this check.
 	Scenarios func() []Scenario
 
-	// Invoke calls the module function. container is the toolchain to run in:
-	// the fake backend passes the zero value (so the check reaches for its
-	// default toolchain, which the toolchain assertion inspects), the engine
-	// backend passes a shim.
+	// Invoke calls the module function, for every item of a collection.
+	// container is the toolchain to run in: a stand-in on the fake backend, a
+	// shim on the engine backend.
 	Invoke func(ctx context.Context, source D, container C) error
 
 	// UnitOf names the unit of work an exec belongs to, or "" for an exec that
@@ -136,7 +144,8 @@ type Check[D, C any] struct {
 	UnitOf func(daggerfake.Exec) string
 
 	// Mount is where the check mounts the tree a unit works on, as a path with
-	// no leading slash.
+	// no leading slash. Empty means each unit's working directory, for checks
+	// that mount every unit at a path of its own.
 	Mount string
 
 	// WantUnitArgv is the argv a unit must run, in order. It pins the shape the
@@ -191,9 +200,6 @@ type units map[string]string
 // outcome is one run of a check against one source tree.
 type outcome struct {
 	units units
-	// toolchain identifies the dependency-module calls the check made for its
-	// toolchain, or "" on a backend that does not observe them.
-	toolchain string
 	// execs is the raw exec log, for failure messages and the shape test. It is
 	// empty on the engine backend, which observes runs rather than describing
 	// them.
@@ -213,7 +219,6 @@ func (s Scenario) run(t *testing.T, b interface{ name() string }, first, second 
 	s.assertRerun(t, b.name(), first, second)
 	s.assertCached(t, b.name(), first, second)
 	s.assertNothingUnasserted(t, b.name(), first, second)
-	assertToolchain(t, b.name(), first, second)
 }
 
 func (s Scenario) assertRerun(t *testing.T, b string, first, second outcome) {
@@ -272,36 +277,16 @@ func (s Scenario) assertNothingUnasserted(t *testing.T, b string, first, second 
 	}
 }
 
-// assertToolchain holds the check to running in a toolchain that no source edit
-// can reach. The toolchain is a call into the devenv module, scoped by that
-// module's own +ignore; a check that started building one from its own source
-// would show up here as a call that changed with the edit.
-func assertToolchain(t *testing.T, b string, first, second outcome) {
-	t.Helper()
-	if b != fakeName {
-		return
-	}
-	if first.toolchain == "" {
-		t.Fatalf("[%s] the check made no dependency-module call for its toolchain; "+
-			"did it stop defaulting to the devenv toolchain?", b)
-	}
-	if first.toolchain != second.toolchain {
-		t.Errorf("[%s] the edit changed the toolchain the check runs in, invalidating every unit\n"+
-			"before: %s\nafter:  %s", b, first.toolchain, second.toolchain)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // the tests
 // ---------------------------------------------------------------------------
 
 // Run is the whole suite for a set of checks: every scenario on the fake
 // backend, the same table on a real engine (skipped without a session), the
-// engine control, and the per-unit shape. modules are the dependency modules
-// the checks may call into, by Query field name (e.g. "devenv").
-func Run[D, C any](t *testing.T, client Client[D, C], modules []string, checks ...Check[D, C]) {
+// engine control, and the per-unit shape.
+func Run[D, C any](t *testing.T, client Client[D, C], checks ...Check[D, C]) {
 	t.Helper()
-	fake := newFakeBackend(client, modules)
+	fake := newFakeBackend(client)
 
 	t.Run("CacheGranularity", func(t *testing.T) {
 		forEachScenario(t, checks, func(t *testing.T, c Check[D, C], s Scenario) {
@@ -400,8 +385,8 @@ func fanOutPerUnit[D, C any](t *testing.T, fake *fakeBackend[D, C], c Check[D, C
 			t.Errorf("unit %q runs the wrong steps\nwant: %v\ngot:  %v", unit, wantArgv, gotArgv)
 		}
 		if got := unitFiles(execs, c, unit); strings.Join(got, ",") != strings.Join(wantFiles, ",") {
-			t.Errorf("unit %q has the wrong files mounted at /%s\nwant: %v\ngot:  %v",
-				unit, c.Mount, wantFiles, got)
+			t.Errorf("unit %q has the wrong files mounted\nwant: %v\ngot:  %v",
+				unit, wantFiles, got)
 		}
 	}
 }
@@ -410,7 +395,11 @@ func fanOutPerUnit[D, C any](t *testing.T, fake *fakeBackend[D, C], c Check[D, C
 func unitFiles[D, C any](execs []daggerfake.Exec, c Check[D, C], unit string) []string {
 	for _, e := range execs {
 		if c.UnitOf(e) == unit {
-			return e.Files[c.Mount]
+			mount := c.Mount
+			if mount == "" {
+				mount = strings.TrimPrefix(e.Workdir, "/")
+			}
+			return e.Files[mount]
 		}
 	}
 	return nil

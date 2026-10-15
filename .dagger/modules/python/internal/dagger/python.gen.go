@@ -9,19 +9,13 @@ import (
 // Python runs Python checks over every project in the repo.
 type Python = core.Python
 
-// PythonFormatOpts contains options for Python.Format
-type PythonFormatOpts = core.PythonFormatOpts
-
 // PythonProjectsOpts contains options for Python.Projects
 type PythonProjectsOpts = core.PythonProjectsOpts
 
-// PythonTestOpts contains options for Python.Test
-type PythonTestOpts = core.PythonTestOpts
-
-// PythonProject is one Python project — a directory with a pyproject.toml —
-// carrying only that project's files, so changing one project does not
-// invalidate the BuildKit cache for the others.
+// Project is one Python project.
 type PythonProject = core.PythonProject
 
-// PythonOpts contains options for Query.Python
-type PythonOpts = core.PythonOpts
+// Projects are the repo's Python projects.
+type PythonProjects = core.PythonProjects
+
+type WithPythonProjectsFunc = core.WithPythonProjectsFunc

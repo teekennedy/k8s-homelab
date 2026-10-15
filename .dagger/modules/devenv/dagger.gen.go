@@ -247,6 +247,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Devenv).Container(&parent, nixDaemon, profiles), nil
+		case "IntegrationToolchain":
+			var parent Devenv
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return (*Devenv).IntegrationToolchain(&parent), nil
 		case "Projects":
 			var parent Devenv
 			err = json.Unmarshal(parentJSON, &parent)
@@ -334,9 +341,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Container",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("Container builds the devenv nix environment as a minimal \"from scratch\"\ncontainer, labelled for publishing. Uses `devenv container copy shell` to\nproduce a minimal nix2container image containing only the runtime closure\n(no build dependencies). The nix store is cached across runs so packages are\nonly built once.").
-							WithSourceMap(dag.SourceMap("main.go", 76, 1)).
-							WithArg("nixDaemon", dag.TypeDef().WithObject("Socket").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Optional host nix daemon socket for faster builds on NixOS CI hosts.\nWhen provided, the host daemon's store is used as a substituter so\npre-built packages are fetched rather than rebuilt from source.\nNote: only works when the host and container share the same platform\n(e.g. Linux-to-Linux). Does not work with macOS host daemons due to\ncross-platform path handling differences.", SourceMap: dag.SourceMap("main.go", 84, 2)}).
-							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/). Defaults to\nthe \"ci\" profile, which holds exactly the toolchain the checks need. The\n\"interactive\" profile — cluster tooling, the kubeconfig enterShell, the\ndagger CLI, the git hook — is deliberately not built here; pass it\nexplicitly if you want a full shell to poke at.", SourceMap: dag.SourceMap("main.go", 92, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
+							WithSourceMap(dag.SourceMap("main.go", 83, 1)).
+							WithArg("nixDaemon", dag.TypeDef().WithObject("Socket").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Optional host nix daemon socket for faster builds on NixOS CI hosts.\nWhen provided, the host daemon's store is used as a substituter so\npre-built packages are fetched rather than rebuilt from source.\nNote: only works when the host and container share the same platform\n(e.g. Linux-to-Linux). Does not work with macOS host daemons due to\ncross-platform path handling differences.", SourceMap: dag.SourceMap("main.go", 91, 2)}).
+							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/). Defaults to\nthe \"ci\" profile, which holds exactly the toolchain the checks need. The\n\"interactive\" profile — cluster tooling, the kubeconfig enterShell, the\ndagger CLI, the git hook — is deliberately not built here; pass it\nexplicitly if you want a full shell to poke at.", SourceMap: dag.SourceMap("main.go", 99, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
+					WithFunction(
+						dag.Function("IntegrationToolchain",
+							dag.TypeDef().WithObject("Container")).
+							WithDescription("IntegrationToolchain is Toolchain for the \"ci\" and \"integration\" profiles:\nthe container the Kubernetes integration workflow runs in. It takes no\narguments so that a dagger.toml setting can link to it.").
+							WithSourceMap(dag.SourceMap("main.go", 74, 1))).
 					WithFunction(
 						dag.Function("Projects",
 							dag.TypeDef().WithListOf(dag.TypeDef().WithObject("DevenvProject"))).
@@ -352,7 +364,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithFunction(
 						dag.Function("Update",
 							dag.TypeDef().WithObject("Changeset")).
-							WithDescription("Update runs `devenv update` for every discovered devenv project and\nreturns the combined changeset. Each project runs in its own container\nwith only its own scoped source mounted, so a lock change in one project\ndoesn't invalidate the cache for the others.\n\nDeliberately not tagged +generate. +generate implies a reproducible step\nthat recomputes a value from other checked-in inputs (like\nlab's update-vendor-hash). devenv update instead fetches whatever the latest\ncommit happens to be for each input right now, so running it twice in a\nrow can produce different output — it belongs to CI as a scheduled\n\"refresh\" step, not as generated code to keep in sync.\nUse `dagger call devenv update --auto-apply` to apply.").
+							WithDescription("Update runs `devenv update` for every discovered devenv project and\nreturns the combined changeset. Each project runs in its own container\nwith only its own scoped source mounted, so a lock change in one project\ndoesn't invalidate the cache for the others.\n\nDeliberately not tagged +generate. +generate implies a reproducible step\nthat recomputes a value from other checked-in inputs (like\nlab's update-vendor-hash). devenv update instead fetches whatever the latest\ncommit happens to be for each input right now, so running it twice in a\nrow can produce different output — it belongs to CI as a scheduled\n\"refresh\" step, not as generated code to keep in sync.\nUse `dagger api call devenv update --auto-apply` to apply.").
 							WithSourceMap(dag.SourceMap("projects.go", 109, 1)).
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("projects.go", 113, 2), DefaultPath: "/", Ignore: []string{"*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"}})).
 					WithConstructor(

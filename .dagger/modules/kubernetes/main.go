@@ -11,10 +11,6 @@ import (
 	"dagger/kubernetes/internal/dagger"
 )
 
-// integrationProfiles adds the cluster tooling the workflow drives — kubectl
-// and curl — on top of the ci toolchain.
-var integrationProfiles = []string{"ci", "integration"}
-
 // Kubernetes runs releases on k3s clusters.
 type Kubernetes struct {
 	// +private
@@ -23,17 +19,9 @@ type Kubernetes struct {
 
 // Runs releases on throwaway or long-lived k3s clusters and tests them there.
 func New(
-	// Container to run helmfile, kubectl and pytest in; defaults to the devenv
-	// ci and integration profiles.
-	// +optional
+	// Container to run helmfile, kubectl and pytest in. dagger.toml wires in
+	// devenv's integration-toolchain: the ci profile plus kubectl and curl.
 	container *dagger.Container,
 ) *Kubernetes {
 	return &Kubernetes{Container: container}
-}
-
-func (m *Kubernetes) toolchain() *dagger.Container {
-	if m.Container != nil {
-		return m.Container
-	}
-	return dag.Devenv().Toolchain(dagger.DevenvToolchainOpts{Profiles: integrationProfiles})
 }

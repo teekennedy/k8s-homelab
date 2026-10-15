@@ -12,14 +12,21 @@ import (
 // Lab builds the lab CLI.
 type Lab struct { // lab (../../../../../:0:0)
 	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
 
-	build *string
+	build *Void
 	id    *ID
 }
 
 func (r *Lab) WithGraphQLQuery(q *querybuilder.Selection) *Lab {
 	return &Lab{
 		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
 	}
 }
 
@@ -45,7 +52,8 @@ func (r *Lab) Binary(opts ...LabBinaryOpts) *File {
 	}
 
 	return &File{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -65,7 +73,8 @@ func (r *Lab) BinaryNix(opts ...LabBinaryNixOpts) *File {
 	}
 
 	return &File{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
@@ -76,9 +85,9 @@ type LabBuildOpts struct {
 
 // Build builds the lab CLI binary using Nix.
 // This ensures the build uses the exact same process as production.
-func (r *Lab) Build(ctx context.Context, opts ...LabBuildOpts) (string, error) {
+func (r *Lab) Build(ctx context.Context, opts ...LabBuildOpts) error {
 	if r.build != nil {
-		return *r.build, nil
+		return nil
 	}
 	q := r.query.Select("build")
 	for i := len(opts) - 1; i >= 0; i-- {
@@ -88,10 +97,7 @@ func (r *Lab) Build(ctx context.Context, opts ...LabBuildOpts) (string, error) {
 		}
 	}
 
-	var response string
-
-	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	return q.Execute(ctx)
 }
 
 // A unique identifier for this Lab.
@@ -104,7 +110,13 @@ func (r *Lab) ID(ctx context.Context) (ID, error) {
 	var response ID
 
 	q = q.Bind(&response)
-	return response, q.Execute(ctx)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
@@ -165,27 +177,20 @@ func (r *Lab) UpdateVendorHash(opts ...LabUpdateVendorHashOpts) *Changeset {
 	}
 
 	return &Changeset{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }
 
-// LabOpts contains options for Query.Lab
-type LabOpts struct {
-	// Container to run Go builds in. It needs go; defaults to the devenv ci
-	// toolchain. Nix builds always use the plain Nix image.
-	Container *Container
-}
-
-func (r *Query) Lab(opts ...LabOpts) *Lab { // lab (../../../../../:0:0)
+func (r *Query) Lab(container *Container, nix *Container) *Lab { // lab (../../../../../:0:0)
+	assertNotNil("container", container)
+	assertNotNil("nix", nix)
 	q := r.query.Select("lab")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `container` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Container) {
-			q = q.Arg("container", opts[i].Container)
-		}
-	}
+	q = q.Arg("container", container)
+	q = q.Arg("nix", nix)
 
 	return &Lab{
-		query: q,
+		query:     q,
+		refetchID: r.refetchID,
 	}
 }

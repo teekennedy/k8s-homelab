@@ -6,9 +6,6 @@ import (
 	"dagger/yaml/internal/dagger/core"
 )
 
-// YamlOpts contains options for Query.Yaml
-type YamlOpts = core.YamlOpts
-
 // Yaml runs yamllint over the repo.
 type Yaml = core.Yaml
 

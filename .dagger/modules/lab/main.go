@@ -16,23 +16,19 @@ import (
 type Lab struct {
 	// +private
 	Container *dagger.Container
+	// +private
+	Nix *dagger.Container
 }
 
 // Builds the lab CLI and keeps its Nix vendorHash current.
 func New(
-	// Container to run Go builds in. It needs go; defaults to the devenv ci
-	// toolchain. Nix builds always use the plain Nix image.
-	// +optional
+	// Container to run Go builds in. It needs go. dagger.toml wires in
+	// devenv's toolchain.
 	container *dagger.Container,
+	// Container to run Nix builds in. dagger.toml wires in nix's image.
+	nix *dagger.Container,
 ) *Lab {
-	return &Lab{Container: container}
-}
-
-func (m *Lab) toolchain() *dagger.Container {
-	if m.Container != nil {
-		return m.Container
-	}
-	return dag.Devenv().Toolchain()
+	return &Lab{Container: container, Nix: nix}
 }
 
 // Build builds the lab CLI binary using Nix.
@@ -42,17 +38,17 @@ func (m *Lab) Build(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
-) (string, error) {
-	_, err := dag.Nix().Image().
+) error {
+	_, err := m.Nix.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "build", "./cmd/lab", "--print-build-logs"}).
 		Sync(ctx)
 	if err != nil {
-		return "", fmt.Errorf("nix build failed: %w", err)
+		return fmt.Errorf("nix build failed: %w", err)
 	}
 
-	return "CLI build passed (Nix)", nil
+	return nil
 }
 
 // Binary returns the built lab CLI binary, built with Go for speed.
@@ -70,7 +66,7 @@ func (m *Lab) Binary(
 	// this produces the same static binary either way.
 	goos, goarch := splitPlatform(platform)
 
-	return m.toolchain().
+	return m.Container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/cmd/lab").
 		WithEnvVariable("CGO_ENABLED", "0").
@@ -98,7 +94,7 @@ func (m *Lab) BinaryNix(
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
 ) *dagger.File {
-	return dag.Nix().Image().
+	return m.Nix.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "build", "./cmd/lab"}).
