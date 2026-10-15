@@ -1,0 +1,20 @@
+{
+  "name": "lab",
+  "engineVersion": "v0.21.10",
+  "sdk": {
+    "source": "go"
+  },
+  "dependencies": [
+    {
+      "name": "devenv",
+      "source": "../devenv"
+    },
+    {
+      "name": "nix",
+      "source": "../nix"
+    }
+  ],
+  "codegen": {
+    "automaticGitignore": false
+  }
+}

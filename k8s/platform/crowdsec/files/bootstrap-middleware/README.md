@@ -68,10 +68,10 @@ The script is tested and linted via Dagger functions:
 
 ```bash
 # Run tests
-dagger call test-python --source=.
+dagger call python test
 
 # Format (a non-empty changeset also fails `dagger check`)
-dagger call format-python --source=. --auto-apply
+dagger generate python:format -y
 ```
 
 ## Architecture

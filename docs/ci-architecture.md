@@ -66,9 +66,9 @@ lab host deploy borg-0
 # CI runs in containers.ci environment (no lab pre-installed)
 # Dagger pipeline builds lab as first step
 
-dagger check 'build*'
-dagger check 'lint*'
-dagger check 'test*'
+dagger check 'lab:*'
+dagger check '*:lint'
+dagger check '*:test'
 dagger check
 ```
 
@@ -78,10 +78,10 @@ dagger check
 # go.mod/go.sum (Renovate bumping a dependency is the usual cause):
 
 # Option 1: Regenerate the hash (run from the repo root)
-dagger call update-go-vendor-hash --auto-apply
+dagger generate lab:update-vendor-hash -y
 # Rewrites cmd/lab/gomod.json, which cmd/lab/default.nix imports.
-# `dagger check check-go-vendor-hash` verifies it in CI, and Renovate
-# runs the generator as a post-upgrade task on cmd/lab dependency PRs.
+# `dagger check` runs the generator and fails on a stale hash, and Renovate
+# runs it as a post-upgrade task on cmd/lab dependency PRs.
 
 # Option 2: Fix manually
 cd cmd/lab
@@ -91,7 +91,7 @@ nix build
 nix build  # Should succeed now
 
 # Option 3: Use Dagger directly (doesn't need lab)
-dagger call build-cli --source=.
+dagger call lab build
 # Dagger builds lab using Nix in a clean container
 ```
 
@@ -140,24 +140,20 @@ dagger call build-cli --source=.
 # Run all checks
 dagger check
 
-# Run checks by category
-dagger check 'lint*'
-dagger check 'build*'
-dagger check 'test*'
-dagger check 'validate*'
+# Run one toolchain's checks, or one kind of check across toolchains
+dagger check 'go:*'
+dagger check '*:lint'
 
 # Run a specific check
-dagger check lint-nix
-dagger check build-cli
+dagger check nix:validate
+dagger check lab:build
 
 # Build lab using Nix (production build)
-dagger call build-cli --source=.
+dagger call lab build
 
-# Build lab using Go (faster, for testing)
-dagger call build-cli-go --source=.
-
-# Get built binary
-dagger call cli-nix --source=. export --path=./lab
+# Get the binary, built with Go (faster) or Nix
+dagger call lab binary export --path=./lab
+dagger call lab binary-nix export --path=./lab
 ```
 
 ## Benefits
@@ -171,5 +167,5 @@ dagger call cli-nix --source=. export --path=./lab
 ## Related Files
 
 - `devenv.nix` - Defines both dev shell and CI container
-- `.dagger/main.go` - Dagger pipeline definitions
+- `.dagger/modules/` - Dagger toolchains; see `.dagger/README.md`
 - `cmd/lab/flake.nix` - Lab's Nix build configuration

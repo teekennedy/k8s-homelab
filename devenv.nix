@@ -96,7 +96,7 @@ in {
     # reachable from a Dagger check.
     interactive.module = {
       scripts.build-containers.exec = ''
-        ${dagger}/bin/dagger call build-dockerfiles "$@"
+        ${dagger}/bin/dagger call release build-dockerfiles "$@"
       '';
 
       packages = with pkgs; [

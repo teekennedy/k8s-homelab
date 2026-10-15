@@ -1,11 +1,58 @@
 {
   "name": "homelab",
   "engineVersion": "v0.21.10",
-  "sdk": {
-    "source": "go",
-    "experimental": {
-      "SELF_CALLS": true
+  "toolchains": [
+    {
+      "name": "ci",
+      "source": ".dagger/modules/ci"
+    },
+    {
+      "name": "cue",
+      "source": ".dagger/modules/cue"
+    },
+    {
+      "name": "devenv",
+      "source": ".dagger/modules/devenv"
+    },
+    {
+      "name": "go",
+      "source": ".dagger/modules/go"
+    },
+    {
+      "name": "helmfile",
+      "source": ".dagger/modules/helmfile"
+    },
+    {
+      "name": "kubernetes",
+      "source": ".dagger/modules/kubernetes"
+    },
+    {
+      "name": "lab",
+      "source": ".dagger/modules/lab"
+    },
+    {
+      "name": "nix",
+      "source": ".dagger/modules/nix"
+    },
+    {
+      "name": "python",
+      "source": ".dagger/modules/python"
+    },
+    {
+      "name": "release",
+      "source": ".dagger/modules/release"
+    },
+    {
+      "name": "terraform",
+      "source": ".dagger/modules/terraform"
+    },
+    {
+      "name": "woodpecker",
+      "source": ".dagger/modules/woodpecker"
+    },
+    {
+      "name": "yaml",
+      "source": ".dagger/modules/yaml"
     }
-  },
-  "source": ".dagger"
+  ]
 }
