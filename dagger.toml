@@ -87,8 +87,11 @@ legacy-default-path = true
 [modules.yaml.settings]
 container = "dag://devenv/toolchain"
 
+# The staleness check regenerates every module's bindings on every
+# `dagger check`, uncached. CI runs the generator and diffs instead.
 [modules.dagger-go-sdk]
 source = "github.com/dagger/go-sdk"
+check.skip = ["generate/stale"]
 
 [sdks.go]
 module = "dagger-go-sdk"

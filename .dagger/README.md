@@ -167,6 +167,12 @@ The `scripts/tests` project's `python` test is a deliberate no-op:
 `release:test-scripts` runs it, with the scripts and manifests it reads
 mounted beside it.
 
+A check's body runs again on every `dagger check`; what makes a warm run fast
+is that its execs are served from cache. A failed exec is never cached, so an
+exec whose non-zero exit a check treats as a pass (pytest's 5, "no tests
+collected", for a project that deselects all of its tests) has to turn it into
+success inside the exec, or it re-runs every time.
+
 `devenv update` is deliberately not a generator: it fetches whatever is latest,
 so it is not reproducible. Renovate runs it weekly with
 `dagger api call devenv update -y`, alongside `dagger lock update`.
@@ -177,8 +183,10 @@ Each module's `dagger.gen.go` and `internal/dagger` are checked in, and
 `codegen.automaticGitignore` is off. In 1.0 Dagger loads a module from its
 committed bindings, and `go:test` and `go:lint` compile these modules like any
 other Go module. SDK codegen is the `dagger-go-sdk` generator, so
-`dagger generate -y` keeps them current and `dagger check` fails when they are
-stale.
+`dagger generate -y` keeps them current. Its staleness check is skipped in
+`dagger check` (`check.skip` in dagger.toml), because it regenerates every
+module's bindings on every run, uncached, which tripled the time of a run with
+nothing to do; CI runs the generator after `dagger check` and fails on a diff.
 
 After changing a module's API, the committed `dagger.gen.go` no longer
 compiles, and Dagger cannot load the module to list it. The generator

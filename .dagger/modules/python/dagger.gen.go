@@ -331,46 +331,46 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		return dag.Module().
 			WithDescription("Tests and formats every Python project in the repo, each in its own scoped\ncontainer so that a change to one project leaves the others cached.\n").
 			WithObject(
-				dag.TypeDef().WithObject("Python", dagger.TypeDefWithObjectOpts{Description: "Python runs Python checks over every project in the repo.", SourceMap: dag.SourceMap("main.go", 43, 6)}).
+				dag.TypeDef().WithObject("Python", dagger.TypeDefWithObjectOpts{Description: "Python runs Python checks over every project in the repo.", SourceMap: dag.SourceMap("main.go", 44, 6)}).
 					WithFunction(
 						dag.Function("Projects",
 							dag.TypeDef().WithObject("Projects")).
 							WithDescription("Projects returns every Python project in the repo — every directory with a\npyproject.toml — keyed by path.").
-							WithSourceMap(dag.SourceMap("main.go", 69, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 73, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
+							WithSourceMap(dag.SourceMap("main.go", 70, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 74, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Python")).
 							WithDescription("Tests and formats every Python project in the repo.").
-							WithSourceMap(dag.SourceMap("main.go", 49, 1)).
-							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs uv and black. dagger.toml wires in\ndevenv's toolchain.", SourceMap: dag.SourceMap("main.go", 52, 2)}))).
+							WithSourceMap(dag.SourceMap("main.go", 50, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs uv and black. dagger.toml wires in\ndevenv's toolchain.", SourceMap: dag.SourceMap("main.go", 53, 2)}))).
 			WithObject(
-				dag.TypeDef().WithObject("Projects", dagger.TypeDefWithObjectOpts{Description: "Projects are the repo's Python projects.", SourceMap: dag.SourceMap("main.go", 91, 6)}).
+				dag.TypeDef().WithObject("Projects", dagger.TypeDefWithObjectOpts{Description: "Projects are the repo's Python projects.", SourceMap: dag.SourceMap("main.go", 92, 6)}).
 					WithCollection().
 					WithFunction(
 						dag.Function("Project",
 							dag.TypeDef().WithObject("Project")).
 							WithDescription("Project returns the Python project at path, carrying only its own files, so\nthat it caches independently of the others.").
-							WithSourceMap(dag.SourceMap("main.go", 104, 1)).
-							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 104, 29)})).
+							WithSourceMap(dag.SourceMap("main.go", 105, 1)).
+							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 105, 29)})).
 					WithCollectionGet("Project").
-					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the projects' directories relative to the repo root.", SourceMap: dag.SourceMap("main.go", 94, 2)}).
+					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the projects' directories relative to the repo root.", SourceMap: dag.SourceMap("main.go", 95, 2)}).
 					WithCollectionKeys("Paths")).
 			WithObject(
-				dag.TypeDef().WithObject("Project", dagger.TypeDefWithObjectOpts{Description: "Project is one Python project.", SourceMap: dag.SourceMap("main.go", 113, 6)}).
+				dag.TypeDef().WithObject("Project", dagger.TypeDefWithObjectOpts{Description: "Project is one Python project.", SourceMap: dag.SourceMap("main.go", 114, 6)}).
 					WithFunction(
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Format runs black on the project, returning the resulting changes.").
-							WithSourceMap(dag.SourceMap("main.go", 173, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 176, 1)).
 							WithGenerator()).
 					WithFunction(
 						dag.Function("Test",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Test runs pytest for the project.\n\nNo -m here on purpose. Which markers an ordinary run excludes is a per-project\ndecision, declared in each pyproject.toml's addopts — and it has to be,\nbecause a command-line -m replaces addopts rather than narrowing it. Passing\none from here would re-enable the tests a project deselected for itself, and\ndeselect the ones a project runs deliberately: jellyfin-exporter registers\n`integration` precisely so those tests run by default against its stub server.").
-							WithSourceMap(dag.SourceMap("main.go", 143, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 144, 1)).
 							WithCheck()).
-					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root\n(e.g. \"k8s/foundation/kured/files/kured-webhook\").", SourceMap: dag.SourceMap("main.go", 116, 2)})), nil
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root\n(e.g. \"k8s/foundation/kured/files/kured-webhook\").", SourceMap: dag.SourceMap("main.go", 117, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

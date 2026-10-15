@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"dagger/python/internal/dagger"
@@ -152,15 +153,17 @@ func (pp *Project) Test(ctx context.Context) error {
 	if pp.Testlib != nil {
 		container = container.WithMountedDirectory(pythonSrcRoot+"/"+kubernetesTestlibPath, pp.Testlib)
 	}
+	// A project whose tests all deselect themselves exits with
+	// pytestNoTestsExitCode, which is a pass. It is turned into one inside the
+	// exec rather than after it: a failed exec is never cached, so it would
+	// re-run on every `dagger check`.
 	_, err := container.
 		WithWorkdir(workdir).
-		WithExec([]string{"uv", "run", "--link-mode", "copy", "pytest"}).
+		WithExec([]string{"sh", "-c", `uv run --link-mode copy pytest; status=$?; [ "$status" -eq "$1" ] && exit 0; exit "$status"`,
+			"--", strconv.Itoa(pytestNoTestsExitCode)}).
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			if execErr.ExitCode == pytestNoTestsExitCode {
-				return nil
-			}
 			return fmt.Errorf("pytest failed in %s:\n%s%s%w", pp.Path, execErr.Stdout, execErr.Stderr, err)
 		}
 		return fmt.Errorf("pytest failed in %s: %w", pp.Path, err)

@@ -14,7 +14,7 @@ steps:
         serviceAccountName: dagger-pipeline
     commands:
       # kubectl is needed for dagger cli to communicate with the runner host
-      - apk add --no-cache curl kubectl
+      - apk add --no-cache curl git kubectl
       # The CLI must match the in-cluster engine, so take its version from there.
       - export DAGGER_VERSION="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:v||p' k8s/platform/dagger-engine/values.yaml)"
       - test -n "$DAGGER_VERSION"
@@ -23,3 +23,7 @@ steps:
       # take far longer. Kept well under the pipeline timeout so a check that
       # drifts this slow still fails loudly.
       - timeout 40m dagger check --progress=report
+      # dagger.toml skips the Go SDK's staleness check, which re-runs codegen
+      # for every module on every `dagger check`; gate on it here instead.
+      - dagger generate --progress=report --dagger-go-sdk -y
+      - git diff --exit-code -- .dagger
