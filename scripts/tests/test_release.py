@@ -18,11 +18,11 @@ class ReleaseTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name)
-        (self.repo / ".dagger/modules/release").mkdir(parents=True)
+        (self.repo / ".dagger/modules/homelab").mkdir(parents=True)
         (self.repo / RESOURCES).mkdir(parents=True)
         shutil.copy(
-            ROOT / ".dagger/modules/release/releases.json",
-            self.repo / ".dagger/modules/release",
+            ROOT / ".dagger/modules/homelab/releases.json",
+            self.repo / ".dagger/modules/homelab",
         )
         (self.repo / "scripts").mkdir()
         shutil.copy(ROOT / "scripts/release-metadata.sh", self.repo / "scripts")

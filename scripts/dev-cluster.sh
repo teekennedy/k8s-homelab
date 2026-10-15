@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs named dev clusters that outlive a single Dagger call, and writes a
-# kubeconfig for each. See "Dev clusters" in .dagger/modules/kubernetes/README.md.
+# kubeconfig for each. See "Dev clusters" in .dagger/docs/kubernetes.md.
 #
 # A cluster is a k3s server run as a Dagger service, so it lives exactly as long
 # as the `dagger api call` that started it. `up` leaves that call running in the

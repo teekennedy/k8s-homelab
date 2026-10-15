@@ -1,9 +1,0 @@
-name = "kubernetes"
-engineVersion = "v1.0.0-beta.17"
-include = ["../../lib"]
-
-[runtime]
-  source = "go"
-
-[codegen]
-  automaticGitignore = false

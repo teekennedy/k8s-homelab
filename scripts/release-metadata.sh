@@ -7,7 +7,7 @@ root=$(git rev-parse --show-toplevel)
 project=$(jq -ce --arg tag "$tag" '
   .[] | select(any(.artifacts[]; .prefix as $prefix |
     $tag | startswith($prefix + "-")))
-' "$root/.dagger/modules/release/releases.json")
+' "$root/.dagger/modules/homelab/releases.json")
 directory=$(printf '%s' "$project" | jq -r .directory)
 config=$(printf '%s' "$project" | jq -r .config)
 canonical=$(printf '%s' "$project" | jq -r '.artifacts[0].prefix')

@@ -103,16 +103,16 @@ formatters:
       #
       # gofumpt's "std imports go in their own first group" rule classifies an
       # import as stdlib when its first path element has no dot — unless the
-      # path is inside module-path. Dagger names each module it generates
-      # `dagger/<name>`, and the shared library is `dagger/lib`, so without
-      # this an import like `dagger/go/internal/dagger` looks like stdlib and
+      # path is inside module-path. Dagger names the module it generates
+      # `dagger/<name>`, so without this an import like
+      # `dagger/homelab/internal/dagger` looks like stdlib and
       # gets merged into the top group, while gopls (which reads go.mod) keeps
       # it in the third-party group. That disagreement made every editor save
       # fight the next `go:lint` run.
       #
       # The gofumpt CLI infers this from go.mod; golangci-lint does not, and a
-      # single root config serves every module here. "dagger" covers all of the
-      # Dagger modules at once, and is harmless for the rest, whose module
+      # single root config serves every module here. "dagger" covers the
+      # Dagger module, and is harmless for the rest, whose module
       # paths contain dots and none of whose imports share this prefix.
       # Default: ""
       module-path: "dagger"

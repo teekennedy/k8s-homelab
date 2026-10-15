@@ -68,10 +68,10 @@ The script is tested and linted via Dagger functions:
 
 ```bash
 # Run tests
-dagger api call python test
+dagger check python --homelab-python-project=k8s/platform/crowdsec/files/bootstrap-middleware
 
 # Format (a non-empty changeset also fails `dagger check`)
-dagger generate python:format -y
+dagger generate python --homelab-python-project=k8s/platform/crowdsec/files/bootstrap-middleware -y
 ```
 
 ## Architecture

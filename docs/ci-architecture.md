@@ -66,8 +66,8 @@ lab host deploy borg-0
 # CI runs in containers.ci environment (no lab pre-installed)
 # Dagger pipeline builds lab as first step
 
-dagger check --lab
-dagger check --go --python
+dagger check lab
+dagger check go python
 dagger check
 ```
 
@@ -140,8 +140,8 @@ dagger api call lab build
 dagger check
 
 # Run one toolchain's checks, or one item's
-dagger check --go
-dagger check --go-module=cmd/lab
+dagger check go
+dagger check go --homelab-go-module=cmd/lab
 
 # Run a specific check
 dagger check nix:validate
@@ -166,5 +166,5 @@ dagger api call lab binary-nix export --path=./lab
 ## Related Files
 
 - `devenv.nix` - Defines both dev shell and CI container
-- `.dagger/modules/` - Dagger toolchains; see `.dagger/README.md`
+- `.dagger/modules/homelab` - the Dagger module CI runs; see `.dagger/README.md`
 - `cmd/lab/flake.nix` - Lab's Nix build configuration

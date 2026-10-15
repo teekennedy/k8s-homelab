@@ -2,6 +2,21 @@
 when:
   - event: pull_request
 
+# The devenv toolchain is pulled from the nearest devenv-ci release instead of
+# built when nothing it is built from changed since, which takes the release
+# tags and enough history to tell which one HEAD descends from.
+clone:
+  git:
+    # default clone image, must be explicitly specified when changing settings
+    image: woodpeckerci/plugin-git@sha256:550075c844fcec0af41d9d28f9860aa5d8c43e1e9419be4b9266dc02c2f29804
+    # https://github.com/woodpecker-ci/plugin-git/blob/main/docs.md
+    settings:
+      tags: true
+      partial: false
+      depth: 0
+      lfs: false
+      recursive: false
+
 steps:
   - name: ci
     image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
@@ -23,7 +38,3 @@ steps:
       # take far longer. Kept well under the pipeline timeout so a check that
       # drifts this slow still fails loudly.
       - timeout 40m dagger check --progress=report
-      # dagger.toml skips the Go SDK's staleness check, which re-runs codegen
-      # for every module on every `dagger check`; gate on it here instead.
-      - dagger generate --progress=report --dagger-go-sdk -y
-      - git diff --exit-code -- .dagger
