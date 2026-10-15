@@ -14,8 +14,11 @@ steps:
         serviceAccountName: dagger-pipeline
     commands:
       # kubectl is needed for dagger cli to communicate with the runner host
-      - apk add --no-cache curl kubectl jq
-      - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin DAGGER_VERSION="$(jq -re .engineVersion dagger.json)" sh
+      - apk add --no-cache curl kubectl
+      # The CLI must match the in-cluster engine, so take its version from there.
+      - export DAGGER_VERSION="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:v||p' k8s/platform/dagger-engine/values.yaml)"
+      - test -n "$DAGGER_VERSION"
+      - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       # A warm run takes ~18m; a cold engine cache with other runs in flight can
       # take far longer. Kept well under the pipeline timeout so a check that
       # drifts this slow still fails loudly.

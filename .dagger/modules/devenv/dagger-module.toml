@@ -1,0 +1,8 @@
+name = "devenv"
+engineVersion = "v0.21.10"
+
+[runtime]
+  source = "go"
+
+[codegen]
+  automaticGitignore = false

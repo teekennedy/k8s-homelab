@@ -332,6 +332,56 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
+	case "":
+		return dag.Module().
+			WithDescription("Tests and formats every Python project in the repo, each in its own scoped\ncontainer so that a change to one project leaves the others cached.\n").
+			WithObject(
+				dag.TypeDef().WithObject("Python", dagger.TypeDefWithObjectOpts{Description: "Python runs Python checks over every project in the repo.", SourceMap: dag.SourceMap("main.go", 20, 6)}).
+					WithFunction(
+						dag.Function("Format",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Format formats Python files with black across all discovered projects.\nReturns a changeset. Use `dagger generate python:format -y` to apply.").
+							WithSourceMap(dag.SourceMap("main.go", 215, 1)).
+							WithGenerator().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 219, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 221, 2)})).
+					WithFunction(
+						dag.Function("Projects",
+							dag.TypeDef().WithListOf(dag.TypeDef().WithObject("PythonProject"))).
+							WithDescription("Projects returns all discovered Python projects with scoped source\ndirectories.").
+							WithSourceMap(dag.SourceMap("main.go", 140, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 144, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
+					WithFunction(
+						dag.Function("Test",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Test runs pytest for all discovered Python projects.\n\nThe release script tests under scripts/tests are left to release:test-scripts,\nwhich mounts the scripts and manifests they read.").
+							WithSourceMap(dag.SourceMap("main.go", 252, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 255, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "scripts/tests/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 257, 2)})).
+					WithConstructor(
+						dag.Function("New",
+							dag.TypeDef().WithObject("Python")).
+							WithDescription("Tests and formats every Python project in the repo.").
+							WithSourceMap(dag.SourceMap("main.go", 26, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs uv and black; defaults to the devenv ci\ntoolchain.", SourceMap: dag.SourceMap("main.go", 30, 2)}))).
+			WithObject(
+				dag.TypeDef().WithObject("PythonProject", dagger.TypeDefWithObjectOpts{Description: "PythonProject is one Python project — a directory with a pyproject.toml —\ncarrying only that project's files, so changing one project does not\ninvalidate the BuildKit cache for the others.", SourceMap: dag.SourceMap("main.go", 76, 6)}).
+					WithFunction(
+						dag.Function("Format",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Format runs black on this project, returning the resulting changes.").
+							WithSourceMap(dag.SourceMap("main.go", 185, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 185, 54)})).
+					WithFunction(
+						dag.Function("Test",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Test runs pytest for this Python project, in the given toolchain container.\n\nNo -m here on purpose. Which markers an ordinary run excludes is a per-project\ndecision, declared in each pyproject.toml's addopts — and it has to be,\nbecause a command-line -m replaces addopts rather than narrowing it. Passing\none from here would re-enable the tests a project deselected for itself, and\ndeselect the ones a project runs deliberately: jellyfin-exporter registers\n`integration` precisely so those tests run by default against its stub server.").
+							WithSourceMap(dag.SourceMap("main.go", 157, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 157, 52)})).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root\n(e.g. \"k8s/foundation/kured/files/kured-webhook\").", SourceMap: dag.SourceMap("main.go", 79, 2)}).
+					WithField("Source", dag.TypeDef().WithObject("Directory"), dagger.TypeDefWithFieldOpts{Description: "Source is the project's scoped source directory.", SourceMap: dag.SourceMap("main.go", 81, 2)}).
+					WithField("Testlib", dag.TypeDef().WithObject("Directory"), dagger.TypeDefWithFieldOpts{Description: "Testlib is the shared integration test library, set only for the\nprojects that import it.", SourceMap: dag.SourceMap("main.go", 84, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

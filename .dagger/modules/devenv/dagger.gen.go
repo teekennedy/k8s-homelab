@@ -325,6 +325,52 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
+	case "":
+		return dag.Module().
+			WithDescription("The devenv shell as a container: the toolchain every other module runs its\nchecks in, and the devenv images the release pipeline publishes.\n\nEvery tool a check needs comes from devenv.lock, so a check runs the same\nalejandra, black or golangci-lint in `dagger check` as in a local shell.\n").
+			WithObject(
+				dag.TypeDef().WithObject("Devenv", dagger.TypeDefWithObjectOpts{Description: "Devenv builds containers from the repo's devenv definition.", SourceMap: dag.SourceMap("main.go", 24, 6)}).
+					WithFunction(
+						dag.Function("Container",
+							dag.TypeDef().WithObject("Container")).
+							WithDescription("Container builds the devenv nix environment as a minimal \"from scratch\"\ncontainer, labelled for publishing. Uses `devenv container copy shell` to\nproduce a minimal nix2container image containing only the runtime closure\n(no build dependencies). The nix store is cached across runs so packages are\nonly built once.").
+							WithSourceMap(dag.SourceMap("main.go", 76, 1)).
+							WithArg("nixDaemon", dag.TypeDef().WithObject("Socket").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Optional host nix daemon socket for faster builds on NixOS CI hosts.\nWhen provided, the host daemon's store is used as a substituter so\npre-built packages are fetched rather than rebuilt from source.\nNote: only works when the host and container share the same platform\n(e.g. Linux-to-Linux). Does not work with macOS host daemons due to\ncross-platform path handling differences.", SourceMap: dag.SourceMap("main.go", 84, 2)}).
+							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/). Defaults to\nthe \"ci\" profile, which holds exactly the toolchain the checks need. The\n\"interactive\" profile — cluster tooling, the kubeconfig enterShell, the\ndagger CLI, the git hook — is deliberately not built here; pass it\nexplicitly if you want a full shell to poke at.", SourceMap: dag.SourceMap("main.go", 92, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
+					WithFunction(
+						dag.Function("Projects",
+							dag.TypeDef().WithListOf(dag.TypeDef().WithObject("DevenvProject"))).
+							WithDescription("Projects returns all discovered devenv projects with scoped source directories.\nThe +ignore list mirrors the constructor's file selection: devenv.yaml/\ndevenv.nix/devenv.lock are what devenv itself reads, plus cmd/lab because\nthe root project's devenv.yaml imports it. This doesn't generalize to a\nfuture devenv project that imports some other path.").
+							WithSourceMap(dag.SourceMap("projects.go", 61, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("projects.go", 65, 2), DefaultPath: "/", Ignore: []string{"*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"}})).
+					WithFunction(
+						dag.Function("Toolchain",
+							dag.TypeDef().WithObject("Container")).
+							WithDescription("Toolchain returns the devenv shell for profiles with the language toolchain\ncaches attached: the container the other modules' checks run in.\n\nThe \"ci\" profile holds exactly what `dagger check` needs. The Kubernetes\nintegration workflow adds \"integration\", which brings kubectl and curl; no\ncheck runs with it, so `dagger check` keeps running in a container that\ncannot reach a cluster even if something tried.\n\nIt is built without the lab CLI's source, so it cannot build the\n\"interactive\" profile, which installs the CLI; use Container for that.").
+							WithSourceMap(dag.SourceMap("main.go", 62, 1)).
+							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/).", SourceMap: dag.SourceMap("main.go", 66, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
+					WithFunction(
+						dag.Function("Update",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Update runs `devenv update` for every discovered devenv project and\nreturns the combined changeset. Each project runs in its own container\nwith only its own scoped source mounted, so a lock change in one project\ndoesn't invalidate the cache for the others.\n\nDeliberately not tagged +generate. +generate implies a reproducible step\nthat recomputes a value from other checked-in inputs (like\nlab's update-vendor-hash). devenv update instead fetches whatever the latest\ncommit happens to be for each input right now, so running it twice in a\nrow can produce different output — it belongs to CI as a scheduled\n\"refresh\" step, not as generated code to keep in sync.\nUse `dagger call devenv update --auto-apply` to apply.").
+							WithSourceMap(dag.SourceMap("projects.go", 109, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("projects.go", 113, 2), DefaultPath: "/", Ignore: []string{"*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"}})).
+					WithConstructor(
+						dag.Function("New",
+							dag.TypeDef().WithObject("Devenv")).
+							WithDescription("Builds the devenv shell: the toolchain container every check runs in, and the published devenv images.").
+							WithSourceMap(dag.SourceMap("main.go", 38, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 41, 2), DefaultPath: "/", Ignore: []string{"*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!cmd/lab/**", "cmd/lab/result", "cmd/lab/.direnv"}}).
+							WithArg("toolchainSource", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Loaded separately rather than filtered out of source, so that it is\ncontent-addressed from the client filesystem: a directory derived from\nsource would carry source's identity, Go files and all.", SourceMap: dag.SourceMap("main.go", 47, 2), DefaultPath: "/", Ignore: []string{"*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!cmd/lab/devenv.nix"}}))).
+			WithObject(
+				dag.TypeDef().WithObject("DevenvProject", dagger.TypeDefWithObjectOpts{Description: "DevenvProject is a devenv project with a scoped source directory.\nEach DevenvProject carries only the files for its project, enabling\nper-project caching: changing files in one project won't invalidate\nthe cache for other projects.", SourceMap: dag.SourceMap("projects.go", 49, 6)}).
+					WithFunction(
+						dag.Function("Update",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Update runs `devenv update` for this project, refreshing its devenv.lock\nwith the latest commit for every input (nixpkgs, etc.). Returns the\nresulting changeset.").
+							WithSourceMap(dag.SourceMap("projects.go", 80, 1))).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root (e.g. \".\" for the root project).", SourceMap: dag.SourceMap("projects.go", 51, 2)}).
+					WithField("Source", dag.TypeDef().WithObject("Directory"), dagger.TypeDefWithFieldOpts{Description: "Source is the project's scoped source directory.", SourceMap: dag.SourceMap("projects.go", 53, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

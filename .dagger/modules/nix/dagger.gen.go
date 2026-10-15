@@ -271,6 +271,44 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
+	case "":
+		return dag.Module().
+			WithDescription("Formats and validates the Nix flake and host configuration, and provides the\nplain Nix container other modules build with.\n").
+			WithObject(
+				dag.TypeDef().WithObject("Nix", dagger.TypeDefWithObjectOpts{Description: "Nix runs Nix checks over the repo.", SourceMap: dag.SourceMap("main.go", 24, 6)}).
+					WithFunction(
+						dag.Function("Format",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Format formats Nix files with alejandra and removes dead code with deadnix.\nReturns a changeset. Use `dagger generate nix:format -y` to apply.").
+							WithSourceMap(dag.SourceMap("main.go", 55, 1)).
+							WithGenerator().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 58, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.nix", ".devenv*", ".devenv/**", "devenv.local.*"}}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 60, 2)})).
+					WithFunction(
+						dag.Function("Image",
+							dag.TypeDef().WithObject("Container")).
+							WithDescription("Image returns the plain Nix image, for evaluating and building flakes.").
+							WithSourceMap(dag.SourceMap("main.go", 48, 1))).
+					WithFunction(
+						dag.Function("Validate",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Validate runs nix flake check.").
+							WithSourceMap(dag.SourceMap("main.go", 92, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 95, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"}})).
+					WithFunction(
+						dag.Function("ValidateBuildMetrics",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("ValidateBuildMetrics runs a real Nix build through the selfupdate metrics\nparser's Python test suite, so a Nix upgrade that changes the internal-json\nevent stream (NixOS/nix#13935) is caught here instead of only on a host.").
+							WithSourceMap(dag.SourceMap("main.go", 113, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 116, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.lock", "!nix/modules/selfupdate/build-metrics/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
+					WithConstructor(
+						dag.Function("New",
+							dag.TypeDef().WithObject("Nix")).
+							WithDescription("Formats and validates the Nix flake and host configuration.").
+							WithSourceMap(dag.SourceMap("main.go", 30, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run the formatters and the build-metrics tests in. It needs\nalejandra, deadnix and uv; defaults to the devenv ci toolchain. Flake\nevaluation and builds always use the plain Nix container instead.", SourceMap: dag.SourceMap("main.go", 35, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

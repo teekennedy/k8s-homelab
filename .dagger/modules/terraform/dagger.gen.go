@@ -278,6 +278,46 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
+	case "":
+		return dag.Module().
+			WithDescription("Formats, lints, locks and validates the OpenTofu modules under terraform/.\n").
+			WithObject(
+				dag.TypeDef().WithObject("Terraform", dagger.TypeDefWithObjectOpts{Description: "Terraform runs OpenTofu checks over terraform/.", SourceMap: dag.SourceMap("main.go", 41, 6)}).
+					WithFunction(
+						dag.Function("Format",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Format formats Terraform/OpenTofu files with `tofu fmt`.\n\n`tofu fmt -recursive` is run once over the whole terraform/ tree rather than\nper module, because unlike validate it needs no per-module init and the\nmodules already share a single source directory.\nReturns a changeset. Use `dagger generate terraform:format -y` to apply.").
+							WithSourceMap(dag.SourceMap("main.go", 178, 1)).
+							WithGenerator().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 181, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
+					WithFunction(
+						dag.Function("Lint",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Lint runs trivy config against the Terraform/OpenTofu tree to catch\nmisconfigurations (unencrypted resources, over-permissive IAM, etc.).\n\nTrivy supersedes tfsec (the two tools' checks now live in the same\naquasecurity org, and tfsec is in maintenance-only mode), so this uses\ntrivy rather than tfsec directly. --skip-check-update and --skip-version-check\nkeep it network-independent and quiet.").
+							WithSourceMap(dag.SourceMap("main.go", 233, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 236, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
+					WithFunction(
+						dag.Function("Lock",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Lock runs tofu providers lock for all Terraform/OpenTofu modules.\n\nUnlike `tofu init`, `tofu providers lock` computes provider hashes for the\ngiven platforms deterministically, regardless of the platform it runs on.\nThis keeps .terraform.lock.hcl stable across different machines, which\n`tofu init` cannot guarantee since it only records hashes for the host\nplatform it happens to run on.\n\nReturns a changeset. Use `dagger generate terraform:lock -y` to apply\nlockfile changes produced by provider locking.").
+							WithSourceMap(dag.SourceMap("main.go", 137, 1)).
+							WithGenerator().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 141, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"}}).
+							WithArg("platforms", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "platforms to compute provider hashes for.", SourceMap: dag.SourceMap("main.go", 145, 2), DefaultValue: dagger.JSON("[\"linux_arm64\",\"linux_amd64\",\"darwin_arm64\"]")})).
+					WithFunction(
+						dag.Function("Validate",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Validate runs tofu init and tofu validate on all discovered Terraform modules.\nEach module is validated independently for parallel execution and individual\nerror reporting.\nWhen paths are provided, only matching modules are validated.").
+							WithSourceMap(dag.SourceMap("main.go", 265, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 268, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"}})).
+					WithConstructor(
+						dag.Function("New",
+							dag.TypeDef().WithObject("Terraform")).
+							WithDescription("Formats, lints, locks and validates the OpenTofu modules under terraform/.").
+							WithSourceMap(dag.SourceMap("main.go", 47, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs tofu and trivy; defaults to the devenv ci\ntoolchain.", SourceMap: dag.SourceMap("main.go", 51, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

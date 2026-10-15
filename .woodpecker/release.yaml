@@ -30,7 +30,10 @@ steps:
         serviceAccountName: dagger-pipeline
     commands:
       - apk add --no-cache curl kubectl jq git git-cliff
-      - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin DAGGER_VERSION="$(jq -re .engineVersion dagger.json)" sh
+      # The CLI must match the in-cluster engine, so take its version from there.
+      - export DAGGER_VERSION="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:v||p' k8s/platform/dagger-engine/values.yaml)"
+      - test -n "$DAGGER_VERSION"
+      - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       - git config --global --add safe.directory "$CI_WORKSPACE"
       - scripts/release-metadata.sh "$CI_COMMIT_TAG" > /tmp/release-metadata.json
       - dagger call release publish --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env:GHCR_ACCESS_TOKEN --metadata=/tmp/release-metadata.json

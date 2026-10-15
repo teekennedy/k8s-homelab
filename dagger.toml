@@ -1,0 +1,108 @@
+[modules.ci]
+source = ".dagger/modules/ci"
+legacy-default-path = true
+
+[modules.cue]
+source = ".dagger/modules/cue"
+legacy-default-path = true
+
+[modules.devenv]
+source = ".dagger/modules/devenv"
+legacy-default-path = true
+
+[modules.go]
+source = ".dagger/modules/go"
+legacy-default-path = true
+
+[modules.helmfile]
+source = ".dagger/modules/helmfile"
+legacy-default-path = true
+
+[modules.kubernetes]
+source = ".dagger/modules/kubernetes"
+legacy-default-path = true
+
+[modules.lab]
+source = ".dagger/modules/lab"
+legacy-default-path = true
+
+[modules.nix]
+source = ".dagger/modules/nix"
+legacy-default-path = true
+
+[modules.python]
+source = ".dagger/modules/python"
+legacy-default-path = true
+
+[modules.release]
+source = ".dagger/modules/release"
+legacy-default-path = true
+
+[modules.terraform]
+source = ".dagger/modules/terraform"
+legacy-default-path = true
+
+[modules.woodpecker]
+source = ".dagger/modules/woodpecker"
+legacy-default-path = true
+
+[modules.yaml]
+source = ".dagger/modules/yaml"
+legacy-default-path = true
+
+[modules.dagger-go-sdk]
+source = "github.com/dagger/go-sdk"
+
+[sdks.go]
+module = "dagger-go-sdk"
+
+[sdks.go.scopes.".dagger/modules/ci"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/cue"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/go"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/helmfile"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/kubernetes"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/lab"]
+clients = ["./.dagger/modules/devenv", "./.dagger/modules/nix"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/nix"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/python"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/release"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/terraform"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/woodpecker"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/yaml"]
+clients = ["./.dagger/modules/devenv"]
+is-module = true

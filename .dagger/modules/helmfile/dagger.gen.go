@@ -348,6 +348,61 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
+	case "":
+		return dag.Module().
+			WithDescription("Renders, lints and validates every chart with the repo's helmfile, once per\nenvironment, and audits the rendered manifests with Polaris and kubeconform.\nEach release renders from a scoped source directory, so a change to one chart\nleaves the others cached.\n").
+			WithObject(
+				dag.TypeDef().WithObject("Helmfile", dagger.TypeDefWithObjectOpts{Description: "Helmfile runs helmfile checks over every chart.", SourceMap: dag.SourceMap("main.go", 28, 6)}).
+					WithFunction(
+						dag.Function("Build",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Build renders every chart with `helmfile template`, once per\nenvironment. Each release is rendered from a scoped source directory so that\na change to one chart doesn't invalidate the cache for the others.\nWhen paths are provided, only charts matching the paths are rendered.").
+							WithSourceMap(dag.SourceMap("main.go", 221, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "charts/*.tgz are built dependencies; they are gitignored, so leaving them\nout makes a local run resolve dependencies the way a clean checkout does.", SourceMap: dag.SourceMap("main.go", 226, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
+							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to render with.", SourceMap: dag.SourceMap("main.go", 230, 2), DefaultValue: dagger.JSON("[\"production\"]")}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 232, 2)})).
+					WithFunction(
+						dag.Function("Kubeconform",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Kubeconform runs kubeconform in strict mode across all Helm charts,\nonce per environment, on the manifests helmfile renders.\nWhen paths are provided, only matching charts are validated.").
+							WithSourceMap(dag.SourceMap("manifests.go", 158, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("manifests.go", 161, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
+							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to render with.", SourceMap: dag.SourceMap("manifests.go", 165, 2), DefaultValue: dagger.JSON("[\"production\"]")}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("manifests.go", 167, 2)})).
+					WithFunction(
+						dag.Function("Lint",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Lint checks the helmfile state itself, once per environment: that it\nrenders (`helmfile build`), and that its releases, the chart directories and\nthe environment's app list agree with each other.").
+							WithSourceMap(dag.SourceMap("main.go", 279, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Only Chart.yaml is needed from k8s/, to know which charts exist.", SourceMap: dag.SourceMap("main.go", 283, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/Chart.yaml"}}).
+							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to lint.", SourceMap: dag.SourceMap("main.go", 287, 2), DefaultValue: dagger.JSON("[\"production\"]")})).
+					WithFunction(
+						dag.Function("Polaris",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Polaris runs Polaris audit across all Helm charts, once per\nenvironment, on the manifests helmfile renders.\nWhen paths are provided, only matching charts are validated.").
+							WithSourceMap(dag.SourceMap("manifests.go", 125, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("manifests.go", 128, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
+							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to render with.", SourceMap: dag.SourceMap("manifests.go", 132, 2), DefaultValue: dagger.JSON("[\"production\"]")}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("manifests.go", 134, 2)})).
+					WithFunction(
+						dag.Function("Validate",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Validate runs `helmfile lint` on every chart, once per environment.\nIt lints each chart with the values helmfile would deploy it with.\nWhen paths are provided, only charts matching the paths are linted.").
+							WithSourceMap(dag.SourceMap("main.go", 251, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 254, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}).
+							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to lint with.", SourceMap: dag.SourceMap("main.go", 258, 2), DefaultValue: dagger.JSON("[\"production\"]")}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 260, 2)})).
+					WithConstructor(
+						dag.Function("New",
+							dag.TypeDef().WithObject("Helmfile")).
+							WithDescription("Renders, lints and audits every chart with the repo's helmfile.").
+							WithSourceMap(dag.SourceMap("main.go", 34, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs helmfile, helm, polaris and kubeconform;\ndefaults to the devenv ci toolchain.", SourceMap: dag.SourceMap("main.go", 38, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

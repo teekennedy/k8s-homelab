@@ -313,6 +313,49 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
+	case "":
+		return dag.Module().
+			WithDescription("Builds, labels and publishes the repo's container images, as listed in\nreleases.json, and tests the release scripts that tag them.\n").
+			WithObject(
+				dag.TypeDef().WithObject("Release", dagger.TypeDefWithObjectOpts{Description: "Release builds and publishes the repo's container images.", SourceMap: dag.SourceMap("main.go", 26, 6)}).
+					WithFunction(
+						dag.Function("BuildDockerfiles",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("BuildDockerfiles builds every Dockerfile using its containing directory as the build context.\nEach directory keeps an independent build cache.").
+							WithSourceMap(dag.SourceMap("main.go", 241, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 244, 2), DefaultPath: "/"})).
+					WithFunction(
+						dag.Function("Image",
+							dag.TypeDef().WithObject("Container")).
+							WithDescription("Image builds a tagged container with OCI metadata, without publishing it.").
+							WithSourceMap(dag.SourceMap("main.go", 175, 1)).
+							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 177, 2)}).
+							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 178, 2)}).
+							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.", SourceMap: dag.SourceMap("main.go", 181, 2)})).
+					WithFunction(
+						dag.Function("Publish",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Publish selects the container and profiles from the release tag and pushes to GHCR.").
+							WithSourceMap(dag.SourceMap("main.go", 216, 1)).
+							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 218, 2)}).
+							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 219, 2)}).
+							WithArg("username", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 220, 2)}).
+							WithArg("token", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 221, 2)}).
+							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh.", SourceMap: dag.SourceMap("main.go", 224, 2)})).
+					WithFunction(
+						dag.Function("TestScripts",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("TestScripts runs the release script regression tests with their repository\ninputs: the scripts, this module's releases.json and the cliff configs.").
+							WithSourceMap(dag.SourceMap("scripts.go", 14, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("scripts.go", 18, 2), DefaultPath: "/", Ignore: []string{"*", "!scripts/tests/test_release.py", "!scripts/tests/pyproject.toml", "!scripts/tests/uv.lock", "!scripts/release.sh", "!scripts/release-metadata.sh", "!.dagger/modules/release/releases.json", "!cliff.toml", "!k8s/platform/forgejo/files/forgejo-resources/cliff.toml", "!k8s/apps/openhands/files/sandbox/cliff.toml"}})).
+					WithConstructor(
+						dag.Function("New",
+							dag.TypeDef().WithObject("Release")).
+							WithDescription("Builds, labels and publishes the repo's container images.").
+							WithSourceMap(dag.SourceMap("main.go", 32, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run the release script tests in. It needs uv, git, jq and\ngit-cliff; defaults to the devenv ci toolchain.", SourceMap: dag.SourceMap("main.go", 36, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

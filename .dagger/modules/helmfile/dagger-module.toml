@@ -1,0 +1,13 @@
+name = "helmfile"
+engineVersion = "v0.21.10"
+include = ["../../lib"]
+
+[runtime]
+  source = "go"
+
+[[dependencies]]
+  name = "devenv"
+  source = "../devenv"
+
+[codegen]
+  automaticGitignore = false

@@ -236,6 +236,25 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
+	case "":
+		return dag.Module().
+			WithDescription("Lints the Woodpecker CI pipelines under .woodpecker/.\n").
+			WithObject(
+				dag.TypeDef().WithObject("Woodpecker", dagger.TypeDefWithObjectOpts{Description: "Woodpecker lints the repo's Woodpecker pipelines.", SourceMap: dag.SourceMap("main.go", 12, 6)}).
+					WithFunction(
+						dag.Function("Lint",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("Lint lints Woodpecker CI pipeline configuration files.\nWhen paths are provided, only matching files are linted.").
+							WithSourceMap(dag.SourceMap("main.go", 30, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 33, 2), DefaultPath: "/", Ignore: []string{"*", "!.woodpecker/*.yaml"}}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 35, 2)})).
+					WithConstructor(
+						dag.Function("New",
+							dag.TypeDef().WithObject("Woodpecker")).
+							WithDescription("Lints the Woodpecker CI pipelines.").
+							WithSourceMap(dag.SourceMap("main.go", 18, 1)).
+							WithArg("container", dag.TypeDef().WithObject("Container").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Container to run in. It needs woodpecker-cli; defaults to the devenv ci\ntoolchain.", SourceMap: dag.SourceMap("main.go", 22, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}
