@@ -160,7 +160,7 @@ func (pp *Project) Test(ctx context.Context) error {
 	_, err := container.
 		WithWorkdir(workdir).
 		WithExec([]string{
-			"sh", "-c", `uv run --link-mode copy pytest; status=$?; [ "$status" -eq "$1" ] && exit 0; exit "$status"`,
+			"sh", "-c", `uv run --frozen --link-mode copy pytest; status=$?; [ "$status" -eq "$1" ] && exit 0; exit "$status"`,
 			"--", strconv.Itoa(pytestNoTestsExitCode),
 		}).
 		Sync(ctx)
