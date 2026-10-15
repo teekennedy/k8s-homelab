@@ -159,8 +159,10 @@ func (pp *Project) Test(ctx context.Context) error {
 	// re-run on every `dagger check`.
 	_, err := container.
 		WithWorkdir(workdir).
-		WithExec([]string{"sh", "-c", `uv run --link-mode copy pytest; status=$?; [ "$status" -eq "$1" ] && exit 0; exit "$status"`,
-			"--", strconv.Itoa(pytestNoTestsExitCode)}).
+		WithExec([]string{
+			"sh", "-c", `uv run --link-mode copy pytest; status=$?; [ "$status" -eq "$1" ] && exit 0; exit "$status"`,
+			"--", strconv.Itoa(pytestNoTestsExitCode),
+		}).
 		Sync(ctx)
 	if err != nil {
 		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
@@ -193,5 +195,36 @@ func (pp *Project) Format(ctx context.Context) (*dagger.Changeset, error) {
 	before := dag.Directory().WithDirectory(pp.Path, pp.Source)
 	after := dag.Directory().WithDirectory(pp.Path, formatted.Directory("/src"))
 
+	return after.Changes(before), nil
+}
+
+// Lock refreshes the project's uv.lock with `uv lock`, so it stays in step with
+// pyproject.toml. A project without a uv.lock is left alone. uv comes from the
+// toolchain, so the lock is written by the same uv version as everything else.
+// +generate
+func (pp *Project) Lock(ctx context.Context) (*dagger.Changeset, error) {
+	locks, err := pp.Source.Glob(ctx, "uv.lock")
+	if err != nil {
+		return nil, fmt.Errorf("looking for %s/uv.lock: %w", pp.Path, err)
+	}
+	if len(locks) == 0 {
+		return dag.Changeset(), nil
+	}
+
+	locked, err := pp.Container.
+		WithMountedDirectory("/src", pp.Source).
+		WithWorkdir("/src").
+		WithExec([]string{"uv", "lock"}).
+		Sync(ctx)
+	if err != nil {
+		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
+			return nil, fmt.Errorf("uv lock failed in %s:\n%s%w", pp.Path, execErr.Stderr, err)
+		}
+		return nil, fmt.Errorf("uv lock failed in %s: %w", pp.Path, err)
+	}
+
+	// Re-rooted under pp.Path before diffing, as in Format.
+	before := dag.Directory().WithDirectory(pp.Path, pp.Source)
+	after := dag.Directory().WithDirectory(pp.Path, locked.Directory("/src"))
 	return after.Changes(before), nil
 }

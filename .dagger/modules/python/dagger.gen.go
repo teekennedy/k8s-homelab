@@ -265,6 +265,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
 			return (*Project).Format(&parent, ctx)
+		case "Lock":
+			var parent Project
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return (*Project).Lock(&parent, ctx)
 		case "Test":
 			var parent Project
 			err = json.Unmarshal(parentJSON, &parent)
@@ -362,7 +369,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Format runs black on the project, returning the resulting changes.").
-							WithSourceMap(dag.SourceMap("main.go", 176, 1)).
+							WithSourceMap(dag.SourceMap("main.go", 178, 1)).
+							WithGenerator()).
+					WithFunction(
+						dag.Function("Lock",
+							dag.TypeDef().WithObject("Changeset")).
+							WithDescription("Lock refreshes the project's uv.lock with `uv lock`, so it stays in step with\npyproject.toml. A project without a uv.lock is left alone. uv comes from the\ntoolchain, so the lock is written by the same uv version as everything else.").
+							WithSourceMap(dag.SourceMap("main.go", 205, 1)).
 							WithGenerator()).
 					WithFunction(
 						dag.Function("Test",

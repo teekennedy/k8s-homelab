@@ -40,11 +40,12 @@ dagger.lock                 # pinned versions of remote modules and the Go SDK
     dagger-module.toml
 ```
 
-Besides our own modules, the workspace installs the official
-[`dagger.io/python/uv`](https://github.com/dagger/python) module for its `lock`
-generator, which keeps every `uv.lock` in step with its `pyproject.toml`. It
-runs in our toolchain container, and its `audit` check is skipped: dependency
-vulnerabilities are Renovate's job.
+Official modules can run in our toolchain too, through the same `base`-style
+wiring. We tried [`dagger.io/python/uv`](https://github.com/dagger/python) for
+its lock generator, but it rediscovers every project and rebuilds its
+containers on every run, uncached, which made a `dagger check` with nothing to
+do take about 25 seconds longer. Our python module's `lock` generator does the
+same job per project, cached like everything else.
 
 ## Modules
 
@@ -58,7 +59,7 @@ vulnerabilities are Renovate's job.
 | `kubernetes` | | | | `integration-test`, `integration-reports`, `dev-cluster`, `dev-cluster-delete` |
 | `lab` | | `build` | `update-vendor-hash` | `binary`, `binary-nix` |
 | `nix` | | `validate`, `validate-build-metrics` | `format` | `image` |
-| `python` | `projects` | per project: `test` | per project: `format` | |
+| `python` | `projects` | per project: `test` | per project: `format`, `lock` | |
 | `release` | | `build-dockerfiles`, `test-scripts` | | `image`, `publish` |
 | `terraform` | `modules` | `lint`; per module: `validate` | `format`; per module: `lock` | |
 | `woodpecker` | | `lint` | | |
@@ -93,8 +94,7 @@ func New(
 }
 ```
 
-The modules don't depend on devenv; the workspace connects them, the same way
-it hands our toolchain to the uv module as its `base`. `kubernetes` gets
+The modules don't depend on devenv; the workspace connects them. `kubernetes` gets
 `dag://devenv/integration-toolchain` instead, which adds kubectl and curl, and
 `lab` also gets `dag://nix/image` for its Nix builds. Only `release` still
 depends on devenv directly, because it builds the published images with the

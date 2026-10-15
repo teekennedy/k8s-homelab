@@ -193,6 +193,18 @@ func (r *PythonProject) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
+// Lock refreshes the project's uv.lock with `uv lock`, so it stays in step with
+// pyproject.toml. A project without a uv.lock is left alone. uv comes from the
+// toolchain, so the lock is written by the same uv version as everything else.
+func (r *PythonProject) Lock() *Changeset {
+	q := r.query.Select("lock")
+
+	return &Changeset{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
 // Path is the project's directory relative to the repo root
 // (e.g. "k8s/foundation/kured/files/kured-webhook").
 func (r *PythonProject) Path(ctx context.Context) (string, error) {
