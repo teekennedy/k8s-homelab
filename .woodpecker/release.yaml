@@ -36,4 +36,4 @@ steps:
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       - git config --global --add safe.directory "$CI_WORKSPACE"
       - scripts/release-metadata.sh "$CI_COMMIT_TAG" > /tmp/release-metadata.json
-      - dagger call release publish --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env:GHCR_ACCESS_TOKEN --metadata=/tmp/release-metadata.json
+      - dagger api call release publish --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env:GHCR_ACCESS_TOKEN --metadata=/tmp/release-metadata.json

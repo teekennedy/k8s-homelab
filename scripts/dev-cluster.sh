@@ -3,7 +3,7 @@
 # kubeconfig for each. See "Dev clusters" in .dagger/modules/kubernetes/README.md.
 #
 # A cluster is a k3s server run as a Dagger service, so it lives exactly as long
-# as the `dagger call` that started it. `up` leaves that call running in the
+# as the `dagger api call` that started it. `up` leaves that call running in the
 # background; `down` stops it. The cluster's state is kept in the Dagger engine
 # under its name, so `up` again resumes it.
 set -euo pipefail
@@ -18,7 +18,7 @@ Commands:
   destroy <name>           Stop the cluster and delete its state and kubeconfig
   env <name>               Print the export that points kubectl at the cluster
   test <name> [args...]    Deploy to the cluster and run the integration tests;
-                           args go to `dagger call kubernetes integration-test`
+                           args go to `dagger api call kubernetes integration-test`
   list                     List the clusters and whether each is running
   logs <name>              Print the cluster's log
 
@@ -58,7 +58,7 @@ check_name() {
 cluster_dir() { echo "$clusters_dir/$1"; }
 kubeconfig_path() { echo "$kube_dir/$1.yaml"; }
 
-# Succeeds if the cluster's `dagger call` is still running.
+# Succeeds if the cluster's `dagger api call` is still running.
 is_running() {
   local pid_file
   pid_file=$(cluster_dir "$1")/pid
@@ -109,7 +109,7 @@ cmd_up() {
   echo "Starting dev cluster $name on https://127.0.0.1:$port ..." >&2
   (
     cd "$repo_root"
-    nohup dagger call --progress plain kubernetes dev-cluster \
+    nohup dagger api call --progress plain kubernetes dev-cluster \
       --name "$name" --token "file:$dir/token" \
       up --ports "$port:6443" >"$dir/log" 2>&1 &
     echo $! >"$dir/pid"
@@ -184,7 +184,7 @@ cmd_destroy() {
   local name=$1 dir
   dir=$(cluster_dir "$name")
   cmd_down "$name"
-  (cd "$repo_root" && dagger call --progress plain kubernetes dev-cluster-delete --name "$name")
+  (cd "$repo_root" && dagger api call --progress plain kubernetes dev-cluster-delete --name "$name")
   # Only what `up` wrote, so anything else kept in the directory survives.
   rm -f "$(kubeconfig_path "$name")" "$dir/token" "$dir/port" "$dir/log" "$dir/ca.crt"
   rmdir "$dir" 2>/dev/null || true
@@ -204,7 +204,7 @@ cmd_test() {
   kubeconfig=$(kubeconfig_path "$name")
   is_running "$name" || die "cluster $name is not running; start it with: dev-cluster.sh up $name"
   cd "$repo_root"
-  exec dagger call kubernetes integration-test \
+  exec dagger api call kubernetes integration-test \
     --cluster "tcp://localhost:$(cat "$dir/port")" --kubeconfig "file:$kubeconfig" "$@"
 }
 

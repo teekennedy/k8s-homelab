@@ -66,9 +66,8 @@ lab host deploy borg-0
 # CI runs in containers.ci environment (no lab pre-installed)
 # Dagger pipeline builds lab as first step
 
-dagger check 'lab:*'
-dagger check '*:lint'
-dagger check '*:test'
+dagger check --lab
+dagger check --go --python
 dagger check
 ```
 
@@ -91,7 +90,7 @@ nix build
 nix build  # Should succeed now
 
 # Option 3: Use Dagger directly (doesn't need lab)
-dagger call lab build
+dagger api call lab build
 # Dagger builds lab using Nix in a clean container
 ```
 
@@ -140,20 +139,20 @@ dagger call lab build
 # Run all checks
 dagger check
 
-# Run one toolchain's checks, or one kind of check across toolchains
-dagger check 'go:*'
-dagger check '*:lint'
+# Run one toolchain's checks, or one item's
+dagger check --go
+dagger check --go-module=cmd/lab
 
 # Run a specific check
 dagger check nix:validate
 dagger check lab:build
 
 # Build lab using Nix (production build)
-dagger call lab build
+dagger api call lab build
 
 # Get the binary, built with Go (faster) or Nix
-dagger call lab binary export --path=./lab
-dagger call lab binary-nix export --path=./lab
+dagger api call lab binary export --path=./lab
+dagger api call lab binary-nix export --path=./lab
 ```
 
 ## Benefits

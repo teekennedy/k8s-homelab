@@ -68,7 +68,7 @@ The script is tested and linted via Dagger functions:
 
 ```bash
 # Run tests
-dagger call python test
+dagger api call python test
 
 # Format (a non-empty changeset also fails `dagger check`)
 dagger generate python:format -y
