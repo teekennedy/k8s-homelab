@@ -5,13 +5,13 @@
 # at start. Released as ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-<version>
 # by any conventional commit that touches this directory; see README.md,
 # "Sandbox image".
-FROM ghcr.io/openhands/agent-server:1.54.0-python@sha256:082368832a7e48087b64da38c7b2cf2442dd7621fde69f8d06ed52283ff136f8
+FROM ghcr.io/openhands/agent-server:1.55.1-python@sha256:109c8de51219d6fa7cc46bc945e20536b1fee276652091c89531480437b6f293
 
 
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 ARG KUBECTL_VERSION=v1.37.1
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
-ARG CLAUDE_ADAPTER_VERSION=0.87.0
+ARG CLAUDE_ADAPTER_VERSION=0.93.0
 # Must match the engine (k8s/platform/dagger-engine/values.yaml), so Renovate
 # does not track it on its own.
 ARG DAGGER_VERSION=1.0.0-beta.17

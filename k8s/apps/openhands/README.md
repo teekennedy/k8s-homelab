@@ -161,7 +161,7 @@ LLM profiles are seeded on an existing database too, preserving UI edits.
 
 ### OpenAI subscription authentication
 
-This uses the subscription transport already in `openhands-sdk==1.53.0`:
+This uses the subscription transport already in `openhands-sdk==1.55.1`:
 `auth_type: subscription`, `subscription_vendor: openai`. The SDK obtains OAuth
 credentials, sends Responses requests to
 `https://chatgpt.com/backend-api/codex/responses`, and refreshes tokens itself.
@@ -172,7 +172,7 @@ plan. See the [SDK implementation][sdk-subscription] and
 [OpenAI authentication documentation][openai-auth]. A successful inference
 request verifies access; the model list alone does not.
 
-[sdk-subscription]: https://github.com/OpenHands/software-agent-sdk/blob/v1.53.0/openhands-sdk/openhands/sdk/llm/auth/openai.py
+[sdk-subscription]: https://github.com/OpenHands/software-agent-sdk/blob/v1.55.1/openhands-sdk/openhands/sdk/llm/auth/openai.py
 [openai-auth]: https://learn.chatgpt.com/docs/auth
 
 1. Enable device code login in your ChatGPT account's security settings (or
@@ -188,8 +188,8 @@ request verifies access; the model list alone does not.
    openhands_auth_dir=$(mktemp -d)
    OH_PERSISTENCE_DIR="$openhands_auth_dir" \
      UV_PYTHON_DOWNLOADS=automatic UV_PYTHON_PREFERENCE=managed \
-     uv run --no-project --python 3.13 --with openhands-sdk==1.53.0 \
-     python -c 'from openhands.sdk import LLM; LLM.subscription_login(vendor="openai", model="gpt-5.5", force_login=True, open_browser=False, auth_method="device_code")'
+     uv run --no-project --python 3.13 --with openhands-sdk==1.55.1 \
+     python -c 'from openhands.sdk import LLM; LLM.subscription_login(vendor="openai", model="gpt-6-sol", force_login=True, open_browser=False, auth_method="device_code")'
    ```
 
    If device login is unavailable, change `auth_method` to `"browser"` and
@@ -208,7 +208,7 @@ request verifies access; the model list alone does not.
 
 4. Sync the chart through Argo CD, then choose **codex** or **isolated-codex**
    in the agent picker and start a new conversation. Select an LLM profile in
-   the model picker: **codex** (`gpt-5.5`), **codex-luna** (`gpt-5.6-luna`), or
+   the model picker: **codex** (`gpt-6-sol`), **codex-luna** (`gpt-6-luna`), or
    **codex-astra** (`gpt-6-astra`). These IDs are in the pinned SDK's allowlist;
    account availability still varies. Edit/create LLM profiles in Settings
    to select another model supported by that SDK version. This server's LLM
