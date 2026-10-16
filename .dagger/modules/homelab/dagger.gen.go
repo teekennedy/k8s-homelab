@@ -2115,15 +2115,15 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithArg("devenvSource", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "The files devenv reads to build any profile: devenv.nix, devenv.yaml,\ndevenv.lock, and all of cmd/lab, which devenv.yaml imports and whose CLI\nthe interactive profile builds from source.", SourceMap: dag.SourceMap("main.go", 29, 2), DefaultPath: "/", Ignore: []string{"*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!cmd/lab/**", "cmd/lab/result", "cmd/lab/.direnv"}}).
 							WithArg("toolchainSource", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenvSource without the lab CLI's own source, which the toolchain the\nchecks run in never builds, so that editing it leaves the toolchain\ncached. Loaded separately rather than filtered out of devenvSource, so\nthat it is content-addressed from the client filesystem: a directory\nderived from devenvSource would carry its identity, Go files and all.\nKeep it in step with toolchainFiles.", SourceMap: dag.SourceMap("main.go", 38, 2), DefaultPath: "/", Ignore: []string{"*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!cmd/lab/devenv.nix"}}))).
 			WithObject(
-				dag.TypeDef().WithObject("Ci", dagger.TypeDefWithObjectOpts{Description: "Ci checks the Dagger module under .dagger.", SourceMap: dag.SourceMap("ci.go", 14, 6)}).
+				dag.TypeDef().WithObject("Ci", dagger.TypeDefWithObjectOpts{Description: "Ci checks the Dagger module under .dagger.", SourceMap: dag.SourceMap("ci.go", 13, 6)}).
 					WithFunction(
 						dag.Function("VerifyCacheGranularity",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("VerifyCacheGranularity runs the Dagger module's tests, including the ones\nthat need a real engine.\n\nThe go toolchain's test runs these too, but only against\ninternal/daggerfake's model of the engine: the engine-backed tests skip\nunless a run opts in to them under a Dagger session, so they need either\n\n\tcd .dagger/modules/homelab && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...\n\nor this function, which opts in, and whose exec gets a session of its own, as\nevery container does. Use it to confirm the fake still agrees with the engine after a Dagger\nupgrade, or after teaching the fake a new API call.\n\nIts result caches on its inputs, like any other function here, and that is\nthe right behaviour: the two things that can change the verdict both bust it.\nEditing .dagger changes source, and upgrading Dagger means a new engine with\na new cache. To force a re-run anyway, vary run (`--run '.*'` is a different\nargument to the default `.` and so a different call).").
-							WithSourceMap(dag.SourceMap("ci.go", 38, 1)).
+							WithSourceMap(dag.SourceMap("ci.go", 37, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: ".golangci.yaml is here because go's lint_test.go reads the repo's real\nconfig rather than a stand-in, so the behaviour tests exercise the\nconfig the gate runs with.", SourceMap: dag.SourceMap("ci.go", 45, 2), DefaultPath: "/", Ignore: []string{"*", "!.dagger/**/*.go", "!.dagger/**/go.mod", "!.dagger/**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.golangci.yaml"}}).
-							WithArg("run", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Run only tests matching this regexp, as `go test -run`. Defaults to all\nof them, which covers the fake-backed tests too.", SourceMap: dag.SourceMap("ci.go", 50, 2), DefaultValue: dagger.JSON("\".\"")}))).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: ".golangci.yaml is here because go's lint_test.go reads the repo's real\nconfig rather than a stand-in, so the behaviour tests exercise the\nconfig the gate runs with.", SourceMap: dag.SourceMap("ci.go", 44, 2), DefaultPath: "/", Ignore: []string{"*", "!.dagger/**/*.go", "!.dagger/**/go.mod", "!.dagger/**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.golangci.yaml"}}).
+							WithArg("run", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Run only tests matching this regexp, as `go test -run`. Defaults to all\nof them, which covers the fake-backed tests too.", SourceMap: dag.SourceMap("ci.go", 49, 2), DefaultValue: dagger.JSON("\".\"")}))).
 			WithObject(
 				dag.TypeDef().WithObject("Cue", dagger.TypeDefWithObjectOpts{Description: "Cue runs CUE generators over config/.", SourceMap: dag.SourceMap("cue.go", 16, 6)}).
 					WithFunction(
@@ -2194,36 +2194,36 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithSourceMap(dag.SourceMap("devenv_projects.go", 109, 1)).
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("devenv_projects.go", 113, 2), DefaultPath: "/", Ignore: []string{"*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"}}))).
 			WithObject(
-				dag.TypeDef().WithObject("Go", dagger.TypeDefWithObjectOpts{Description: "Go runs Go checks over every module in the repo.", SourceMap: dag.SourceMap("go.go", 32, 6)}).
+				dag.TypeDef().WithObject("Go", dagger.TypeDefWithObjectOpts{Description: "Go runs Go checks over every module in the repo.", SourceMap: dag.SourceMap("go.go", 31, 6)}).
 					WithFunction(
 						dag.Function("Modules",
 							dag.TypeDef().WithObject("GoModules")).
 							WithDescription("Modules returns every Go module in the repo, keyed by path. Vendored\nmodules are skipped.").
-							WithSourceMap(dag.SourceMap("go.go", 39, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "The scripts and releases.json are here because Dagger modules go:embed\nthem; without them those modules do not build.", SourceMap: dag.SourceMap("go.go", 45, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.golangci.yaml"}}))).
+							WithSourceMap(dag.SourceMap("go.go", 38, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "The scripts and releases.json are here because Dagger modules go:embed\nthem; without them those modules do not build.", SourceMap: dag.SourceMap("go.go", 44, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.golangci.yaml"}}))).
 			WithObject(
-				dag.TypeDef().WithObject("Helmfile", dagger.TypeDefWithObjectOpts{Description: "Helmfile runs helmfile checks over every chart.", SourceMap: dag.SourceMap("helmfile.go", 29, 6)}).
+				dag.TypeDef().WithObject("Helmfile", dagger.TypeDefWithObjectOpts{Description: "Helmfile runs helmfile checks over every chart.", SourceMap: dag.SourceMap("helmfile.go", 31, 6)}).
 					WithFunction(
 						dag.Function("Environments",
 							dag.TypeDef().WithObject("HelmfileEnvironments")).
 							WithDescription("Environments returns the helmfile environments the checks run in, keyed by\nname.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 38, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "charts/*.tgz are built dependencies; they are gitignored, so leaving them\nout makes a local run resolve dependencies the way a clean checkout does.", SourceMap: dag.SourceMap("helmfile.go", 44, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}))).
+							WithSourceMap(dag.SourceMap("helmfile.go", 40, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "charts/*.tgz are built dependencies; they are gitignored, so leaving them\nout makes a local run resolve dependencies the way a clean checkout does.", SourceMap: dag.SourceMap("helmfile.go", 46, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}}))).
 			WithObject(
 				dag.TypeDef().WithObject("Kubernetes", dagger.TypeDefWithObjectOpts{Description: "Kubernetes runs releases on k3s clusters.", SourceMap: dag.SourceMap("kubernetes.go", 16, 6)}).
 					WithFunction(
 						dag.Function("DevCluster",
 							dag.TypeDef().WithObject("Service")).
 							WithDescription("DevCluster is a k3s cluster that keeps its state between runs: starting a\ncluster of the same name again resumes it, with its releases and volumes.\nIt runs for as long as the call that started it does, so it is used with\n`up`, which also publishes the API server on the host:\n\n\tdagger api call kubernetes dev-cluster --name=dev --token=file:./token up --ports=6443:6443\n\nscripts/dev-cluster.sh wraps this, and writes the kubeconfig. See \"Dev\nclusters\" in .dagger/docs/kubernetes.md.").
-							WithSourceMap(dag.SourceMap("kubernetes_k3s.go", 565, 1)).
-							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{Description: "Names the cluster's state, and so which cluster this is.", SourceMap: dag.SourceMap("kubernetes_k3s.go", 567, 2)}).
-							WithArg("token", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{Description: "Admin token the API server accepts. Whoever holds it is cluster-admin.", SourceMap: dag.SourceMap("kubernetes_k3s.go", 569, 2)})).
+							WithSourceMap(dag.SourceMap("kubernetes_k3s.go", 563, 1)).
+							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{Description: "Names the cluster's state, and so which cluster this is.", SourceMap: dag.SourceMap("kubernetes_k3s.go", 565, 2)}).
+							WithArg("token", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{Description: "Admin token the API server accepts. Whoever holds it is cluster-admin.", SourceMap: dag.SourceMap("kubernetes_k3s.go", 567, 2)})).
 					WithFunction(
 						dag.Function("DevClusterDelete",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
 							WithDescription("DevClusterDelete deletes a dev cluster's state. The cluster must be stopped:\na running one holds its state volume, and this waits for it.\n\n\tdagger api call kubernetes dev-cluster-delete --name=dev").
-							WithSourceMap(dag.SourceMap("kubernetes_k3s.go", 582, 1)).
-							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("kubernetes_k3s.go", 583, 2)})).
+							WithSourceMap(dag.SourceMap("kubernetes_k3s.go", 580, 1)).
+							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("kubernetes_k3s.go", 581, 2)})).
 					WithFunction(
 						dag.Function("IntegrationReports",
 							dag.TypeDef().WithObject("Directory")).
@@ -2280,98 +2280,98 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithGenerator().
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "buildGoModule vendors only the packages the source actually imports, so\nthe whole module directory is needed to produce the right hash.", SourceMap: dag.SourceMap("lab_vendorhash.go", 34, 2), DefaultPath: "/", Ignore: []string{"*", "!cmd/lab/**/*", "cmd/lab/result", "cmd/lab/.direnv"}}))).
 			WithObject(
-				dag.TypeDef().WithObject("Nix", dagger.TypeDefWithObjectOpts{Description: "Nix runs Nix checks over the repo.", SourceMap: dag.SourceMap("nix.go", 25, 6)}).
+				dag.TypeDef().WithObject("Nix", dagger.TypeDefWithObjectOpts{Description: "Nix runs Nix checks over the repo.", SourceMap: dag.SourceMap("nix.go", 24, 6)}).
 					WithFunction(
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Format formats Nix files with alejandra and removes dead code with deadnix.\nReturns a changeset. Use `dagger generate nix:format -y` to apply.").
-							WithSourceMap(dag.SourceMap("nix.go", 43, 1)).
+							WithSourceMap(dag.SourceMap("nix.go", 42, 1)).
 							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 46, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.nix", ".devenv*", ".devenv/**", "devenv.local.*"}}).
-							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 48, 2)})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 45, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.nix", ".devenv*", ".devenv/**", "devenv.local.*"}}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 47, 2)})).
 					WithFunction(
 						dag.Function("Image",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("Image returns the plain Nix image, for evaluating and building flakes.").
-							WithSourceMap(dag.SourceMap("nix.go", 31, 1))).
+							WithSourceMap(dag.SourceMap("nix.go", 30, 1))).
 					WithFunction(
 						dag.Function("Validate",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Validate runs nix flake check.").
-							WithSourceMap(dag.SourceMap("nix.go", 80, 1)).
+							WithSourceMap(dag.SourceMap("nix.go", 79, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 83, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 82, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"}})).
 					WithFunction(
 						dag.Function("ValidateBuildMetrics",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("ValidateBuildMetrics runs a real Nix build through the selfupdate metrics\nparser's Python test suite, so a Nix upgrade that changes the internal-json\nevent stream (NixOS/nix#13935) is caught here instead of only on a host.").
-							WithSourceMap(dag.SourceMap("nix.go", 101, 1)).
+							WithSourceMap(dag.SourceMap("nix.go", 100, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 104, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.lock", "!nix/modules/selfupdate/build-metrics/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}))).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 103, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.lock", "!nix/modules/selfupdate/build-metrics/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}))).
 			WithObject(
-				dag.TypeDef().WithObject("Python", dagger.TypeDefWithObjectOpts{Description: "Python runs Python checks over every project in the repo.", SourceMap: dag.SourceMap("python.go", 31, 6)}).
+				dag.TypeDef().WithObject("Python", dagger.TypeDefWithObjectOpts{Description: "Python runs Python checks over every project in the repo.", SourceMap: dag.SourceMap("python.go", 30, 6)}).
 					WithFunction(
 						dag.Function("Projects",
 							dag.TypeDef().WithObject("PythonProjects")).
 							WithDescription("Projects returns every Python project in the repo — every directory with a\npyproject.toml — keyed by path.").
-							WithSourceMap(dag.SourceMap("python.go", 48, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("python.go", 52, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}))).
+							WithSourceMap(dag.SourceMap("python.go", 47, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("python.go", 51, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}))).
 			WithObject(
 				dag.TypeDef().WithObject("Release", dagger.TypeDefWithObjectOpts{Description: "Release builds and publishes the repo's container images.", SourceMap: dag.SourceMap("release.go", 26, 6)}).
 					WithFunction(
 						dag.Function("BuildDockerfiles",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("BuildDockerfiles builds every Dockerfile using its containing directory as the build context.\nEach directory keeps an independent build cache.").
-							WithSourceMap(dag.SourceMap("release.go", 216, 1)).
+							WithSourceMap(dag.SourceMap("release.go", 214, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 219, 2), DefaultPath: "/"})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 217, 2), DefaultPath: "/"})).
 					WithFunction(
 						dag.Function("Image",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("Image builds a tagged container with OCI metadata, without publishing it.").
-							WithSourceMap(dag.SourceMap("release.go", 150, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 152, 2)}).
-							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 153, 2)}).
-							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.", SourceMap: dag.SourceMap("release.go", 156, 2)})).
+							WithSourceMap(dag.SourceMap("release.go", 148, 1)).
+							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 150, 2)}).
+							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 151, 2)}).
+							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.", SourceMap: dag.SourceMap("release.go", 154, 2)})).
 					WithFunction(
 						dag.Function("Publish",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
 							WithDescription("Publish selects the container and profiles from the release tag and pushes to GHCR.").
-							WithSourceMap(dag.SourceMap("release.go", 191, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 193, 2)}).
-							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 194, 2)}).
-							WithArg("username", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 195, 2)}).
-							WithArg("token", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 196, 2)}).
-							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh.", SourceMap: dag.SourceMap("release.go", 199, 2)})).
+							WithSourceMap(dag.SourceMap("release.go", 189, 1)).
+							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 191, 2)}).
+							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 192, 2)}).
+							WithArg("username", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 193, 2)}).
+							WithArg("token", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 194, 2)}).
+							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh.", SourceMap: dag.SourceMap("release.go", 197, 2)})).
 					WithFunction(
 						dag.Function("TestScripts",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("TestScripts runs the release script regression tests with their repository\ninputs: the scripts, this module's releases.json and the cliff configs.").
-							WithSourceMap(dag.SourceMap("release_scripts.go", 14, 1)).
+							WithSourceMap(dag.SourceMap("release_scripts.go", 13, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release_scripts.go", 18, 2), DefaultPath: "/", Ignore: []string{"*", "!scripts/tests/test_release.py", "!scripts/tests/pyproject.toml", "!scripts/tests/uv.lock", "!scripts/release.sh", "!scripts/release-metadata.sh", "!.dagger/modules/homelab/releases.json", "!cliff.toml", "!k8s/platform/forgejo/files/forgejo-resources/cliff.toml", "!k8s/apps/openhands/files/sandbox/cliff.toml"}}))).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release_scripts.go", 17, 2), DefaultPath: "/", Ignore: []string{"*", "!scripts/tests/test_release.py", "!scripts/tests/pyproject.toml", "!scripts/tests/uv.lock", "!scripts/release.sh", "!scripts/release-metadata.sh", "!.dagger/modules/homelab/releases.json", "!cliff.toml", "!k8s/platform/forgejo/files/forgejo-resources/cliff.toml", "!k8s/apps/openhands/files/sandbox/cliff.toml"}}))).
 			WithObject(
-				dag.TypeDef().WithObject("Terraform", dagger.TypeDefWithObjectOpts{Description: "Terraform runs OpenTofu checks over terraform/.", SourceMap: dag.SourceMap("terraform.go", 17, 6)}).
+				dag.TypeDef().WithObject("Terraform", dagger.TypeDefWithObjectOpts{Description: "Terraform runs OpenTofu checks over terraform/.", SourceMap: dag.SourceMap("terraform.go", 16, 6)}).
 					WithFunction(
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Format formats Terraform/OpenTofu files with `tofu fmt`.\n\n`tofu fmt -recursive` is run once over the whole terraform/ tree rather than\nper module, because unlike validate it needs no per-module init and the\nmodules already share a single source directory.\nReturns a changeset. Use `dagger generate terraform:format -y` to apply.").
-							WithSourceMap(dag.SourceMap("terraform.go", 169, 1)).
+							WithSourceMap(dag.SourceMap("terraform.go", 156, 1)).
 							WithGenerator().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("terraform.go", 172, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("terraform.go", 159, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
 					WithFunction(
 						dag.Function("Lint",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Lint runs trivy config against the Terraform/OpenTofu tree to catch\nmisconfigurations (unencrypted resources, over-permissive IAM, etc.).\n\nTrivy supersedes tfsec (the two tools' checks now live in the same\naquasecurity org, and tfsec is in maintenance-only mode), so this uses\ntrivy rather than tfsec directly. --skip-check-update and --skip-version-check\nkeep it network-independent and quiet.").
-							WithSourceMap(dag.SourceMap("terraform.go", 191, 1)).
+							WithSourceMap(dag.SourceMap("terraform.go", 178, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("terraform.go", 194, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("terraform.go", 181, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"}})).
 					WithFunction(
 						dag.Function("Modules",
 							dag.TypeDef().WithObject("TerraformModules")).
 							WithDescription("Modules returns every OpenTofu module under terraform/ — every directory\nwith a .terraform.lock.hcl — keyed by path.").
-							WithSourceMap(dag.SourceMap("terraform.go", 37, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("terraform.go", 41, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"}}))).
+							WithSourceMap(dag.SourceMap("terraform.go", 36, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("terraform.go", 40, 2), DefaultPath: "/", Ignore: []string{"*", "!terraform/**/*", "terraform/**/.terraform/**", "terraform/**/*.tfstate", "terraform/**/*.tfstate.*"}}))).
 			WithObject(
 				dag.TypeDef().WithObject("Woodpecker", dagger.TypeDefWithObjectOpts{Description: "Woodpecker lints the repo's Woodpecker pipelines.", SourceMap: dag.SourceMap("woodpecker.go", 13, 6)}).
 					WithFunction(
@@ -2383,15 +2383,15 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("woodpecker.go", 24, 2), DefaultPath: "/", Ignore: []string{"*", "!.woodpecker/*.yaml"}}).
 							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("woodpecker.go", 26, 2)}))).
 			WithObject(
-				dag.TypeDef().WithObject("Yaml", dagger.TypeDefWithObjectOpts{Description: "Yaml runs yamllint over the repo.", SourceMap: dag.SourceMap("yaml.go", 14, 6)}).
+				dag.TypeDef().WithObject("Yaml", dagger.TypeDefWithObjectOpts{Description: "Yaml runs yamllint over the repo.", SourceMap: dag.SourceMap("yaml.go", 13, 6)}).
 					WithFunction(
 						dag.Function("Lint",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Lint runs yamllint in strict mode against .yamllint.yaml.\n\nThis replaces the yamllint git hook that used to live in devenv.nix, and it\nis a real gate: the previous implementation caught the exec error and\nreturned success with a \"completed with warnings\" string, so `dagger check`\ncould never fail on YAML while the local hook blocked the commit.").
-							WithSourceMap(dag.SourceMap("yaml.go", 26, 1)).
+							WithSourceMap(dag.SourceMap("yaml.go", 25, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: ".pre-commit-config.yaml and .devenv are generated by devenv and\ngitignored. The config file is a symlink into the nix store, which\nresolves in a local shell but dangles once copied into a container, so\nyamllint fails on it with ENOENT rather than a lint error.", SourceMap: dag.SourceMap("yaml.go", 33, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", ".pre-commit-config.yaml", ".devenv*", ".devenv/**", "k8s/**/mixins/vendor/**"}}).
-							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("yaml.go", 35, 2)}))).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: ".pre-commit-config.yaml and .devenv are generated by devenv and\ngitignored. The config file is a symlink into the nix store, which\nresolves in a local shell but dangles once copied into a container, so\nyamllint fails on it with ENOENT rather than a lint error.", SourceMap: dag.SourceMap("yaml.go", 32, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.yaml", "!**/*.yml", "!.yamllint.yaml", ".pre-commit-config.yaml", ".devenv*", ".devenv/**", "k8s/**/mixins/vendor/**"}}).
+							WithArg("paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("yaml.go", 34, 2)}))).
 			WithObject(
 				dag.TypeDef().WithObject("DevenvProject", dagger.TypeDefWithObjectOpts{Description: "DevenvProject is a devenv project with a scoped source directory.\nEach DevenvProject carries only the files for its project, enabling\nper-project caching: changing files in one project won't invalidate\nthe cache for other projects.", SourceMap: dag.SourceMap("devenv_projects.go", 49, 6)}).
 					WithFunction(
@@ -2402,28 +2402,28 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root (e.g. \".\" for the root project).", SourceMap: dag.SourceMap("devenv_projects.go", 51, 2)}).
 					WithField("Source", dag.TypeDef().WithObject("Directory"), dagger.TypeDefWithFieldOpts{Description: "Source is the project's scoped source directory.", SourceMap: dag.SourceMap("devenv_projects.go", 53, 2)})).
 			WithObject(
-				dag.TypeDef().WithObject("GoModules", dagger.TypeDefWithObjectOpts{Description: "GoModules are the repo's Go modules.", SourceMap: dag.SourceMap("go.go", 64, 6)}).
+				dag.TypeDef().WithObject("GoModules", dagger.TypeDefWithObjectOpts{Description: "GoModules are the repo's Go modules.", SourceMap: dag.SourceMap("go.go", 63, 6)}).
 					WithCollection().
 					WithFunction(
 						dag.Function("Module",
 							dag.TypeDef().WithObject("GoModule")).
 							WithDescription("Module returns the Go module at path, carrying only its own files and its\nlocal replace targets, so that it caches independently of the others.").
-							WithSourceMap(dag.SourceMap("go.go", 77, 1)).
-							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("go.go", 77, 50)})).
+							WithSourceMap(dag.SourceMap("go.go", 76, 1)).
+							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("go.go", 76, 50)})).
 					WithCollectionGet("Module").
-					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the modules' directories relative to the repo root.", SourceMap: dag.SourceMap("go.go", 67, 2)}).
+					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the modules' directories relative to the repo root.", SourceMap: dag.SourceMap("go.go", 66, 2)}).
 					WithCollectionKeys("Paths")).
 			WithObject(
-				dag.TypeDef().WithObject("HelmfileEnvironments", dagger.TypeDefWithObjectOpts{Description: "HelmfileEnvironments are the helmfile environments the checks run in.", SourceMap: dag.SourceMap("helmfile.go", 60, 6)}).
+				dag.TypeDef().WithObject("HelmfileEnvironments", dagger.TypeDefWithObjectOpts{Description: "HelmfileEnvironments are the helmfile environments the checks run in.", SourceMap: dag.SourceMap("helmfile.go", 62, 6)}).
 					WithCollection().
 					WithFunction(
 						dag.Function("Environment",
 							dag.TypeDef().WithObject("HelmfileEnvironment")).
 							WithDescription("Environment returns the helmfile environment called name.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 73, 1)).
-							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("helmfile.go", 73, 45)})).
+							WithSourceMap(dag.SourceMap("helmfile.go", 75, 1)).
+							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("helmfile.go", 75, 45)})).
 					WithCollectionGet("Environment").
-					WithField("Names", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{SourceMap: dag.SourceMap("helmfile.go", 62, 2)}).
+					WithField("Names", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{SourceMap: dag.SourceMap("helmfile.go", 64, 2)}).
 					WithCollectionKeys("Names")).
 			WithObject(
 				dag.TypeDef().WithObject("KubernetesIntegrationRun", dagger.TypeDefWithObjectOpts{Description: "KubernetesIntegrationRun is the outcome of one workflow run that got as far\nas running tests. It is plain data, with no Directory, so that the call is\ncached; see Caching in .dagger/docs/kubernetes.md.", SourceMap: dag.SourceMap("kubernetes_integration.go", 50, 6)}).
@@ -2431,117 +2431,117 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithField("Reports", dag.TypeDef().WithListOf(dag.TypeDef().WithObject("KubernetesIntegrationReport")), dagger.TypeDefWithFieldOpts{Description: "Reports holds one JUnit XML report per release.", SourceMap: dag.SourceMap("kubernetes_integration.go", 55, 2)}).
 					WithField("Failed", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Failed names the releases whose tests did not all pass. Empty is a pass;\nan infrastructure failure is an error instead, not an entry here.", SourceMap: dag.SourceMap("kubernetes_integration.go", 58, 2)})).
 			WithObject(
-				dag.TypeDef().WithObject("PythonProjects", dagger.TypeDefWithObjectOpts{Description: "PythonProjects are the repo's Python projects.", SourceMap: dag.SourceMap("python.go", 70, 6)}).
+				dag.TypeDef().WithObject("PythonProjects", dagger.TypeDefWithObjectOpts{Description: "PythonProjects are the repo's Python projects.", SourceMap: dag.SourceMap("python.go", 69, 6)}).
 					WithCollection().
 					WithFunction(
 						dag.Function("Project",
 							dag.TypeDef().WithObject("PythonProject")).
 							WithDescription("Project returns the Python project at path, carrying only its own files, so\nthat it caches independently of the others.").
-							WithSourceMap(dag.SourceMap("python.go", 83, 1)).
-							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("python.go", 83, 35)})).
+							WithSourceMap(dag.SourceMap("python.go", 82, 1)).
+							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("python.go", 82, 35)})).
 					WithCollectionGet("Project").
-					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the projects' directories relative to the repo root.", SourceMap: dag.SourceMap("python.go", 73, 2)}).
+					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the projects' directories relative to the repo root.", SourceMap: dag.SourceMap("python.go", 72, 2)}).
 					WithCollectionKeys("Paths")).
 			WithObject(
-				dag.TypeDef().WithObject("TerraformModules", dagger.TypeDefWithObjectOpts{Description: "TerraformModules are the repo's OpenTofu modules.", SourceMap: dag.SourceMap("terraform.go", 57, 6)}).
+				dag.TypeDef().WithObject("TerraformModules", dagger.TypeDefWithObjectOpts{Description: "TerraformModules are the repo's OpenTofu modules.", SourceMap: dag.SourceMap("terraform.go", 56, 6)}).
 					WithCollection().
 					WithFunction(
 						dag.Function("Module",
 							dag.TypeDef().WithObject("TerraformModule")).
 							WithDescription("Module returns the OpenTofu module at path. It carries all of terraform/,\nbecause modules reference their siblings by relative path.").
-							WithSourceMap(dag.SourceMap("terraform.go", 72, 1)).
-							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("terraform.go", 72, 36)})).
+							WithSourceMap(dag.SourceMap("terraform.go", 71, 1)).
+							WithArg("path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("terraform.go", 71, 36)})).
 					WithCollectionGet("Module").
-					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the modules' directories relative to the repo root.", SourceMap: dag.SourceMap("terraform.go", 60, 2)}).
+					WithField("Paths", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Paths are the modules' directories relative to the repo root.", SourceMap: dag.SourceMap("terraform.go", 59, 2)}).
 					WithCollectionKeys("Paths")).
 			WithObject(
-				dag.TypeDef().WithObject("GoModule", dagger.TypeDefWithObjectOpts{Description: "GoModule is one Go module.", SourceMap: dag.SourceMap("go.go", 106, 6)}).
+				dag.TypeDef().WithObject("GoModule", dagger.TypeDefWithObjectOpts{Description: "GoModule is one Go module.", SourceMap: dag.SourceMap("go.go", 105, 6)}).
 					WithFunction(
 						dag.Function("Lint",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Lint runs `go mod tidy` followed by `golangci-lint run --fix` on the module,\nreturning the resulting changes. It fails if issues remain that --fix cannot\nresolve (e.g. cyclop, gosec).").
-							WithSourceMap(dag.SourceMap("go.go", 203, 1)).
+							WithSourceMap(dag.SourceMap("go.go", 202, 1)).
 							WithGenerator()).
 					WithFunction(
 						dag.Function("Test",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Test runs the module's Go tests.").
-							WithSourceMap(dag.SourceMap("go.go", 189, 1)).
+							WithSourceMap(dag.SourceMap("go.go", 188, 1)).
 							WithCheck()).
-					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root (e.g. \"cmd/lab\").", SourceMap: dag.SourceMap("go.go", 108, 2)})).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root (e.g. \"cmd/lab\").", SourceMap: dag.SourceMap("go.go", 107, 2)})).
 			WithObject(
-				dag.TypeDef().WithObject("HelmfileEnvironment", dagger.TypeDefWithObjectOpts{Description: "HelmfileEnvironment is one helmfile environment.", SourceMap: dag.SourceMap("helmfile.go", 78, 6)}).
+				dag.TypeDef().WithObject("HelmfileEnvironment", dagger.TypeDefWithObjectOpts{Description: "HelmfileEnvironment is one helmfile environment.", SourceMap: dag.SourceMap("helmfile.go", 80, 6)}).
 					WithFunction(
 						dag.Function("Lint",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Lint checks the helmfile state itself in this environment: that it renders\n(`helmfile build`), and that its releases, the chart directories and the\nenvironment's app list agree with each other.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 93, 1)).
+							WithSourceMap(dag.SourceMap("helmfile.go", 95, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("Releases",
 							dag.TypeDef().WithObject("HelmfileReleases")).
 							WithDescription("Releases returns every chart's release in this environment, keyed by\nrelease name.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 102, 1))).
-					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Name is the environment's name, as helmfile's --environment takes it.", SourceMap: dag.SourceMap("helmfile.go", 80, 2)})).
+							WithSourceMap(dag.SourceMap("helmfile.go", 104, 1))).
+					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Name is the environment's name, as helmfile's --environment takes it.", SourceMap: dag.SourceMap("helmfile.go", 82, 2)})).
 			WithObject(
 				dag.TypeDef().WithObject("KubernetesIntegrationReport", dagger.TypeDefWithObjectOpts{Description: "KubernetesIntegrationReport is one release's JUnit XML report.", SourceMap: dag.SourceMap("kubernetes_integration.go", 62, 6)}).
 					WithField("Release", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Release is the helmfile release the report is for.", SourceMap: dag.SourceMap("kubernetes_integration.go", 64, 2)}).
 					WithField("XML", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "XML is the report's contents.", SourceMap: dag.SourceMap("kubernetes_integration.go", 66, 2)})).
 			WithObject(
-				dag.TypeDef().WithObject("PythonProject", dagger.TypeDefWithObjectOpts{Description: "PythonProject is one Python project.", SourceMap: dag.SourceMap("python.go", 92, 6)}).
+				dag.TypeDef().WithObject("PythonProject", dagger.TypeDefWithObjectOpts{Description: "PythonProject is one Python project.", SourceMap: dag.SourceMap("python.go", 91, 6)}).
 					WithFunction(
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Format runs black on the project, returning the resulting changes.").
-							WithSourceMap(dag.SourceMap("python.go", 156, 1)).
+							WithSourceMap(dag.SourceMap("python.go", 152, 1)).
 							WithGenerator()).
 					WithFunction(
 						dag.Function("Lock",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Lock refreshes the project's uv.lock with `uv lock`, so it stays in step with\npyproject.toml. A project without a uv.lock is left alone. uv comes from the\ntoolchain, so the lock is written by the same uv version as everything else.").
-							WithSourceMap(dag.SourceMap("python.go", 183, 1)).
+							WithSourceMap(dag.SourceMap("python.go", 169, 1)).
 							WithGenerator()).
 					WithFunction(
 						dag.Function("Test",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Test runs pytest for the project.\n\nNo -m here on purpose. Which markers an ordinary run excludes is a per-project\ndecision, declared in each pyproject.toml's addopts — and it has to be,\nbecause a command-line -m replaces addopts rather than narrowing it. Passing\none from here would re-enable the tests a project deselected for itself, and\ndeselect the ones a project runs deliberately: jellyfin-exporter registers\n`integration` precisely so those tests run by default against its stub server.").
-							WithSourceMap(dag.SourceMap("python.go", 122, 1)).
+							WithSourceMap(dag.SourceMap("python.go", 121, 1)).
 							WithCheck()).
-					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root\n(e.g. \"k8s/foundation/kured/files/kured-webhook\").", SourceMap: dag.SourceMap("python.go", 95, 2)})).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the project's directory relative to the repo root\n(e.g. \"k8s/foundation/kured/files/kured-webhook\").", SourceMap: dag.SourceMap("python.go", 94, 2)})).
 			WithObject(
-				dag.TypeDef().WithObject("TerraformModule", dagger.TypeDefWithObjectOpts{Description: "TerraformModule is one OpenTofu module.", SourceMap: dag.SourceMap("terraform.go", 77, 6)}).
+				dag.TypeDef().WithObject("TerraformModule", dagger.TypeDefWithObjectOpts{Description: "TerraformModule is one OpenTofu module.", SourceMap: dag.SourceMap("terraform.go", 76, 6)}).
 					WithFunction(
 						dag.Function("Lock",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Lock runs tofu providers lock for the module.\n\nUnlike `tofu init`, `tofu providers lock` computes provider hashes for the\ngiven platforms deterministically, regardless of the platform it runs on.\nThis keeps .terraform.lock.hcl stable across different machines, which\n`tofu init` cannot guarantee since it only records hashes for the host\nplatform it happens to run on.").
-							WithSourceMap(dag.SourceMap("terraform.go", 138, 1)).
+							WithSourceMap(dag.SourceMap("terraform.go", 131, 1)).
 							WithGenerator()).
 					WithFunction(
 						dag.Function("Validate",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Validate runs tofu init and tofu validate on the module.").
-							WithSourceMap(dag.SourceMap("terraform.go", 116, 1)).
+							WithSourceMap(dag.SourceMap("terraform.go", 112, 1)).
 							WithCheck()).
-					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root.", SourceMap: dag.SourceMap("terraform.go", 79, 2)})).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root.", SourceMap: dag.SourceMap("terraform.go", 78, 2)})).
 			WithObject(
-				dag.TypeDef().WithObject("HelmfileReleases", dagger.TypeDefWithObjectOpts{Description: "HelmfileReleases are one environment's releases.", SourceMap: dag.SourceMap("helmfile.go", 118, 6)}).
+				dag.TypeDef().WithObject("HelmfileReleases", dagger.TypeDefWithObjectOpts{Description: "HelmfileReleases are one environment's releases.", SourceMap: dag.SourceMap("helmfile.go", 120, 6)}).
 					WithCollection().
 					WithFunction(
 						dag.Function("Release",
 							dag.TypeDef().WithObject("HelmfileRelease")).
 							WithDescription("Release returns the release called name.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 135, 1)).
-							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("helmfile.go", 135, 37)})).
+							WithSourceMap(dag.SourceMap("helmfile.go", 137, 1)).
+							WithArg("name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("helmfile.go", 137, 37)})).
 					WithCollectionGet("Release").
-					WithField("Names", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Names are the release names. The helmfile templates derive a release's\nchart path from its name, so each is its chart directory's basename.", SourceMap: dag.SourceMap("helmfile.go", 122, 2)}).
+					WithField("Names", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.TypeDefWithFieldOpts{Description: "Names are the release names. The helmfile templates derive a release's\nchart path from its name, so each is its chart directory's basename.", SourceMap: dag.SourceMap("helmfile.go", 124, 2)}).
 					WithCollectionKeys("Names")).
 			WithObject(
-				dag.TypeDef().WithObject("HelmfileRelease", dagger.TypeDefWithObjectOpts{Description: "HelmfileRelease is one release of the helmfile in one environment.", SourceMap: dag.SourceMap("helmfile.go", 145, 6)}).
+				dag.TypeDef().WithObject("HelmfileRelease", dagger.TypeDefWithObjectOpts{Description: "HelmfileRelease is one release of the helmfile in one environment.", SourceMap: dag.SourceMap("helmfile.go", 147, 6)}).
 					WithFunction(
 						dag.Function("Build",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Build runs `helmfile template` on this release to verify it renders.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 227, 1)).
+							WithSourceMap(dag.SourceMap("helmfile.go", 229, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("Kubeconform",
@@ -2559,11 +2559,11 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Validate",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Validate runs `helmfile lint` (helm lint with the release's merged values)\non this release, reusing the dependencies the render already built.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 237, 1)).
+							WithSourceMap(dag.SourceMap("helmfile.go", 239, 1)).
 							WithCheck()).
-					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Name is the release name.", SourceMap: dag.SourceMap("helmfile.go", 147, 2)}).
-					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the chart's directory relative to the repo root.", SourceMap: dag.SourceMap("helmfile.go", 149, 2)}).
-					WithField("Environment", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Environment is the helmfile environment it renders with.", SourceMap: dag.SourceMap("helmfile.go", 151, 2)})), nil
+					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Name is the release name.", SourceMap: dag.SourceMap("helmfile.go", 149, 2)}).
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the chart's directory relative to the repo root.", SourceMap: dag.SourceMap("helmfile.go", 151, 2)}).
+					WithField("Environment", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Environment is the helmfile environment it renders with.", SourceMap: dag.SourceMap("helmfile.go", 153, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

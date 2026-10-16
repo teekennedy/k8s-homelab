@@ -81,11 +81,14 @@ func releaseDescription(description, changelog string) string {
 	return description
 }
 
+// authoredLabelFields are the OCI labels an image may set itself.
+var authoredLabelFields = []string{"title", "description", "source", "url", "documentation", "licenses"}
+
 func releaseLabels(artifact releaseArtifact, tag string, metadata releaseMetadata, existing map[string]string) map[string]string {
 	labels := imageLabels(artifact.Title, artifact.Description,
 		"https://git.msng.to/ops/k8s-homelab/releases/tag/"+tag)
 	// Image-authored metadata takes precedence over release manifest defaults.
-	for _, field := range []string{"title", "description", "source", "url", "documentation", "licenses"} {
+	for _, field := range authoredLabelFields {
 		key := "org.opencontainers.image." + field
 		if value, ok := existing[key]; ok {
 			labels[key] = value
@@ -104,21 +107,16 @@ func releaseLabels(artifact releaseArtifact, tag string, metadata releaseMetadat
 }
 
 func withReleaseLabels(ctx context.Context, container *dagger.Container, artifact releaseArtifact, tag string, metadata releaseMetadata) (*dagger.Container, error) {
-	labels, err := container.Labels(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("read image labels: %w", err)
-	}
-	existing := make(map[string]string, len(labels))
-	for _, label := range labels {
-		name, err := label.Name(ctx)
+	existing := make(map[string]string, len(authoredLabelFields))
+	for _, field := range authoredLabelFields {
+		key := "org.opencontainers.image." + field
+		value, err := container.Label(ctx, key)
 		if err != nil {
-			return nil, fmt.Errorf("read image label name: %w", err)
+			return nil, fmt.Errorf("read image label %s: %w", key, err)
 		}
-		value, err := label.Value(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("read image label %s: %w", name, err)
+		if value != "" {
+			existing[key] = value
 		}
-		existing[name] = value
 	}
 	return withImageLabels(container, releaseLabels(artifact, tag, metadata, existing)), nil
 }
@@ -225,11 +223,7 @@ func (m *Release) BuildDockerfiles(
 	g := new(errgroup.Group)
 	for _, file := range files {
 		g.Go(func() error {
-			buildContext := source
-			if dir := filepath.Dir(file); dir != "." {
-				buildContext = source.Directory(dir)
-			}
-			_, err := buildContext.DockerBuild().Sync(ctx)
+			_, err := directoryAt(source, filepath.Dir(file)).DockerBuild().Sync(ctx)
 			if err != nil {
 				return fmt.Errorf("build %s: %w", file, err)
 			}

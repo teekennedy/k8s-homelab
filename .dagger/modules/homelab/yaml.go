@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"dagger/homelab/internal/dagger"
@@ -42,16 +41,13 @@ func (m *Yaml) Lint(ctx context.Context,
 	}
 	container := m.Container
 
-	out, err := container.
+	_, err := container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec(args).
-		Stdout(ctx)
+		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return fmt.Errorf("yamllint failed:\n%s%s", execErr.Stdout, execErr.Stderr)
-		}
-		return fmt.Errorf("yamllint failed: %w\n%s", err, out)
+		return fmt.Errorf("yamllint failed: %w", withExecOutput(err))
 	}
 
 	return nil

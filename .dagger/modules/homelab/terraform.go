@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -103,10 +102,7 @@ func (tm *TerraformModule) initialized(ctx context.Context) (*dagger.Container, 
 		WithExec([]string{"tofu", "init", "-backend=false", "-input=false"}).
 		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, fmt.Errorf("terraform module %s: init failed:\n%s", tm.Path, execErr.Stderr)
-		}
-		return nil, fmt.Errorf("terraform module %s: init failed: %w", tm.Path, err)
+		return nil, fmt.Errorf("terraform module %s: init failed: %w", tm.Path, withExecOutput(err))
 	}
 	return updated, nil
 }
@@ -119,10 +115,7 @@ func (tm *TerraformModule) Validate(ctx context.Context) error {
 		return err
 	}
 	if _, err := initialized.WithExec([]string{"tofu", "validate"}).Sync(ctx); err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return fmt.Errorf("terraform module %s: validation failed:\n%s", tm.Path, execErr.Stderr)
-		}
-		return fmt.Errorf("terraform module %s: validation failed: %w", tm.Path, err)
+		return fmt.Errorf("terraform module %s: validation failed: %w", tm.Path, withExecOutput(err))
 	}
 	return nil
 }
@@ -146,17 +139,11 @@ func (tm *TerraformModule) Lock(ctx context.Context) (*dagger.Changeset, error) 
 	}
 	updated, err := initialized.WithExec(args).Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, fmt.Errorf("terraform module %s: providers lock failed:\n%s", tm.Path, execErr.Stderr)
-		}
-		return nil, fmt.Errorf("terraform module %s: providers lock failed: %w", tm.Path, err)
+		return nil, fmt.Errorf("terraform module %s: providers lock failed: %w", tm.Path, withExecOutput(err))
 	}
 
-	before := dag.Directory().WithDirectory(tm.Path, tm.Source.Directory(tm.Path))
-	after := dag.Directory().
-		WithDirectory(tm.Path, updated.Directory("/src/"+tm.Path)).
-		WithoutDirectory(tm.Path + "/.terraform")
-	return after.Changes(before), nil
+	return rerooted(tm.Path, tm.Source.Directory(tm.Path),
+		updated.Directory("/src/"+tm.Path).WithoutDirectory(".terraform")), nil
 }
 
 // Format formats Terraform/OpenTofu files with `tofu fmt`.
@@ -193,7 +180,7 @@ func (m *Terraform) Lint(ctx context.Context,
 	// +ignore=["*", "!terraform/**/*.tf", "!terraform/**/*.tfvars"]
 	source *dagger.Directory,
 ) error {
-	out, err := m.Container.
+	_, err := m.Container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
 		WithExec([]string{
@@ -204,12 +191,9 @@ func (m *Terraform) Lint(ctx context.Context,
 			"--exit-code", "1",
 			"terraform",
 		}).
-		Stdout(ctx)
+		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return fmt.Errorf("trivy config failed:\n%s%s", execErr.Stdout, execErr.Stderr)
-		}
-		return fmt.Errorf("trivy config failed: %w\n%s", err, out)
+		return fmt.Errorf("trivy config failed: %w", withExecOutput(err))
 	}
 
 	return nil

@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"dagger/homelab/internal/dagger"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // The published devenv-ci image standing in for a toolchain build. A release
@@ -135,17 +137,25 @@ func parseReleaseVersion(s string) ([3]int, bool) {
 // rather than commits catches uncommitted edits too, and ignores a change
 // that was later reverted.
 func changedFiles(ctx context.Context, before, after *dagger.Directory, paths []string) ([]string, error) {
+	differs := make([]bool, len(paths))
+	g, gctx := errgroup.WithContext(ctx)
+	for i, p := range paths {
+		g.Go(func() error {
+			a, err := fileDigest(gctx, before, p)
+			if err != nil {
+				return err
+			}
+			b, err := fileDigest(gctx, after, p)
+			differs[i] = a != b
+			return err
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("diffing file digests: %w", err)
+	}
 	var changed []string
-	for _, p := range paths {
-		a, err := fileDigest(ctx, before, p)
-		if err != nil {
-			return nil, err
-		}
-		b, err := fileDigest(ctx, after, p)
-		if err != nil {
-			return nil, err
-		}
-		if a != b {
+	for i, p := range paths {
+		if differs[i] {
 			changed = append(changed, p)
 		}
 	}

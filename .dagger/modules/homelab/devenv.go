@@ -111,16 +111,8 @@ func (m *Devenv) Container(
 	} else if len(profiles) == 0 {
 		description = "Devenv shell"
 	}
-	return withImageLabels(devenvShell(m.Source, nixDaemon, profiles), map[string]string{
-		"org.opencontainers.image.title":         "Devenv shell",
-		"org.opencontainers.image.description":   description,
-		"org.opencontainers.image.source":        imageSource,
-		"org.opencontainers.image.url":           imageSource,
-		"org.opencontainers.image.documentation": imageSource,
-		"org.opencontainers.image.licenses":      "MIT",
-		"org.opencontainers.image.version":       "dev",
-		"org.opencontainers.image.revision":      "unknown",
-	})
+	return withImageLabels(devenvShell(m.Source, nixDaemon, profiles),
+		imageLabels("Devenv shell", description, imageSource))
 }
 
 // withImageLabels sets labels, and the OCI ones as manifest annotations too.

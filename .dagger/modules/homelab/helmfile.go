@@ -15,6 +15,8 @@ import (
 
 	"dagger/homelab/internal/dagger"
 	"dagger/homelab/internal/helmfile"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -244,6 +246,17 @@ func (r *HelmfileRelease) Validate(ctx context.Context) error {
 	return nil
 }
 
+// rerooted diffs a path-scoped directory against its changed version as a
+// Changeset with repo-relative paths. Diffing the scoped directories directly
+// yields paths relative to the unit ("main.go"), and `--auto-apply` — which
+// writes relative to the repo root — would drop the file in the wrong place.
+// Grafting each side onto an empty tree at path restores the repo-relative
+// paths without widening what the exec had mounted.
+func rerooted(path string, before, after *dagger.Directory) *dagger.Changeset {
+	return dag.Directory().WithDirectory(path, after).
+		Changes(dag.Directory().WithDirectory(path, before))
+}
+
 // withExecOutput appends a failed exec's output to its error, which otherwise
 // only carries the exit code.
 func withExecOutput(err error) error {
@@ -270,7 +283,6 @@ func helmfileReleases(
 	toolchain *dagger.Container,
 ) ([]helmfile.Release, error) {
 	listJSON, err := helmfileContainer(toolchain, helmfileStateSource(source, env)).
-		WithExec([]string{"helmfile", "--environment", env, "build"}).
 		WithExec([]string{"helmfile", "--environment", env, "list", "--output", "json"}).
 		Stdout(ctx)
 	if err != nil {
@@ -306,13 +318,21 @@ func lintHelmfileState(
 	chartPaths []string,
 	toolchain *dagger.Container,
 ) error {
-	releases, err := helmfileReleases(ctx, source, env, toolchain)
-	if err != nil {
+	var (
+		releases []helmfile.Release
+		apps     map[string]map[string]bool
+	)
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() (err error) {
+		releases, err = helmfileReleases(gctx, source, env, toolchain)
 		return err
-	}
-	apps, err := helmfileEnvApps(ctx, source, env)
-	if err != nil {
+	})
+	g.Go(func() (err error) {
+		apps, err = helmfileEnvApps(gctx, source, env)
 		return err
+	})
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("loading helmfile state: %w", err)
 	}
 
 	problems := helmfileStateProblems(releases, chartPaths, apps, helmfile.EnvValuesPath(env))

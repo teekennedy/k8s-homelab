@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"dagger/homelab/internal/dagger"
@@ -72,7 +71,7 @@ fi
 exit $status
 `
 
-	out, err := container.
+	_, err := container.
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src/.dagger").
 		// The opt-in and the exec's own Dagger session are what make the
@@ -81,12 +80,9 @@ exit $status
 		// client.
 		WithEnvVariable("HOMELAB_ENGINE_TESTS", "1").
 		WithExec([]string{"sh", "-c", script, "--", run}).
-		Stdout(ctx)
+		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return fmt.Errorf("cache granularity tests failed:\n%s%s", execErr.Stdout, execErr.Stderr)
-		}
-		return fmt.Errorf("cache granularity tests failed: %w\n%s", err, out)
+		return fmt.Errorf("cache granularity tests failed: %w", withExecOutput(err))
 	}
 	return nil
 }

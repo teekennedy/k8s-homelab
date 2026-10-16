@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 
 	"dagger/homelab/internal/dagger"
@@ -88,7 +87,7 @@ func (m *Nix) Validate(ctx context.Context,
 		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "flake", "check", "--no-build"}).
 		Sync(ctx)
 	if err != nil {
-		return fmt.Errorf("nix flake check failed: %w", err)
+		return fmt.Errorf("nix flake check failed: %w", withExecOutput(err))
 	}
 
 	return nil
@@ -121,10 +120,7 @@ func (m *Nix) ValidateBuildMetrics(ctx context.Context,
 		WithExec([]string{"uv", "run", "--no-cache", "--link-mode", "copy", "pytest"}).
 		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return fmt.Errorf("nix build metrics parser failed:\n%s%s", execErr.Stdout, execErr.Stderr)
-		}
-		return fmt.Errorf("nix build metrics parser failed: %w", err)
+		return fmt.Errorf("nix build metrics parser failed: %w", withExecOutput(err))
 	}
 
 	return nil

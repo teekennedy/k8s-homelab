@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -191,7 +190,7 @@ func (gm *GoModule) Test(ctx context.Context) error {
 		WithExec([]string{"go", "test", "./..."}).
 		Sync(ctx)
 	if err != nil {
-		return fmt.Errorf("go test failed in %s: %w", gm.Path, err)
+		return fmt.Errorf("go test failed in %s: %w", gm.Path, withExecOutput(err))
 	}
 	return nil
 }
@@ -212,20 +211,8 @@ func (gm *GoModule) Lint(ctx context.Context) (*dagger.Changeset, error) {
 		// golangci-lint reports the issues it could not fix on stdout, which is
 		// the only part of the failure worth reading. Without this the caller
 		// gets a bare "exit code: 1" and has to go find the trace.
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, fmt.Errorf("go lint failed in %s:\n%s%s", gm.Path, execErr.Stdout, execErr.Stderr)
-		}
-		return nil, fmt.Errorf("go lint failed in %s: %w", gm.Path, err)
+		return nil, fmt.Errorf("go lint failed in %s: %w", gm.Path, withExecOutput(err))
 	}
 
-	// Re-rooted under gm.Path before diffing. Both sides of a Changeset are
-	// module-scoped directories, so diffing them directly yields paths relative
-	// to the module ("main.go"), and `--auto-apply` — which writes relative to
-	// the repo root — would drop the file in the wrong place. Grafting each side
-	// onto an empty tree at gm.Path restores the repo-relative paths without
-	// widening what the exec above had mounted.
-	before := dag.Directory().WithDirectory(gm.Path, gm.Source)
-	after := dag.Directory().WithDirectory(gm.Path, fixed.Directory(gm.workdir()))
-
-	return after.Changes(before), nil
+	return rerooted(gm.Path, gm.Source, fixed.Directory(gm.workdir())), nil
 }

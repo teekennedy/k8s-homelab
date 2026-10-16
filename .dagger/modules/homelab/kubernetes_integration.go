@@ -315,10 +315,32 @@ func integrationPlan(
 	toolchain *dagger.Container,
 	releases []string,
 ) ([]*integrationRelease, error) {
-	apps, err := helmfileEnvApps(ctx, source, devEnvironment)
-	if err != nil {
-		return nil, err
+	var (
+		apps    map[string]map[string]bool
+		entries []helmfile.Release
+		tests   []string
+	)
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() (err error) {
+		apps, err = helmfileEnvApps(gctx, source, devEnvironment)
+		return err
+	})
+	g.Go(func() (err error) {
+		entries, err = helmfileReleases(gctx, source, devEnvironment, toolchain)
+		return err
+	})
+	g.Go(func() (err error) {
+		tests, err = source.Glob(gctx, "**/"+path.Join(kubernetesTestsDir, "pyproject.toml"))
+		return wrapErr("globbing integration tests", err)
+	})
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("loading integration test inputs: %w", err)
 	}
+	hasTests := make(map[string]bool, len(tests))
+	for _, t := range tests {
+		hasTests[t] = true
+	}
+
 	enabled := enabledReleases(apps)
 	if len(releases) == 0 {
 		releases = enabled
@@ -327,10 +349,6 @@ func integrationPlan(
 		return nil, err
 	}
 
-	entries, err := helmfileReleases(ctx, source, devEnvironment, toolchain)
-	if err != nil {
-		return nil, err
-	}
 	byName := make(map[string]helmfile.Release, len(entries))
 	for _, e := range entries {
 		byName[e.Name] = e
@@ -346,7 +364,7 @@ func integrationPlan(
 			return nil, fmt.Errorf("release %q has no namespace in the %s environment", name, devEnvironment)
 		}
 		testsPath := path.Join(entry.Chart, kubernetesTestsDir)
-		if found, _ := source.Glob(ctx, path.Join(testsPath, "pyproject.toml")); len(found) != 1 {
+		if !hasTests[path.Join(testsPath, "pyproject.toml")] {
 			return nil, fmt.Errorf("release %q has no Kubernetes integration tests: expected a "+
 				"Python project at %s ",
 				name, testsPath)
@@ -527,4 +545,12 @@ func releaseNames(plan []*integrationRelease) []string {
 		names[i] = r.Name
 	}
 	return names
+}
+
+// wrapErr adds context to a non-nil err and passes nil through.
+func wrapErr(msg string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: %w", msg, err)
 }

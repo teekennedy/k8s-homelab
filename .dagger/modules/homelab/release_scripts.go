@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"dagger/homelab/internal/dagger"
@@ -24,10 +23,7 @@ func (m *Release) TestScripts(
 		WithExec([]string{"uv", "run", "--frozen", "--link-mode", "copy", "pytest"}).
 		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return fmt.Errorf("script tests failed: %w\n%s%s", err, execErr.Stdout, execErr.Stderr)
-		}
-		return fmt.Errorf("script tests failed: %w", err)
+		return fmt.Errorf("script tests failed: %w", withExecOutput(err))
 	}
 	return nil
 }

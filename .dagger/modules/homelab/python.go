@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -143,10 +142,7 @@ func (pp *PythonProject) Test(ctx context.Context) error {
 		}).
 		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return fmt.Errorf("pytest failed in %s:\n%s%s%w", pp.Path, execErr.Stdout, execErr.Stderr, err)
-		}
-		return fmt.Errorf("pytest failed in %s: %w", pp.Path, err)
+		return fmt.Errorf("pytest failed in %s: %w", pp.Path, withExecOutput(err))
 	}
 	return nil
 }
@@ -160,20 +156,10 @@ func (pp *PythonProject) Format(ctx context.Context) (*dagger.Changeset, error) 
 		WithExec(blackCmd()).
 		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, fmt.Errorf("black failed in %s:\n%s%w", pp.Path, execErr.Stderr, err)
-		}
-		return nil, fmt.Errorf("black failed in %s: %w", pp.Path, err)
+		return nil, fmt.Errorf("black failed in %s: %w", pp.Path, withExecOutput(err))
 	}
 
-	// Re-rooted under pp.Path before diffing. Both sides are project-scoped, so
-	// diffing them directly yields paths relative to the project, and
-	// `--auto-apply` — which writes relative to the repo root — would drop the
-	// file in the wrong place.
-	before := dag.Directory().WithDirectory(pp.Path, pp.Source)
-	after := dag.Directory().WithDirectory(pp.Path, formatted.Directory("/src"))
-
-	return after.Changes(before), nil
+	return rerooted(pp.Path, pp.Source, formatted.Directory("/src")), nil
 }
 
 // Lock refreshes the project's uv.lock with `uv lock`, so it stays in step with
@@ -195,14 +181,8 @@ func (pp *PythonProject) Lock(ctx context.Context) (*dagger.Changeset, error) {
 		WithExec([]string{"uv", "lock"}).
 		Sync(ctx)
 	if err != nil {
-		if execErr, ok := errors.AsType[*dagger.ExecError](err); ok {
-			return nil, fmt.Errorf("uv lock failed in %s:\n%s%w", pp.Path, execErr.Stderr, err)
-		}
-		return nil, fmt.Errorf("uv lock failed in %s: %w", pp.Path, err)
+		return nil, fmt.Errorf("uv lock failed in %s: %w", pp.Path, withExecOutput(err))
 	}
 
-	// Re-rooted under pp.Path before diffing, as in Format.
-	before := dag.Directory().WithDirectory(pp.Path, pp.Source)
-	after := dag.Directory().WithDirectory(pp.Path, locked.Directory("/src"))
-	return after.Changes(before), nil
+	return rerooted(pp.Path, pp.Source, locked.Directory("/src")), nil
 }

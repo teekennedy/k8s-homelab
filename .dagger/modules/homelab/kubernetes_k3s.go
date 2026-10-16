@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -546,11 +545,10 @@ func (c *k3sCluster) Close(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
 	defer cancel()
 
-	var errs []error
 	if _, err := c.server.Stop(ctx); err != nil {
-		errs = append(errs, fmt.Errorf("stopping the k3s server for cluster %s: %w", c.Name, err))
+		return fmt.Errorf("stopping the k3s server for cluster %s: %w", c.Name, err)
 	}
-	return errors.Join(errs...)
+	return nil
 }
 
 // DevCluster is a k3s cluster that keeps its state between runs: starting a

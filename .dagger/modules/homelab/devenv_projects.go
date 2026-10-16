@@ -112,18 +112,7 @@ func (m *Devenv) Update(
 	// +ignore=["*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"]
 	source *dagger.Directory,
 ) (*dagger.Changeset, error) {
-	projectPaths := discoverDevenvProjectPaths(ctx, source)
-	if len(projectPaths) == 0 {
-		return source.Changes(source), nil
-	}
-
-	projects := make([]*DevenvProject, len(projectPaths))
-	for i, projPath := range projectPaths {
-		projects[i] = &DevenvProject{
-			Path:   projPath,
-			Source: directoryAt(source, projPath),
-		}
-	}
+	projects := m.Projects(ctx, source)
 
 	changesets := make([]*dagger.Changeset, len(projects))
 	g := new(errgroup.Group)
