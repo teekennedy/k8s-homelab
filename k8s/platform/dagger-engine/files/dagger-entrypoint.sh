@@ -45,7 +45,11 @@ else
   # standard dind setup that the upstream entrypoint does.
   if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
     mkdir -p /sys/fs/cgroup/init
-    xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+    # One pid per write: cgroup.procs migrates only the first pid of a write,
+    # and busybox xargs batches its output into one write.
+    for pid in $(cat /sys/fs/cgroup/cgroup.procs); do
+      echo "$pid" > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+    done
     sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers \
       > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
   fi
