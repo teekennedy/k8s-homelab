@@ -157,7 +157,12 @@ OpenHands agent, not the Codex ACP preset. They retain OpenHands' file editor,
 terminal and git event integration. `codex` runs on `repo`; `isolated-codex`
 runs on `isolated`. Claude remains the default, including for automations
 until another agent profile is activated. These additional profiles and their
-LLM profiles are seeded on an existing database too, preserving UI edits.
+LLM profiles are seeded on an existing database too, preserving UI edits,
+except that a changed `model` under `appServer.defaults.llm_profiles` is
+set on its stored profile once, as `model` is for Claude Code (see "Claude
+models"). That is how a Codex model changes: canvas 1.25 and later send
+every other settings page to **Application** when locked to a cloud
+backend, so the agent and LLM profile pages cannot be reached.
 
 ### OpenAI subscription authentication
 
@@ -210,8 +215,8 @@ request verifies access; the model list alone does not.
    in the agent picker and start a new conversation. Select an LLM profile in
    the model picker: **codex** (`gpt-6-sol`), **codex-luna** (`gpt-6-luna`), or
    **codex-astra** (`gpt-6-astra`). These IDs are in the pinned SDK's allowlist;
-   account availability still varies. Edit/create LLM profiles in Settings
-   to select another model supported by that SDK version. This server's LLM
+   account availability still varies. To select another model supported by
+   that SDK version, change `appServer.defaults.llm_profiles`. This server's LLM
    profiles always use OpenAI subscription auth; API keys are rejected.
 
 The optional Secret is mounted only in `seed-home`, never read by the app

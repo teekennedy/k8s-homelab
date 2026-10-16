@@ -256,7 +256,8 @@ appServer:
   # no setup. Written to the database once; the Settings UI owns them after
   # that. Shapes: GET /api/v1/settings and POST /api/agent-profiles/{name}.
   defaults:
-    # Seeded on every start when missing; subsequent UI edits are preserved.
+    # Seeded on every start when missing. A profile's `model` is also set
+    # whenever its value here changes; until it changes again, UI edits stand.
     llm_profiles:
       codex:
         model: gpt-6-sol
@@ -342,7 +343,7 @@ sandboxSpecs:
   # Built from files/sandbox/Dockerfile, which pins the upstream agent-server
   # tag and adds kubectl, the dagger CLI and the Claude Code adapter. Released
   # by any conventional commit under files/sandbox; Renovate bumps this tag.
-  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.0@sha256:92de5a01c1efa7425b1e92727caf24af7b40bfe8722b5302a3bb263219224c03
+  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.2@sha256:3e1ed9f45adf5092da86ffc043f397db8764a1e77624706d77af12cc657c3be6
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:

@@ -45,6 +45,35 @@ def test_declared_codex_agents_survive_restart_and_ui_edits(tmp_path):
     db.close()
 
 
+def test_the_declared_llm_model_is_applied_once_per_value(tmp_path):
+    from app_server.db import Database
+
+    def store_with(model):
+        seed = tmp_path / "seed.json"
+        seed.write_text(json.dumps({"llm_profiles": {"codex": {"model": model}}}))
+        store = SettingsStore(db, seed)
+        store.ensure_declared_profiles()
+        return store
+
+    db = Database(tmp_path / "db")
+    # A profile stored before declared models were tracked takes the
+    # declared one.
+    SettingsStore(db, None).save_llm_profile(
+        "codex", {"model": "gpt-5.5", "reasoning_effort": "high"}
+    )
+    store = store_with("gpt-6-sol")
+    assert store.llm_config("codex")["model"] == "gpt-6-sol"
+    assert store.llm_config("codex")["reasoning_effort"] == "high"
+
+    # A UI edit outlives a restart on the same declared value...
+    store.save_llm_profile("codex", {"model": "gpt-6-astra"})
+    assert store_with("gpt-6-sol").llm_config("codex")["model"] == "gpt-6-astra"
+
+    # ...and gives way when the declared value changes.
+    assert store_with("gpt-6-luna").llm_config("codex")["model"] == "gpt-6-luna"
+    db.close()
+
+
 @pytest.mark.parametrize(
     "base",
     [

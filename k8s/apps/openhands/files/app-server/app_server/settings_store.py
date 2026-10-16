@@ -21,6 +21,8 @@ SETTINGS_KEY = "settings"
 PROFILES_KEY = "agent_profiles"
 # The declared model last applied per ACP server; see apply_declared_models.
 APPLIED_MODELS_KEY = "applied_models"
+# The declared model last applied per LLM profile; see ensure_declared_profiles.
+APPLIED_LLM_MODELS_KEY = "applied_llm_models"
 LLM_PROFILES_KEY = "llm_profiles"
 
 # Fields an ACP profile carries over onto agent_settings at launch.
@@ -297,12 +299,21 @@ class SettingsStore:
             self._put(PROFILES_KEY, doc)
 
     def ensure_declared_profiles(self) -> None:
-        """Seed additional agents and LLMs without replacing UI edits."""
+        """Seed additional agents and LLMs without replacing UI edits. A
+        declared LLM model is set on its profile once per declared value;
+        until the value in values.yaml changes again, UI edits stand."""
         llms = self._llm_profiles()
+        applied = self._get(APPLIED_LLM_MODELS_KEY, {})
         for name, config in (self._seed.get("llm_profiles") or {}).items():
-            if name not in llms["profiles"]:
-                llms["profiles"][name] = self._subscription_config(config)
+            declared = self._subscription_config(config)
+            stored = llms["profiles"].get(name)
+            if stored is None:
+                llms["profiles"][name] = declared
+            elif applied.get(name) != declared["model"]:
+                stored["model"] = declared["model"]
+            applied[name] = declared["model"]
         self._put(LLM_PROFILES_KEY, llms)
+        self._put(APPLIED_LLM_MODELS_KEY, applied)
         agents = self._profiles()
         for name, body in (self._seed.get("agent_profiles") or {}).items():
             if name not in agents["profiles"]:
