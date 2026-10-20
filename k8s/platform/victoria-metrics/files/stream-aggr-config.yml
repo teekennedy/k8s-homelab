@@ -1,18 +1,25 @@
 # Downsample everything to 5m per series. The four matches partition all
 # metric names; anything unmatched is dropped (-streamAggr.dropInput).
+#
+# keep_metric_names stores the output under the input's name instead of
+# `<name>:5m_<output>`, so queries and dashboards written against Prometheus
+# work unchanged. It requires exactly one output per rule.
 
 # `total` keeps counter-reset semantics so rate()/increase() still work.
 - match: '{__name__=~".+_total"}'
   interval: 5m
   outputs: [total]
+  keep_metric_names: true
 
 - match: '{__name__=~".+_bucket"}'
   interval: 5m
   outputs: [total]
+  keep_metric_names: true
 
 - match: '{__name__=~".+_(sum|count)"}'
   interval: 5m
   outputs: [total]
+  keep_metric_names: true
 
 # Gauges: avg only. Adding min/max would store three series per input gauge,
 # which roughly doubles the long-term footprint for spike detail that
@@ -20,3 +27,4 @@
 - match: '{__name__!~".+_(total|bucket|sum|count)"}'
   interval: 5m
   outputs: [avg]
+  keep_metric_names: true

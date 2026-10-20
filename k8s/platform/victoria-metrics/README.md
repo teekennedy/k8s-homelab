@@ -23,16 +23,21 @@ runs in vmsingle itself. Rules are in `files/stream-aggr-config.yml`:
 Aggregation is per-series (no `by`/`without`), so only resolution changes.
 One output per input series: `min`/`max` on the gauge rule would store three
 series per gauge, which the volume doesn't have room for (see "Capacity").
-Aggregated series are named `<metric>:5m_<output>`, e.g.
-`node_cpu_seconds_total:5m_total`. `-streamAggr.dropInput=true` means no raw
-samples are stored. Grafana's VictoriaMetrics datasource uses
-`timeInterval: 5m` to match.
+Every rule sets `keep_metric_names`, so aggregated series keep the input's
+name and the same PromQL works against Prometheus and VictoriaMetrics.
+`-streamAggr.dropInput=true` means no raw samples are stored. Grafana's
+VictoriaMetrics datasource uses `timeInterval: 5m` to match.
+
+vmsingle only reads `-streamAggr.config` at startup (it has no
+`-configCheckInterval`), so a change to `files/stream-aggr-config.yml` needs
+`kubectl -n victoria-metrics rollout restart sts victoria-metrics-server`
+after Argo CD syncs it.
 
 Verify after deploy:
 
 ```sh
 VM=http://victoria-metrics-server.victoria-metrics.svc:8428
-curl -s $VM/api/v1/label/__name__/values | grep -c ':5m_'      # > 0
+curl -s "$VM/api/v1/query?query=count(up)"                     # > 0
 curl -s "$VM/api/v1/query?query=count({__name__=~\"go_.*\"})"  # empty
 ```
 
