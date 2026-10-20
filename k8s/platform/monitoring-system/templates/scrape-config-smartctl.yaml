@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/scrapeconfig_v1alpha1.json
+# smartctl_exporter runs on every host as a NixOS service
+# (nix/hosts/common/smartctl-exporter.nix) rather than as a privileged pod.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: smartctl
+  namespace: {{ .Release.Namespace }}
+  labels:
+    release: {{ .Release.Name }}
+spec:
+  kubernetesSDConfigs:
+    - role: Node
+  relabelings:
+    - sourceLabels: [__meta_kubernetes_node_address_InternalIP]
+      replacement: "$1:9633"
+      targetLabel: __address__
+      action: replace
+    - sourceLabels: [__meta_kubernetes_node_name]
+      targetLabel: instance
+      action: replace
+    - replacement: smartctl
+      targetLabel: job
+      action: replace
+  scheme: HTTP
+  scrapeInterval: 60s

@@ -19,6 +19,11 @@ spec:
   enableSuperuserAccess: true
   monitoring:
     enablePodMonitor: true
+    # One series per postgres setting per instance; nothing reads them.
+    podMonitorMetricRelabelings:
+      - action: drop
+        sourceLabels: [__name__]
+        regex: cnpg_pg_settings_setting
   affinity:
     nodeSelector:
       node.msng.to/cnpg-storage: "true"

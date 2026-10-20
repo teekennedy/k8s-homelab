@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Valkey replication sets (primary + replicas + Sentinel) in auth-system and
+# forgejo. Metrics come from the redis_exporter sidecar in each pod.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: valkey-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: valkey
+      interval: 1m
+      rules:
+        - alert: ValkeyDown
+          expr: redis_up == 0
+          for: 5m
+          labels:
+            severity: warning
+            component: valkey
+          annotations:
+            summary: {{ "Valkey {{ $labels.namespace }}/{{ $labels.pod }} is down" | quote }}
+            description: {{ "The exporter in {{ $labels.namespace }}/{{ $labels.pod }} cannot reach Valkey." | quote }}
+
+        - alert: ValkeyNoPrimary
+          expr: |
+            count by (namespace) (redis_up == 1)
+              unless on (namespace) count by (namespace) (redis_instance_info{role="master"})
+          for: 2m
+          labels:
+            severity: critical
+            component: valkey
+          annotations:
+            summary: {{ "Valkey in {{ $labels.namespace }} has no primary" | quote }}
+            description: {{ "No Valkey instance in {{ $labels.namespace }} reports the primary role, so writes are failing. Check Sentinel: `kubectl -n {{ $labels.namespace }} exec valkey-0 -c sentinel -- valkey-cli -p 26379 -a \"$SENTINEL_PASSWORD\" sentinel masters`." | quote }}
+
+        - alert: ValkeyMultiplePrimaries
+          expr: count by (namespace) (redis_instance_info{role="master"}) > 1
+          for: 5m
+          labels:
+            severity: critical
+            component: valkey
+          annotations:
+            summary: {{ "Valkey in {{ $labels.namespace }} has {{ $value }} primaries" | quote }}
+            description: {{ "More than one Valkey instance in {{ $labels.namespace }} reports the primary role (split brain). Writes to the wrong one will be lost when Sentinel reconciles." | quote }}
+
+        - alert: ValkeyReplicaLinkDown
+          expr: redis_master_link_up == 0
+          for: 5m
+          labels:
+            severity: warning
+            component: valkey
+          annotations:
+            summary: {{ "Valkey replica {{ $labels.namespace }}/{{ $labels.pod }} lost its primary" | quote }}
+            description: {{ "Replica {{ $labels.namespace }}/{{ $labels.pod }} has not been connected to its primary for 5 minutes." | quote }}
+
+        # maxmemory-policy is allkeys-lru, so a full instance evicts keys
+        # rather than refusing writes. For Authelia that means logged-out users.
+        - alert: ValkeyMemoryHigh
+          expr: |
+            redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+              and redis_memory_max_bytes > 0
+          for: 15m
+          labels:
+            severity: warning
+            component: valkey
+          annotations:
+            summary: {{ "Valkey {{ $labels.namespace }}/{{ $labels.pod }} is near maxmemory" | quote }}
+            description: {{ "Valkey {{ $labels.namespace }}/{{ $labels.pod }} is at {{ $value | humanizePercentage }} of maxmemory and will start evicting keys." | quote }}

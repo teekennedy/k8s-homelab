@@ -42,6 +42,11 @@ spec:
       archive_timeout: "1h"
   monitoring:
     enablePodMonitor: true
+    # One series per postgres setting per instance; nothing reads them.
+    podMonitorMetricRelabelings:
+      - action: drop
+        sourceLabels: [__name__]
+        regex: cnpg_pg_settings_setting
   enablePDB: true
   affinity:
     enablePodAntiAffinity: true

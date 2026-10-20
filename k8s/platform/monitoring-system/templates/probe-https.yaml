@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/probe_v1.json
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: https-endpoints
+  namespace: {{ .Release.Namespace }}
+spec:
+  jobName: blackbox-https
+  interval: 60s
+  module: http_2xx
+  prober:
+    url: blackbox-exporter.{{ .Release.Namespace }}.svc:9115
+  targets:
+    staticConfig:
+      static:
+        {{- toYaml .Values.blackboxProbes | nindent 8 }}

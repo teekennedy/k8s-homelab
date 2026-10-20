@@ -60,6 +60,7 @@ local prometheusMixin = addMixin({
   dashboardFolder: 'Prometheus',
   mixin: (import 'prometheus/mixin.libsonnet') + {
     _config+:: {
+      prometheusSelector: 'job="monitoring-system-kube-pro-prometheus"',
       showMultiCluster: false,
       grafanaPrometheus+: {
         # Sadly there is no timezone override for prometheus-mixin right now
@@ -74,7 +75,37 @@ local prometheusOperatorMixin = addMixin({
   namespace: 'monitoring-system',
   dashboardFolder: 'Prometheus Operator',
   mixin: (import 'prometheus-operator-mixin/mixin.libsonnet') + {
-    _config+:: {},
+    _config+:: {
+      prometheusOperatorSelector: 'job="monitoring-system-kube-pro-operator"',
+    },
+  },
+});
+
+local alertmanagerMixin = addMixin({
+  name: 'alertmanager',
+  namespace: 'monitoring-system',
+  dashboardFolder: 'Alertmanager',
+  mixin: (import 'alertmanager/mixin.libsonnet') + {
+    _config+:: {
+      alertmanagerSelector: 'job="monitoring-system-kube-pro-alertmanager"',
+      alertmanagerClusterLabels: 'job,namespace',
+      alertmanagerNameLabels: 'namespace,pod',
+    },
+  },
+});
+
+# Watchdog and TargetDown from kube-prometheus. InfoInhibitor is left out: it
+# only makes sense with a matching Alertmanager inhibit rule and null route.
+local generalMixin = addMixin({
+  name: 'general',
+  namespace: 'monitoring-system',
+  mixin: (import 'kube-prometheus/components/mixin/alerts/general.libsonnet') + {
+    prometheusAlerts+:: {
+      groups: [
+        g { rules: [r for r in g.rules if r.alert != 'InfoInhibitor'] }
+        for g in super.groups
+      ],
+    },
   },
 });
 
@@ -104,6 +135,8 @@ local excludedDashboards = [
   'k8s-resources-windows-pod.json',
   'k8s-windows-cluster-rsrc-use.json',
   'k8s-windows-node-rsrc-use.json',
+  'nodes-aix.json',
+  'nodes-darwin.json',
   'prometheus-remote-write.json',
 ];
 
@@ -120,6 +153,7 @@ local corednsMixinHelmGrafanaDashboards = generateGrafanaDashboardConfigMaps(cor
 local grafanaMixinHelmGrafanaDashboards = generateGrafanaDashboardConfigMaps(grafanaMixin);
 local prometheusMixinHelmGrafanaDashboards = generateGrafanaDashboardConfigMaps(prometheusMixin);
 local prometheusOperatorMixinHelmGrafanaDashboards = generateGrafanaDashboardConfigMaps(prometheusOperatorMixin);
+local alertmanagerMixinHelmGrafanaDashboards = generateGrafanaDashboardConfigMaps(alertmanagerMixin);
 
 local grafanaDashboards =
   kubernetesMixinHelmGrafanaDashboards +
@@ -127,7 +161,8 @@ local grafanaDashboards =
   corednsMixinHelmGrafanaDashboards +
   grafanaMixinHelmGrafanaDashboards +
   prometheusMixinHelmGrafanaDashboards +
-  prometheusOperatorMixinHelmGrafanaDashboards;
+  prometheusOperatorMixinHelmGrafanaDashboards +
+  alertmanagerMixinHelmGrafanaDashboards;
 
 
 local prometheusAlerts = {
@@ -137,6 +172,8 @@ local prometheusAlerts = {
   'grafana-mixin-rules.json': grafanaMixin.prometheusRules,
   'prometheus-mixin-rules.json': prometheusMixin.prometheusRules,
   'prometheus-operator-mixin-rules.json': prometheusOperatorMixin.prometheusRules,
+  'alertmanager-mixin-rules.json': alertmanagerMixin.prometheusRules,
+  'general-mixin-rules.json': generalMixin.prometheusRules,
 };
 
 grafanaDashboards + prometheusAlerts

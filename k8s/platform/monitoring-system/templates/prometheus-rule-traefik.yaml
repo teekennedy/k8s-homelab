@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: traefik-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: traefik
+      interval: 1m
+      rules:
+        # Traefik's own service name is in exported_service; `service` is the
+        # Kubernetes Service that was scraped (always "traefik"). The
+        # request-rate floor keeps a single failed request on an idle service
+        # from reading as a 100% error rate.
+        - alert: TraefikServiceHighErrorRate
+          expr: |
+            (
+              sum by (exported_service) (rate(traefik_service_requests_total{code=~"5.."}[5m]))
+                / sum by (exported_service) (rate(traefik_service_requests_total[5m]))
+            ) > 0.05
+            and sum by (exported_service) (rate(traefik_service_requests_total[5m])) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            component: ingress
+          annotations:
+            summary: {{ "Traefik service {{ $labels.exported_service }} is returning 5xx errors" | quote }}
+            description: {{ "{{ $value | humanizePercentage }} of requests to {{ $labels.exported_service }} have returned a 5xx status for 10 minutes. 502/503/504 usually mean the backend pods are down or not ready." | quote }}

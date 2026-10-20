@@ -23,6 +23,14 @@ spec:
       targetLabel: job
       action: replace
   metricRelabelings:
+    # k3s serves its whole metrics registry on this port. Everything except
+    # etcd's own metrics is already scraped from the kubelet endpoint.
+    - action: keep
+      sourceLabels: [__name__]
+      regex: etcd_.*|grpc_server_handled_total|process_.*|go_.*
+    - action: drop
+      sourceLabels: [__name__]
+      regex: etcd_debugging_(lease|disk)_.*
     - action: drop
       sourceLabels: [__name__]
       regex: (etcd_disk_backend_(defrag|snapshot)_duration_seconds|etcd_mvcc_(db_compaction_(keys|pause|total)_duration_seconds|hash_duration_seconds|hash_rev_duration_seconds)|etcd_snap_(db_save_total|db_fsync|fsync)_duration_seconds|etcd_network_(client_grpc_received|client_grpc_sent)_bytes|grpc_server_handling_seconds)_bucket

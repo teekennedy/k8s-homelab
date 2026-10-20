@@ -234,17 +234,61 @@ kube-prometheus-stack:
       ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api-reference/api.md#relabelconfig
       ##
       metricRelabelings:
-        # Drop excessively noisy apiserver and etcd buckets.
-        # These 7 metrics accounted for over 43% of my total series count before their removal.
+        # Drop apiserver, etcd client, and scheduler histograms and gauges that
+        # no dashboard or rule reads.
         - action: drop
           sourceLabels: [__name__]
-          regex: (apiserver|etcd)_(request_duration_seconds|request_sli_duration_seconds|request_body_size_bytes|response_sizes|watch_cache_read_wait_seconds|watch_events_sizes)_bucket
+          regex: (apiserver|etcd)_(request_duration_seconds|request_body_size_bytes|response_sizes|watch_cache_read_wait_seconds|watch_events_sizes)_bucket
+        - action: drop
+          sourceLabels: [__name__]
+          regex: apiserver_(watch_events_dispatch_duration_seconds|storage_list_duration_seconds|watch_list_duration_seconds|watch_cache_initialization_duration_seconds|admission_controller_admission_duration_seconds|admission_step_admission_duration_seconds|admission_webhook_admission_duration_seconds|flowcontrol_(request_execution_seconds|request_wait_duration_seconds|work_estimated_seats|read_vs_write_current_requests|priority_level_seat_utilization|priority_level_request_utilization|demand_seats|request_concurrency_in_use))_bucket
+        - action: drop
+          sourceLabels: [__name__]
+          regex: apiserver_(storage_list_[a-z_]+_total|watch_cache_[a-z_]+|resource_size_estimate_bytes|longrunning_requests|(storage_list|watch_list|watch_events_dispatch)_duration_seconds_(sum|count))
+        - action: drop
+          sourceLabels: [__name__]
+          regex: etcd_request_duration_seconds_bucket|scheduler_(plugin_execution_duration_seconds|event_handling_duration_seconds|framework_extension_point_duration_seconds)_bucket|kubernetes_feature_enabled
+        # The apiserver SLO recording rules (apiserver_request:burnrate*) only
+        # read the 1s, 5s, 30s and +Inf buckets of this histogram.
+        - action: drop
+          sourceLabels: [__name__, le]
+          regex: apiserver_request_sli_duration_seconds_bucket;(0\.05|0\.1|10|60)(\.0)?
         # Reduce bucket cardinality of kubelet storage operations.
         # (from values.yaml default)
         - action: drop
           sourceLabels: [__name__, le]
           regex: (csi_operations|storage_operation_duration)_seconds_bucket;(0.25|2.5|15|25|120|600)(\.0)?
-  kubeApiServer: {}
+      # Replaces the chart default, so its rules are repeated here before ours.
+      cAdvisorMetricRelabelings:
+        - sourceLabels: [__name__]
+          action: drop
+          regex: 'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)'
+        - sourceLabels: [__name__]
+          action: drop
+          regex: 'container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)'
+        - sourceLabels: [__name__]
+          action: drop
+          regex: 'container_memory_(mapped_file|swap)'
+        - sourceLabels: [__name__]
+          action: drop
+          regex: 'container_(file_descriptors|tasks_state|threads_max)'
+        - sourceLabels: [__name__, interface]
+          action: drop
+          regex: 'container_network_.*;(cali|cilium|cni|lxc|nodelocaldns|tunl).*'
+        - sourceLabels: [__name__]
+          action: drop
+          regex: 'container_spec.*'
+        - sourceLabels: [id, pod]
+          action: drop
+          regex: '.+;'
+        # Unused by any dashboard or rule.
+        - sourceLabels: [__name__]
+          action: drop
+          regex: 'container_(blkio_device_usage_total|memory_failures_total|pressure_[a-z_]+|ulimits_soft)'
+  # k3s serves the apiserver's metrics from the kubelet endpoint too, so a
+  # separate apiserver scrape would only duplicate them.
+  kubeApiServer:
+    enabled: false
   kubeControllerManager:
     enabled: false
   kubeEtcd:
@@ -322,6 +366,11 @@ kube-prometheus-stack:
     prometheusSpec:
       externalUrl: https://prometheus.msng.to
 
+      # The operator only maintains an EndpointSlice for kubelet targets
+      # (prometheusOperator.kubeletEndpointsEnabled is false), so discovery
+      # through v1 Endpoints would find no kubelets.
+      serviceDiscoveryRole: EndpointSlice
+
       resources:
         requests:
           cpu: 500m
@@ -367,10 +416,22 @@ kube-prometheus-stack:
     containerSecurityContext:
       readOnlyRootFilesystem: true
       allowPrivilegeEscalation: false
+    # Replaces the chart default, so its filesystem excludes are repeated here.
+    # /cache/var/lib/kubelet and /run/k3s/containerd are impermanence and k3s
+    # paths that otherwise add a series per pod volume.
     extraArgs:
       - --collector.systemd
       - --collector.zfs
       - --collector.textfile.directory=/var/node-exporter-textfiles
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/credentials/.+|run/containerd/.+|run/k3s/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+|cache/var/lib/kubelet/.+)($|/)
+      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+    prometheus:
+      monitor:
+        metricRelabelings:
+          # Alerts only read the active and failed states.
+          - action: drop
+            sourceLabels: [__name__, state]
+            regex: node_systemd_unit_state;(activating|deactivating|inactive)
     extraVolumes:
       - name: dbus-socket
         hostPath:
@@ -406,6 +467,27 @@ kube-prometheus-stack:
         memory: 128Mi
       limits:
         memory: 256Mi
+    # No dashboard or rule reads these resources' metrics.
+    collectorsExclude:
+      - certificatesigningrequests
+      - configmaps
+      - endpointslices
+      - ingresses
+      - leases
+      - mutatingwebhookconfigurations
+      - networkpolicies
+      - secrets
+      - services
+      - storageclasses
+      - validatingwebhookconfigurations
+      - volumeattachments
+    # Unused per-object metadata. kube_replicaset_owner is kept: the workload
+    # recording rules join on it.
+    metricDenylist:
+      - kube_replicaset_(created|metadata_generation|spec_replicas|status_[a-z_]+|annotations|labels)
+      - kube_pod_(tolerations|status_qos_class|status_scheduled|status_scheduled_time|status_initialized_time|status_ready_time|status_container_ready_time|service_account|scheduler|restart_policy|ips|created|spec_volumes_[a-z_]+|init_container_state_started|container_state_started)
+      - kube_[a-z_]+_(created|annotations)
+      - kube_(pod|deployment|statefulset|daemonset|node|namespace|cronjob|persistentvolume|poddisruptionbudget)_labels
     rbac:
       extraRules:
         - apiGroups: ["longhorn.io"]
@@ -439,6 +521,37 @@ kube-prometheus-stack:
                         type: [type]
                         reason: [reason]
                       valueFrom: [status]
+
+prometheus-blackbox-exporter:
+  fullnameOverride: blackbox-exporter
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+# HTTPS endpoints probed through blackbox-exporter by templates/probe-https.yaml.
+# Redirects are followed, so endpoints behind Authelia succeed when the login
+# page loads: that still covers DNS, ingress, TLS and the auth path.
+blackboxProbes:
+  - https://msng.to
+  - https://authelia.msng.to
+  - https://ci.msng.to
+  - https://files.msng.to
+  - https://git.msng.to
+  - https://grafana.msng.to
+  - https://jellyfin.msng.to
+  - https://rss.msng.to
+  - https://terraria.msng.to
 
 loki:
   enabled: true

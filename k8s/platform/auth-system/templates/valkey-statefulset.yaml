@@ -36,6 +36,8 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+      # Room for the preStop failover below plus Valkey's own shutdown.
+      terminationGracePeriodSeconds: 60
       # Spread the three pods across distinct nodes so a single node loss never
       # takes more than one replica (and never breaks Sentinel quorum).
       affinity:
@@ -87,6 +89,22 @@ spec:
           readOnly: true
         - name: data
           mountPath: /data
+        # If this pod is the primary, hand the role to a replica through
+        # Sentinel before Valkey stops, so clients see a coordinated
+        # switchover instead of waiting out down-after-milliseconds. Gives up
+        # after 25s (e.g. no healthy replica) and shuts down normally.
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - sh
+              - -c
+              - |
+                role() { valkey-cli -a "$VALKEY_PASSWORD" --no-auth-warning role | head -1; }
+                [ "$(role)" = master ] || exit 0
+                valkey-cli -p 26379 -a "$SENTINEL_PASSWORD" --no-auth-warning sentinel failover mymaster
+                i=0
+                while [ "$(role)" = master ] && [ $i -lt 25 ]; do sleep 1; i=$((i+1)); done
         livenessProbe:
           exec:
             command:
@@ -144,6 +162,18 @@ spec:
           readOnly: true
         - name: sentinel-conf
           mountPath: /sentinel
+        # The valkey container's preStop asks this Sentinel to run the
+        # failover, and all preStop hooks start at once, so keep Sentinel up
+        # until the local Valkey is no longer primary.
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - sh
+              - -c
+              - |
+                i=0
+                while [ "$(valkey-cli -a "$VALKEY_PASSWORD" --no-auth-warning role | head -1)" = master ] && [ $i -lt 30 ]; do sleep 1; i=$((i+1)); done
         livenessProbe:
           exec:
             command:
@@ -170,6 +200,40 @@ spec:
             cpu: "50m"
           limits:
             memory: "128Mi"
+      - name: exporter
+        image: "{{ .Values.valkey.exporterImage }}"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        ports:
+        - containerPort: 9121
+          name: metrics
+        env:
+        - name: REDIS_ADDR
+          value: redis://localhost:6379
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.authelia.secret.existingSecret }}
+              key: session.redis.password.txt
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: metrics
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: metrics
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
       volumes:
       - name: config
         configMap:

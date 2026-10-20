@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/podmonitor_v1.json
+# Scrapes the redis_exporter sidecar in every Valkey pod. Alerts live in
+# k8s/platform/monitoring-system/templates/prometheus-rule-valkey.yaml.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: valkey
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: valkey
+      app.kubernetes.io/component: valkey
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s

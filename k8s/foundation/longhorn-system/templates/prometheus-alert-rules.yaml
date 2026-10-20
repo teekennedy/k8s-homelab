@@ -107,3 +107,32 @@ spec:
       labels:
         issue: Longhorn instance manager {{`{{$labels.instance_manager}}`}} on {{`{{$labels.node}}`}} consumes 3 times the CPU request.
         severity: warning
+    # A failed Backup object stays in Error until it is deleted, so this keeps
+    # firing after a later backup of the same volume succeeds. Backups of
+    # volumes that no longer exist are ignored: the UI lists backups per
+    # volume, so those can only be cleaned up with
+    # `kubectl -n longhorn-system delete backups.longhorn.io <name>`.
+    - alert: LonghornBackupFailed
+      annotations:
+        description: Longhorn backup {{`{{$labels.backup}}`}} of volume {{`{{$labels.volume}}`}} is in the Error state.
+        summary: Longhorn backup {{`{{$labels.backup}}`}} failed
+        custom_link_text: backups
+        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/backup
+      expr: longhorn_backup_state == 4 and on (volume) group by (volume) (longhorn_volume_robustness)
+      for: 5m
+      labels:
+        issue: Longhorn backup {{`{{$labels.backup}}`}} of volume {{`{{$labels.volume}}`}} failed.
+        severity: warning
+    # backup-daily runs at 02:30, so 36h means at least one run was missed.
+    # Volumes that were never backed up report 0 and are skipped.
+    - alert: LonghornVolumeBackupStale
+      annotations:
+        description: The newest backup of the PVC {{`{{$labels.pvc}}`}} in the {{`{{$labels.pvc_namespace}}`}} namespace is {{`{{$value | humanizeDuration}}`}} old.
+        summary: Longhorn volume {{`{{$labels.pvc_namespace}}`}}/{{`{{$labels.pvc}}`}} has not been backed up recently
+        custom_link_text: volume
+        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/volume/{{`{{$labels.volume}}`}}
+      expr: (time() - longhorn_volume_last_backup_at) > 36 * 3600 and longhorn_volume_last_backup_at > 0
+      for: 1h
+      labels:
+        issue: Longhorn volume for PVC {{`{{$labels.pvc}}`}} in the {{`{{$labels.pvc_namespace}}`}} namespace has a stale backup.
+        severity: warning

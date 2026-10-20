@@ -19,6 +19,12 @@ spec:
       # with "unsupported Content-Type".
       path: /metrics
       interval: 30s
+      # The headless Service carries the same labels, so without this the
+      # server is scraped twice.
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          regex: woodpecker-server
+          action: keep
       authorization:
         credentials:
           name: woodpecker-prometheus-secret

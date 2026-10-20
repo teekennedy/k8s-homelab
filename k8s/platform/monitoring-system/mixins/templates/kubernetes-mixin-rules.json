@@ -17,7 +17,7 @@
                   "alert": "KubePodCrashLooping",
                   "annotations": {
                      "description": "Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is in waiting state (reason: \"CrashLoopBackOff\").",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodcrashlooping",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodcrashlooping",
                      "summary": "Pod is crash looping."
                   },
                   "expr": "max_over_time(kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\", job=\"kube-state-metrics\"}[5m]) >= 1\n",
@@ -30,10 +30,10 @@
                   "alert": "KubePodNotReady",
                   "annotations": {
                      "description": "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready state for longer than 15 minutes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodnotready",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepodnotready",
                      "summary": "Pod has been in a non-ready state for more than 15 minutes."
                   },
-                  "expr": "sum by (namespace, pod, job, cluster) (\n  max by(namespace, pod, job, cluster) (\n    kube_pod_status_phase{job=\"kube-state-metrics\", phase=~\"Pending|Unknown\"}\n  ) * on(namespace, pod, cluster) group_left(owner_kind) topk by(namespace, pod, cluster) (\n    1, max by(namespace, pod, owner_kind, cluster) (kube_pod_owner{owner_kind!=\"Job\"})\n  )\n) > 0\n",
+                  "expr": "sum by (namespace, pod, job, cluster) (\n  max by(namespace, pod, job, cluster) (\n    kube_pod_status_phase{job=\"kube-state-metrics\", phase=~\"Pending|Unknown\"}\n    or\n    (\n      kube_pod_status_phase{job=\"kube-state-metrics\", phase=\"Running\"} == 1\n      and on(namespace, pod, cluster)\n      kube_pod_status_ready{job=\"kube-state-metrics\", condition=\"true\"} == 0\n    )\n  ) * on(namespace, pod, cluster) group_left() topk by(namespace, pod, cluster) (\n    1, max by(namespace, pod, owner_kind, cluster) (kube_pod_owner{owner_kind!=\"Job\"})\n  )\n) > 0\nunless on(namespace, pod, cluster)\nkube_pod_status_reason{job=\"kube-state-metrics\", reason=\"SchedulingGated\"} == 1\n",
                   "for": "15m",
                   "labels": {
                      "severity": "warning"
@@ -43,7 +43,7 @@
                   "alert": "KubeDeploymentGenerationMismatch",
                   "annotations": {
                      "description": "Deployment generation for {{ $labels.namespace }}/{{ $labels.deployment }} does not match, this indicates that the Deployment has failed but has not been rolled back.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedeploymentgenerationmismatch",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedeploymentgenerationmismatch",
                      "summary": "Deployment generation mismatch due to possible roll-back"
                   },
                   "expr": "kube_deployment_status_observed_generation{job=\"kube-state-metrics\"}\n  !=\nkube_deployment_metadata_generation{job=\"kube-state-metrics\"}\n",
@@ -56,7 +56,7 @@
                   "alert": "KubeDeploymentReplicasMismatch",
                   "annotations": {
                      "description": "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has not matched the expected number of replicas for longer than 15 minutes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedeploymentreplicasmismatch",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedeploymentreplicasmismatch",
                      "summary": "Deployment has not matched the expected number of replicas."
                   },
                   "expr": "(\n  kube_deployment_spec_replicas{job=\"kube-state-metrics\"}\n    >\n  kube_deployment_status_replicas_available{job=\"kube-state-metrics\"}\n) and (\n  changes(kube_deployment_status_replicas_updated{job=\"kube-state-metrics\"}[10m])\n    ==\n  0\n)\n",
@@ -69,7 +69,7 @@
                   "alert": "KubeDeploymentRolloutStuck",
                   "annotations": {
                      "description": "Rollout of deployment {{ $labels.namespace }}/{{ $labels.deployment }} is not progressing for longer than 15 minutes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedeploymentrolloutstuck",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedeploymentrolloutstuck",
                      "summary": "Deployment rollout is not progressing."
                   },
                   "expr": "kube_deployment_status_condition{condition=\"Progressing\", status=\"false\",job=\"kube-state-metrics\"}\n!= 0\n",
@@ -82,7 +82,7 @@
                   "alert": "KubeStatefulSetReplicasMismatch",
                   "annotations": {
                      "description": "StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} has not matched the expected number of replicas for longer than 15 minutes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetreplicasmismatch",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetreplicasmismatch",
                      "summary": "StatefulSet has not matched the expected number of replicas."
                   },
                   "expr": "(\n  kube_statefulset_status_replicas_ready{job=\"kube-state-metrics\"}\n    !=\n  kube_statefulset_replicas{job=\"kube-state-metrics\"}\n) and (\n  changes(kube_statefulset_status_replicas_updated{job=\"kube-state-metrics\"}[10m])\n    ==\n  0\n)\n",
@@ -95,7 +95,7 @@
                   "alert": "KubeStatefulSetGenerationMismatch",
                   "annotations": {
                      "description": "StatefulSet generation for {{ $labels.namespace }}/{{ $labels.statefulset }} does not match, this indicates that the StatefulSet has failed but has not been rolled back.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetgenerationmismatch",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetgenerationmismatch",
                      "summary": "StatefulSet generation mismatch due to possible roll-back"
                   },
                   "expr": "kube_statefulset_status_observed_generation{job=\"kube-state-metrics\"}\n  !=\nkube_statefulset_metadata_generation{job=\"kube-state-metrics\"}\n",
@@ -108,7 +108,7 @@
                   "alert": "KubeStatefulSetUpdateNotRolledOut",
                   "annotations": {
                      "description": "StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }} update has not been rolled out.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetupdatenotrolledout",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubestatefulsetupdatenotrolledout",
                      "summary": "StatefulSet update has not been rolled out."
                   },
                   "expr": "(\n  max by(namespace, statefulset, job, cluster) (\n    kube_statefulset_status_current_revision{job=\"kube-state-metrics\"}\n      unless\n    kube_statefulset_status_update_revision{job=\"kube-state-metrics\"}\n  )\n    * on(namespace, statefulset, job, cluster)\n  (\n    kube_statefulset_replicas{job=\"kube-state-metrics\"}\n      !=\n    kube_statefulset_status_replicas_updated{job=\"kube-state-metrics\"}\n  )\n)  and on(namespace, statefulset, job, cluster) (\n  changes(kube_statefulset_status_replicas_updated{job=\"kube-state-metrics\"}[5m])\n    ==\n  0\n)\n",
@@ -121,7 +121,7 @@
                   "alert": "KubeDaemonSetRolloutStuck",
                   "annotations": {
                      "description": "DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} has not finished or progressed for at least 15m.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetrolloutstuck",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetrolloutstuck",
                      "summary": "DaemonSet rollout is stuck."
                   },
                   "expr": "(\n  (\n    kube_daemonset_status_current_number_scheduled{job=\"kube-state-metrics\"}\n      !=\n    kube_daemonset_status_desired_number_scheduled{job=\"kube-state-metrics\"}\n  ) or (\n    kube_daemonset_status_number_misscheduled{job=\"kube-state-metrics\"}\n      !=\n    0\n  ) or (\n    kube_daemonset_status_updated_number_scheduled{job=\"kube-state-metrics\"}\n      !=\n    kube_daemonset_status_desired_number_scheduled{job=\"kube-state-metrics\"}\n  ) or (\n    kube_daemonset_status_number_available{job=\"kube-state-metrics\"}\n      !=\n    kube_daemonset_status_desired_number_scheduled{job=\"kube-state-metrics\"}\n  )\n) and (\n  changes(kube_daemonset_status_updated_number_scheduled{job=\"kube-state-metrics\"}[5m])\n    ==\n  0\n)\n",
@@ -134,7 +134,7 @@
                   "alert": "KubeContainerWaiting",
                   "annotations": {
                      "description": "pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on container {{ $labels.container}} has been in waiting state for longer than 1 hour. (reason: \"{{ $labels.reason }}\").",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecontainerwaiting",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecontainerwaiting",
                      "summary": "Pod container waiting longer than 1 hour"
                   },
                   "expr": "kube_pod_container_status_waiting_reason{reason!=\"CrashLoopBackOff\", job=\"kube-state-metrics\"} > 0\n",
@@ -147,7 +147,7 @@
                   "alert": "KubeDaemonSetNotScheduled",
                   "annotations": {
                      "description": "{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} are not scheduled.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetnotscheduled",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetnotscheduled",
                      "summary": "DaemonSet pods are not scheduled."
                   },
                   "expr": "kube_daemonset_status_desired_number_scheduled{job=\"kube-state-metrics\"}\n  -\nkube_daemonset_status_current_number_scheduled{job=\"kube-state-metrics\"} > 0\n",
@@ -160,7 +160,7 @@
                   "alert": "KubeDaemonSetMisScheduled",
                   "annotations": {
                      "description": "{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} are running where they are not supposed to run.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetmisscheduled",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubedaemonsetmisscheduled",
                      "summary": "DaemonSet pods are misscheduled."
                   },
                   "expr": "kube_daemonset_status_number_misscheduled{job=\"kube-state-metrics\"} > 0\n",
@@ -173,10 +173,10 @@
                   "alert": "KubeJobNotCompleted",
                   "annotations": {
                      "description": "Job {{ $labels.namespace }}/{{ $labels.job_name }} is taking more than {{ \"43200\" | humanizeDuration }} to complete.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubejobnotcompleted",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubejobnotcompleted",
                      "summary": "Job did not complete in time"
                   },
-                  "expr": "time() - max by(namespace, job_name, cluster) (kube_job_status_start_time{job=\"kube-state-metrics\"}\n  and\nkube_job_status_active{job=\"kube-state-metrics\"} > 0) > 43200\n",
+                  "expr": "time() - max by(namespace, job_name, cluster) (kube_job_status_start_time{job=\"kube-state-metrics\"}\n  and\nkube_job_status_active{job=\"kube-state-metrics\"} > 0) > 43200\n  unless on(namespace, job_name, cluster)\nmax by(namespace, job_name, cluster) (kube_job_labels{job=\"kube-state-metrics\",label_excluded_from_alerts=\"true\"} == 1)\n",
                   "labels": {
                      "severity": "warning"
                   }
@@ -185,7 +185,7 @@
                   "alert": "KubeJobFailed",
                   "annotations": {
                      "description": "Job {{ $labels.namespace }}/{{ $labels.job_name }} failed to complete. Removing failed job after investigation should clear this alert.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubejobfailed",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubejobfailed",
                      "summary": "Job failed to complete."
                   },
                   "expr": "kube_job_failed{job=\"kube-state-metrics\"}  > 0\n",
@@ -198,7 +198,7 @@
                   "alert": "KubeHpaReplicasMismatch",
                   "annotations": {
                      "description": "HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler  }} has not matched the desired number of replicas for longer than 15 minutes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubehpareplicasmismatch",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubehpareplicasmismatch",
                      "summary": "HPA has not matched desired number of replicas."
                   },
                   "expr": "(kube_horizontalpodautoscaler_status_desired_replicas{job=\"kube-state-metrics\"}\n  !=\nkube_horizontalpodautoscaler_status_current_replicas{job=\"kube-state-metrics\"})\n  and\n(kube_horizontalpodautoscaler_status_current_replicas{job=\"kube-state-metrics\"}\n  >\nkube_horizontalpodautoscaler_spec_min_replicas{job=\"kube-state-metrics\"})\n  and\n(kube_horizontalpodautoscaler_status_current_replicas{job=\"kube-state-metrics\"}\n  <\nkube_horizontalpodautoscaler_spec_max_replicas{job=\"kube-state-metrics\"})\n  and\nchanges(kube_horizontalpodautoscaler_status_current_replicas{job=\"kube-state-metrics\"}[15m]) == 0\n",
@@ -211,10 +211,10 @@
                   "alert": "KubeHpaMaxedOut",
                   "annotations": {
                      "description": "HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler  }} has been running at max replicas for longer than 15 minutes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubehpamaxedout",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubehpamaxedout",
                      "summary": "HPA is running at max replicas"
                   },
-                  "expr": "kube_horizontalpodautoscaler_status_current_replicas{job=\"kube-state-metrics\"}\n  ==\nkube_horizontalpodautoscaler_spec_max_replicas{job=\"kube-state-metrics\"}\n",
+                  "expr": "(\n  kube_horizontalpodautoscaler_status_current_replicas{job=\"kube-state-metrics\"}\n    ==\n  kube_horizontalpodautoscaler_spec_max_replicas{job=\"kube-state-metrics\"}\n)\nand on(namespace, horizontalpodautoscaler, cluster) (\n  kube_horizontalpodautoscaler_spec_max_replicas{job=\"kube-state-metrics\"}\n    !=\n  kube_horizontalpodautoscaler_spec_min_replicas{job=\"kube-state-metrics\"}\n)\nand on(namespace, horizontalpodautoscaler, cluster) (\n  kube_horizontalpodautoscaler_status_condition{condition=\"ScalingLimited\", status=\"true\", job=\"kube-state-metrics\"}\n    ==\n  1\n)\n",
                   "for": "15m",
                   "labels": {
                      "severity": "warning"
@@ -224,10 +224,10 @@
                   "alert": "KubePdbNotEnoughHealthyPods",
                   "annotations": {
                      "description": "PDB {{ $labels.namespace }}/{{ $labels.poddisruptionbudget }} expects {{ $value }} more healthy pods. The desired number of healthy pods has not been met for at least 15m.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepdbnotenoughhealthypods",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepdbnotenoughhealthypods",
                      "summary": "PDB does not have enough healthy pods."
                   },
-                  "expr": "(\n  kube_poddisruptionbudget_status_desired_healthy{job=\"kube-state-metrics\"}\n  -\n  kube_poddisruptionbudget_status_current_healthy{job=\"kube-state-metrics\"}\n)\n> 0\n",
+                  "expr": "(\n  kube_poddisruptionbudget_status_desired_healthy{job=\"kube-state-metrics\"}\n  -\n  kube_poddisruptionbudget_status_current_healthy{job=\"kube-state-metrics\"}\n)\n> 0\nand\nkube_poddisruptionbudget_status_expected_pods{job=\"kube-state-metrics\"}\n> 0\n",
                   "for": "15m",
                   "labels": {
                      "severity": "warning"
@@ -242,7 +242,7 @@
                   "alert": "KubeCPUOvercommit",
                   "annotations": {
                      "description": "Cluster has overcommitted CPU resource requests for Pods by {{ printf \"%.2f\" $value }} CPU shares and cannot tolerate node failure.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecpuovercommit",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecpuovercommit",
                      "summary": "Cluster has overcommitted CPU resource requests."
                   },
                   "expr": "# Non-HA clusters.\n(\n  (\n    sum(namespace_cpu:kube_pod_container_resource_requests:sum{})\n    -\n    sum(kube_node_status_allocatable{resource=\"cpu\", job=\"kube-state-metrics\"}) > 0\n  )\n  and\n  count(max by (node) (kube_node_role{job=\"kube-state-metrics\", role=\"control-plane\"})) < 3\n)\nor\n# HA clusters.\n(\n  sum(namespace_cpu:kube_pod_container_resource_requests:sum{})\n  -\n  (\n    # Skip clusters with only one allocatable node.\n    (\n      sum(kube_node_status_allocatable{resource=\"cpu\", job=\"kube-state-metrics\"})\n      -\n      max(kube_node_status_allocatable{resource=\"cpu\", job=\"kube-state-metrics\"})\n    ) > 0\n  ) > 0\n)\n",
@@ -255,7 +255,7 @@
                   "alert": "KubeMemoryOvercommit",
                   "annotations": {
                      "description": "Cluster has overcommitted memory resource requests for Pods by {{ $value | humanize }} bytes and cannot tolerate node failure.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubememoryovercommit",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubememoryovercommit",
                      "summary": "Cluster has overcommitted memory resource requests."
                   },
                   "expr": "# Non-HA clusters.\n(\n  (\n    sum(namespace_memory:kube_pod_container_resource_requests:sum{})\n    -\n    sum(kube_node_status_allocatable{resource=\"memory\", job=\"kube-state-metrics\"}) > 0\n  )\n  and\n  count(max by (node) (kube_node_role{job=\"kube-state-metrics\", role=\"control-plane\"})) < 3\n)\nor\n# HA clusters.\n(\n  sum(namespace_memory:kube_pod_container_resource_requests:sum{})\n  -\n  (\n    # Skip clusters with only one allocatable node.\n    (\n      sum(kube_node_status_allocatable{resource=\"memory\", job=\"kube-state-metrics\"})\n      -\n      max(kube_node_status_allocatable{resource=\"memory\", job=\"kube-state-metrics\"})\n    ) > 0\n  ) > 0\n)\n",
@@ -268,7 +268,7 @@
                   "alert": "KubeCPUQuotaOvercommit",
                   "annotations": {
                      "description": "Cluster has overcommitted CPU resource requests for Namespaces.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecpuquotaovercommit",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecpuquotaovercommit",
                      "summary": "Cluster has overcommitted CPU resource requests."
                   },
                   "expr": "sum (\n  min without(resource) (kube_resourcequota{job=\"kube-state-metrics\", type=\"hard\", resource=~\"(cpu|requests.cpu)\"})\n)\n/\nsum (\n  kube_node_status_allocatable{resource=\"cpu\", job=\"kube-state-metrics\"}\n) > 1.5\n",
@@ -281,7 +281,7 @@
                   "alert": "KubeMemoryQuotaOvercommit",
                   "annotations": {
                      "description": "Cluster has overcommitted memory resource requests for Namespaces.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubememoryquotaovercommit",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubememoryquotaovercommit",
                      "summary": "Cluster has overcommitted memory resource requests."
                   },
                   "expr": "sum (\n  min without(resource) (kube_resourcequota{job=\"kube-state-metrics\", type=\"hard\", resource=~\"(memory|requests.memory)\"})\n)\n/\nsum (\n  kube_node_status_allocatable{resource=\"memory\", job=\"kube-state-metrics\"}\n) > 1.5\n",
@@ -294,10 +294,10 @@
                   "alert": "KubeQuotaAlmostFull",
                   "annotations": {
                      "description": "Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage }} of its {{ $labels.resource }} quota.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotaalmostfull",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotaalmostfull",
                      "summary": "Namespace quota is going to be full."
                   },
-                  "expr": "max without (instance, job, type) (\n  kube_resourcequota{job=\"kube-state-metrics\", type=\"used\"}\n)\n/ on (cluster, namespace, resource, resourcequota) group_left()\n(\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"hard\"}\n  ) > 0\n)\n> 0.9 < 1\n",
+                  "expr": "topk by (cluster, namespace, resource, resourcequota) (1,\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"used\"}\n  )\n)\n/ on (cluster, namespace, resource, resourcequota) group_left()\ntopk by (cluster, namespace, resource, resourcequota) (1,\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"hard\"}\n  ) > 0\n)\n> 0.9 < 1\n",
                   "for": "15m",
                   "labels": {
                      "severity": "info"
@@ -307,10 +307,10 @@
                   "alert": "KubeQuotaFullyUsed",
                   "annotations": {
                      "description": "Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage }} of its {{ $labels.resource }} quota.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotafullyused",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotafullyused",
                      "summary": "Namespace quota is fully used."
                   },
-                  "expr": "max without (instance, job, type) (\n  kube_resourcequota{job=\"kube-state-metrics\", type=\"used\"}\n)\n/ on (cluster, namespace, resource, resourcequota) group_left()\n(\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"hard\"}\n  ) > 0\n)\n== 1\n",
+                  "expr": "topk by (cluster, namespace, resource, resourcequota) (1,\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"used\"}\n  )\n)\n/ on (cluster, namespace, resource, resourcequota) group_left()\ntopk by (cluster, namespace, resource, resourcequota) (1,\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"hard\"}\n  ) > 0\n)\n== 1\n",
                   "for": "15m",
                   "labels": {
                      "severity": "info"
@@ -320,10 +320,10 @@
                   "alert": "KubeQuotaExceeded",
                   "annotations": {
                      "description": "Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage }} of its {{ $labels.resource }} quota.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotaexceeded",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubequotaexceeded",
                      "summary": "Namespace quota has exceeded the limits."
                   },
-                  "expr": "max without (instance, job, type) (\n  kube_resourcequota{job=\"kube-state-metrics\", type=\"used\"}\n)\n/ on (cluster, namespace, resource, resourcequota) group_left()\n(\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"hard\"}\n  ) > 0\n) > 1\n",
+                  "expr": "topk by (cluster, namespace, resource, resourcequota) (1,\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"used\"}\n  )\n)\n/ on (cluster, namespace, resource, resourcequota) group_left()\ntopk by (cluster, namespace, resource, resourcequota) (1,\n  max without (instance, job, type) (\n    kube_resourcequota{job=\"kube-state-metrics\", type=\"hard\"}\n  ) > 0\n) > 1\n",
                   "for": "15m",
                   "labels": {
                      "severity": "warning"
@@ -333,10 +333,10 @@
                   "alert": "CPUThrottlingHigh",
                   "annotations": {
                      "description": "{{ $value | humanizePercentage }} throttling of CPU in namespace {{ $labels.namespace }} for container {{ $labels.container }} in pod {{ $labels.pod }}.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-cputhrottlinghigh",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-cputhrottlinghigh",
                      "summary": "Processes experience elevated CPU throttling."
                   },
-                  "expr": "sum without (id, metrics_path, name, image, endpoint, job, node) (\n  topk by (cluster, namespace, pod, container, instance) (1,\n    increase(\n      container_cpu_cfs_throttled_periods_total{container!=\"\", job=\"kubelet\", namespace!=\"dagger-engine\" }\n    [5m])\n  )\n)\n/ on (cluster, namespace, pod, container, instance) group_left\nsum without (id, metrics_path, name, image, endpoint, job, node) (\n  topk by (cluster, namespace, pod, container, instance) (1,\n    increase(\n      container_cpu_cfs_periods_total{job=\"kubelet\", }\n    [5m])\n  )\n)\n> ( 25 / 100 )\n",
+                  "expr": "sum without (id, metrics_path, name, image, endpoint, job, node) (\n  topk by (cluster, namespace, pod, container, instance) (1,\n    increase(\n      container_cpu_cfs_throttled_periods_total{container!=\"\", job=\"kubelet\", }\n    [5m])\n  )\n)\n/ on (cluster, namespace, pod, container, instance) group_left\nsum without (id, metrics_path, name, image, endpoint, job, node) (\n  topk by (cluster, namespace, pod, container, instance) (1,\n    increase(\n      container_cpu_cfs_periods_total{job=\"kubelet\", }\n    [5m])\n  )\n)\n> ( 25 / 100 )\n",
                   "for": "15m",
                   "labels": {
                      "severity": "info"
@@ -351,7 +351,7 @@
                   "alert": "KubePersistentVolumeFillingUp",
                   "annotations": {
                      "description": "The PersistentVolume claimed by {{ $labels.persistentvolumeclaim }} in Namespace {{ $labels.namespace }} {{ with $labels.cluster -}} on Cluster {{ . }} {{- end }} is only {{ $value | humanizePercentage }} free.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumefillingup",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumefillingup",
                      "summary": "PersistentVolume is filling up."
                   },
                   "expr": "(\n  kubelet_volume_stats_available_bytes{job=\"kubelet\"}\n    /\n  kubelet_volume_stats_capacity_bytes{job=\"kubelet\"}\n) < 0.03\nand\nkubelet_volume_stats_used_bytes{job=\"kubelet\"} > 0\nunless on(cluster, namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_access_mode{ access_mode=\"ReadOnlyMany\"} == 1\nunless on(cluster, namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_labels{label_excluded_from_alerts=\"true\"} == 1\n",
@@ -364,7 +364,7 @@
                   "alert": "KubePersistentVolumeFillingUp",
                   "annotations": {
                      "description": "Based on recent sampling, the PersistentVolume claimed by {{ $labels.persistentvolumeclaim }} in Namespace {{ $labels.namespace }} {{ with $labels.cluster -}} on Cluster {{ . }} {{- end }} is expected to fill up within four days. Currently {{ $value | humanizePercentage }} is available.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumefillingup",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumefillingup",
                      "summary": "PersistentVolume is filling up."
                   },
                   "expr": "(\n  kubelet_volume_stats_available_bytes{job=\"kubelet\"}\n    /\n  kubelet_volume_stats_capacity_bytes{job=\"kubelet\"}\n) < 0.15\nand\nkubelet_volume_stats_used_bytes{job=\"kubelet\"} > 0\nand\npredict_linear(kubelet_volume_stats_available_bytes{job=\"kubelet\"}[6h], 4 * 24 * 3600) < 0\nunless on(cluster, namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_access_mode{ access_mode=\"ReadOnlyMany\"} == 1\nunless on(cluster, namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_labels{label_excluded_from_alerts=\"true\"} == 1\n",
@@ -377,7 +377,7 @@
                   "alert": "KubePersistentVolumeInodesFillingUp",
                   "annotations": {
                      "description": "The PersistentVolume claimed by {{ $labels.persistentvolumeclaim }} in Namespace {{ $labels.namespace }} {{ with $labels.cluster -}} on Cluster {{ . }} {{- end }} only has {{ $value | humanizePercentage }} free inodes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumeinodesfillingup",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumeinodesfillingup",
                      "summary": "PersistentVolumeInodes are filling up."
                   },
                   "expr": "(\n  kubelet_volume_stats_inodes_free{job=\"kubelet\"}\n    /\n  kubelet_volume_stats_inodes{job=\"kubelet\"}\n) < 0.03\nand\nkubelet_volume_stats_inodes_used{job=\"kubelet\"} > 0\nunless on(cluster, namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_access_mode{ access_mode=\"ReadOnlyMany\"} == 1\nunless on(cluster, namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_labels{label_excluded_from_alerts=\"true\"} == 1\n",
@@ -390,7 +390,7 @@
                   "alert": "KubePersistentVolumeInodesFillingUp",
                   "annotations": {
                      "description": "Based on recent sampling, the PersistentVolume claimed by {{ $labels.persistentvolumeclaim }} in Namespace {{ $labels.namespace }} {{ with $labels.cluster -}} on Cluster {{ . }} {{- end }} is expected to run out of inodes within four days. Currently {{ $value | humanizePercentage }} of its inodes are free.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumeinodesfillingup",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumeinodesfillingup",
                      "summary": "PersistentVolumeInodes are filling up."
                   },
                   "expr": "(\n  kubelet_volume_stats_inodes_free{job=\"kubelet\"}\n    /\n  kubelet_volume_stats_inodes{job=\"kubelet\"}\n) < 0.15\nand\nkubelet_volume_stats_inodes_used{job=\"kubelet\"} > 0\nand\npredict_linear(kubelet_volume_stats_inodes_free{job=\"kubelet\"}[6h], 4 * 24 * 3600) < 0\nunless on(cluster, namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_access_mode{ access_mode=\"ReadOnlyMany\"} == 1\nunless on(cluster, namespace, persistentvolumeclaim)\nkube_persistentvolumeclaim_labels{label_excluded_from_alerts=\"true\"} == 1\n",
@@ -403,7 +403,7 @@
                   "alert": "KubePersistentVolumeErrors",
                   "annotations": {
                      "description": "The persistent volume {{ $labels.persistentvolume }} {{ with $labels.cluster -}} on Cluster {{ . }} {{- end }} has status {{ $labels.phase }}.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumeerrors",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubepersistentvolumeerrors",
                      "summary": "PersistentVolume is having issues with provisioning."
                   },
                   "expr": "kube_persistentvolume_status_phase{phase=~\"Failed|Pending\",job=\"kube-state-metrics\"} > 0\n",
@@ -421,7 +421,7 @@
                   "alert": "KubeVersionMismatch",
                   "annotations": {
                      "description": "There are {{ $value }} different semantic versions of Kubernetes components running.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeversionmismatch",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeversionmismatch",
                      "summary": "Different semantic versions of Kubernetes components running."
                   },
                   "expr": "count by (cluster) (count by (git_version, cluster) (label_replace(kubernetes_build_info{job!~\"kube-dns|coredns\"},\"git_version\",\"$1\",\"git_version\",\"(v[0-9]*.[0-9]*).*\"))) > 1\n",
@@ -434,7 +434,7 @@
                   "alert": "KubeClientErrors",
                   "annotations": {
                      "description": "Kubernetes API server client '{{ $labels.job }}/{{ $labels.instance }}' is experiencing {{ $value | humanizePercentage }} errors.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclienterrors",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclienterrors",
                      "summary": "Kubernetes API server client is experiencing errors."
                   },
                   "expr": "(sum(rate(rest_client_requests_total{job=\"kubelet\",code=~\"5..\"}[5m])) by (cluster, instance, job, namespace)\n  /\nsum(rate(rest_client_requests_total{job=\"kubelet\"}[5m])) by (cluster, instance, job, namespace))\n> 0.01\n",
@@ -451,9 +451,9 @@
                {
                   "alert": "KubeAPIErrorBudgetBurn",
                   "annotations": {
-                     "description": "The API server is burning too much error budget.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn",
-                     "summary": "The API server is burning too much error budget."
+                     "description": "The Kube API server is burning too much error budget.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn",
+                     "summary": "The Kube API server is burning too much error budget."
                   },
                   "expr": "sum by(cluster) (apiserver_request:burnrate1h) > (14.40 * 0.01000)\nand on(cluster)\nsum by(cluster) (apiserver_request:burnrate5m) > (14.40 * 0.01000)\n",
                   "for": "2m",
@@ -466,9 +466,9 @@
                {
                   "alert": "KubeAPIErrorBudgetBurn",
                   "annotations": {
-                     "description": "The API server is burning too much error budget.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn",
-                     "summary": "The API server is burning too much error budget."
+                     "description": "The Kube API server is burning too much error budget.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn",
+                     "summary": "The Kube API server is burning too much error budget."
                   },
                   "expr": "sum by(cluster) (apiserver_request:burnrate6h) > (6.00 * 0.01000)\nand on(cluster)\nsum by(cluster) (apiserver_request:burnrate30m) > (6.00 * 0.01000)\n",
                   "for": "15m",
@@ -481,9 +481,9 @@
                {
                   "alert": "KubeAPIErrorBudgetBurn",
                   "annotations": {
-                     "description": "The API server is burning too much error budget.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn",
-                     "summary": "The API server is burning too much error budget."
+                     "description": "The Kube API server is burning too much error budget.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn",
+                     "summary": "The Kube API server is burning too much error budget."
                   },
                   "expr": "sum by(cluster) (apiserver_request:burnrate1d) > (3.00 * 0.01000)\nand on(cluster)\nsum by(cluster) (apiserver_request:burnrate2h) > (3.00 * 0.01000)\n",
                   "for": "1h",
@@ -496,9 +496,9 @@
                {
                   "alert": "KubeAPIErrorBudgetBurn",
                   "annotations": {
-                     "description": "The API server is burning too much error budget.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn",
-                     "summary": "The API server is burning too much error budget."
+                     "description": "The Kube API server is burning too much error budget.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapierrorbudgetburn",
+                     "summary": "The Kube API server is burning too much error budget."
                   },
                   "expr": "sum by(cluster) (apiserver_request:burnrate3d) > (1.00 * 0.01000)\nand on(cluster)\nsum by(cluster) (apiserver_request:burnrate6h) > (1.00 * 0.01000)\n",
                   "for": "3h",
@@ -517,7 +517,7 @@
                   "alert": "KubeClientCertificateExpiration",
                   "annotations": {
                      "description": "A client certificate used to authenticate to kubernetes apiserver is expiring in less than 7.0 days.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclientcertificateexpiration",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclientcertificateexpiration",
                      "summary": "Client certificate is about to expire."
                   },
                   "expr": "histogram_quantile(0.01, sum without (namespace, service, endpoint) (rate(apiserver_client_certificate_expiration_seconds_bucket{job=\"kubelet\"}[5m]))) < 604800\nand\non(job, cluster, instance) apiserver_client_certificate_expiration_seconds_count{job=\"kubelet\"} > 0\n",
@@ -530,7 +530,7 @@
                   "alert": "KubeClientCertificateExpiration",
                   "annotations": {
                      "description": "A client certificate used to authenticate to kubernetes apiserver is expiring in less than 24.0 hours.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclientcertificateexpiration",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeclientcertificateexpiration",
                      "summary": "Client certificate is about to expire."
                   },
                   "expr": "histogram_quantile(0.01, sum without (namespace, service, endpoint) (rate(apiserver_client_certificate_expiration_seconds_bucket{job=\"kubelet\"}[5m]))) < 86400\nand\non(job, cluster, instance) apiserver_client_certificate_expiration_seconds_count{job=\"kubelet\"} > 0\n",
@@ -543,7 +543,7 @@
                   "alert": "KubeAggregatedAPIErrors",
                   "annotations": {
                      "description": "Kubernetes aggregated API {{ $labels.instance }}/{{ $labels.name }} has reported {{ $labels.reason }} errors.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeaggregatedapierrors",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeaggregatedapierrors",
                      "summary": "Kubernetes aggregated API has reported errors."
                   },
                   "expr": "sum by(cluster, instance, name, reason)(increase(aggregator_unavailable_apiservice_total{job=\"kubelet\"}[1m])) > 0\n",
@@ -556,7 +556,7 @@
                   "alert": "KubeAggregatedAPIDown",
                   "annotations": {
                      "description": "Kubernetes aggregated API {{ $labels.name }}/{{ $labels.namespace }} has been only {{ $value | humanize }}% available over the last 10m.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeaggregatedapidown",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeaggregatedapidown",
                      "summary": "Kubernetes aggregated API is down."
                   },
                   "expr": "(1 - max by(name, namespace, cluster)(avg_over_time(aggregator_unavailable_apiservice{job=\"kubelet\"}[10m]))) * 100 < 85\n",
@@ -569,7 +569,7 @@
                   "alert": "KubeAPIDown",
                   "annotations": {
                      "description": "KubeAPI has disappeared from Prometheus target discovery.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapidown",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapidown",
                      "summary": "Target disappeared from Prometheus target discovery."
                   },
                   "expr": "absent(up{job=\"kubelet\"})\n",
@@ -579,10 +579,23 @@
                   }
                },
                {
+                  "alert": "KubeAPIInstanceUnreachable",
+                  "annotations": {
+                     "description": "A KubeAPI instance has been unreachable for more than 15 minutes.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapiinstanceunreachable",
+                     "summary": "KubeAPI instance is unreachable."
+                  },
+                  "expr": "up{job=\"kubelet\"} == 0\n",
+                  "for": "15m",
+                  "labels": {
+                     "severity": "warning"
+                  }
+               },
+               {
                   "alert": "KubeAPITerminatedRequests",
                   "annotations": {
                      "description": "The kubernetes apiserver has terminated {{ $value | humanizePercentage }} of its incoming requests.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapiterminatedrequests",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeapiterminatedrequests",
                      "summary": "The kubernetes apiserver has terminated {{ $value | humanizePercentage }} of its incoming requests."
                   },
                   "expr": "sum by(cluster) (rate(apiserver_request_terminations_total{job=\"kubelet\"}[10m])) / ( sum by(cluster) (rate(apiserver_request_total{job=\"kubelet\"}[10m])) + sum by(cluster) (rate(apiserver_request_terminations_total{job=\"kubelet\"}[10m])) ) > 0.20\n",
@@ -600,7 +613,7 @@
                   "alert": "KubeNodeNotReady",
                   "annotations": {
                      "description": "{{ $labels.node }} has been unready for more than 15 minutes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodenotready",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodenotready",
                      "summary": "Node is not ready."
                   },
                   "expr": "kube_node_status_condition{job=\"kube-state-metrics\",condition=\"Ready\",status=\"true\"} == 0\nand on (cluster, node)\nkube_node_spec_unschedulable{job=\"kube-state-metrics\"} == 0\n",
@@ -613,7 +626,7 @@
                   "alert": "KubeNodePressure",
                   "annotations": {
                      "description": "{{ $labels.node }} has active Condition {{ $labels.condition }}. This is caused by resource usage exceeding eviction thresholds.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodepressure",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodepressure",
                      "summary": "Node has as active Condition."
                   },
                   "expr": "kube_node_status_condition{job=\"kube-state-metrics\",condition=~\"(MemoryPressure|DiskPressure|PIDPressure)\",status=\"true\"} == 1\nand on (cluster, node)\nkube_node_spec_unschedulable{job=\"kube-state-metrics\"} == 0\n",
@@ -626,7 +639,7 @@
                   "alert": "KubeNodeUnreachable",
                   "annotations": {
                      "description": "{{ $labels.node }} is unreachable and some workloads may be rescheduled.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodeunreachable",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodeunreachable",
                      "summary": "Node is unreachable."
                   },
                   "expr": "(kube_node_spec_taint{job=\"kube-state-metrics\",key=\"node.kubernetes.io/unreachable\",effect=\"NoSchedule\"} unless ignoring(key,value) kube_node_spec_taint{job=\"kube-state-metrics\",key=~\"ToBeDeletedByClusterAutoscaler|cloud.google.com/impending-node-termination|aws-node-termination-handler/spot-itn\"}) == 1\n",
@@ -639,7 +652,7 @@
                   "alert": "KubeletTooManyPods",
                   "annotations": {
                      "description": "Kubelet '{{ $labels.node }}' is running at {{ $value | humanizePercentage }} of its Pod capacity.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubelettoomanypods",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubelettoomanypods",
                      "summary": "Kubelet is running at capacity."
                   },
                   "expr": "(\n  max by (cluster, instance) (\n    kubelet_running_pods{job=\"kubelet\"} > 1\n  )\n  * on (cluster, instance) group_left(node)\n  max by (cluster, instance, node) (\n    kubelet_node_name{job=\"kubelet\"}\n  )\n)\n/ on (cluster, node) group_left()\nmax by (cluster, node) (\n  kube_node_status_capacity{job=\"kube-state-metrics\", resource=\"pods\"} != 1\n) > 0.95\n",
@@ -652,7 +665,7 @@
                   "alert": "KubeNodeReadinessFlapping",
                   "annotations": {
                      "description": "The readiness status of node {{ $labels.node }} has changed {{ $value }} times in the last 15 minutes.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodereadinessflapping",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodereadinessflapping",
                      "summary": "Node readiness status is flapping."
                   },
                   "expr": "sum(changes(kube_node_status_condition{job=\"kube-state-metrics\",status=\"true\",condition=\"Ready\"}[15m])) by (cluster, node) > 2\nand on (cluster, node)\nkube_node_spec_unschedulable{job=\"kube-state-metrics\"} == 0\n",
@@ -665,7 +678,7 @@
                   "alert": "KubeNodeEviction",
                   "annotations": {
                      "description": "Node {{ $labels.node }} is evicting Pods due to {{ $labels.eviction_signal }}.  Eviction occurs when eviction thresholds are crossed, typically caused by Pods exceeding RAM/ephemeral-storage limits.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodeeviction",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubenodeeviction",
                      "summary": "Node is evicting pods."
                   },
                   "expr": "sum(rate(kubelet_evictions{job=\"kubelet\"}[15m])) by(cluster, eviction_signal, instance)\n* on (cluster, instance) group_left(node)\nmax by (cluster, instance, node) (\n  kubelet_node_name{job=\"kubelet\"}\n)\n> 0\n",
@@ -678,7 +691,7 @@
                   "alert": "KubeletPlegDurationHigh",
                   "annotations": {
                      "description": "The Kubelet Pod Lifecycle Event Generator has a 99th percentile duration of {{ $value }} seconds on node {{ $labels.node }}.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletplegdurationhigh",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletplegdurationhigh",
                      "summary": "Kubelet Pod Lifecycle Event Generator is taking too long to relist."
                   },
                   "expr": "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile{quantile=\"0.99\"} >= 10\n",
@@ -691,7 +704,7 @@
                   "alert": "KubeletPodStartUpLatencyHigh",
                   "annotations": {
                      "description": "Kubelet Pod startup 99th percentile latency is {{ $value }} seconds on node {{ $labels.node }}.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletpodstartuplatencyhigh",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletpodstartuplatencyhigh",
                      "summary": "Kubelet Pod startup latency is too high."
                   },
                   "expr": "histogram_quantile(0.99,\n  sum by (cluster, instance, le) (\n    topk by (cluster, instance, le, operation_type) (1,\n      rate(kubelet_pod_worker_duration_seconds_bucket{job=\"kubelet\"}[5m])\n    )\n  )\n)\n* on(cluster, instance) group_left(node)\ntopk by (cluster, instance, node) (1,\n  kubelet_node_name{job=\"kubelet\"}\n)\n> 60\n",
@@ -704,7 +717,7 @@
                   "alert": "KubeletClientCertificateExpiration",
                   "annotations": {
                      "description": "Client certificate for Kubelet on node {{ $labels.node }} expires in {{ $value | humanizeDuration }}.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificateexpiration",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificateexpiration",
                      "summary": "Kubelet client certificate is about to expire."
                   },
                   "expr": "kubelet_certificate_manager_client_ttl_seconds < 604800\n",
@@ -716,7 +729,7 @@
                   "alert": "KubeletClientCertificateExpiration",
                   "annotations": {
                      "description": "Client certificate for Kubelet on node {{ $labels.node }} expires in {{ $value | humanizeDuration }}.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificateexpiration",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificateexpiration",
                      "summary": "Kubelet client certificate is about to expire."
                   },
                   "expr": "kubelet_certificate_manager_client_ttl_seconds < 86400\n",
@@ -728,7 +741,7 @@
                   "alert": "KubeletServerCertificateExpiration",
                   "annotations": {
                      "description": "Server certificate for Kubelet on node {{ $labels.node }} expires in {{ $value | humanizeDuration }}.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificateexpiration",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificateexpiration",
                      "summary": "Kubelet server certificate is about to expire."
                   },
                   "expr": "kubelet_certificate_manager_server_ttl_seconds < 604800\n",
@@ -740,7 +753,7 @@
                   "alert": "KubeletServerCertificateExpiration",
                   "annotations": {
                      "description": "Server certificate for Kubelet on node {{ $labels.node }} expires in {{ $value | humanizeDuration }}.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificateexpiration",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificateexpiration",
                      "summary": "Kubelet server certificate is about to expire."
                   },
                   "expr": "kubelet_certificate_manager_server_ttl_seconds < 86400\n",
@@ -752,7 +765,7 @@
                   "alert": "KubeletClientCertificateRenewalErrors",
                   "annotations": {
                      "description": "Kubelet on node {{ $labels.node }} has failed to renew its client certificate ({{ $value | humanize }} errors in the last 5 minutes).",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificaterenewalerrors",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletclientcertificaterenewalerrors",
                      "summary": "Kubelet has failed to renew its client certificate."
                   },
                   "expr": "increase(kubelet_certificate_manager_client_expiration_renew_errors[5m]) > 0\n",
@@ -765,7 +778,7 @@
                   "alert": "KubeletServerCertificateRenewalErrors",
                   "annotations": {
                      "description": "Kubelet on node {{ $labels.node }} has failed to renew its server certificate ({{ $value | humanize }} errors in the last 5 minutes).",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificaterenewalerrors",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletservercertificaterenewalerrors",
                      "summary": "Kubelet has failed to renew its server certificate."
                   },
                   "expr": "increase(kubelet_server_expiration_renew_errors[5m]) > 0\n",
@@ -775,13 +788,26 @@
                   }
                },
                {
+                  "alert": "KubeletInstanceUnreachable",
+                  "annotations": {
+                     "description": "A Kubelet instance has been unreachable for more than 15 minutes.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletinstanceunreachable",
+                     "summary": "Kubelet instance is unreachable."
+                  },
+                  "expr": "up{job=\"kubelet\"} == 0\n",
+                  "for": "15m",
+                  "labels": {
+                     "severity": "warning"
+                  }
+               },
+               {
                   "alert": "KubeletDown",
                   "annotations": {
                      "description": "Kubelet has disappeared from Prometheus target discovery.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletdown",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeletdown",
                      "summary": "Target disappeared from Prometheus target discovery."
                   },
-                  "expr": "absent(up{job=\"kubelet\"})\n",
+                  "expr": "count by (cluster) (kube_node_info{job=\"kube-state-metrics\"})\nunless on (cluster)\ncount by (cluster) (up{job=\"kubelet\"} == 1)\n",
                   "for": "15m",
                   "labels": {
                      "severity": "critical"
@@ -796,13 +822,26 @@
                   "alert": "KubeSchedulerDown",
                   "annotations": {
                      "description": "KubeScheduler has disappeared from Prometheus target discovery.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeschedulerdown",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeschedulerdown",
                      "summary": "Target disappeared from Prometheus target discovery."
                   },
                   "expr": "absent(up{job=\"kubelet\"})\n",
                   "for": "15m",
                   "labels": {
                      "severity": "critical"
+                  }
+               },
+               {
+                  "alert": "KubeSchedulerInstanceUnreachable",
+                  "annotations": {
+                     "description": "A KubeScheduler instance has been unreachable for more than 15 minutes.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeschedulerinstanceunreachable",
+                     "summary": "KubeScheduler instance is unreachable."
+                  },
+                  "expr": "up{job=\"kubelet\"} == 0\n",
+                  "for": "15m",
+                  "labels": {
+                     "severity": "warning"
                   }
                }
             ]
@@ -814,13 +853,26 @@
                   "alert": "KubeControllerManagerDown",
                   "annotations": {
                      "description": "KubeControllerManager has disappeared from Prometheus target discovery.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecontrollermanagerdown",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecontrollermanagerdown",
                      "summary": "Target disappeared from Prometheus target discovery."
                   },
                   "expr": "absent(up{job=\"kubelet\"})\n",
                   "for": "15m",
                   "labels": {
                      "severity": "critical"
+                  }
+               },
+               {
+                  "alert": "KubeControllerManagerInstanceUnreachable",
+                  "annotations": {
+                     "description": "A KubeControllerManager instance has been unreachable for more than 15 minutes.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubecontrollermanagerinstanceunreachable",
+                     "summary": "KubeControllerManager instance is unreachable."
+                  },
+                  "expr": "up{job=\"kubelet\"} == 0\n",
+                  "for": "15m",
+                  "labels": {
+                     "severity": "warning"
                   }
                }
             ]
@@ -832,13 +884,26 @@
                   "alert": "KubeProxyDown",
                   "annotations": {
                      "description": "KubeProxy has disappeared from Prometheus target discovery.",
-                     "runbook_url": "https://github.com/kubernetes-monitoring/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeproxydown",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeproxydown",
                      "summary": "Target disappeared from Prometheus target discovery."
                   },
                   "expr": "absent(up{job=\"kubelet\"})\n",
                   "for": "15m",
                   "labels": {
                      "severity": "critical"
+                  }
+               },
+               {
+                  "alert": "KubeProxyInstanceUnreachable",
+                  "annotations": {
+                     "description": "A KubeProxy instance has been unreachable for more than 15 minutes.",
+                     "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubeproxyinstanceunreachable",
+                     "summary": "KubeProxy instance is unreachable."
+                  },
+                  "expr": "up{job=\"kubelet\"} == 0\n",
+                  "for": "15m",
+                  "labels": {
+                     "severity": "warning"
                   }
                }
             ]
@@ -938,16 +1003,48 @@
             "name": "kube-apiserver-burnrate.rules",
             "rules": [
                {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\"}[1d]))\n    -\n    (\n      (\n        sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=~\"resource|\",le=~\"1(\\\\.0)?\"}[1d]))\n        or\n        vector(0)\n      )\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"namespace\",le=~\"5(\\\\.0)?\"}[1d]))\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"cluster\",le=~\"30(\\\\.0)?\"}[1d]))\n    )\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\",code=~\"5..\"}[1d]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\"}[1d]))\n",
+                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\"}[5m]))\n    -\n    (\n      (\n        sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=~\"resource|\",le=~\"1(\\\\.0)?\"}[5m]))\n        or\n        vector(0)\n      )\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"namespace\",le=~\"5(\\\\.0)?\"}[5m]))\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"cluster\",le=~\"30(\\\\.0)?\"}[5m]))\n    )\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\",code=~\"5..\"}[5m]))\n)\n",
                   "labels": {
                      "verb": "read"
                   },
-                  "record": "apiserver_request:burnrate1d"
+                  "record": "cluster_verb:apiserver_request_sli_bad_events:rate5m"
+               },
+               {
+                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[5m]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[5m]))\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[5m]))\n)\n",
+                  "labels": {
+                     "verb": "write"
+                  },
+                  "record": "cluster_verb:apiserver_request_sli_bad_events:rate5m"
+               },
+               {
+                  "expr": "sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\"}[5m]))\n",
+                  "labels": {
+                     "verb": "read"
+                  },
+                  "record": "cluster_verb:apiserver_request_sli_events:rate5m"
+               },
+               {
+                  "expr": "sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[5m]))\n",
+                  "labels": {
+                     "verb": "write"
+                  },
+                  "record": "cluster_verb:apiserver_request_sli_events:rate5m"
+               },
+               {
+                  "expr": "cluster_verb:apiserver_request_sli_bad_events:rate5m\n/\ncluster_verb:apiserver_request_sli_events:rate5m\n",
+                  "record": "apiserver_request:burnrate5m"
                },
                {
                   "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\"}[1h]))\n    -\n    (\n      (\n        sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=~\"resource|\",le=~\"1(\\\\.0)?\"}[1h]))\n        or\n        vector(0)\n      )\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"namespace\",le=~\"5(\\\\.0)?\"}[1h]))\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"cluster\",le=~\"30(\\\\.0)?\"}[1h]))\n    )\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\",code=~\"5..\"}[1h]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\"}[1h]))\n",
                   "labels": {
                      "verb": "read"
+                  },
+                  "record": "apiserver_request:burnrate1h"
+               },
+               {
+                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[1h]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[1h]))\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[1h]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[1h]))\n",
+                  "labels": {
+                     "verb": "write"
                   },
                   "record": "apiserver_request:burnrate1h"
                },
@@ -959,6 +1056,13 @@
                   "record": "apiserver_request:burnrate2h"
                },
                {
+                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[2h]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[2h]))\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[2h]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[2h]))\n",
+                  "labels": {
+                     "verb": "write"
+                  },
+                  "record": "apiserver_request:burnrate2h"
+               },
+               {
                   "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\"}[30m]))\n    -\n    (\n      (\n        sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=~\"resource|\",le=~\"1(\\\\.0)?\"}[30m]))\n        or\n        vector(0)\n      )\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"namespace\",le=~\"5(\\\\.0)?\"}[30m]))\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"cluster\",le=~\"30(\\\\.0)?\"}[30m]))\n    )\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\",code=~\"5..\"}[30m]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\"}[30m]))\n",
                   "labels": {
                      "verb": "read"
@@ -966,18 +1070,11 @@
                   "record": "apiserver_request:burnrate30m"
                },
                {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\"}[3d]))\n    -\n    (\n      (\n        sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=~\"resource|\",le=~\"1(\\\\.0)?\"}[3d]))\n        or\n        vector(0)\n      )\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"namespace\",le=~\"5(\\\\.0)?\"}[3d]))\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"cluster\",le=~\"30(\\\\.0)?\"}[3d]))\n    )\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\",code=~\"5..\"}[3d]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\"}[3d]))\n",
+                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[30m]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[30m]))\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[30m]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[30m]))\n",
                   "labels": {
-                     "verb": "read"
+                     "verb": "write"
                   },
-                  "record": "apiserver_request:burnrate3d"
-               },
-               {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\"}[5m]))\n    -\n    (\n      (\n        sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=~\"resource|\",le=~\"1(\\\\.0)?\"}[5m]))\n        or\n        vector(0)\n      )\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"namespace\",le=~\"5(\\\\.0)?\"}[5m]))\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"cluster\",le=~\"30(\\\\.0)?\"}[5m]))\n    )\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\",code=~\"5..\"}[5m]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\"}[5m]))\n",
-                  "labels": {
-                     "verb": "read"
-                  },
-                  "record": "apiserver_request:burnrate5m"
+                  "record": "apiserver_request:burnrate30m"
                },
                {
                   "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\"}[6h]))\n    -\n    (\n      (\n        sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=~\"resource|\",le=~\"1(\\\\.0)?\"}[6h]))\n        or\n        vector(0)\n      )\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"namespace\",le=~\"5(\\\\.0)?\"}[6h]))\n      +\n      sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"LIST|GET\",subresource!~\"proxy|attach|log|exec|portforward\",scope=\"cluster\",le=~\"30(\\\\.0)?\"}[6h]))\n    )\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\",code=~\"5..\"}[6h]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"LIST|GET\"}[6h]))\n",
@@ -987,53 +1084,19 @@
                   "record": "apiserver_request:burnrate6h"
                },
                {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[1d]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[1d]))\n  )\n  +\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[1d]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[1d]))\n",
-                  "labels": {
-                     "verb": "write"
-                  },
-                  "record": "apiserver_request:burnrate1d"
-               },
-               {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[1h]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[1h]))\n  )\n  +\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[1h]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[1h]))\n",
-                  "labels": {
-                     "verb": "write"
-                  },
-                  "record": "apiserver_request:burnrate1h"
-               },
-               {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[2h]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[2h]))\n  )\n  +\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[2h]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[2h]))\n",
-                  "labels": {
-                     "verb": "write"
-                  },
-                  "record": "apiserver_request:burnrate2h"
-               },
-               {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[30m]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[30m]))\n  )\n  +\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[30m]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[30m]))\n",
-                  "labels": {
-                     "verb": "write"
-                  },
-                  "record": "apiserver_request:burnrate30m"
-               },
-               {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[3d]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[3d]))\n  )\n  +\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[3d]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[3d]))\n",
-                  "labels": {
-                     "verb": "write"
-                  },
-                  "record": "apiserver_request:burnrate3d"
-               },
-               {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[5m]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[5m]))\n  )\n  +\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[5m]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[5m]))\n",
-                  "labels": {
-                     "verb": "write"
-                  },
-                  "record": "apiserver_request:burnrate5m"
-               },
-               {
-                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[6h]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[6h]))\n  )\n  +\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[6h]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[6h]))\n",
+                  "expr": "(\n  (\n    # too slow\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_count{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\"}[6h]))\n    -\n    sum by (cluster) (rate(apiserver_request_sli_duration_seconds_bucket{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",subresource!~\"proxy|attach|log|exec|portforward\",le=~\"1(\\\\.0)?\"}[6h]))\n  )\n  +\n  # errors\n  sum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\",code=~\"5..\"}[6h]))\n)\n/\nsum by (cluster) (rate(apiserver_request_total{job=\"kubelet\",verb=~\"POST|PUT|PATCH|DELETE\"}[6h]))\n",
                   "labels": {
                      "verb": "write"
                   },
                   "record": "apiserver_request:burnrate6h"
+               },
+               {
+                  "expr": "avg_over_time(cluster_verb:apiserver_request_sli_bad_events:rate5m[1d])\n/\navg_over_time(cluster_verb:apiserver_request_sli_events:rate5m[1d])\n",
+                  "record": "apiserver_request:burnrate1d"
+               },
+               {
+                  "expr": "avg_over_time(cluster_verb:apiserver_request_sli_bad_events:rate5m[3d])\n/\navg_over_time(cluster_verb:apiserver_request_sli_events:rate5m[3d])\n",
+                  "record": "apiserver_request:burnrate3d"
                }
             ]
          },

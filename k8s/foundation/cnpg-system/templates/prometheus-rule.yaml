@@ -87,3 +87,35 @@ spec:
           annotations:
             summary: {{ "CloudNativePG standby {{ $labels.namespace }}/{{ $labels.pod }} is not streaming" | quote }}
             description: {{ "The WAL receiver on standby {{ $labels.namespace }}/{{ $labels.pod }} has been down for an hour. The pod may still report Ready and CNPG may still call the cluster healthy. Check the pod log for 'requested WAL segment has already been removed', which means it has diverged and needs a re-clone." | quote }}
+
+    # Backups run through the barman-cloud plugin, which exports its own
+    # timestamps; cnpg_collector_last_*_backup_timestamp stays 0 with plugin
+    # backups. Every instance reports the cluster-wide value, hence max by
+    # namespace. Clusters without a ScheduledBackup (crowdsec-psql) export
+    # nothing and are not covered.
+    - name: cnpg-backups
+      interval: 5m
+      rules:
+        - alert: CNPGBackupFailed
+          expr: |
+            max by (namespace) (barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp)
+              > max by (namespace) (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp)
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: {{ "CloudNativePG backup failed in {{ $labels.namespace }}" | quote }}
+            description: {{ "The most recent backup attempt in {{ $labels.namespace }} failed and no backup has succeeded since. Check `kubectl -n {{ $labels.namespace }} get backups.postgresql.cnpg.io` and the plugin-barman-cloud sidecar log." | quote }}
+
+        # Backups are scheduled daily; 36h means at least one was missed.
+        - alert: CNPGBackupStale
+          expr: |
+            time() - max by (namespace) (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp > 0)
+              > 36 * 3600
+          for: 1h
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: {{ "No CloudNativePG backup in {{ $labels.namespace }} for {{ $value | humanizeDuration }}" | quote }}
+            description: {{ "The newest base backup in {{ $labels.namespace }} is {{ $value | humanizeDuration }} old. Check that the ScheduledBackup is not suspended and that the last Backup objects completed." | quote }}

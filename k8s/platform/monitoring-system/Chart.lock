@@ -8,5 +8,8 @@ dependencies:
 - name: promtail
   repository: https://grafana.github.io/helm-charts
   version: 6.17.1
-digest: sha256:b74c8a93febb7a44d556fcd3ca1dd33ccabc32fb6a5fb140e186edb4bf0e4a0d
-generated: "2026-10-15T01:25:09.597275491Z"
+- name: prometheus-blackbox-exporter
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 11.20.0
+digest: sha256:927d900c3baa379415e0d9c741a621ba895893429107d2a2b7c00108f7ebf858
+generated: "2026-10-19T23:33:31.749075-06:00"

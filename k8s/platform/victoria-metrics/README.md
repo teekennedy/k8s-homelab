@@ -5,7 +5,7 @@ everything here; VictoriaMetrics downsamples it and keeps it for 4y.
 
 ```
 Prometheus (7d raw) --remote_write--> vmsingle
-                                        -relabelConfig      drop go_*/process_*
+                                        -relabelConfig      keep allowlist
                                         -streamAggr.config  downsample to 5m
                                         -> TSDB (retentionPeriod: 4y)
 ```
@@ -28,10 +28,28 @@ name and the same PromQL works against Prometheus and VictoriaMetrics.
 `-streamAggr.dropInput=true` means no raw samples are stored. Grafana's
 VictoriaMetrics datasource uses `timeInterval: 5m` to match.
 
-vmsingle only reads `-streamAggr.config` at startup (it has no
-`-configCheckInterval`), so a change to `files/stream-aggr-config.yml` needs
-`kubectl -n victoria-metrics rollout restart sts victoria-metrics-server`
-after Argo CD syncs it.
+## Allowlist
+
+`server.relabel.config` in `values.yaml` keeps only metrics worth having for
+years (capacity and usage trends, availability, hardware wear, alert history)
+and drops everything else before stream aggregation, so the rest only lives in
+Prometheus' 7d window. Container usage is stored through the
+`namespace_container:*` recording rules in
+`k8s/platform/monitoring-system/templates/prometheus-rule-longterm.yaml`
+rather than the raw cAdvisor series: those carry a `pod` label that changes on
+every rollout, and each new pod name is a new series in the 4y index.
+
+To keep a new metric long-term, add it to the allowlist. History starts from
+when the change lands; nothing is backfilled.
+
+## Config reloads
+
+vmsingle re-reads both `-relabelConfig` and `-streamAggr.config` on
+`/-/reload` (or SIGHUP), but has no file-watch interval. The `config-reloader`
+sidecar watches both mounted ConfigMaps and calls `/-/reload` when either
+changes, so an Argo CD sync applies config changes without a restart. A config
+with errors is rejected and the previous one stays active; check the
+`victoria-metrics-server` container log after a change.
 
 Verify after deploy:
 
@@ -51,31 +69,23 @@ so they see full-resolution samples and unsuffixed metric names.
 
 ## Capacity
 
-Stream aggregation only applies to data as it arrives. The ~147Gi of raw
-samples ingested between 2026-02-04 and 2026-10-07 cannot be compacted after
-the fact: `-downsampling.period` and per-series retention filters are
-[enterprise features][enterprise], and stream aggregation keys its windows off
-ingestion time rather than sample timestamps, so re-importing history through
-it would stamp every sample with the time of the import.
+Sizes for the full 4y retention, from rates measured on this instance's 5m
+aggregated data (~0.63 bytes per sample, ~160 bytes of indexdb per series per
+day):
 
-That raw block is frozen — `-streamAggr.dropInput` means nothing is written to
-those series any more — so it doesn't grow, and it ages out on its own once the
-Feb 2026 partitions pass the 4y retention in 2030. Until then the volume has to
-hold it on top of the aggregated data:
-
-| Component | Size |
+| Component | 4y size |
 |---|---|
-| Frozen raw history (Feb–Oct 2026) | ~147Gi |
-| 4y of 5m aggregated data, one output per series | ~130Gi |
-| Headroom for merges (VictoriaMetrics wants 20% free) | ~120Gi |
+| Samples: ~2.5k series x 288/day x 1461 days, about 1.05 billion | ~0.7Gi |
+| indexdb: per-day index for every series, plus churn (alerts, mounts) | ~0.7Gi |
+| Total | ~1.5Gi |
 
-The 130Gi estimate comes from the measured raw rate of ~0.6Gi/day, reduced by
-the 10x drop in sample count (30s to 5m) and offset by downsampled samples
-compressing less well than raw ones. Two things make it optimistic: it's an
-average over a period in which the cluster grew, and it assumes series churn
-stays flat — over four years churn is the most likely reason for an overrun,
-since indexdb grows with the total number of unique series ever seen, not the
-active set. Re-check it against the real numbers with:
+The 10Gi volume leaves room for the allowlist to grow about fivefold, for
+background merges, and for vmbackup snapshots. Each additional 1k allowlisted
+series adds roughly 0.6Gi over 4y. Series churn matters more than the active
+count, since indexdb grows with every unique series ever seen; that is why the
+relabel config strips pod-specific labels before aggregation.
+
+Check the real numbers with:
 
 ```sh
 VM=http://victoria-metrics-server.victoria-metrics.svc:8428
@@ -83,36 +93,8 @@ curl -s $VM/api/v1/status/tsdb | jq '.data.totalSeries, .data.totalLabelValuePai
 curl -s $VM/metrics | grep -E '^(vm_data_size_bytes|vm_free_disk_space_bytes|vm_rows\{)'
 ```
 
-The best measurement is simply the daily growth of `sum(vm_data_size_bytes)`
-once aggregation has been running a week — that needs no modelling at all.
-
-### Why 400Gi and not more
-
-Longhorn schedules against a replica's *requested* size, not its usage, and
-caps total scheduled bytes per disk at `storageOverProvisioningPercentage`
-(100%) of capacity minus reserved space. The disk backing this volume is only
-~31% used but ~84% scheduled, so the ceiling for one replica on it is ~436Gi —
-an attempt to expand to 500Gi is rejected by `validator.longhorn.io` with
-`Scheduling space condition failed`. 400Gi leaves a little room under that
-ceiling. Check the real numbers before changing the size:
-
-```sh
-kubectl -n longhorn-system get nodes.longhorn.io -o json | jq -r '
-  .items[] | .metadata.name as $n | .status.diskStatus | to_entries[] |
-  "\($n)\t\(.key[0:8])\tmax=\(.value.storageMaximum/1073741824|floor)Gi\tsched=\(.value.storageScheduled/1073741824|floor)Gi\tavail=\(.value.storageAvailable/1073741824|floor)Gi"'
-```
-
-If no single disk can take the growth, drop the volume to one replica. The
-backup path for this data is vmbackup to the NAS (plus restic offsite), not
-Longhorn replication, so the second replica buys availability rather than
-durability:
-
-```sh
-kubectl -n longhorn-system patch volumes.longhorn.io <pv-name> \
-  --type=merge -p '{"spec":{"numberOfReplicas":1}}'
-```
-
-[enterprise]: https://docs.victoriametrics.com/victoriametrics/enterprise/
+The daily growth of `sum(vm_data_size_bytes)` is the simplest measure of
+whether the estimate holds.
 
 ## Resizing the volume
 
@@ -130,7 +112,7 @@ read-only and stops storing metrics.
 
 ```sh
 kubectl -n victoria-metrics patch pvc server-volume-victoria-metrics-server-0 \
-  -p '{"spec":{"resources":{"requests":{"storage":"400Gi"}}}}'
+  -p '{"spec":{"resources":{"requests":{"storage":"<new size>"}}}}'
 # Longhorn 1.12 expands ext4 online; watch it land.
 kubectl -n victoria-metrics get pvc server-volume-victoria-metrics-server-0 -w
 

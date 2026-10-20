@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Rollups that VictoriaMetrics keeps long-term in place of the raw series (see
+# k8s/platform/victoria-metrics/values.yaml). Each drops the labels that
+# change when a pod is replaced (pod, instance), since every new pod name
+# would otherwise be a new series in the 4y index.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: longterm-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: recording-rules
+spec:
+  groups:
+    - name: longterm.rules
+      interval: 1m
+      rules:
+        - record: namespace_container:container_cpu_usage_seconds:rate5m
+          expr: |
+            sum by (namespace, container) (
+              rate(container_cpu_usage_seconds_total{job="kubelet", metrics_path="/metrics/cadvisor", container!="", image!=""}[5m])
+            )
+        - record: namespace_container:container_memory_working_set_bytes:sum
+          expr: |
+            sum by (namespace, container) (
+              container_memory_working_set_bytes{job="kubelet", metrics_path="/metrics/cadvisor", container!="", image!=""}
+            )
+        # Only pods that are Pending or Running; finished Job pods keep their
+        # requests in kube-state-metrics until they are deleted.
+        - record: namespace_container:kube_pod_container_resource_requests:sum
+          expr: |
+            sum by (namespace, container, resource) (
+              kube_pod_container_resource_requests{job="kube-state-metrics"}
+                * on (namespace, pod) group_left ()
+                  (max by (namespace, pod) (kube_pod_status_phase{job="kube-state-metrics", phase=~"Pending|Running"}) == 1)
+            )
+        - record: namespace_container:kube_pod_container_resource_limits:sum
+          expr: |
+            sum by (namespace, container, resource) (
+              kube_pod_container_resource_limits{job="kube-state-metrics"}
+                * on (namespace, pod) group_left ()
+                  (max by (namespace, pod) (kube_pod_status_phase{job="kube-state-metrics", phase=~"Pending|Running"}) == 1)
+            )
+        # A gauge rather than a summed counter: a sum of per-pod counters drops
+        # whenever a pod is replaced, which increase() would misread as a reset.
+        - record: namespace_container:kube_pod_container_status_restarts:increase5m
+          expr: |
+            sum by (namespace, container) (
+              increase(kube_pod_container_status_restarts_total{job="kube-state-metrics"}[5m])
+            )
+        # Traefik runs several replicas, each with its own counters, so the
+        # per-pod series can't simply be merged downstream.
+        - record: exported_service_code:traefik_service_requests:rate5m
+          expr: |
+            sum by (exported_service, code) (
+              rate(traefik_service_requests_total{job="traefik"}[5m])
+            )

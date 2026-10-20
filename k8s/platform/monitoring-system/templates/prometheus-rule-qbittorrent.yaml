@@ -25,7 +25,7 @@ spec:
       annotations:
         description: QBittorrent metrics exporter is not responding. This could indicate the exporter or QBittorrent itself is down.
         summary: QBittorrent metrics exporter is unavailable
-      expr: up{job="qbittorrent-metrics"} == 0
+      expr: up{job="jellyfin-downloader"} == 0
       for: 5m
       labels:
         issue: QBittorrent metrics exporter is down

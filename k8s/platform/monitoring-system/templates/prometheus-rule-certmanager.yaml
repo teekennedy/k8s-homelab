@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Certificates here range from 24h (lldap, renewed 8h before expiry) to 90d
+# (Let's Encrypt) to 10y (internal CA), so a fixed "expires within N days"
+# threshold is wrong for all of them. These alerts key off cert-manager's own
+# renewal time instead.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: certmanager-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: cert-manager
+      interval: 1m
+      rules:
+        - alert: CertManagerCertificateNotReady
+          expr: max by (exported_namespace, name) (certmanager_certificate_ready_status{condition="False"}) == 1
+          for: 15m
+          labels:
+            severity: warning
+            component: certificates
+          annotations:
+            summary: {{ "Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready" | quote }}
+            description: {{ "cert-manager has reported Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} as not Ready for 15 minutes. Check `kubectl -n {{ $labels.exported_namespace }} describe certificate {{ $labels.name }}` and its CertificateRequest." | quote }}
+
+        - alert: CertManagerCertificateRenewalOverdue
+          expr: max by (exported_namespace, name) (time() - certmanager_certificate_renewal_timestamp_seconds) > 3600
+          for: 15m
+          labels:
+            severity: warning
+            component: certificates
+          annotations:
+            summary: {{ "Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} has not renewed" | quote }}
+            description: {{ "Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} passed its renewal time {{ $value | humanizeDuration }} ago and has not been reissued." | quote }}
+
+        # Half of the renewal window is gone without a new certificate.
+        - alert: CertManagerCertificateExpiringSoon
+          expr: |
+            max by (exported_namespace, name) (
+              (certmanager_certificate_expiration_timestamp_seconds - time())
+                < (certmanager_certificate_expiration_timestamp_seconds - certmanager_certificate_renewal_timestamp_seconds) / 2
+            )
+          for: 5m
+          labels:
+            severity: critical
+            component: certificates
+          annotations:
+            summary: {{ "Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} expires in {{ $value | humanizeDuration }}" | quote }}
+            description: {{ "Certificate {{ $labels.exported_namespace }}/{{ $labels.name }} expires in {{ $value | humanizeDuration }} and is more than halfway through its renewal window without being reissued." | quote }}

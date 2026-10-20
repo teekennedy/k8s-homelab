@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Probes run from inside the cluster (templates/probe-https.yaml), so they
+# cover DNS, ingress, TLS and the backend, but not the WAN link.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: blackbox-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: blackbox
+      interval: 1m
+      rules:
+        - alert: EndpointDown
+          expr: probe_success{job="blackbox-https"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: ingress
+          annotations:
+            summary: {{ "{{ $labels.instance }} is unreachable" | quote }}
+            description: {{ "The HTTPS probe for {{ $labels.instance }} has failed for 5 minutes." | quote }}
+
+        # Let's Encrypt certificates renew 30 days before expiry, so 14 days
+        # left means renewal has been failing for two weeks.
+        - alert: EndpointCertificateExpiring
+          expr: (probe_ssl_earliest_cert_expiry{job="blackbox-https"} - time()) < 14 * 86400
+          for: 1h
+          labels:
+            severity: warning
+            component: ingress
+          annotations:
+            summary: {{ "TLS certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}" | quote }}
+            description: {{ "The certificate served by {{ $labels.instance }} expires in {{ $value | humanizeDuration }}." | quote }}

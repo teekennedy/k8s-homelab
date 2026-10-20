@@ -19,7 +19,7 @@
                      "description": "Errors while performing List operations in controller {{$labels.controller}} in {{$labels.namespace}} namespace.",
                      "summary": "Errors while performing list operations in controller."
                   },
-                  "expr": "(sum by (controller,namespace) (rate(prometheus_operator_list_operations_failed_total{job=\"prometheus-operator\"}[10m])) / sum by (controller,namespace) (rate(prometheus_operator_list_operations_total{job=\"prometheus-operator\"}[10m]))) > 0.4\n",
+                  "expr": "(sum by (controller,namespace) (rate(prometheus_operator_list_operations_failed_total{job=\"monitoring-system-kube-pro-operator\"}[10m])) / sum by (controller,namespace) (rate(prometheus_operator_list_operations_total{job=\"monitoring-system-kube-pro-operator\"}[10m]))) > 0.4\n",
                   "for": "15m",
                   "labels": {
                      "severity": "warning"
@@ -31,7 +31,7 @@
                      "description": "Errors while performing watch operations in controller {{$labels.controller}} in {{$labels.namespace}} namespace.",
                      "summary": "Errors while performing watch operations in controller."
                   },
-                  "expr": "(sum by (controller,namespace) (rate(prometheus_operator_watch_operations_failed_total{job=\"prometheus-operator\"}[5m])) / sum by (controller,namespace) (rate(prometheus_operator_watch_operations_total{job=\"prometheus-operator\"}[5m]))) > 0.4\n",
+                  "expr": "(sum by (controller,namespace) (rate(prometheus_operator_watch_operations_failed_total{job=\"monitoring-system-kube-pro-operator\"}[5m])) / sum by (controller,namespace) (rate(prometheus_operator_watch_operations_total{job=\"monitoring-system-kube-pro-operator\"}[5m]))) > 0.4\n",
                   "for": "15m",
                   "labels": {
                      "severity": "warning"
@@ -43,7 +43,7 @@
                      "description": "Controller {{ $labels.controller }} in {{ $labels.namespace }} namespace fails to reconcile {{ $value }} objects.",
                      "summary": "Last controller reconciliation failed"
                   },
-                  "expr": "min_over_time(prometheus_operator_syncs{status=\"failed\",job=\"prometheus-operator\"}[5m]) > 0\n",
+                  "expr": "min_over_time(prometheus_operator_syncs{status=\"failed\",job=\"monitoring-system-kube-pro-operator\"}[5m]) > 0\n",
                   "for": "10m",
                   "labels": {
                      "severity": "warning"
@@ -55,7 +55,7 @@
                      "description": "{{ $value | humanizePercentage }} of reconciling operations failed for {{ $labels.controller }} controller in {{ $labels.namespace }} namespace.",
                      "summary": "Errors while reconciling objects."
                   },
-                  "expr": "(sum by (controller,namespace) (rate(prometheus_operator_reconcile_errors_total{job=\"prometheus-operator\"}[5m]))) / (sum by (controller,namespace) (rate(prometheus_operator_reconcile_operations_total{job=\"prometheus-operator\"}[5m]))) > 0.1\n",
+                  "expr": "(sum by (controller,namespace) (rate(prometheus_operator_reconcile_errors_total{job=\"monitoring-system-kube-pro-operator\"}[5m]))) / (sum by (controller,namespace) (rate(prometheus_operator_reconcile_operations_total{job=\"monitoring-system-kube-pro-operator\"}[5m]))) > 0.1\n",
                   "for": "10m",
                   "labels": {
                      "severity": "warning"
@@ -67,7 +67,7 @@
                      "description": "{{ $value | humanizePercentage }} of status update operations failed for {{ $labels.controller }} controller in {{ $labels.namespace }} namespace.",
                      "summary": "Errors while updating objects status."
                   },
-                  "expr": "(sum by (controller,namespace) (rate(prometheus_operator_status_update_errors_total{job=\"prometheus-operator\"}[5m]))) / (sum by (controller,namespace) (rate(prometheus_operator_status_update_operations_total{job=\"prometheus-operator\"}[5m]))) > 0.1\n",
+                  "expr": "(sum by (controller,namespace) (rate(prometheus_operator_status_update_errors_total{job=\"monitoring-system-kube-pro-operator\"}[5m]))) / (sum by (controller,namespace) (rate(prometheus_operator_status_update_operations_total{job=\"monitoring-system-kube-pro-operator\"}[5m]))) > 0.1\n",
                   "for": "10m",
                   "labels": {
                      "severity": "warning"
@@ -79,7 +79,7 @@
                      "description": "Errors while reconciling Prometheus in {{ $labels.namespace }} Namespace.",
                      "summary": "Errors while reconciling Prometheus."
                   },
-                  "expr": "rate(prometheus_operator_node_address_lookup_errors_total{job=\"prometheus-operator\"}[5m]) > 0.1\n",
+                  "expr": "rate(prometheus_operator_node_address_lookup_errors_total{job=\"monitoring-system-kube-pro-operator\"}[5m]) > 0.1\n",
                   "for": "10m",
                   "labels": {
                      "severity": "warning"
@@ -91,7 +91,7 @@
                      "description": "Prometheus operator in {{ $labels.namespace }} namespace isn't ready to reconcile {{ $labels.controller }} resources.",
                      "summary": "Prometheus operator not ready"
                   },
-                  "expr": "min by (controller,namespace) (max_over_time(prometheus_operator_ready{job=\"prometheus-operator\"}[5m]) == 0)\n",
+                  "expr": "min by (controller,namespace) (max_over_time(prometheus_operator_ready{job=\"monitoring-system-kube-pro-operator\"}[5m]) == 0)\n",
                   "for": "5m",
                   "labels": {
                      "severity": "warning"
@@ -103,7 +103,7 @@
                      "description": "Prometheus operator in {{ $labels.namespace }} namespace rejected {{ printf \"%0.0f\" $value }} {{ $labels.controller }}/{{ $labels.resource }} resources.",
                      "summary": "Resources rejected by Prometheus operator"
                   },
-                  "expr": "min_over_time(prometheus_operator_managed_resources{state=\"rejected\",job=\"prometheus-operator\"}[5m]) > 0\n",
+                  "expr": "min_over_time(prometheus_operator_managed_resources{state=\"rejected\",job=\"monitoring-system-kube-pro-operator\"}[5m]) > 0\n",
                   "for": "5m",
                   "labels": {
                      "severity": "warning"

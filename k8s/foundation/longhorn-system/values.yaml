@@ -42,6 +42,11 @@ longhorn:
   metrics:
     serviceMonitor:
       enabled: true
+      # Manager-internal client and workqueue histograms; nothing reads them.
+      metricRelabelings:
+        - action: drop
+          sourceLabels: [__name__]
+          regex: longhorn_(rest_client|workqueue)_[a-z_]+
   persistence:
     reclaimPolicy: Retain
   longhornManager:

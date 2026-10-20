@@ -23,7 +23,12 @@ Install jsonnet and jsonnet-bundler and run `jb install` to download dependencie
 
 To build, run `jsonnet main.jsonnet -J vendor -m templates`. This will render the templates to the templates folder.
 
-To update dependencies, run `jb update`.
+To update dependencies, delete `jsonnetfile.lock.json` and the `vendor/` folder and run `jb install`, then re-render.
+`jb update` only moves the three direct dependencies in `jsonnetfile.json`; everything kube-prometheus pulls in transitively (node-mixin, prometheus-mixin, alertmanager-mixin, ...) stays at its locked commit.
+A fresh install resolves those to the versions kube-prometheus itself pins.
+Renovate has no jsonnet-bundler manager, so this is a manual step.
+
+Selectors are set per mixin in `main.jsonnet`. Upstream defaults like `job="prometheus"` don't match the job names kube-prometheus-stack generates (`monitoring-system-kube-pro-prometheus`), and a wrong selector makes alerts silently never fire rather than error.
 
 [kube-prometheus-stack]: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
 [jsonnet-bundler]: https://github.com/jsonnet-bundler/jsonnet-bundler
