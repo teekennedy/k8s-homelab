@@ -3,6 +3,7 @@ import json
 from fastapi.testclient import TestClient
 
 from app_server.main import build_metrics
+from app_server.metrics import render
 
 from .test_conversations import CONV_ID, _start, agent  # noqa: F401
 
@@ -48,3 +49,21 @@ def test_metrics_report_usage_per_conversation_and_sandboxes(
 
 def test_the_api_port_does_not_serve_metrics(api, user):
     assert api.get("/metrics", headers=user).status_code == 404
+
+
+def test_usage_entries_sharing_a_model_are_one_series():
+    entry = {
+        "model_name": "sonnet",
+        "accumulated_cost": 0.25,
+        "accumulated_token_usage": {"prompt_tokens": 10},
+    }
+    meta = {"stats": {"usage_to_metrics": {"agent": entry, "condenser": entry}}}
+    row = {"id": "c1", "title": "t", "meta": json.dumps(meta)}
+
+    text = render([row], {})
+
+    own = 'conversation="c1",title="t",trigger="unknown",model="sonnet"'
+    assert text.count(f"openhands_conversation_cost_usd{{{own}}} ") == 1
+    assert f"openhands_conversation_cost_usd{{{own}}} 0.500000" in text
+    assert f'openhands_conversation_tokens{{{own},kind="prompt"}} 20' in text
+    assert 'openhands_usage_cost_usd{model="sonnet"} 0.500000' in text

@@ -52,21 +52,27 @@ def render(
             "title": (row["title"] or "")[:TITLE_LENGTH],
             "trigger": meta.get("trigger") or "unknown",
         }
+        # Usage is keyed by usage id (agent, condenser, ...), and several ids can
+        # share a model. Sum them so each conversation/model pair is one series.
+        own_cost: dict[str, float] = defaultdict(float)
+        own_tokens: dict[tuple[str, str], int] = defaultdict(int)
         usage = (meta.get("stats") or {}).get("usage_to_metrics") or {}
         for entry in usage.values():
             model = str(entry.get("model_name") or "unknown")
-            spent = float(entry.get("accumulated_cost") or 0.0)
+            own_cost[model] += float(entry.get("accumulated_cost") or 0.0)
+            accumulated = entry.get("accumulated_token_usage") or {}
+            for kind in TOKEN_KINDS:
+                own_tokens[(model, kind)] += int(accumulated.get(kind) or 0)
+        for model, spent in own_cost.items():
             cost[model] += spent
             per_cost.append(
                 f"openhands_conversation_cost_usd{_labels(**own, model=model)}"
                 f" {spent:.6f}"
             )
-            accumulated = entry.get("accumulated_token_usage") or {}
-            for kind in TOKEN_KINDS:
-                count = int(accumulated.get(kind) or 0)
-                tokens[(model, kind)] += count
-                label = _labels(**own, model=model, kind=kind.removesuffix("_tokens"))
-                per_tokens.append(f"openhands_conversation_tokens{label} {count}")
+        for (model, kind), count in own_tokens.items():
+            tokens[(model, kind)] += count
+            label = _labels(**own, model=model, kind=kind.removesuffix("_tokens"))
+            per_tokens.append(f"openhands_conversation_tokens{label} {count}")
 
     lines = [
         "# HELP openhands_conversations Conversations held, by last reported status.",
