@@ -1,7 +1,7 @@
 dependencies:
 - name: kube-prometheus-stack
   repository: oci://ghcr.io/prometheus-community/charts
-  version: 92.1.0
+  version: 92.11.0
 - name: loki
   repository: oci://ghcr.io/grafana/helm-charts
   version: 7.3.0
@@ -11,5 +11,5 @@ dependencies:
 - name: prometheus-blackbox-exporter
   repository: oci://ghcr.io/prometheus-community/charts
   version: 11.20.0
-digest: sha256:ef30ec65ae3f1d4ecb6f5dd82f25bcf53c27946cedd1a34dbb0799dd111633d9
-generated: "2026-10-21T12:22:53.127199-06:00"
+digest: sha256:16940763c89f59ee8998f4e4c681905ede86cfd979e5125d57779a1e37237f60
+generated: "2026-10-21T20:26:47.624261046Z"
