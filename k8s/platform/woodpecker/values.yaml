@@ -206,11 +206,13 @@ woodpecker-resources:
         approvalAllowedUsers:
           - openhands
       secrets:
-        # Can push to main, so it is only handed to push pipelines, e.g.
-        # .woodpecker/release-tag.yaml
+        # Can push to main, so it is only handed to push and tag pipelines:
+        # .woodpecker/release-tag.yaml and .woodpecker/release.yaml. Only
+        # release-bot creates the tags those run for.
         - name: release_bot_token
           events:
             - push
+            - tag
           mirrorSecret:
             name: release-bot-forgejo-user
             namespace: woodpecker

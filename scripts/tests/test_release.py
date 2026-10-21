@@ -204,5 +204,73 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("Repair tooling", releases[0]["body"])
 
 
+class RecordDevenvCiTests(unittest.TestCase):
+    """scripts/record-devenv-ci.sh against a local bare repository."""
+
+    RECORD = Path(".dagger/modules/homelab/devenv-ci.json")
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        base = Path(self.temp.name)
+        self.remote = base / "remote.git"
+        self.git(base, "init", "-q", "--bare", str(self.remote))
+        self.seed = base / "seed"
+        self.clone(self.seed)
+        (self.seed / "devenv.nix").write_text("{}\n")
+        self.git(self.seed, "add", "devenv.nix")
+        self.git(self.seed, "commit", "-qm", "chore: baseline")
+        self.git(self.seed, "push", "-q", str(self.remote), "HEAD:main")
+
+    def git(self, cwd, *args):
+        return subprocess.check_output(["git", *args], cwd=cwd, text=True).strip()
+
+    def clone(self, path):
+        self.git(path.parent, "clone", "-q", str(self.remote), str(path))
+        self.git(path, "config", "user.name", "Release test")
+        self.git(path, "config", "user.email", "test@example.com")
+
+    def record(self, tag):
+        """Runs the script from a detached checkout of main with tag's record."""
+        work = Path(tempfile.mkdtemp(dir=self.temp.name)) / "work"
+        self.clone(work)
+        self.git(work, "checkout", "-q", "--detach", "origin/main")
+        (work / self.RECORD).parent.mkdir(parents=True, exist_ok=True)
+        (work / self.RECORD).write_text(json.dumps({"tag": tag}, indent=2) + "\n")
+        env = dict(os.environ, CI_COMMIT_TAG=tag, RELEASE_REMOTE=str(self.remote))
+        result = subprocess.run(
+            [str(ROOT / "scripts/record-devenv-ci.sh")],
+            cwd=work,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout
+
+    def main_record(self):
+        return json.loads(self.git(self.remote, "show", f"main:{self.RECORD}"))["tag"]
+
+    def commits(self):
+        return int(self.git(self.remote, "rev-list", "--count", "main"))
+
+    def test_records_and_advances(self):
+        self.record("devenv-ci-1.2.9")
+        self.assertEqual(self.main_record(), "devenv-ci-1.2.9")
+        self.record("devenv-ci-1.2.10")
+        self.assertEqual(self.main_record(), "devenv-ci-1.2.10")
+        self.assertEqual(self.commits(), 3)
+
+    def test_rerun_is_a_no_op(self):
+        self.record("devenv-ci-1.2.3")
+        self.assertIn("already records", self.record("devenv-ci-1.2.3"))
+        self.assertEqual(self.commits(), 2)
+
+    def test_older_release_does_not_replace_newer(self):
+        self.record("devenv-ci-1.3.0")
+        self.assertIn("newer", self.record("devenv-ci-1.2.10"))
+        self.assertEqual(self.main_record(), "devenv-ci-1.3.0")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -38,9 +38,9 @@ type Go struct {
 func (m *Go) Modules(
 	ctx context.Context,
 	// +defaultPath="/"
-	// The scripts and releases.json are here because Dagger modules go:embed
-	// them; without them those modules do not build.
-	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.golangci.yaml"]
+	// The scripts, releases.json and devenv-ci.json are here because Dagger
+	// modules go:embed them; without them those modules do not build.
+	// +ignore=["*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.dagger/modules/homelab/devenv-ci.json", "!.golangci.yaml"]
 	source *dagger.Directory,
 ) (*GoModules, error) {
 	goModFiles, err := source.Glob(ctx, "**/go.mod")

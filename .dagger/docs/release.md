@@ -8,7 +8,7 @@ release scripts that tag them.
 | `publish` | Build the image a release tag names and push it to GHCR |
 | `image` | The same image, labelled, without publishing it |
 | `build-dockerfiles` | Check: build every `Dockerfile` in the repo |
-| `test-scripts` | Check: run `scripts/tests` against the release scripts, `releases.json` and the cliff configs |
+| `test-scripts` | Check: run `scripts/tests` against the release scripts (including `record-devenv-ci.sh`), `releases.json` and the cliff configs |
 
 Devenv images come from the devenv toolchain's `container`, so a published
 `devenv-ci` image is built from exactly what `dagger check` runs in.
@@ -29,6 +29,13 @@ starts at `openhands-sandbox-0.2.0`, likewise with its own cliff.toml.
 pipeline invokes `dagger api call release publish --tag=<tag> --username=teekennedy
 --token=env:GHCR_ACCESS_TOKEN`, selecting profiles or a Dockerfile build from
 the manifest. Images use `ghcr.io/teekennedy/k8s-homelab:<tag>`.
+After publishing a `devenv-ci` tag, the pipeline records the image with
+`dagger api call devenv ci-release --tag=<tag>` and
+`scripts/record-devenv-ci.sh` commits the record,
+`.dagger/modules/homelab/devenv-ci.json`, to main as release-bot, so that
+`dagger check` pulls the image instead of building the toolchain (see the
+module README). The script never replaces a newer release's record, so
+retrying an older tag's pipeline is safe.
 When adding projects, also extend the push path and tag ref filters in
 `.woodpecker/release-tag.yaml` and `.woodpecker/release.yaml`.
 

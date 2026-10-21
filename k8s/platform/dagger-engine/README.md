@@ -51,7 +51,8 @@ and metrics when `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` and
 - Traces: Explore → Tempo, e.g.
   `{resource.service.name="dagger-cli" && resource.cicd.pipeline.run.id="1234"}`.
   CLI spans carry the CI and git attributes; engine spans carry
-  `service.name=unknown_service:dagger-engine` and the session ID.
+  `service.name=dagger-engine` (from `OTEL_SERVICE_NAME` in values.yaml) and
+  the session ID.
 - Span → logs and span → metrics links are set up on the Tempo datasource.
   Exec output is in Loki under `{service_name=~"dagger-(cli|engine)"}` with
   `trace_id` and `span_id` as structured metadata.
@@ -133,6 +134,20 @@ span at a time. Use the TraceQL query above for that, within Tempo's
 retention. Per-function resource usage has no equivalent either: exec metrics
 are labelled only with their exec's span, which nothing joins back to a
 function name.
+
+### Dashboard and flakes
+
+The Dagger dashboard (`monitoring-system/dashboards/dagger.json`) combines the
+queries above: check and function durations, executed vs cached check runs,
+failures and flakes.
+
+A flake is a commit with both a failed and a passing CI run, e.g. a restarted
+pipeline that went green. Check spans don't carry the commit, so the
+collector turns each CI run's root `dagger-cli` span into its own
+`dagger_ci_runs_calls_total` series, labelled with `vcs_ref_head_revision`,
+`cicd_pipeline_run_id` and `status_code` (`STATUS_CODE_ERROR` when any check
+failed). It counts runs, not checks: which check flaked is in the failed
+check spans of that commit's runs.
 
 ### Engine resource metrics
 

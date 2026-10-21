@@ -63,9 +63,8 @@ func (m *Devenv) Toolchain(
 // runs in, taken from the published devenv-ci image when that image is what a
 // build would produce: see publishedCiShell. Otherwise it is built, as
 // Toolchain builds it.
-// +cache="session"
-func (m *Devenv) CiToolchain(ctx context.Context, ws dagger.Workspace) *dagger.Container {
-	shell, err := m.publishedCiShell(ctx, ws)
+func (m *Devenv) CiToolchain(ctx context.Context) *dagger.Container {
+	shell, err := m.publishedCiShell(ctx)
 	if err != nil {
 		warnf("building the devenv ci toolchain from source: %v", err)
 	}

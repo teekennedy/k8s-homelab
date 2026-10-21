@@ -111,9 +111,8 @@ shell as a container:
 
 ```go
 // Go tests and lints every Go module in the repo.
-// +cache="session"
-func (h *Homelab) Go(ctx context.Context, ws dagger.Workspace) *Go {
-	return &Go{Container: h.Toolchains.CiToolchain(ctx, ws)}
+func (h *Homelab) Go(ctx context.Context) *Go {
+	return &Go{Container: h.Toolchains.CiToolchain(ctx)}
 }
 ```
 
@@ -138,28 +137,35 @@ The exceptions build with plain Nix rather than devenv: `nix/validate`,
 Building the toolchain is a Nix build. The `devenv-ci-<version>` release
 publishes the same `ci` profile, built from the same four files, as
 `ghcr.io/teekennedy/k8s-homelab:devenv-ci-<version>`, so `devenv ci-toolchain`
-pulls that image instead of building whenever it is what a build would produce:
+pulls that image instead of building whenever it is what a build would produce.
 
-1. Find the highest `devenv-ci-*` tag that HEAD descends from, from the
-   workspace's Git history.
-2. Compare the four files' contents in that tag's tree with the workspace's.
-   Comparing contents rather than listing commits also catches uncommitted
-   edits, and ignores a change that was later reverted.
-3. Check that the image is for the engine's platform. Releases are built in CI
-   and are `linux/amd64` only, so an Apple Silicon engine always builds.
-4. Pull it.
+`modules/homelab/devenv-ci.json` records the latest release: its tag, its
+image pinned by digest, its platform, and the sha256 of each of the four files
+it was built from. The module embeds it, and the toolchain:
+
+1. Compares the four files' sha256 with the record. Comparing contents also
+   catches uncommitted edits, and ignores a change that was later reverted.
+2. Checks that the image is for the engine's platform. Releases are built in
+   CI and are `linux/amd64` only, so an Apple Silicon engine always builds.
+3. Pulls the image by digest, which needs no registry lookup once the engine
+   has it.
 
 Any changed file, or a platform mismatch, builds as before, with a line in the
-log saying why. A step that fails (no tags in a shallow clone, a registry
-outage) builds too, with a `warning:`. The accessors that resolve it are cached
-for the session, so the decision is made once per run, and made afresh on the
-next: a release can appear between two runs without any file changing.
+log saying why. A step that fails (a registry outage) builds too, with a
+`warning:`. Nothing here reads Git or the network, so the decision is cached
+like any other call, and PR pipelines clone shallow.
+
+The release pipeline (`.woodpecker/release.yaml`) writes the record with
+`dagger api call devenv ci-release --tag=<tag>` after publishing, and
+`scripts/record-devenv-ci.sh` commits it to main as release-bot. Between a
+toolchain change landing and its release being recorded, checks build the
+toolchain. To record a release by hand, run the same call from a checkout of
+its tag and export the file over `modules/homelab/devenv-ci.json`.
 
 What the image does not track is the devenv CLI image `devenvShell` builds
 with: a Renovate bump of it does not change the four files, so the toolchain
 stays the previous release's until the next devenv release, exactly as the
-published image does. The PR pipeline clones with tags and full history
-(`.woodpecker/ci.yaml`), so CI can find the release tag.
+published image does.
 
 ### Collections
 

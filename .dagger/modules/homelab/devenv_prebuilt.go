@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	_ "embed"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
-	"slices"
-	"strconv"
 	"strings"
 
 	"dagger/homelab/internal/dagger"
@@ -30,152 +32,142 @@ const (
 // toolchainSource constructor argument's +ignore lets through.
 var toolchainFiles = []string{"devenv.nix", "devenv.yaml", "devenv.lock", "cmd/lab/devenv.nix"}
 
-// publishedCiShell returns the devenv-ci image of the nearest release tag on
-// HEAD, if the toolchain files are unchanged since that tag and the image is
-// for the engine's platform.
+// ciReleaseJSON is the latest devenv-ci release, as CiRelease records it.
+// The release pipeline commits it to main after publishing the image.
+//
+//go:embed devenv-ci.json
+var ciReleaseJSON []byte
+
+// ciRelease records a published devenv-ci image and the toolchain files it
+// was built from.
+type ciRelease struct {
+	Tag string `json:"tag"`
+	// Image is the image's address pinned by digest, so pulling it needs no
+	// registry lookup once the engine has it.
+	Image    string          `json:"image"`
+	Platform dagger.Platform `json:"platform"`
+	// Files maps each of toolchainFiles to the sha256 of its contents, or ""
+	// when the release had no such file.
+	Files map[string]string `json:"files"`
+}
+
+// CiRelease records the published devenv-ci image for tag and the toolchain
+// files it was built from, as .dagger/modules/homelab/devenv-ci.json, which
+// CiToolchain reads. Run it from a checkout of tag.
+func (m *Devenv) CiRelease(ctx context.Context, tag string) (*dagger.File, error) {
+	if _, _, err := artifactForTag(tag); err != nil || !strings.HasPrefix(tag, ciReleasePrefix+"-") {
+		return nil, fmt.Errorf("not a %s release tag: %q", ciReleasePrefix, tag)
+	}
+	image := dag.Container().From(releaseRepository+":"+tag, dagger.ContainerFromOpts{NoLock: true})
+	ref, err := image.ImageRef(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("resolving %s: %w", tag, err)
+	}
+	platform, err := image.Platform(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("reading the platform of %s: %w", ref, err)
+	}
+	files, err := fileDigests(ctx, m.ToolchainSource, toolchainFiles)
+	if err != nil {
+		return nil, err
+	}
+	record, err := json.MarshalIndent(ciRelease{Tag: tag, Image: ref, Platform: platform, Files: files}, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("encoding the %s record: %w", tag, err)
+	}
+	return dag.File("devenv-ci.json", string(record)+"\n"), nil
+}
+
+// publishedCiShell returns the recorded devenv-ci image if the toolchain
+// files are unchanged since its release and it is for the engine's platform.
 //
 // It returns nil and no error when the image does not apply, which is the
 // ordinary reason to build, and an error when a step failed, which is worth a
 // warning. Either way the caller builds.
-func (m *Devenv) publishedCiShell(ctx context.Context, ws dagger.Workspace) (*dagger.Container, error) {
-	head := ws.Git().Head()
-	tag, err := nearestReleaseTag(ctx, head, ciReleasePrefix)
-	if err != nil {
-		return nil, fmt.Errorf("finding the nearest %s release: %w", ciReleasePrefix, err)
+func (m *Devenv) publishedCiShell(ctx context.Context) (*dagger.Container, error) {
+	var release ciRelease
+	if err := json.Unmarshal(ciReleaseJSON, &release); err != nil {
+		return nil, fmt.Errorf("reading devenv-ci.json: %w", err)
 	}
-	if tag == "" {
-		return nil, fmt.Errorf("no %s release tag is an ancestor of HEAD", ciReleasePrefix)
+	if release.Image == "" {
+		return nil, fmt.Errorf("devenv-ci.json records no %s release", ciReleasePrefix)
 	}
 
-	changed, err := changedFiles(ctx, head.AsRepository().Tag(tag).Tree(), m.ToolchainSource, toolchainFiles)
+	changed, err := m.changedSince(ctx, release)
 	if err != nil {
-		return nil, fmt.Errorf("comparing the toolchain files with %s: %w", tag, err)
+		return nil, err
 	}
 	if len(changed) > 0 {
-		infof("building the devenv ci toolchain: %s changed since %s", strings.Join(changed, ", "), tag)
+		infof("building the devenv ci toolchain: %s changed since %s", strings.Join(changed, ", "), release.Tag)
 		return nil, nil
 	}
 
-	ref := releaseRepository + ":" + tag
-	// Not recorded in dagger.lock: every new release would add an entry, and
-	// a release tag already names one image.
-	image := dag.Container().From(ref, dagger.ContainerFromOpts{NoLock: true})
-	platform, err := image.Platform(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("resolving %s: %w", ref, err)
-	}
 	engine, err := dag.DefaultPlatform(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("reading the engine's platform: %w", err)
 	}
-	if !samePlatform(platform, engine) {
-		infof("building the devenv ci toolchain: %s is for %s, not the engine's %s", ref, platform, engine)
+	if !samePlatform(release.Platform, engine) {
+		infof("building the devenv ci toolchain: %s is for %s, not the engine's %s", release.Tag, release.Platform, engine)
 		return nil, nil
 	}
+	// Recorded in devenv-ci.json, not dagger.lock.
+	image := dag.Container().From(release.Image, dagger.ContainerFromOpts{NoLock: true})
 	// Pulled here, so that a failed pull falls back to a build rather than
 	// failing every check that runs in it.
 	if _, err := image.Sync(ctx); err != nil {
-		return nil, fmt.Errorf("pulling %s: %w", ref, err)
+		return nil, fmt.Errorf("pulling %s: %w", release.Image, err)
 	}
-	infof("using %s as the devenv ci toolchain: no toolchain file changed since %s", ref, tag)
+	infof("using %s as the devenv ci toolchain: no toolchain file changed since %s", release.Image, release.Tag)
 	return image, nil
 }
 
-// nearestReleaseTag returns the highest-versioned release tag with prefix that
-// is head or an ancestor of it, or "" when there is none.
-func nearestReleaseTag(ctx context.Context, head *dagger.GitRef, prefix string) (string, error) {
-	repo := head.AsRepository()
-	names, err := repo.Tags(ctx, dagger.GitRepositoryTagsOpts{Patterns: []string{"refs/tags/" + prefix + "-*"}})
+// changedSince returns the toolchain files whose contents differ from
+// release's.
+func (m *Devenv) changedSince(ctx context.Context, release ciRelease) ([]string, error) {
+	current, err := fileDigests(ctx, m.ToolchainSource, toolchainFiles)
 	if err != nil {
-		return "", fmt.Errorf("listing tags: %w", err)
-	}
-	type release struct {
-		tag     string
-		version [3]int
-	}
-	var releases []release
-	for _, name := range names {
-		tag := strings.TrimPrefix(name, "refs/tags/")
-		if version, ok := parseReleaseVersion(strings.TrimPrefix(tag, prefix+"-")); ok {
-			releases = append(releases, release{tag, version})
-		}
-	}
-	slices.SortFunc(releases, func(a, b release) int {
-		return slices.Compare(b.version[:], a.version[:])
-	})
-	for _, r := range releases {
-		contains, err := head.Contains(ctx, repo.Tag(r.tag))
-		if err != nil {
-			return "", fmt.Errorf("checking whether HEAD contains %s: %w", r.tag, err)
-		}
-		if contains {
-			return r.tag, nil
-		}
-	}
-	return "", nil
-}
-
-// parseReleaseVersion parses a release tag's "major.minor.patch" suffix, the
-// only form releaseVersionPattern accepts.
-func parseReleaseVersion(s string) ([3]int, bool) {
-	var version [3]int
-	if !releaseVersionPattern.MatchString(s) {
-		return version, false
-	}
-	for i, part := range strings.Split(s, ".") {
-		n, err := strconv.Atoi(part)
-		if err != nil {
-			return version, false
-		}
-		version[i] = n
-	}
-	return version, true
-}
-
-// changedFiles returns the paths whose contents differ between two trees,
-// counting a file present in only one of them as changed. Comparing contents
-// rather than commits catches uncommitted edits too, and ignores a change
-// that was later reverted.
-func changedFiles(ctx context.Context, before, after *dagger.Directory, paths []string) ([]string, error) {
-	differs := make([]bool, len(paths))
-	g, gctx := errgroup.WithContext(ctx)
-	for i, p := range paths {
-		g.Go(func() error {
-			a, err := fileDigest(gctx, before, p)
-			if err != nil {
-				return err
-			}
-			b, err := fileDigest(gctx, after, p)
-			differs[i] = a != b
-			return err
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("diffing file digests: %w", err)
+		return nil, err
 	}
 	var changed []string
-	for i, p := range paths {
-		if differs[i] {
-			changed = append(changed, p)
+	for _, path := range toolchainFiles {
+		if recorded, ok := release.Files[path]; !ok || recorded != current[path] {
+			changed = append(changed, path)
 		}
 	}
 	return changed, nil
 }
 
-// fileDigest returns the digest of a file's contents, or "" if it is absent.
-func fileDigest(ctx context.Context, dir *dagger.Directory, path string) (string, error) {
-	exists, err := dir.Exists(ctx, path)
-	if err != nil {
-		return "", fmt.Errorf("looking for %s: %w", path, err)
+// fileDigests returns the sha256 of each path's contents in dir, or "" for a
+// path that is absent.
+func fileDigests(ctx context.Context, dir *dagger.Directory, paths []string) (map[string]string, error) {
+	digests := make([]string, len(paths))
+	g, gctx := errgroup.WithContext(ctx)
+	for i, path := range paths {
+		g.Go(func() error {
+			exists, err := dir.Exists(gctx, path)
+			if err != nil {
+				return fmt.Errorf("looking for %s: %w", path, err)
+			}
+			if !exists {
+				return nil
+			}
+			contents, err := dir.File(path).Contents(gctx)
+			if err != nil {
+				return fmt.Errorf("reading %s: %w", path, err)
+			}
+			sum := sha256.Sum256([]byte(contents))
+			digests[i] = "sha256:" + hex.EncodeToString(sum[:])
+			return nil
+		})
 	}
-	if !exists {
-		return "", nil
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("hashing the toolchain files: %w", err)
 	}
-	digest, err := dir.File(path).Digest(ctx, dagger.FileDigestOpts{ExcludeMetadata: true})
-	if err != nil {
-		return "", fmt.Errorf("hashing %s: %w", path, err)
+	result := make(map[string]string, len(paths))
+	for i, path := range paths {
+		result[path] = digests[i]
 	}
-	return digest, nil
+	return result, nil
 }
 
 // samePlatform compares two platforms by OS and architecture, ignoring the

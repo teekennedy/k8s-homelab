@@ -962,20 +962,27 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		}
 	case "Devenv":
 		switch fnName {
+		case "CiRelease":
+			var parent Devenv
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var tag string
+			if inputArgs["tag"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["tag"]), &tag)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg tag", err))
+				}
+			}
+			return (*Devenv).CiRelease(&parent, ctx, tag)
 		case "CiToolchain":
 			var parent Devenv
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Devenv).CiToolchain(&parent, ctx, ws), nil
+			return (*Devenv).CiToolchain(&parent, ctx), nil
 		case "Container":
 			var parent Devenv
 			err = json.Unmarshal(parentJSON, &parent)
@@ -1235,28 +1242,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Ci(&parent, ctx, ws), nil
+			return (*Homelab).Ci(&parent, ctx), nil
 		case "Cue":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Cue(&parent, ctx, ws), nil
+			return (*Homelab).Cue(&parent, ctx), nil
 		case "Devenv":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -1270,26 +1263,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Go(&parent, ctx, ws), nil
+			return (*Homelab).Go(&parent, ctx), nil
 		case "Helmfile":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
 			}
 			var environments []string
 			if inputArgs["environments"] != nil {
@@ -1298,7 +1277,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg environments", err))
 				}
 			}
-			return (*Homelab).Helmfile(&parent, ctx, ws, environments), nil
+			return (*Homelab).Helmfile(&parent, ctx, environments), nil
 		case "Kubernetes":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -1312,68 +1291,33 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Lab(&parent, ctx, ws), nil
+			return (*Homelab).Lab(&parent, ctx), nil
 		case "Nix":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Nix(&parent, ctx, ws), nil
+			return (*Homelab).Nix(&parent, ctx), nil
 		case "Python":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Python(&parent, ctx, ws), nil
+			return (*Homelab).Python(&parent, ctx), nil
 		case "Release":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Release(&parent, ctx, ws), nil
+			return (*Homelab).Release(&parent, ctx), nil
 		case "Terraform":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
-			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
 			}
 			var platforms []string
 			if inputArgs["platforms"] != nil {
@@ -1382,35 +1326,21 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg platforms", err))
 				}
 			}
-			return (*Homelab).Terraform(&parent, ctx, ws, platforms), nil
+			return (*Homelab).Terraform(&parent, ctx, platforms), nil
 		case "Woodpecker":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Woodpecker(&parent, ctx, ws), nil
+			return (*Homelab).Woodpecker(&parent, ctx), nil
 		case "Yaml":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
-			var ws dagger.Workspace
-			if inputArgs["ws"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["ws"]), &ws)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
-				}
-			}
-			return (*Homelab).Yaml(&parent, ctx, ws), nil
+			return (*Homelab).Yaml(&parent, ctx), nil
 		case "":
 			var parent Homelab
 			err = json.Unmarshal(parentJSON, &parent)
@@ -2015,16 +1945,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Ci",
 							dag.TypeDef().WithObject("Ci")).
 							WithDescription("Ci checks this repo's Dagger module, beyond what go's checks cover.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 58, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 58, 43)})).
+							WithSourceMap(dag.SourceMap("main.go", 50, 1))).
 					WithFunction(
 						dag.Function("Cue",
 							dag.TypeDef().WithObject("Cue")).
 							WithDescription("Cue formats, upgrades, trims and exports the CUE configuration under config/.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 64, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 64, 44)})).
+							WithSourceMap(dag.SourceMap("main.go", 55, 1))).
 					WithFunction(
 						dag.Function("Devenv",
 							dag.TypeDef().WithObject("Devenv")).
@@ -2034,72 +1960,54 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Go",
 							dag.TypeDef().WithObject("Go")).
 							WithDescription("Go tests and lints every Go module in the repo.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 70, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 70, 43)})).
+							WithSourceMap(dag.SourceMap("main.go", 60, 1))).
 					WithFunction(
 						dag.Function("Helmfile",
 							dag.TypeDef().WithObject("Helmfile")).
 							WithDescription("Helmfile renders, lints and audits every chart with the repo's helmfile.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 76, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 78, 2)}).
-							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to check every chart in.", SourceMap: dag.SourceMap("main.go", 82, 2), DefaultValue: dagger.JSON("[\"production\"]")})).
+							WithSourceMap(dag.SourceMap("main.go", 65, 1)).
+							WithArg("environments", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Helmfile environments to check every chart in.", SourceMap: dag.SourceMap("main.go", 70, 2), DefaultValue: dagger.JSON("[\"production\"]")})).
 					WithFunction(
 						dag.Function("Kubernetes",
 							dag.TypeDef().WithObject("Kubernetes")).
 							WithDescription("Kubernetes runs releases on throwaway or long-lived k3s clusters and tests\nthem there. It runs in the ci and integration profiles, which no release\npublishes, so it is always built from source.").
-							WithSourceMap(dag.SourceMap("main.go", 90, 1))).
+							WithSourceMap(dag.SourceMap("main.go", 78, 1))).
 					WithFunction(
 						dag.Function("Lab",
 							dag.TypeDef().WithObject("Lab")).
 							WithDescription("Lab builds the lab CLI and keeps its Nix vendorHash current.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 96, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 96, 44)})).
+							WithSourceMap(dag.SourceMap("main.go", 83, 1))).
 					WithFunction(
 						dag.Function("Nix",
 							dag.TypeDef().WithObject("Nix")).
 							WithDescription("Nix formats and validates the Nix flake and host configuration.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 102, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 102, 44)})).
+							WithSourceMap(dag.SourceMap("main.go", 88, 1))).
 					WithFunction(
 						dag.Function("Python",
 							dag.TypeDef().WithObject("Python")).
 							WithDescription("Python tests and formats every Python project in the repo.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 108, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 108, 47)})).
+							WithSourceMap(dag.SourceMap("main.go", 93, 1))).
 					WithFunction(
 						dag.Function("Release",
 							dag.TypeDef().WithObject("Release")).
 							WithDescription("Release builds, labels and publishes the repo's container images.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 114, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 114, 48)})).
+							WithSourceMap(dag.SourceMap("main.go", 98, 1))).
 					WithFunction(
 						dag.Function("Terraform",
 							dag.TypeDef().WithObject("Terraform")).
 							WithDescription("Terraform formats, lints, locks and validates the OpenTofu modules under terraform/.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 120, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 122, 2)}).
-							WithArg("platforms", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Platforms the lock generator computes provider hashes for.", SourceMap: dag.SourceMap("main.go", 126, 2), DefaultValue: dagger.JSON("[\"linux_arm64\",\"linux_amd64\",\"darwin_arm64\"]")})).
+							WithSourceMap(dag.SourceMap("main.go", 103, 1)).
+							WithArg("platforms", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Platforms the lock generator computes provider hashes for.", SourceMap: dag.SourceMap("main.go", 108, 2), DefaultValue: dagger.JSON("[\"linux_arm64\",\"linux_amd64\",\"darwin_arm64\"]")})).
 					WithFunction(
 						dag.Function("Woodpecker",
 							dag.TypeDef().WithObject("Woodpecker")).
 							WithDescription("Woodpecker lints the Woodpecker CI pipelines.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 133, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 133, 51)})).
+							WithSourceMap(dag.SourceMap("main.go", 114, 1))).
 					WithFunction(
 						dag.Function("Yaml",
 							dag.TypeDef().WithObject("Yaml")).
 							WithDescription("Yaml lints every YAML file in the repo.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("main.go", 139, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("main.go", 139, 45)})).
+							WithSourceMap(dag.SourceMap("main.go", 119, 1))).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Homelab")).
@@ -2149,24 +2057,28 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			WithObject(
 				dag.TypeDef().WithObject("Devenv", dagger.TypeDefWithObjectOpts{Description: "Devenv builds containers from the repo's devenv definition.", SourceMap: dag.SourceMap("devenv.go", 26, 6)}).
 					WithFunction(
+						dag.Function("CiRelease",
+							dag.TypeDef().WithObject("File")).
+							WithDescription("CiRelease records the published devenv-ci image for tag and the toolchain\nfiles it was built from, as .dagger/modules/homelab/devenv-ci.json, which\nCiToolchain reads. Run it from a checkout of tag.").
+							WithSourceMap(dag.SourceMap("devenv_prebuilt.go", 57, 1)).
+							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("devenv_prebuilt.go", 57, 49)})).
+					WithFunction(
 						dag.Function("CiToolchain",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("CiToolchain is Toolchain for the \"ci\" profile, the container every check\nruns in, taken from the published devenv-ci image when that image is what a\nbuild would produce: see publishedCiShell. Otherwise it is built, as\nToolchain builds it.").
-							WithCachePolicy(dagger.FunctionCachePolicyPerSession).
-							WithSourceMap(dag.SourceMap("devenv.go", 67, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("devenv.go", 67, 51)})).
+							WithSourceMap(dag.SourceMap("devenv.go", 66, 1))).
 					WithFunction(
 						dag.Function("Container",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("Container builds the devenv nix environment as a minimal \"from scratch\"\ncontainer, labelled for publishing. Uses `devenv container copy shell` to\nproduce a minimal nix2container image containing only the runtime closure\n(no build dependencies). The nix store is cached across runs so packages are\nonly built once.").
-							WithSourceMap(dag.SourceMap("devenv.go", 90, 1)).
-							WithArg("nixDaemon", dag.TypeDef().WithObject("Socket").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Optional host nix daemon socket for faster builds on NixOS CI hosts.\nWhen provided, the host daemon's store is used as a substituter so\npre-built packages are fetched rather than rebuilt from source.\nNote: only works when the host and container share the same platform\n(e.g. Linux-to-Linux). Does not work with macOS host daemons due to\ncross-platform path handling differences.", SourceMap: dag.SourceMap("devenv.go", 98, 2)}).
-							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/). Defaults to\nthe \"ci\" profile, which holds exactly the toolchain the checks need. The\n\"interactive\" profile — cluster tooling, the kubeconfig enterShell, the\ndagger CLI, the git hook — is deliberately not built here; pass it\nexplicitly if you want a full shell to poke at.", SourceMap: dag.SourceMap("devenv.go", 106, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
+							WithSourceMap(dag.SourceMap("devenv.go", 89, 1)).
+							WithArg("nixDaemon", dag.TypeDef().WithObject("Socket").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Optional host nix daemon socket for faster builds on NixOS CI hosts.\nWhen provided, the host daemon's store is used as a substituter so\npre-built packages are fetched rather than rebuilt from source.\nNote: only works when the host and container share the same platform\n(e.g. Linux-to-Linux). Does not work with macOS host daemons due to\ncross-platform path handling differences.", SourceMap: dag.SourceMap("devenv.go", 97, 2)}).
+							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/). Defaults to\nthe \"ci\" profile, which holds exactly the toolchain the checks need. The\n\"interactive\" profile — cluster tooling, the kubeconfig enterShell, the\ndagger CLI, the git hook — is deliberately not built here; pass it\nexplicitly if you want a full shell to poke at.", SourceMap: dag.SourceMap("devenv.go", 105, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
 					WithFunction(
 						dag.Function("IntegrationToolchain",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("IntegrationToolchain is Toolchain for the \"ci\" and \"integration\" profiles:\nthe container the Kubernetes integration workflow runs in. No release\npublishes it, so it is always built.").
-							WithSourceMap(dag.SourceMap("devenv.go", 81, 1))).
+							WithSourceMap(dag.SourceMap("devenv.go", 80, 1))).
 					WithFunction(
 						dag.Function("Projects",
 							dag.TypeDef().WithListOf(dag.TypeDef().WithObject("DevenvProject"))).
@@ -2192,7 +2104,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							dag.TypeDef().WithObject("GoModules")).
 							WithDescription("Modules returns every Go module in the repo, keyed by path. Vendored\nmodules are skipped.").
 							WithSourceMap(dag.SourceMap("go.go", 38, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "The scripts and releases.json are here because Dagger modules go:embed\nthem; without them those modules do not build.", SourceMap: dag.SourceMap("go.go", 44, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.golangci.yaml"}}))).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "The scripts, releases.json and devenv-ci.json are here because Dagger\nmodules go:embed them; without them those modules do not build.", SourceMap: dag.SourceMap("go.go", 44, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.go", "!**/go.mod", "!**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.dagger/modules/homelab/devenv-ci.json", "!.golangci.yaml"}}))).
 			WithObject(
 				dag.TypeDef().WithObject("Helmfile", dagger.TypeDefWithObjectOpts{Description: "Helmfile runs helmfile checks over every chart.", SourceMap: dag.SourceMap("helmfile.go", 31, 6)}).
 					WithFunction(
@@ -2341,7 +2253,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithDescription("TestScripts runs the release script regression tests with their repository\ninputs: the scripts, this module's releases.json and the cliff configs.").
 							WithSourceMap(dag.SourceMap("release_scripts.go", 13, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release_scripts.go", 17, 2), DefaultPath: "/", Ignore: []string{"*", "!scripts/tests/test_release.py", "!scripts/tests/pyproject.toml", "!scripts/tests/uv.lock", "!scripts/release.sh", "!scripts/release-metadata.sh", "!.dagger/modules/homelab/releases.json", "!cliff.toml", "!k8s/platform/forgejo/files/forgejo-resources/cliff.toml", "!k8s/apps/openhands/files/sandbox/cliff.toml"}}))).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release_scripts.go", 17, 2), DefaultPath: "/", Ignore: []string{"*", "!scripts/tests/test_release.py", "!scripts/tests/pyproject.toml", "!scripts/tests/uv.lock", "!scripts/release.sh", "!scripts/release-metadata.sh", "!scripts/record-devenv-ci.sh", "!.dagger/modules/homelab/releases.json", "!cliff.toml", "!k8s/platform/forgejo/files/forgejo-resources/cliff.toml", "!k8s/apps/openhands/files/sandbox/cliff.toml"}}))).
 			WithObject(
 				dag.TypeDef().WithObject("Terraform", dagger.TypeDefWithObjectOpts{Description: "Terraform runs OpenTofu checks over terraform/.", SourceMap: dag.SourceMap("terraform.go", 16, 6)}).
 					WithFunction(

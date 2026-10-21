@@ -919,7 +919,38 @@ opentelemetry-collector:
         error_mode: ignore
         trace_statements:
           - keep_keys(resource.attributes, ["service.name"])
+      # One span per CI `dagger check` run: the CLI's root span, which is an
+      # error when any check failed.
+      filter/dagger-ci-runs:
+        error_mode: ignore
+        traces:
+          span:
+            - not IsRootSpan()
+            - resource.attributes["deployment.environment.name"] != "ci"
+            - not IsMatch(name, "^dagger(-[^ ]+)? check( |$)")
+      # The commit and pipeline run are resource attributes; span_metrics
+      # dimensions are read from the span.
+      transform/dagger-ci-run-attributes:
+        error_mode: ignore
+        trace_statements:
+          - set(span.attributes["vcs.ref.head.revision"], resource.attributes["vcs.ref.head.revision"])
+          - set(span.attributes["cicd.pipeline.run.id"], resource.attributes["cicd.pipeline.run.id"])
+          - keep_keys(resource.attributes, ["service.name"])
     connectors:
+      # A `dagger_ci_runs_calls_total` series per CI run, labelled with its
+      # commit and status, so a commit with both a failed and a passing run
+      # (a restart that went green) shows up as a flake. Every run is a new
+      # series, so these are left out of VictoriaMetrics.
+      span_metrics/dagger-ci-runs:
+        namespace: dagger.ci.runs
+        histogram:
+          disable: true
+        dimensions:
+          - name: vcs.ref.head.revision
+          - name: cicd.pipeline.run.id
+        exclude_dimensions: [span.name, span.kind, collector.instance.id]
+        # Stop exporting a run's series a day after it ended.
+        metrics_expiration: 24h
       # Duration histograms per check and per module function, for trends
       # beyond Tempo's retention. A function's cache outcome is for the call
       # itself, not for the execs it returns (see dagger-engine/README.md).
@@ -965,12 +996,16 @@ opentelemetry-collector:
           receivers: [otlp]
           processors: [memory_limiter, filter/dagger-calls, transform/drop-run-resource]
           exporters: [span_metrics]
+        traces/dagger-ci-runs:
+          receivers: [otlp]
+          processors: [memory_limiter, filter/dagger-ci-runs, transform/dagger-ci-run-attributes]
+          exporters: [span_metrics/dagger-ci-runs]
         metrics:
           receivers: [otlp]
           processors: [memory_limiter, delta_to_cumulative, batch]
           exporters: [otlp_http/prometheus]
         metrics/span-metrics:
-          receivers: [span_metrics]
+          receivers: [span_metrics, span_metrics/dagger-ci-runs]
           processors: [batch]
           exporters: [otlp_http/prometheus]
         logs:

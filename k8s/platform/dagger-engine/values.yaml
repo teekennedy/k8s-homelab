@@ -24,6 +24,10 @@ dagger-helm:
     # The engine's own telemetry. Session traces, logs and per-exec metrics
     # are exported by each client (see README.md), not from here.
     env:
+      # Session spans, logs and metrics carry the OTel SDK's default resource,
+      # which is `unknown_service:dagger-engine` without this.
+      - name: OTEL_SERVICE_NAME
+        value: dagger-engine
       # Prometheus /metrics: connected clients, dagql and local cache size.
       - name: _EXPERIMENTAL_DAGGER_METRICS_ADDR
         value: "0.0.0.0:8080"

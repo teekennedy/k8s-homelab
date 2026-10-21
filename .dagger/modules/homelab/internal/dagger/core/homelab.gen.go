@@ -30,10 +30,8 @@ func (r *Homelab) WithGraphQLQuery(q *querybuilder.Selection) *Homelab {
 }
 
 // Ci checks this repo's Dagger module, beyond what go's checks cover.
-func (r *Homelab) Ci(ws *Workspace) *HomelabCi {
-	assertNotNil("ws", ws)
+func (r *Homelab) Ci() *HomelabCi {
 	q := r.query.Select("ci")
-	q = q.Arg("ws", ws)
 
 	return &HomelabCi{
 		query:     q,
@@ -42,10 +40,8 @@ func (r *Homelab) Ci(ws *Workspace) *HomelabCi {
 }
 
 // Cue formats, upgrades, trims and exports the CUE configuration under config/.
-func (r *Homelab) Cue(ws *Workspace) *HomelabCue {
-	assertNotNil("ws", ws)
+func (r *Homelab) Cue() *HomelabCue {
 	q := r.query.Select("cue")
-	q = q.Arg("ws", ws)
 
 	return &HomelabCue{
 		query:     q,
@@ -65,10 +61,8 @@ func (r *Homelab) Devenv() *HomelabDevenv {
 }
 
 // Go tests and lints every Go module in the repo.
-func (r *Homelab) Go(ws *Workspace) *HomelabGo {
-	assertNotNil("ws", ws)
+func (r *Homelab) Go() *HomelabGo {
 	q := r.query.Select("go")
-	q = q.Arg("ws", ws)
 
 	return &HomelabGo{
 		query:     q,
@@ -85,8 +79,7 @@ type HomelabHelmfileOpts struct {
 }
 
 // Helmfile renders, lints and audits every chart with the repo's helmfile.
-func (r *Homelab) Helmfile(ws *Workspace, opts ...HomelabHelmfileOpts) *HomelabHelmfile {
-	assertNotNil("ws", ws)
+func (r *Homelab) Helmfile(opts ...HomelabHelmfileOpts) *HomelabHelmfile {
 	q := r.query.Select("helmfile")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `environments` optional argument
@@ -94,7 +87,6 @@ func (r *Homelab) Helmfile(ws *Workspace, opts ...HomelabHelmfileOpts) *HomelabH
 			q = q.Arg("environments", opts[i].Environments)
 		}
 	}
-	q = q.Arg("ws", ws)
 
 	return &HomelabHelmfile{
 		query:     q,
@@ -170,10 +162,8 @@ func (r *Homelab) Kubernetes() *HomelabKubernetes {
 }
 
 // Lab builds the lab CLI and keeps its Nix vendorHash current.
-func (r *Homelab) Lab(ws *Workspace) *HomelabLab {
-	assertNotNil("ws", ws)
+func (r *Homelab) Lab() *HomelabLab {
 	q := r.query.Select("lab")
-	q = q.Arg("ws", ws)
 
 	return &HomelabLab{
 		query:     q,
@@ -182,10 +172,8 @@ func (r *Homelab) Lab(ws *Workspace) *HomelabLab {
 }
 
 // Nix formats and validates the Nix flake and host configuration.
-func (r *Homelab) Nix(ws *Workspace) *HomelabNix {
-	assertNotNil("ws", ws)
+func (r *Homelab) Nix() *HomelabNix {
 	q := r.query.Select("nix")
-	q = q.Arg("ws", ws)
 
 	return &HomelabNix{
 		query:     q,
@@ -194,10 +182,8 @@ func (r *Homelab) Nix(ws *Workspace) *HomelabNix {
 }
 
 // Python tests and formats every Python project in the repo.
-func (r *Homelab) Python(ws *Workspace) *HomelabPython {
-	assertNotNil("ws", ws)
+func (r *Homelab) Python() *HomelabPython {
 	q := r.query.Select("python")
-	q = q.Arg("ws", ws)
 
 	return &HomelabPython{
 		query:     q,
@@ -206,10 +192,8 @@ func (r *Homelab) Python(ws *Workspace) *HomelabPython {
 }
 
 // Release builds, labels and publishes the repo's container images.
-func (r *Homelab) Release(ws *Workspace) *HomelabRelease {
-	assertNotNil("ws", ws)
+func (r *Homelab) Release() *HomelabRelease {
 	q := r.query.Select("release")
-	q = q.Arg("ws", ws)
 
 	return &HomelabRelease{
 		query:     q,
@@ -226,8 +210,7 @@ type HomelabTerraformOpts struct {
 }
 
 // Terraform formats, lints, locks and validates the OpenTofu modules under terraform/.
-func (r *Homelab) Terraform(ws *Workspace, opts ...HomelabTerraformOpts) *HomelabTerraform {
-	assertNotNil("ws", ws)
+func (r *Homelab) Terraform(opts ...HomelabTerraformOpts) *HomelabTerraform {
 	q := r.query.Select("terraform")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `platforms` optional argument
@@ -235,7 +218,6 @@ func (r *Homelab) Terraform(ws *Workspace, opts ...HomelabTerraformOpts) *Homela
 			q = q.Arg("platforms", opts[i].Platforms)
 		}
 	}
-	q = q.Arg("ws", ws)
 
 	return &HomelabTerraform{
 		query:     q,
@@ -244,10 +226,8 @@ func (r *Homelab) Terraform(ws *Workspace, opts ...HomelabTerraformOpts) *Homela
 }
 
 // Woodpecker lints the Woodpecker CI pipelines.
-func (r *Homelab) Woodpecker(ws *Workspace) *HomelabWoodpecker {
-	assertNotNil("ws", ws)
+func (r *Homelab) Woodpecker() *HomelabWoodpecker {
 	q := r.query.Select("woodpecker")
-	q = q.Arg("ws", ws)
 
 	return &HomelabWoodpecker{
 		query:     q,
@@ -256,10 +236,8 @@ func (r *Homelab) Woodpecker(ws *Workspace) *HomelabWoodpecker {
 }
 
 // Yaml lints every YAML file in the repo.
-func (r *Homelab) Yaml(ws *Workspace) *HomelabYaml {
-	assertNotNil("ws", ws)
+func (r *Homelab) Yaml() *HomelabYaml {
 	q := r.query.Select("yaml")
-	q = q.Arg("ws", ws)
 
 	return &HomelabYaml{
 		query:     q,
@@ -553,14 +531,25 @@ func (r *HomelabDevenv) WithGraphQLQuery(q *querybuilder.Selection) *HomelabDeve
 	}
 }
 
+// CiRelease records the published devenv-ci image for tag and the toolchain
+// files it was built from, as .dagger/modules/homelab/devenv-ci.json, which
+// CiToolchain reads. Run it from a checkout of tag.
+func (r *HomelabDevenv) CiRelease(tag string) *File {
+	q := r.query.Select("ciRelease")
+	q = q.Arg("tag", tag)
+
+	return &File{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
 // CiToolchain is Toolchain for the "ci" profile, the container every check
 // runs in, taken from the published devenv-ci image when that image is what a
 // build would produce: see publishedCiShell. Otherwise it is built, as
 // Toolchain builds it.
-func (r *HomelabDevenv) CiToolchain(ws *Workspace) *Container {
-	assertNotNil("ws", ws)
+func (r *HomelabDevenv) CiToolchain() *Container {
 	q := r.query.Select("ciToolchain")
-	q = q.Arg("ws", ws)
 
 	return &Container{
 		query:     q,
@@ -982,8 +971,8 @@ func (r *HomelabGo) UnmarshalJSON(bs []byte) error {
 
 // HomelabGoModulesOpts contains options for HomelabGo.Modules
 type HomelabGoModulesOpts struct {
-	// The scripts and releases.json are here because Dagger modules go:embed
-	// them; without them those modules do not build.
+	// The scripts, releases.json and devenv-ci.json are here because Dagger
+	// modules go:embed them; without them those modules do not build.
 	Source *Directory
 }
 
