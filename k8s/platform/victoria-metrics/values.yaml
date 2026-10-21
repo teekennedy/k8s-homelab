@@ -137,7 +137,7 @@ victoria-metrics-single:
           - name: stream-aggr-config
             mountPath: /etc/vm/stream-aggr
             readOnly: true
-          - name: relabelconfig
+          - name: relabelings-assets
             mountPath: /relabelconfig
             readOnly: true
         livenessProbe:
