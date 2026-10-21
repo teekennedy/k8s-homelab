@@ -80,7 +80,7 @@ types too, through `dagger.Connect()`.
 
 | Toolchain | Collections | Checks | Generators | Other functions |
 | --- | --- | --- | --- | --- |
-| `ci` | | `verify-cache-granularity` | | |
+| `ci` | | `integration-test` | | |
 | `cue` | | | `export`, `fix`, `format`, `trim` | |
 | `devenv` | | | | `ci-toolchain`, `toolchain`, `integration-toolchain`, `container`, `projects`, `update` |
 | `go` | `modules` | per module: `test` | per module: `lint` | |
@@ -267,14 +267,20 @@ Renovate install.
 `go`, `helmfile` and `kubernetes` assert that a source edit re-runs exactly the
 units it should — the property the scoping above exists for — with the harness
 in `internal/cachetest`. It runs each check over every unit twice, before and
-after an edit, and compares per-unit exec cache keys:
+after an edit, and compares per-unit exec cache keys. The keys come from
+`internal/daggerfake`, which evaluates the check's GraphQL against a
+content-addressed model of the engine without running anything, so the tables
+run in milliseconds as part of `go`'s test.
 
-- **Fake backend** (`go` test, milliseconds): `internal/daggerfake` evaluates
-  the check's GraphQL against a content-addressed model of the engine and
-  records a cache key per exec, without running anything.
-- **Engine backend** (`ci/verify-cache-granularity`): the same scenarios against
-  a real engine, with the check's tools replaced by shims that count their runs.
-  Without a Dagger session these tests skip.
+`ci/integration-test` holds the fake to the engine. daggerfake's conformance
+tests send the same GraphQL to both and require the same answers: whether an
+exec is served from cache after a given change (an edit beside a mounted
+subdirectory, a changed env var, an earlier exec's output…), and what `glob`,
+`entries`, `contents` and `isEmpty` return. They take seconds, and skip unless
+a run opts in with `HOMELAB_ENGINE_TESTS=1` under a Dagger session
+(`internal/enginetest`); the check does both, and also runs the golangci-lint
+behaviour test in `go_lint_test.go`. Run it after a
+Dagger upgrade, and add a case when the fake learns a new call.
 
 A toolchain adds coverage with a fixture, a scenario table and a
 `cachetest.Check`; `client_test.go` adapts the harness to the generated SDK. See

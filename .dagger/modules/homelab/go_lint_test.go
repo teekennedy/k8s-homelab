@@ -10,18 +10,15 @@ import (
 
 	"dagger/homelab/internal/cachetest"
 	"dagger/homelab/internal/dagger"
+	"dagger/homelab/internal/enginetest"
 )
 
 // The tests in go_cache_test.go answer "what would re-run"; they never run a
 // command. These answer the other half: does Lint actually do the thing it
 // claims — reformat, tidy, and fail on what autofixing cannot resolve.
 //
-// That needs a real engine and a real toolchain, so they skip without a Dagger
-// session, exactly like the engine half of the cache harness:
-//
-//	cd .dagger/modules/homelab && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...
-//
-// or via `dagger check ci:verify-cache-granularity`.
+// That needs a real engine and a real toolchain, so they skip unless a run opts
+// in; see internal/enginetest.
 //
 // # Why not the devenv container
 //
@@ -150,7 +147,7 @@ func lintBehaviours() []lintBehaviour {
 }
 
 func TestLintBehaviour(t *testing.T) {
-	cachetest.RequireEngine(t)
+	enginetest.Require(t)
 	config := realGolangciConfig(t)
 
 	for _, c := range lintBehaviours() {

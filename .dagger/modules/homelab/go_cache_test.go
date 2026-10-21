@@ -47,13 +47,8 @@ func eachModule(ctx context.Context, source *dagger.Directory, ctr *dagger.Conta
 // local replace, and a vendored module that discovery must skip.
 // Each module carries a distinctly named file so its exec can be identified by
 // what is mounted into it.
-//
-// nonce is woven into every file so a run can start from a cold cache. The fake
-// backend passes "" — it is a fresh engine every time — while the engine
-// backend passes a per-process value, so that a previous invocation's cache
-// entries can never make run 1 look like a hit.
-func goFixture(nonce string) cachetest.Repo {
-	body := "package main // " + nonce + "\n\nfunc main() {}\n"
+func goFixture() cachetest.Repo {
+	body := "package main\n\nfunc main() {}\n"
 	return cachetest.Repo{
 		".golangci.yaml": "version: \"2\"\n",
 
@@ -67,13 +62,13 @@ func goFixture(nonce string) cachetest.Repo {
 
 		// A module that builds against a sibling through a local replace.
 		".dagger/lib/go.mod":           "module dagger/lib\n\ngo 1.26\n",
-		libPath:                        "package lib // " + nonce + "\n\nconst X = 1\n",
+		libPath:                        "package lib\n\nconst X = 1\n",
 		".dagger/modules/tool/go.mod":  "module dagger/tool\n\ngo 1.26\n\nrequire dagger/lib v0.0.0\n\nreplace dagger/lib => ../../lib\n",
 		".dagger/modules/tool/tool.go": body,
 
 		// Vendored: a go.mod, but not one of the repo's own modules.
 		"cmd/lab/vendor/example.com/dep/go.mod": "module example.com/dep\n",
-		"cmd/lab/vendor/example.com/dep/dep.go": "package dep // " + nonce + "\n",
+		"cmd/lab/vendor/example.com/dep/dep.go": "package dep\n",
 	}
 }
 
@@ -126,8 +121,6 @@ func testCheck() goCheck {
 		UnitOf:        unitByScopedGoModule,
 		WantUnitArgv:  cachetest.SameArgv("go test ./..."),
 		WantUnitFiles: goUnitFiles,
-		ShimTools:     []string{"go"},
-		ShimMarker:    markerFromMount,
 	}
 }
 
@@ -156,16 +149,8 @@ func lintCheck() goCheck {
 			"golangci-lint run --fix --config "+golangciLintConfigPath+" ./...",
 		),
 		WantUnitFiles: goUnitFiles,
-		ShimTools:     []string{"go", "golangci-lint"},
-		ShimMarker:    markerFromMount,
 	}
 }
-
-// markerFromMount is the engine backend's ShimMarker for the Go checks. It
-// names the module by the one .go file at the root of its working directory —
-// where GoModule.Test and GoModule.Lint mount each module, and what
-// unitByScopedGoModule reads on the fake side.
-const markerFromMount = `$(basename "$(ls "$PWD"/*.go 2>/dev/null | head -1)")`
 
 // unitByScopedGoModule names a Go check's unit by the one .go file sitting
 // directly in the module directory mounted at its working directory. That is how one module's
@@ -175,8 +160,7 @@ const markerFromMount = `$(basename "$(ls "$PWD"/*.go 2>/dev/null | head -1)")`
 // Nested paths are skipped, which is what keeps cmd/lab's vendored dep from
 // being mistaken for its unit name. Execs with no such file — anything
 // running on an earlier exec's output — are not
-// per-unit work and return "". The engine backend's shim applies the same rule
-// with `ls "$PWD"/*.go`, so both backends key their results identically.
+// per-unit work and return "".
 func unitByScopedGoModule(e daggerfake.Exec) string {
 	for _, f := range e.Files[strings.TrimPrefix(e.Workdir, "/")] {
 		if !strings.Contains(f, "/") && strings.HasSuffix(f, ".go") {

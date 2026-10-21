@@ -30,6 +30,9 @@
 // fully determined by the exec's cache key, never by bytes the fake would have
 // to invent.
 //
+// conformance_test.go holds the model to a real engine: it sends the same
+// queries to both and requires the same cache hits and the same data back.
+//
 // # What it does not model
 //
 //   - `+ignore` and `+defaultPath`. Those are applied by the CLI when it loads
@@ -545,7 +548,7 @@ func (e *Engine) applyDirectory(d *dirVal, field string, args map[string]any) (a
 		if d.opaque != "" {
 			return nil, fmt.Errorf("entries of an opaque directory is not modelled")
 		}
-		return sortedKeys(d.files), nil
+		return entries(sortedKeys(d.files)), nil
 
 	case "glob":
 		if d.opaque != "" {
@@ -828,16 +831,43 @@ func copyStrSliceMap(m map[string][]string) map[string][]string {
 	return out
 }
 
-// glob applies Dagger's Directory.glob semantics to a file list: "*" matches
-// within a path segment, "**" matches across segments, and a leading "**/"
-// also matches paths with no directory at all.
-func glob(paths []string, pattern string) []string {
+// entries applies Directory.entries to a file list: the top level only, with a
+// directory named once and marked by a trailing slash.
+func entries(paths []string) []string {
+	seen := map[string]bool{}
 	var out []string
 	for _, p := range paths {
-		if matchGlob(pattern, p) {
+		if dir, _, nested := strings.Cut(p, "/"); nested {
+			p = dir + "/"
+		}
+		if !seen[p] {
+			seen[p] = true
 			out = append(out, p)
 		}
 	}
+	slices.Sort(out)
+	return out
+}
+
+// glob applies Dagger's Directory.glob semantics to a file list: "*" matches
+// within a path segment, "**" matches across segments, and a leading "**/"
+// also matches paths with no directory at all. Directories match too, and are
+// returned with a trailing slash; the fake only knows the ones that hold a file.
+func glob(paths []string, pattern string) []string {
+	candidates := map[string]bool{}
+	for _, p := range paths {
+		candidates[p] = true
+		for dir := path.Dir(p); dir != "."; dir = path.Dir(dir) {
+			candidates[dir+"/"] = true
+		}
+	}
+	var out []string
+	for p := range candidates {
+		if matchGlob(pattern, strings.TrimSuffix(p, "/")) {
+			out = append(out, p)
+		}
+	}
+	slices.Sort(out)
 	return out
 }
 

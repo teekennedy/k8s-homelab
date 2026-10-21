@@ -882,7 +882,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 	switch parentName {
 	case "Ci":
 		switch fnName {
-		case "VerifyCacheGranularity":
+		case "IntegrationTest":
 			var parent Ci
 			err = json.Unmarshal(parentJSON, &parent)
 			if err != nil {
@@ -895,14 +895,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
 				}
 			}
-			var run string
-			if inputArgs["run"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["run"]), &run)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg run", err))
-				}
-			}
-			return nil, (*Ci).VerifyCacheGranularity(&parent, ctx, source, run)
+			return nil, (*Ci).IntegrationTest(&parent, ctx, source)
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
@@ -2117,13 +2110,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			WithObject(
 				dag.TypeDef().WithObject("Ci", dagger.TypeDefWithObjectOpts{Description: "Ci checks the Dagger module under .dagger.", SourceMap: dag.SourceMap("ci.go", 13, 6)}).
 					WithFunction(
-						dag.Function("VerifyCacheGranularity",
+						dag.Function("IntegrationTest",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
-							WithDescription("VerifyCacheGranularity runs the Dagger module's tests, including the ones\nthat need a real engine.\n\nThe go toolchain's test runs these too, but only against\ninternal/daggerfake's model of the engine: the engine-backed tests skip\nunless a run opts in to them under a Dagger session, so they need either\n\n\tcd .dagger/modules/homelab && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...\n\nor this function, which opts in, and whose exec gets a session of its own, as\nevery container does. Use it to confirm the fake still agrees with the engine after a Dagger\nupgrade, or after teaching the fake a new API call.\n\nIts result caches on its inputs, like any other function here, and that is\nthe right behaviour: the two things that can change the verdict both bust it.\nEditing .dagger changes source, and upgrading Dagger means a new engine with\na new cache. To force a re-run anyway, vary run (`--run '.*'` is a different\nargument to the default `.` and so a different call).").
-							WithSourceMap(dag.SourceMap("ci.go", 37, 1)).
+							WithDescription("IntegrationTest runs the module's tests with the ones that need a real\nengine opted in: daggerfake's conformance tests, which hold the fake the\ncache-granularity tests run against to the engine it models, and\nTestLintBehaviour, which runs golangci-lint for real.\n\ngo/test runs the same tests with those skipped. Run this after a Dagger\nupgrade or after teaching the fake a new API call. Its result caches on the\nmodule's source, and an engine upgrade starts from an empty cache.").
+							WithSourceMap(dag.SourceMap("ci.go", 27, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: ".golangci.yaml is here because go's lint_test.go reads the repo's real\nconfig rather than a stand-in, so the behaviour tests exercise the\nconfig the gate runs with.", SourceMap: dag.SourceMap("ci.go", 44, 2), DefaultPath: "/", Ignore: []string{"*", "!.dagger/**/*.go", "!.dagger/**/go.mod", "!.dagger/**/go.sum", "!.dagger/**/scripts/*.sh", "!.dagger/modules/homelab/releases.json", "!.golangci.yaml"}}).
-							WithArg("run", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind).WithOptional(true), dagger.FunctionWithArgOpts{Description: "Run only tests matching this regexp, as `go test -run`. Defaults to all\nof them, which covers the fake-backed tests too.", SourceMap: dag.SourceMap("ci.go", 49, 2), DefaultValue: dagger.JSON("\".\"")}))).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: ".golangci.yaml is here because TestLintBehaviour reads the repo's real\nconfig rather than a stand-in.", SourceMap: dag.SourceMap("ci.go", 33, 2), DefaultPath: "/", Ignore: []string{"*", "!.dagger/modules/homelab/**", "!.golangci.yaml"}}))).
 			WithObject(
 				dag.TypeDef().WithObject("Cue", dagger.TypeDefWithObjectOpts{Description: "Cue runs CUE generators over config/.", SourceMap: dag.SourceMap("cue.go", 16, 6)}).
 					WithFunction(

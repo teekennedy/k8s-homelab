@@ -8,8 +8,6 @@ import (
 	"dagger/homelab/internal/daggerfake"
 )
 
-const fakeName = "fake"
-
 // fakeBackend answers from daggerfake's modelled cache keys.
 type fakeBackend[D, C any] struct {
 	client Client[D, C]
@@ -18,9 +16,6 @@ type fakeBackend[D, C any] struct {
 func newFakeBackend[D, C any](client Client[D, C]) *fakeBackend[D, C] {
 	return &fakeBackend[D, C]{client: client}
 }
-
-func (*fakeBackend[D, C]) name() string               { return fakeName }
-func (*fakeBackend[D, C]) fixture(c Check[D, C]) Repo { return c.Fixture("") }
 
 // Fake swaps the module's `dag` for one backed by a fresh fake engine, and
 // returns that engine.

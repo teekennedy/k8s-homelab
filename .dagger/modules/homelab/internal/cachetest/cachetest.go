@@ -22,22 +22,18 @@
 //     path that isn't there.
 //  3. A Check wiring the two together, passed to Run.
 //
-// Run drives every scenario through both backends, plus a shape test and the
-// engine control. The toolchain a check runs in is a constructor argument,
-// wired from devenv in dagger.toml: the fake backend passes a stand-in for it,
-// and the engine backend a shim.
+// Run drives every scenario through the fake, plus a shape test. The fake
+// answers "would this unit re-run" from daggerfake's modelled cache keys rather
+// than by running anything, so the whole table runs in milliseconds under a
+// plain `go test`. The toolchain a check runs in is a constructor argument, and
+// the harness passes a stand-in for it.
 //
-// # The two backends
-//
-// The fake backend answers "would this unit re-run" from daggerfake's modelled
-// cache keys rather than by running anything, so the whole table runs in
-// milliseconds under a plain `go test`. The engine backend runs the same table
-// against a real engine, and skips without a session; see engine.go.
+// That the fake's answers are the engine's is daggerfake's own concern: its
+// conformance tests put the same queries to both.
 package cachetest
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -99,44 +95,26 @@ type Client[D, C any] interface {
 	UseFake(t *testing.T, engine graphql.Client)
 	// Toolchain returns a stand-in for the wired toolchain container.
 	Toolchain() C
-	// Directory builds files in-process with WithNewFile.
+	// Directory builds files in-process with WithNewFile, which the fake
+	// treats as a directory loaded off a filesystem.
 	Directory(files Repo) D
-	// HostDirectory loads a host path the way the CLI loads a +defaultPath
-	// argument, forcing it so an unreadable path fails here.
-	HostDirectory(ctx context.Context, path string) (D, error)
-	// Container returns image with volume mounted at mount and files written
-	// executable, in order: the order is part of the container's identity, so
-	// it has to be the same from one run to the next.
-	Container(image, mount, volume string, files []File) C
-	// Stdout runs script in Container(image, mount, volume, nil) with env set
-	// to a fresh value, and returns its stdout.
-	Stdout(ctx context.Context, image, mount, volume, env, script string) (string, error)
-}
-
-// File is an executable file the engine backend writes into a container.
-type File struct {
-	Path     string
-	Contents string
 }
 
 // Check is one module function these tests can drive, together with everything
-// needed to read its work back: how to invoke it, which execs are its per-unit
-// work, and how the engine backend observes those execs.
+// needed to read its work back: how to invoke it, and which execs are its
+// per-unit work.
 type Check[D, C any] struct {
 	// Name identifies the check in test names and failure messages.
 	Name string
 
-	// Fixture builds the source tree this check runs against. nonce is woven in
-	// by the backend: the fake passes "", the engine a per-process value, so a
-	// previous invocation's cache entries can never make run 1 look like a hit.
-	Fixture func(nonce string) Repo
+	// Fixture builds the source tree this check runs against.
+	Fixture func() Repo
 
 	// Scenarios are the cache-granularity questions to ask of this check.
 	Scenarios func() []Scenario
 
 	// Invoke calls the module function, for every item of a collection.
-	// container is the toolchain to run in: a stand-in on the fake backend, a
-	// shim on the engine backend.
+	// container is the stand-in toolchain to run in.
 	Invoke func(ctx context.Context, source D, container C) error
 
 	// UnitOf names the unit of work an exec belongs to, or "" for an exec that
@@ -156,12 +134,6 @@ type Check[D, C any] struct {
 
 	// WantUnitFiles is what each unit must have mounted at Mount, by unit name.
 	WantUnitFiles map[string][]string
-
-	// ShimTools are the executables the engine backend replaces with a stamping
-	// shim, and ShimMarker is the shell snippet that names the unit from inside
-	// the exec. See engine.go.
-	ShimTools  []string
-	ShimMarker string
 }
 
 // SameArgv is a WantUnitArgv for checks whose units all run the same commands
@@ -200,58 +172,48 @@ type units map[string]string
 // outcome is one run of a check against one source tree.
 type outcome struct {
 	units units
-	// execs is the raw exec log, for failure messages and the shape test. It is
-	// empty on the engine backend, which observes runs rather than describing
-	// them.
+	// execs is the raw exec log, for failure messages and the shape test.
 	execs []daggerfake.Exec
 }
 
-// backend runs a check against a source tree and reports, per unit, an identity
-// that changes exactly when that unit's work would re-run.
-type backend[D, C any] interface {
-	name() string
-	fixture(c Check[D, C]) Repo
-	run(t *testing.T, c Check[D, C], files Repo) outcome
-}
-
-func (s Scenario) run(t *testing.T, b interface{ name() string }, first, second outcome) {
+func (s Scenario) run(t *testing.T, first, second outcome) {
 	t.Helper()
-	s.assertRerun(t, b.name(), first, second)
-	s.assertCached(t, b.name(), first, second)
-	s.assertNothingUnasserted(t, b.name(), first, second)
+	s.assertRerun(t, first, second)
+	s.assertCached(t, first, second)
+	s.assertNothingUnasserted(t, first, second)
 }
 
-func (s Scenario) assertRerun(t *testing.T, b string, first, second outcome) {
+func (s Scenario) assertRerun(t *testing.T, first, second outcome) {
 	t.Helper()
 	for _, unit := range s.Rerun {
 		before, existed := first.units[unit]
 		after, ok := second.units[unit]
 		switch {
 		case !ok:
-			t.Errorf("[%s] unit %q did not run at all after the edit; units that ran: %v",
-				b, unit, sortedKeys(second.units))
+			t.Errorf("unit %q did not run at all after the edit; units that ran: %v",
+				unit, sortedKeys(second.units))
 		case existed && before == after:
-			t.Errorf("[%s] unit %q was served from cache, but the edit should have invalidated it\n%s",
-				b, unit, formatExecs(second.execs))
+			t.Errorf("unit %q was served from cache, but the edit should have invalidated it\n%s",
+				unit, formatExecs(second.execs))
 		}
 	}
 }
 
-func (s Scenario) assertCached(t *testing.T, b string, first, second outcome) {
+func (s Scenario) assertCached(t *testing.T, first, second outcome) {
 	t.Helper()
 	for _, unit := range s.Cached {
 		before, existed := first.units[unit]
 		after, ok := second.units[unit]
 		switch {
 		case !existed:
-			t.Errorf("[%s] unit %q never ran on the first run; the scenario cannot say it stayed cached",
-				b, unit)
+			t.Errorf("unit %q never ran on the first run; the scenario cannot say it stayed cached",
+				unit)
 		case !ok:
-			t.Errorf("[%s] unit %q disappeared after the edit; units that ran: %v",
-				b, unit, sortedKeys(second.units))
+			t.Errorf("unit %q disappeared after the edit; units that ran: %v",
+				unit, sortedKeys(second.units))
 		case before != after:
-			t.Errorf("[%s] unit %q was re-run, but nothing it owns changed; caching is not per-unit\n"+
-				"before: %s\nafter:  %s", b, unit, before, after)
+			t.Errorf("unit %q was re-run, but nothing it owns changed; caching is not per-unit\n"+
+				"before: %s\nafter:  %s", unit, before, after)
 		}
 	}
 }
@@ -259,7 +221,7 @@ func (s Scenario) assertCached(t *testing.T, b string, first, second outcome) {
 // assertNothingUnasserted makes every unit the check produced appear in exactly
 // one of Rerun and Cached. Without it a scenario could pass by staying silent
 // about the unit that actually broke — including one a fixture grew later.
-func (s Scenario) assertNothingUnasserted(t *testing.T, b string, first, second outcome) {
+func (s Scenario) assertNothingUnasserted(t *testing.T, first, second outcome) {
 	t.Helper()
 
 	asserted := map[string]bool{}
@@ -269,8 +231,8 @@ func (s Scenario) assertNothingUnasserted(t *testing.T, b string, first, second 
 	for _, seen := range []units{first.units, second.units} {
 		for unit := range seen {
 			if !asserted[unit] {
-				t.Errorf("[%s] unit %q ran but the scenario says nothing about it; "+
-					"add it to Rerun or Cached", b, unit)
+				t.Errorf("unit %q ran but the scenario says nothing about it; "+
+					"add it to Rerun or Cached", unit)
 				asserted[unit] = true
 			}
 		}
@@ -281,9 +243,8 @@ func (s Scenario) assertNothingUnasserted(t *testing.T, b string, first, second 
 // the tests
 // ---------------------------------------------------------------------------
 
-// Run is the whole suite for a set of checks: every scenario on the fake
-// backend, the same table on a real engine (skipped without a session), the
-// engine control, and the per-unit shape.
+// Run is the whole suite for a set of checks: every scenario, and the per-unit
+// shape.
 func Run[D, C any](t *testing.T, client Client[D, C], checks ...Check[D, C]) {
 	t.Helper()
 	fake := newFakeBackend(client)
@@ -292,16 +253,6 @@ func Run[D, C any](t *testing.T, client Client[D, C], checks ...Check[D, C]) {
 		forEachScenario(t, checks, func(t *testing.T, c Check[D, C], s Scenario) {
 			runScenario(t, fake, c, s)
 		})
-	})
-	t.Run("EngineCacheGranularity", func(t *testing.T) {
-		forEachScenario(t, checks, func(t *testing.T, c Check[D, C], s Scenario) {
-			runScenario[D, C](t, newEngineBackend(t, client), c, s)
-		})
-	})
-	t.Run("EngineOracleObservesExecs", func(t *testing.T) {
-		for _, c := range checks {
-			t.Run(c.Name, func(t *testing.T) { engineOracle(t, newEngineBackend(t, client), c) })
-		}
 	})
 	t.Run("ChecksFanOutPerUnit", func(t *testing.T) {
 		for _, c := range checks {
@@ -321,37 +272,12 @@ func forEachScenario[D, C any](t *testing.T, checks []Check[D, C], fn func(*test
 	}
 }
 
-func runScenario[D, C any](t *testing.T, b backend[D, C], c Check[D, C], s Scenario) {
+func runScenario[D, C any](t *testing.T, fake *fakeBackend[D, C], c Check[D, C], s Scenario) {
 	t.Helper()
-	base := b.fixture(c)
-	first := b.run(t, c, base)
-	second := b.run(t, c, s.Edit(t, base))
-	s.run(t, b, first, second)
-}
-
-// engineOracle is the control for every engine scenario: it proves the shim
-// actually records runs and that a repeat of identical work is a cache hit.
-// Without it, a backend that silently recorded nothing would make every
-// isolation assertion pass.
-func engineOracle[D, C any](t *testing.T, b *engineBackend[D, C], c Check[D, C]) {
-	t.Helper()
-	files := b.fixture(c)
-
-	first := b.run(t, c, files).units
-	if len(first) == 0 {
-		t.Fatal("the shim recorded no execs at all; the oracle is not observing anything")
-	}
-	for unit := range c.WantUnitFiles {
-		if first[unit] == "" {
-			t.Errorf("no exec recorded for unit %q; got %v", unit, sortedKeys(first))
-		}
-	}
-
-	// Re-running byte-identical work must change nothing.
-	second := b.run(t, c, files).units
-	if d := delta(first, second); len(d) != 0 {
-		t.Errorf("re-running an unchanged tree re-executed %v; the engine is not caching at all", d)
-	}
+	base := c.Fixture()
+	first := fake.run(t, c, base)
+	second := fake.run(t, c, s.Edit(t, base))
+	s.run(t, first, second)
 }
 
 // fanOutPerUnit pins the shape the whole caching argument rests on: one run of
@@ -360,7 +286,7 @@ func engineOracle[D, C any](t *testing.T, b *engineBackend[D, C], c Check[D, C])
 // assertions would mean anything.
 func fanOutPerUnit[D, C any](t *testing.T, fake *fakeBackend[D, C], c Check[D, C]) {
 	t.Helper()
-	execs := fake.run(t, c, c.Fixture("")).execs
+	execs := fake.run(t, c, c.Fixture()).execs
 
 	byUnit := map[string][]string{}
 	for _, e := range execs {
@@ -408,17 +334,6 @@ func unitFiles[D, C any](execs []daggerfake.Exec, c Check[D, C], unit string) []
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
-
-// delta returns the entries whose identity changed between two reads.
-func delta(before, after units) []string {
-	var changed []string
-	for k, v := range after {
-		if before[k] != v {
-			changed = append(changed, fmt.Sprintf("%s %s->%s", k, before[k], v))
-		}
-	}
-	return changed
-}
 
 // FormatExecs renders an exec log for a failure message.
 func FormatExecs(execs []daggerfake.Exec) string { return formatExecs(execs) }

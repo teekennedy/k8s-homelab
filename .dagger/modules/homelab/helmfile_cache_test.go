@@ -18,7 +18,7 @@ import (
 // scenarios. The harness that runs them is dagger/lib/cachetest.
 //
 // helmfile:lint is not in the table. It is one exec per environment rather than
-// a fan-out, and it parses that exec's stdout, which neither backend produces.
+// a fan-out, and it parses that exec's stdout, which the fake does not produce.
 // Its cross-checking logic is covered directly by TestHelmfileStateProblems.
 
 // TestCacheGranularity runs the helmfile checks through the cache harness.
@@ -56,15 +56,14 @@ type helmfileCheck = cachetest.Check[*dagger.Directory, *dagger.Container]
 
 // helmfileFixture mirrors the real repo's helmfile layout: the state file, one
 // generated values file per environment, a chart in each of two tiers, and a
-// shared library chart. nonce is woven in so the engine backend can start
-// from a cold cache; see cachetest.Check.Fixture.
-func helmfileFixture(nonce string) cachetest.Repo {
+// shared library chart.
+func helmfileFixture() cachetest.Repo {
 	chart := func(name string) string {
-		return "apiVersion: v2\nname: " + name + "\nversion: 0.1.0 # " + nonce + "\n"
+		return "apiVersion: v2\nname: " + name + "\nversion: 0.1.0\n"
 	}
-	env := func(name string) string { return `{"name": "` + name + `", "nonce": "` + nonce + `"}` + "\n" }
+	env := func(name string) string { return `{"name": "` + name + `"}` + "\n" }
 	return cachetest.Repo{
-		helmfilePath:                     "releases: [] # " + nonce + "\n",
+		helmfilePath:                     "releases: []\n",
 		"config/gen/production/env.json": env("production"),
 		"config/gen/staging/env.json":    env("staging"),
 
@@ -80,7 +79,7 @@ func helmfileFixture(nonce string) cachetest.Repo {
 		"k8s/charts/shared/Chart.yaml": chart("shared"),
 
 		// Read by the Polaris audit only, so it is in no release's mount.
-		polarisConfigPath: "checks: {} # " + nonce + "\n",
+		polarisConfigPath: "checks: {}\n",
 	}
 }
 
@@ -149,8 +148,6 @@ func buildCheck() helmfileCheck {
 			return []string{helmfileTemplateArgv(unit)}
 		},
 		WantUnitFiles: helmfileUnitFiles,
-		ShimTools:     []string{"helmfile"},
-		ShimMarker:    markerFromHelmfileArgs,
 	}
 }
 
@@ -174,8 +171,6 @@ func validateCheck() helmfileCheck {
 			}
 		},
 		WantUnitFiles: helmfileUnitFiles,
-		ShimTools:     []string{"helmfile"},
-		ShimMarker:    markerFromHelmfileArgs,
 	}
 }
 
@@ -198,8 +193,6 @@ func polarisCheck() helmfileCheck {
 			}
 		},
 		WantUnitFiles: helmfileUnitFiles,
-		ShimTools:     []string{"helmfile", "polaris"},
-		ShimMarker:    markerFromHelmfileArgs,
 	}
 }
 
@@ -224,8 +217,6 @@ func kubeconformCheck() helmfileCheck {
 			}
 		},
 		WantUnitFiles: helmfileUnitFiles,
-		ShimTools:     []string{"helmfile", "kubeconform"},
-		ShimMarker:    markerFromHelmfileArgs,
 	}
 }
 
@@ -287,17 +278,6 @@ func unitByMountedRelease(e daggerfake.Exec) string {
 	}
 	return env + "." + release
 }
-
-// markerFromHelmfileArgs is the engine backend's shimMarker for the helmfile
-// checks. The shim standing in for helmfile reads the same two arguments
-// unitByHelmfileRelease does; the audit shims have no such arguments, so they
-// read the tree in /repo as unitByMountedRelease does.
-const markerFromHelmfileArgs = `$(e=; n=; while [ $# -gt 0 ]; do case "$1" in ` +
-	`--environment) e=$2 ;; name=*) n=${1#name=} ;; esac; shift; done; ` +
-	`if [ -z "$e" ]; then ` +
-	`e=$(basename "$(dirname config/gen/*/env.json)"); ` +
-	`n=$(basename "$(dirname "$(find k8s -name Chart.yaml -not -path 'k8s/charts/*')")"); fi; ` +
-	`echo "$e.$n")`
 
 // ---------------------------------------------------------------------------
 // scenarios

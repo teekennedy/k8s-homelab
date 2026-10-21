@@ -275,8 +275,8 @@ type HomelabCi struct { // homelab (../../../../../:0:0)
 	// field again.
 	refetchID bool
 
-	id                     *ID
-	verifyCacheGranularity *Void
+	id              *ID
+	integrationTest *Void
 }
 
 func (r *HomelabCi) WithGraphQLQuery(q *querybuilder.Selection) *HomelabCi {
@@ -343,50 +343,30 @@ func (r *HomelabCi) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-// HomelabCiVerifyCacheGranularityOpts contains options for HomelabCi.VerifyCacheGranularity
-type HomelabCiVerifyCacheGranularityOpts struct {
-	// .golangci.yaml is here because go's lint_test.go reads the repo's real
-	// config rather than a stand-in, so the behaviour tests exercise the
-	// config the gate runs with.
+// HomelabCiIntegrationTestOpts contains options for HomelabCi.IntegrationTest
+type HomelabCiIntegrationTestOpts struct {
+	// .golangci.yaml is here because TestLintBehaviour reads the repo's real
+	// config rather than a stand-in.
 	Source *Directory
-	// Run only tests matching this regexp, as `go test -run`. Defaults to all
-	// of them, which covers the fake-backed tests too.
-	//
-	// Default: "."
-	Run string
 }
 
-// VerifyCacheGranularity runs the Dagger module's tests, including the ones
-// that need a real engine.
+// IntegrationTest runs the module's tests with the ones that need a real
+// engine opted in: daggerfake's conformance tests, which hold the fake the
+// cache-granularity tests run against to the engine it models, and
+// TestLintBehaviour, which runs golangci-lint for real.
 //
-// The go toolchain's test runs these too, but only against
-// internal/daggerfake's model of the engine: the engine-backed tests skip
-// unless a run opts in to them under a Dagger session, so they need either
-//
-//	cd .dagger/modules/homelab && HOMELAB_ENGINE_TESTS=1 dagger run go test ./...
-//
-// or this function, which opts in, and whose exec gets a session of its own, as
-// every container does. Use it to confirm the fake still agrees with the engine after a Dagger
-// upgrade, or after teaching the fake a new API call.
-//
-// Its result caches on its inputs, like any other function here, and that is
-// the right behaviour: the two things that can change the verdict both bust it.
-// Editing .dagger changes source, and upgrading Dagger means a new engine with
-// a new cache. To force a re-run anyway, vary run (`--run '.*'` is a different
-// argument to the default `.` and so a different call).
-func (r *HomelabCi) VerifyCacheGranularity(ctx context.Context, opts ...HomelabCiVerifyCacheGranularityOpts) error {
-	if r.verifyCacheGranularity != nil {
+// go/test runs the same tests with those skipped. Run this after a Dagger
+// upgrade or after teaching the fake a new API call. Its result caches on the
+// module's source, and an engine upgrade starts from an empty cache.
+func (r *HomelabCi) IntegrationTest(ctx context.Context, opts ...HomelabCiIntegrationTestOpts) error {
+	if r.integrationTest != nil {
 		return nil
 	}
-	q := r.query.Select("verifyCacheGranularity")
+	q := r.query.Select("integrationTest")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Source) {
 			q = q.Arg("source", opts[i].Source)
-		}
-		// `run` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Run) {
-			q = q.Arg("run", opts[i].Run)
 		}
 	}
 

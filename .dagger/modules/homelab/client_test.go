@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"maps"
 	"slices"
 	"testing"
@@ -18,7 +16,7 @@ import (
 	"github.com/dagger/querybuilder"
 )
 
-// client is this module's side of dagger/lib/cachetest: the few calls the
+// client is this module's side of internal/cachetest: the few calls the
 // harness makes through the module's own generated SDK.
 type client struct{}
 
@@ -43,31 +41,4 @@ func (client) Directory(files cachetest.Repo) *dagger.Directory {
 		d = d.WithNewFile(p, files[p])
 	}
 	return d
-}
-
-func (client) HostDirectory(ctx context.Context, path string) (*dagger.Directory, error) {
-	dir := dag.Address(path).Directory()
-	if _, err := dir.Entries(ctx); err != nil {
-		return nil, fmt.Errorf("loading %s: %w", path, err)
-	}
-	return dir, nil
-}
-
-func (client) Container(image, mount, volume string, files []cachetest.File) *dagger.Container {
-	ctr := dag.Container().From(image).WithMountedCache(mount, dag.CacheVolume(volume))
-	for _, f := range files {
-		ctr = ctr.WithNewFile(f.Path, f.Contents, dagger.ContainerWithNewFileOpts{Permissions: 0o755})
-	}
-	return ctr
-}
-
-func (c client) Stdout(ctx context.Context, image, mount, volume, env, script string) (string, error) {
-	out, err := c.Container(image, mount, volume, nil).
-		WithEnvVariable("READ", env).
-		WithExec([]string{"sh", "-c", script}).
-		Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("running %q: %w", script, err)
-	}
-	return out, nil
 }

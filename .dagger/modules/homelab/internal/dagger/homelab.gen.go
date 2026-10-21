@@ -18,8 +18,8 @@ type HomelabTerraformOpts = core.HomelabTerraformOpts
 // Ci checks the Dagger module under .dagger.
 type HomelabCi = core.HomelabCi
 
-// HomelabCiVerifyCacheGranularityOpts contains options for HomelabCi.VerifyCacheGranularity
-type HomelabCiVerifyCacheGranularityOpts = core.HomelabCiVerifyCacheGranularityOpts
+// HomelabCiIntegrationTestOpts contains options for HomelabCi.IntegrationTest
+type HomelabCiIntegrationTestOpts = core.HomelabCiIntegrationTestOpts
 
 // Cue runs CUE generators over config/.
 type HomelabCue = core.HomelabCue
