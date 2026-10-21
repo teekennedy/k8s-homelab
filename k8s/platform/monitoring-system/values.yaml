@@ -538,6 +538,15 @@ prometheus-blackbox-exporter:
       memory: 32Mi
     limits:
       memory: 64Mi
+  config:
+    modules:
+      http_2xx:
+        http:
+          # Probe as a browser. Without an Accept header, apps that do their
+          # own OIDC (e.g. mod_auth_openidc in FreshRSS) treat the request as
+          # an API call and return 401 instead of redirecting to the IdP.
+          headers:
+            Accept: "text/html,*/*"
 
 # HTTPS endpoints probed through blackbox-exporter by templates/probe-https.yaml.
 # Redirects are followed, so endpoints behind Authelia succeed when the login

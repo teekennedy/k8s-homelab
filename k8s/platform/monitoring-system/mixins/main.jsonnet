@@ -94,15 +94,17 @@ local alertmanagerMixin = addMixin({
   },
 });
 
-# Watchdog and TargetDown from kube-prometheus. InfoInhibitor is left out: it
-# only makes sense with a matching Alertmanager inhibit rule and null route.
+# Watchdog from kube-prometheus. InfoInhibitor is left out: it only makes sense
+# with a matching Alertmanager inhibit rule and null route. TargetDown is left
+# out because PrometheusTargetScrapeFailed (files/scrape-health-rules.json)
+# already alerts per target, including in jobs too large to cross its 10%.
 local generalMixin = addMixin({
   name: 'general',
   namespace: 'monitoring-system',
   mixin: (import 'kube-prometheus/components/mixin/alerts/general.libsonnet') + {
     prometheusAlerts+:: {
       groups: [
-        g { rules: [r for r in g.rules if r.alert != 'InfoInhibitor'] }
+        g { rules: [r for r in g.rules if !std.member(['InfoInhibitor', 'TargetDown'], r.alert)] }
         for g in super.groups
       ],
     },
