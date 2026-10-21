@@ -9,6 +9,7 @@
 ["","oci-sha",["docker.io/golangci/golangci-lint:v2.14.0"],"sha256:ad862ba6b3798cbe0fd9fd7408d498fd74fbd2623a92406b2fd3898faf0bf98f"]
 ["","oci-sha",["docker.io/library/alpine:3.22"],"sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8"]
 ["","oci-sha",["docker.io/nixos/nix:2.35.2"],"sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c"]
+["","oci-sha",["docker.io/nixos/nix:2.35.3"],"sha256:ff480dbb23511aa1c10710aa068ceea5b93fed9bfce5f5379f3a6b07282cbc7b"]
 ["","oci-sha",["docker.io/rancher/k3s:v1.37.1-k3s1"],"sha256:ca7f37d993d82ef0dcdcfecb2e0e2618ea541dbaffc620c8cedebe01a82acd0d"]
 ["","oci-sha",["ghcr.io/cachix/devenv/devenv:v2.4.0"],"sha256:d45385cfc144d2277949462ef0219ae334b55df5805762b59e66a9a44cefdd2e"]
 ["","vanity-url",["https://dagger.io/sdk/helpers"],"https://github.com/dagger/sdk-helpers"]
