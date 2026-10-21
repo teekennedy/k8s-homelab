@@ -4,15 +4,15 @@ version: 0.1.51
 dependencies:
   - name: kube-prometheus-stack
     version: 92.1.0
-    repository: https://prometheus-community.github.io/helm-charts
+    repository: oci://ghcr.io/prometheus-community/charts
   - name: loki
     version: 7.3.0
-    repository: https://grafana.github.io/helm-charts
+    repository: oci://ghcr.io/grafana/helm-charts
     condition: loki.enabled
   - name: promtail
     version: 6.17.1
-    repository: https://grafana.github.io/helm-charts
+    repository: oci://ghcr.io/grafana/helm-charts
     condition: promtail.enabled
   - name: prometheus-blackbox-exporter
     version: 11.20.0
-    repository: https://prometheus-community.github.io/helm-charts
+    repository: oci://ghcr.io/prometheus-community/charts

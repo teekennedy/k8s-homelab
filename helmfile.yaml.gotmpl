@@ -15,44 +15,18 @@ environments:
 # and file:// dependencies need no entry. Names are arbitrary: helm matches
 # a dependency to its repository by URL.
 repositories:
-  - name: argo
-    url: https://argoproj.github.io/argo-helm
   - name: authelia
     url: https://charts.authelia.com
-  - name: bjw-s
-    url: https://bjw-s-labs.github.io/helm-charts
-  - name: cnpg
-    url: https://cloudnative-pg.github.io/charts
-  - name: crowdsec
-    url: https://crowdsecurity.github.io/helm-charts
   - name: csi-driver-nfs
     url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
   - name: csi-driver-smb
     url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-smb/master/charts
   - name: external-dns
     url: https://kubernetes-sigs.github.io/external-dns
-  - name: grafana
-    url: https://grafana.github.io/helm-charts
-  - name: intel
-    url: https://intel.github.io/helm-charts/
-  - name: jetstack
-    url: https://charts.jetstack.io
-  - name: kubereboot
-    url: https://kubereboot.github.io/charts
   - name: longhorn
     url: https://charts.longhorn.io
   - name: metallb
     url: https://metallb.github.io/metallb
-  - name: node-feature-discovery
-    url: https://kubernetes-sigs.github.io/node-feature-discovery/charts
-  - name: oauth2-proxy
-    url: https://oauth2-proxy.github.io/manifests
-  - name: prometheus-community
-    url: https://prometheus-community.github.io/helm-charts
-  - name: traefik
-    url: https://traefik.github.io/charts
-  - name: victoria-metrics
-    url: https://victoriametrics.github.io/helm-charts/
 
 templates:
   foundation:

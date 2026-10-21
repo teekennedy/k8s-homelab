@@ -7,4 +7,4 @@ appVersion: "sha256-1b6af2e9741e2ea24268a553a3699a0010344f02d6fa13d099357d72dd2e
 dependencies:
   - name: app-template
     version: 5.2.1
-    repository: https://bjw-s-labs.github.io/helm-charts
+    repository: oci://ghcr.io/bjw-s-labs/helm

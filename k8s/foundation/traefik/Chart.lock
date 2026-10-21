@@ -1,6 +1,6 @@
 dependencies:
 - name: traefik
-  repository: https://traefik.github.io/charts
+  repository: oci://ghcr.io/traefik/helm
   version: 41.7.1
-digest: sha256:8ea7cfe9c0105767719ebff81ca399de9934c5261a2b3b0020e1f2fe11c09bbf
-generated: "2026-10-21T18:25:33.962967113Z"
+digest: sha256:06cd3a13f437075da715a08744d676c65f8e6f3d8656b24cd10f3d3141b2f25e
+generated: "2026-10-21T12:44:28.890491-06:00"

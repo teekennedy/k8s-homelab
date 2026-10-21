@@ -4,4 +4,4 @@ version: 0.0.19
 dependencies:
   - name: traefik
     version: 41.7.1
-    repository: https://traefik.github.io/charts
+    repository: oci://ghcr.io/traefik/helm

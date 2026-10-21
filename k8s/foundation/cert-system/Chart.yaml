@@ -4,4 +4,4 @@ version: 0.2.0
 dependencies:
   - name: trust-manager
     version: v0.25.0
-    repository: https://charts.jetstack.io
+    repository: oci://quay.io/jetstack/charts

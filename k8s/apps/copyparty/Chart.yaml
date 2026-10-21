@@ -11,7 +11,7 @@ dependencies:
   # See values.yaml for why the shared platform instances can't be reused.
   - name: oauth2-proxy
     version: 10.7.1
-    repository: https://oauth2-proxy.github.io/manifests
+    repository: oci://ghcr.io/oauth2-proxy/charts
   # Shared glue for that instance: the mittwald/reflector Secret and the
   # forwardAuth + errors middleware pair. Library chart, renders nothing itself.
   - name: oauth2-proxy-instance

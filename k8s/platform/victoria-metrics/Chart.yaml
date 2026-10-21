@@ -7,4 +7,4 @@ appVersion: 1.153.0
 dependencies:
   - name: victoria-metrics-single
     version: 0.48.0
-    repository: https://victoriametrics.github.io/helm-charts/
+    repository: oci://ghcr.io/victoriametrics/helm-charts
