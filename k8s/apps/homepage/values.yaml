@@ -8,7 +8,7 @@ homepage:
   image:
     registry: ghcr.io
     repository: gethomepage/homepage
-    tag: "v2.5.0@sha256:57c4a0531937889c0b968b120fe9c2560bbe036b5c9e18c49a9e2479de9975d1"
+    tag: "v2.6.0@sha256:3e38fe788223cb46a3ce1f046ef11667b40f7707fdca0dcbfa3f86c5c42bf1e8"
   # Homepage owns the apex msng.to Ingress and gates it with OIDC login.
   ingress:
     enabled: true
@@ -101,7 +101,7 @@ secret-sync:
   enabled: true
   image:
     repository: golang
-    tag: 1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414
+    tag: 1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d
   rollout:
     enabled: true
     namespace: homepage
