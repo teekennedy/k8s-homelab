@@ -5,4 +5,6 @@ appVersion: "3.4.1"
 dependencies:
   - name: kubernetes-secret-generator
     version: "3.4.1"
-    repository: https://helm.mittwald.de
+    # TODO switch this back to https://helm.mittwald.de once that repo is working again.
+    # See https://github.com/mittwald/kubernetes-secret-generator/issues/115#issuecomment-6322640893
+    repository: oci://ghcr.io/loculus-project
