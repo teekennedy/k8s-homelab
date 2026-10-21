@@ -12,6 +12,14 @@ argo-cd:
     params:
       server.insecure: true
       controller.diff.server.side: false
+      # A webhook refreshes every app at once. Cap concurrent renders so
+      # they don't contend for CPU and network, and give each request time
+      # to wait in that queue: the helmfile plugin has no timeout of its
+      # own and inherits the caller's deadline (default 60s), which also
+      # covers time spent queued behind the parallelism limit.
+      reposerver.parallelism.limit: 6
+      controller.repo.server.timeout.seconds: 180
+      server.repo.server.timeout.seconds: 180
     # argocd-cm configmap
     cm:
       # ArgoCD's default annotation tracking stores a large amount of data in annotations for large resources.
@@ -113,6 +121,17 @@ argo-cd:
                   i=$((i + 1))
                 done
                 cd "${up:-.}"
+                # Concurrent renders share Helm's caches, but repositories.yaml
+                # is locked by `helm repo add` for the whole index download.
+                # Without --force-update, a repository that is already
+                # registered is skipped without a download, so the lock is
+                # only held for real work once per repository. The file is
+                # keyed by the helmfile's content so a renamed or re-pointed
+                # repository starts a fresh file rather than conflicting with
+                # an existing entry. `helm dependency build` still refreshes
+                # every index, outside the lock.
+                repos_key=$(sha256sum helmfile.yaml.gotmpl | cut -c1-16)
+                export HELM_REPOSITORY_CONFIG="$HELM_CONFIG_HOME/repositories-$repos_key.yaml"
                 # Render what ArgoCD's native Helm support would: CRDs
                 # included (left out, they would be pruned), and against the
                 # destination cluster's Kubernetes version and API versions
@@ -127,7 +146,7 @@ argo-cd:
                 if [ -n "${KUBE_API_VERSIONS:-}" ]; then
                   set -- "$@" --template-args "--api-versions $KUBE_API_VERSIONS"
                 fi
-                exec helmfile --environment "${ARGOCD_ENV_HELMFILE_ENVIRONMENT:-production}" --selector "name=$ARGOCD_APP_NAME" template "$@"
+                exec helmfile --disable-force-update --environment "${ARGOCD_ENV_HELMFILE_ENVIRONMENT:-production}" --selector "name=$ARGOCD_APP_NAME" template "$@"
   server:
     ingress:
       enabled: false
