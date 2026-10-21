@@ -1,0 +1,34 @@
+{{- $collector := index .Values "opentelemetry-collector" }}
+{{- if $collector.enabled }}
+# OTLP/HTTP for clients outside the cluster (local `dagger` runs). Internal
+# gateway only, and unauthenticated: anything on the LAN can push.
+#
+# Not the chart's httproute: its backendRefs can't set group and kind. Every
+# field the API server defaults (group, kind, weight) is spelled out, because
+# server-side apply otherwise reports the defaulted fields as drift.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $collector.fullnameOverride }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecure
+  hostnames:
+    - otel.msng.to
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ $collector.fullnameOverride }}
+          port: 4318
+          weight: 1
+{{- end }}

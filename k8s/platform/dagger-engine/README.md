@@ -53,10 +53,10 @@ and metrics when `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` and
   CLI spans carry the CI and git attributes; engine spans carry
   `service.name=unknown_service:dagger-engine` and the session ID.
 - Span → logs and span → metrics links are set up on the Tempo datasource.
-  Exec output is in Loki under `{service_name=~"dagger-.+"}` with `trace_id`
-  and `span_id` as structured metadata.
+  Exec output is in Loki under `{service_name=~"dagger-(cli|engine)"}` with
+  `trace_id` and `span_id` as structured metadata.
 - Exec metrics are `dagger_io_metrics_*{job="dagger-engine"}`, labelled with
-  `dagger_io_metrics_trace`, `dagger_io_metrics_span` and
+  `dagger_io_metrics_trace` and `dagger_io_metrics_span`, and some with
   `dagger_io_dag_digest`. The digest hashes the call's inputs, so it changes
   whenever a file the exec reads changes; it is not a stable name across runs.
   Each exec is a new series, so these stay in Prometheus' 7-day window
@@ -88,7 +88,9 @@ and metrics when `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` and
   `Container.withExec` descendants. Check span durations mix cached and real
   runs (a cached check still takes a few seconds).
 - TraceQL metrics reach back up to a week (`max_duration`), e.g. p90 duration
-  and failure rate per check, and p90 of only the checks whose execs ran:
+  and failure rate per check, and p90 of only the checks whose execs ran.
+  Quantiles come from power-of-two buckets, so they read as e.g. 8.6s or
+  17.2s:
 
   ```
   {span."dagger.io/check.name" != nil} | quantile_over_time(duration, .9) by (span."dagger.io/check.name")

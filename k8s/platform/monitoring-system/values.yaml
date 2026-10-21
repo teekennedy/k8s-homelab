@@ -83,7 +83,7 @@ kube-prometheus-stack:
             spanStartTimeShift: "-1m"
             spanEndTimeShift: "1m"
             customQuery: true
-            query: '{service_name=~"dagger-.+"} | trace_id="${__trace.traceId}" | span_id="${__span.spanId}"'
+            query: '{service_name=~"dagger-(cli|engine)"} | trace_id="${__trace.traceId}" | span_id="${__span.spanId}"'
           # Dagger's per-exec CPU, memory, IO and network metrics are labelled
           # with the span that ran the exec.
           tracesToMetrics:
@@ -874,23 +874,7 @@ opentelemetry-collector:
     capabilities:
       drop:
         - ALL
-  # OTLP/HTTP for clients outside the cluster (local `dagger` runs). Internal
-  # gateway only, and unauthenticated: anything on the LAN can push.
-  httproute:
-    enabled: true
-    parentRefs:
-      - name: traefik-gateway
-        namespace: kube-system
-        sectionName: websecure
-    hostnames:
-      - otel.msng.to
-    rules:
-      - matches:
-          - path:
-              type: PathPrefix
-              value: /v1/
-        backendRefs:
-          - port: 4318
+  # The otel.msng.to HTTPRoute is templates/otel-collector-httproute.yaml.
   # Replaces the chart's default config instead of merging with it: as a
   # subchart, `null` can't remove its default jaeger/zipkin/prometheus
   # receivers (helm/helm#12879).
