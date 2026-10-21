@@ -817,6 +817,14 @@ tempo:
         # TraceQL metrics (`{...} | rate()`, `quantile_over_time`) over up to a
         # week of spans; the default is 24h.
         max_duration: 168h
+    overrides:
+      defaults:
+        global:
+          # A whole `dagger check` run is one trace. A fully cached CI run is
+          # already ~17k spans and ~7MB, over the 5MB default, and Tempo drops
+          # every span past the limit (tempo_discarded_spans_total
+          # reason=trace_too_large), including the root span.
+          max_bytes_per_trace: 50000000
     resources:
       requests:
         cpu: 100m
