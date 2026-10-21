@@ -369,6 +369,17 @@
       }
     },
     {
+      "description": "Hold the self-hosted Renovate image at 44.160.1. From 44.161.0 the image's libcurl breaks git auth with a token-only URL, so Renovate can no longer clone Forgejo repos (see the image pin in k8s/platform/renovate/values.yaml). Remove once a newer image works.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/renovatebot/renovate",
+        "renovatebot/renovate"
+      ],
+      "allowedVersions": "<=44.160.1"
+    },
+    {
       "description": "Don't apply minimumReleaseAge to jellyfin image+appVersion so they stay grouped",
       "minimumReleaseAge": "0 days",
       "matchPackageNames": [
