@@ -14,7 +14,7 @@ import (
 // Container image constants with renovate annotations for automated updates.
 const (
 	// renovate: datasource=docker depName=nixos/nix
-	nixImageRef = "nixos/nix:2.35.2"
+	nixImageRef = "nixos/nix:2.35.3"
 )
 
 //go:embed scripts/nix-build-metrics-probe.sh
