@@ -16,7 +16,7 @@ image:
   # reasons (scripts/docker/base/build-no265.sh). See README.md.
   repository: copyparty/iv
   pullPolicy: IfNotPresent
-  tag: "1.20.24@sha256:90ade4c9f1e4e84a042799f584baf9d0c3cab946d06389458d01fd83e7411f26"
+  tag: "1.20.25@sha256:c88c2789a2308bf20b39766acc1e936c25e088a6dd324b1a4c4ddc8ac6a954b9"
 
 nameOverride: ""
 fullnameOverride: ""
