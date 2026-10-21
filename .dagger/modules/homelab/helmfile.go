@@ -181,21 +181,31 @@ func newRelease(source *dagger.Directory, chartPath, env string, container *dagg
 }
 
 // helmfileContainer mounts a scoped repo layout into the toolchain container.
-//
-// Helm's repository config and index cache are pointed at container-local
-// paths instead of the shared helm cache volumes. Helmfile registers every
-// repository in the state file on each run, and `helm repo add` holds the
-// repositories.yaml lock while it downloads the index; with one render per
-// release running in parallel, a shared file turns into a queue that outlasts
-// helm's lock timeout. A fresh config per exec also means a repository missing
-// from the state file fails here rather than being papered over by one that an
-// earlier run left registered.
+// Helm's config, index cache and chart cache stay on the toolchain's shared
+// cache volumes; see withRepoConfig for how execs share repositories.yaml.
 func helmfileContainer(toolchain *dagger.Container, source *dagger.Directory) *dagger.Container {
 	return toolchain.
-		WithEnvVariable("HELM_CONFIG_HOME", "/helmfile/helm/config").
-		WithEnvVariable("HELM_REPOSITORY_CACHE", "/helmfile/helm/repository").
 		WithMountedDirectory(helmRepoRoot, source).
 		WithWorkdir(helmRepoRoot)
+}
+
+// withRepoConfig wraps a helmfile command that registers repositories, running
+// it in a shell that points HELM_REPOSITORY_CONFIG at a repositories file named
+// after the state file's content. redirect is appended to the command, e.g.
+// " > /rendered.yaml".
+//
+// `helm repo add` holds the repositories file's lock while it downloads the
+// index, so parallel renders queue on a shared file unless an already
+// registered repository is skipped, which is what --disable-force-update does.
+// Keying the file by the state file's content keeps that safe: a repository
+// that is renamed, re-pointed or removed starts a fresh file, so it fails or
+// conflicts here rather than being papered over by an entry an earlier run
+// left behind. `helm dependency build` still refreshes every index, so a
+// chart version newer than the cached index resolves.
+func withRepoConfig(redirect string, command []string) []string {
+	script := `export HELM_REPOSITORY_CONFIG="$HELM_CONFIG_HOME/repositories-$(sha256sum ` +
+		helmfilePath + ` | cut -c1-16).yaml"; exec "$@"` + redirect
+	return append([]string{"sh", "-c", script, "--"}, command...)
 }
 
 // args returns a helmfile invocation scoped to this release and environment.
@@ -203,6 +213,7 @@ func (r *HelmfileRelease) args(command ...string) []string {
 	return append([]string{
 		"helmfile",
 		"--quiet",
+		"--disable-force-update",
 		"--environment", r.Environment,
 		"--selector", "name=" + r.Name,
 	}, command...)
@@ -217,11 +228,10 @@ func (r *HelmfileRelease) args(command ...string) []string {
 // matching release fails here: helmfile exits non-zero when the selector
 // matches nothing.
 func (r *HelmfileRelease) rendered() *dagger.Container {
-	// Redirected in a shell rather than with RedirectStdout, which still echoes
-	// every rendered manifest into the check's log.
-	redirect := []string{"sh", "-c", `exec "$@" > /rendered.yaml`, "--"}
+	// Redirected in the shell rather than with RedirectStdout, which still
+	// echoes every rendered manifest into the check's log.
 	return helmfileContainer(r.Container, r.Source).
-		WithExec(append(redirect, r.args("template", "--include-crds")...))
+		WithExec(withRepoConfig(" > /rendered.yaml", r.args("template", "--include-crds")))
 }
 
 // Build runs `helmfile template` on this release to verify it renders.

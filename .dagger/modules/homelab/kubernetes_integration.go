@@ -425,6 +425,7 @@ func checkEnabled(enabled, requested []string) error {
 func syncReleases(ctx context.Context, cluster *k3sCluster, plan []*integrationRelease, attempt int) error {
 	args := []string{
 		"helmfile",
+		"--disable-force-update",
 		"--environment", devEnvironment,
 		// A kubeconfig that is not this run's cluster has no context by this
 		// name, so helmfile fails rather than deploying somewhere else.
@@ -441,7 +442,7 @@ func syncReleases(ctx context.Context, cluster *k3sCluster, plan []*integrationR
 		ctr = ctr.WithEnvVariable("HOMELAB_HELMFILE_SYNC", strconv.Itoa(attempt))
 	}
 
-	if _, err := ctr.WithExec(args).Sync(ctx); err != nil {
+	if _, err := ctr.WithExec(withRepoConfig("", args)).Sync(ctx); err != nil {
 		return fmt.Errorf("helmfile sync (attempt %d) failed for %s in the %s environment: %w",
 			attempt, strings.Join(releaseNames(plan), ", "), devEnvironment, withExecOutput(err))
 	}

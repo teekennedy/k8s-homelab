@@ -2541,7 +2541,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Build",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Build runs `helmfile template` on this release to verify it renders.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 229, 1)).
+							WithSourceMap(dag.SourceMap("helmfile.go", 239, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("Kubeconform",
@@ -2559,7 +2559,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Validate",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Validate runs `helmfile lint` (helm lint with the release's merged values)\non this release, reusing the dependencies the render already built.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 239, 1)).
+							WithSourceMap(dag.SourceMap("helmfile.go", 249, 1)).
 							WithCheck()).
 					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Name is the release name.", SourceMap: dag.SourceMap("helmfile.go", 149, 2)}).
 					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the chart's directory relative to the repo root.", SourceMap: dag.SourceMap("helmfile.go", 151, 2)}).
