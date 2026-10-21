@@ -32,7 +32,7 @@ steps:
   - name: tag-release
     # The only image release_bot_token is released to; see
     # k8s/platform/woodpecker/values.yaml.
-    image: alpine/git@sha256:ce84fd6a057b4dc5cf5009da2dd832f1c6d096c1984bf50496cf3c256402264d
+    image: alpine/git@sha256:03228d7ded483b0b3e55e1de7fa660d70d3e1bb432fa7021d29e192640de11aa
     environment:
       FORGEJO_TOKEN:
         from_secret: release_bot_token
