@@ -7,7 +7,7 @@ image:
   repository: ghcr.io/openhands/agent-canvas
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "1.27.1@sha256:91b7a217dcbefe8c10562523b043458ed1dfaf8ba770194b319fe754cee03f23"
+  tag: "1.29.0@sha256:b2f742a9ec1b263e44f6ffaf9a1d04b17491c56de022d8e10d48c7cc05a56b6c"
 
 nameOverride: ""
 fullnameOverride: ""
@@ -118,7 +118,7 @@ remoteControl:
   # renovate: datasource=npm depName=@anthropic-ai/claude-code
   cliVersion: "2.1.273"
   # renovate: datasource=docker depName=node
-  nodeImage: node:24-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5
+  nodeImage: node:24-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
   # HOME for the session, on the volume below: the checkout, the trust record
   # and the CLI's own state all live here, so a restart resumes rather than
   # starts over.
@@ -222,7 +222,7 @@ appServer:
   # The python-flavoured tag ships an interpreter, so a pod start only fetches
   # the locked dependencies in files/app-server/uv.lock.
   # renovate: datasource=docker depName=ghcr.io/astral-sh/uv
-  image: ghcr.io/astral-sh/uv:python3.13-alpine@sha256:d739b9119aa2a83e34636abb747e7aff0891c14a798f6bd756f0e1e74530d34b
+  image: ghcr.io/astral-sh/uv:python3.13-alpine@sha256:e952f997ae794df0caf62bf814831d01b34e9141d1f3850d3cdc659c1790b18b
   port: 8080
   # Sandbox webhooks only. A port of its own so the NetworkPolicy can admit
   # sandbox pods to it and to nothing else on this server.
