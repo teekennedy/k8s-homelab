@@ -15,9 +15,28 @@ dagger-helm:
           "enabled": true,
           "maxUsedSpace": "150GB",
           "minFreeSpace": "15%"
+        },
+        "telemetry": {
+          "resourceMetrics": true
         }
       }
     kind: StatefulSet
+    # The engine's own telemetry. Session traces, logs and per-exec metrics
+    # are exported by each client (see README.md), not from here.
+    env:
+      # Prometheus /metrics: connected clients, dagql and local cache size.
+      - name: _EXPERIMENTAL_DAGGER_METRICS_ADDR
+        value: "0.0.0.0:8080"
+      # OTLP push for telemetry.resourceMetrics (engine cgroup CPU, memory,
+      # network). Only the metrics signal is set: the engine reads no other
+      # OTLP endpoint.
+      - name: OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+        value: http://otel-collector.monitoring-system.svc:4318/v1/metrics
+      - name: OTEL_EXPORTER_OTLP_METRICS_PROTOCOL
+        value: http/protobuf
+    containerPorts:
+      - name: metrics
+        containerPort: 8080
     resources:
       limits:
         cpu: "8"

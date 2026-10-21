@@ -19,4 +19,6 @@ steps:
       - export DAGGER_VERSION="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:v||p' k8s/platform/dagger-engine/values.yaml)"
       - test -n "$DAGGER_VERSION"
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
+      # Export the run's traces, logs and metrics to Grafana (Tempo/Loki/Prometheus).
+      - . scripts/dagger-otel-env.sh
       - timeout 25m dagger core engine local-cache prune

@@ -79,6 +79,18 @@ spec:
           port: 9000
         - protocol: TCP
           port: 8000
+    # OTLP/HTTP to the OpenTelemetry Collector, where the dagger CLI exports
+    # each pipeline's traces, logs and metrics.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+      ports:
+        - protocol: TCP
+          port: 4318
     # Public internet: apk mirrors, dl.dagger.io, and container registries.
     - to:
         - ipBlock:

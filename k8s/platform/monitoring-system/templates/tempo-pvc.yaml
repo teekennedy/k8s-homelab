@@ -1,0 +1,20 @@
+{{- if and .Values.tempo.enabled .Values.tempo.persistence.enabled }}
+# The Tempo chart can't label its volumeClaimTemplate, so its PVC is declared
+# here under the name the StatefulSet expects, and the StatefulSet adopts it.
+# Traces are disposable: the volume is trimmed but never backed up.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-{{ .Release.Name }}-tempo-0
+  namespace: {{ .Release.Namespace }}
+  labels:
+    recurring-job.longhorn.io/source: "enabled"
+    recurring-job-group.longhorn.io/ephemeral: "enabled"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.tempo.persistence.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.tempo.persistence.size }}
+{{- end }}
