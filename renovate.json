@@ -496,6 +496,25 @@
       ]
     },
     {
+      "description": "The Grafana plugin catalog API carries no repository link, so point Renovate at each plugin's GitHub repo to render release notes in the PR.",
+      "matchDatasources": [
+        "custom.grafana-plugins"
+      ],
+      "matchPackageNames": [
+        "grafana-metricsdrilldown-app"
+      ],
+      "sourceUrl": "https://github.com/grafana/metrics-drilldown"
+    },
+    {
+      "matchDatasources": [
+        "custom.grafana-plugins"
+      ],
+      "matchPackageNames": [
+        "grafana-lokiexplore-app"
+      ],
+      "sourceUrl": "https://github.com/grafana/logs-drilldown"
+    },
+    {
       "description": "Track smallstep/step-cli changelog from GitHub releases",
       "matchDatasources": [
         "docker"
