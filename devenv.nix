@@ -130,6 +130,9 @@ in {
       # Don't prompt me to sign up for dagger cloud
       env.DAGGER_NO_NAG = "1";
       env.DAGGER_X_RELEASE = "v1.0.0-beta.17";
+      # Checks at once. Their containers share the engine pod's memory limit,
+      # and running all of them together OOM-kills it.
+      env.DAGGER_CHECK_PARALLEL = "12";
 
       enterShell = ''
         mkdir -p "$(dirname "$KUBECONFIG")"

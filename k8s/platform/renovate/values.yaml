@@ -105,6 +105,10 @@ renovate:
     #
     # NIX_CI_REPOSITORIES lists the repos whose dagger runs get the remote Nix
     # builders; see files/dagger.sh.
+    #
+    # DAGGER_CHECK_PARALLEL caps how many checks, or with files/dagger.sh how
+    # many generators, run at once: their containers share the engine pod's
+    # memory limit.
     config: |
       {
         "platform": "forgejo",
@@ -119,7 +123,8 @@ renovate:
           "DAGGER_NO_NAG": "1",
           "KUBERNETES_SERVICE_HOST": "kubernetes.default.svc",
           "KUBERNETES_SERVICE_PORT": "443",
-          "NIX_CI_REPOSITORIES": "ops/k8s-homelab"
+          "NIX_CI_REPOSITORIES": "ops/k8s-homelab",
+          "DAGGER_CHECK_PARALLEL": "12"
         }
       }
     persistence:

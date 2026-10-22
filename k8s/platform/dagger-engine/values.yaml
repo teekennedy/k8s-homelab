@@ -38,10 +38,6 @@ dagger-helm:
         value: http://otel-collector.monitoring-system.svc:4318/v1/metrics
       - name: OTEL_EXPORTER_OTLP_METRICS_PROTOCOL
         value: http/protobuf
-    # Caps concurrent build steps engine-wide, however many clients connect.
-    # Keep it well above the CPU count: module functions hold a slot while
-    # waiting on nested calls, so low values can deadlock.
-    args: ["--oci-max-parallelism=16"]
     containerPorts:
       - name: metrics
         containerPort: 8080

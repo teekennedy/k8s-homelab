@@ -9,6 +9,9 @@ steps:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"
       # Don't prompt for dagger cloud sign up
       DAGGER_NO_NAG: "1"
+      # Checks at once. Their containers share the engine pod's memory limit,
+      # and running all of them together OOM-kills it.
+      DAGGER_CHECK_PARALLEL: "12"
     backend_options:
       kubernetes:
         serviceAccountName: dagger-pipeline
