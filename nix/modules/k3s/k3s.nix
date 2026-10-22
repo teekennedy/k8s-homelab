@@ -56,7 +56,10 @@ in {
         kubectl
       ]
       ++ lib.optionals isServer [
-        etcd.deps.etcdctl # having etcdctl is helpful when you need to manage the cluster
+        # Etcd 3.7 package has no passthru deps as of 2026-10-22. Fallback to 3.6 for now.
+        # TODO switch to etcd 3.7 etcdctl once its available through passthru deps.
+        # See https://github.com/NixOS/nixpkgs/blob/nixos-unstable/pkgs/by-name/et/etcd_3_7/package.nix
+        etcd_3_6.deps.etcdctl # having etcdctl is helpful when you need to manage the cluster
       ];
 
     # Increase the inotify user instance limit.
