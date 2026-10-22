@@ -110,6 +110,11 @@ and that store is kept apart from the usual one, which holds such paths. The
 signed-only store then only ever holds paths from cache.nixos.org or the
 builders, which sign everything they build with the cluster key.
 
+The container doesn't need to trust that key. It never substitutes from the
+builders, and Nix's build hook imports a build's outputs without checking
+signatures, keeping the ones they carry. It is the builder receiving a path
+that checks them, against its own trusted keys, which include the cluster key.
+
 ### Connection sharing
 
 Nix hands each derivation to a builder from a `nix __build-remote` process of
