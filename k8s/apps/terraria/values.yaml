@@ -107,7 +107,7 @@ app-template:
         discord-bot:
           image:
             repository: ghcr.io/astral-sh/uv
-            tag: alpine@sha256:325c1a47db636422f3d1e6a935a0a9d0e6395031665e5baa033d1691ddc9c27e
+            tag: alpine@sha256:6ba9c830aa848d21e1e9d8028ae01ed02b08980b25aeabef9a6683c5743c6d0f
             pullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
