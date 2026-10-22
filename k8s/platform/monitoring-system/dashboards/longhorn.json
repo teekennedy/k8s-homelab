@@ -160,7 +160,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "count(longhorn_volume_robustness{volume=~\"$volume\"}==1) OR on() vector(0)",
+          "expr": "count(longhorn_volume_robustness{volume=~\"$volume\", state=\"healthy\"}==1) OR on() vector(0)",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -341,7 +341,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "count(longhorn_volume_robustness{volume=~\"$volume\"}==2) OR on() vector(0)",
+          "expr": "count(longhorn_volume_robustness{volume=~\"$volume\", state=\"degraded\"}==1) OR on() vector(0)",
           "interval": "",
           "legendFormat": "",
           "range": true,
@@ -408,7 +408,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "count(longhorn_volume_robustness{volume=~\"$volume\"}==3) OR on() vector(0)",
+          "expr": "count(longhorn_volume_robustness{volume=~\"$volume\", state=\"faulted\"}==1) OR on() vector(0)",
           "interval": "",
           "legendFormat": "",
           "range": true,

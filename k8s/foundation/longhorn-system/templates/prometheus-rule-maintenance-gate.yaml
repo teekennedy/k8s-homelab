@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# Maintenance gate: don't reboot a node while any volume is missing a healthy
+# replica. A reboot takes that node's replicas offline, so starting one before
+# the previous node's rebuilds finish can leave a volume with no healthy
+# replica at all.
+#
+# kured blocks reboots while any alert outside its alertFilterRegexp is firing.
+# LonghornVolumeDegraded is routed to the null receiver in the
+# monitoring-system values; LonghornVolumeStatusWarning is the one that notifies.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: longhorn-maintenance-gate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: maintenance-gates
+      interval: 30s
+      rules:
+        # No `for:` -- the gate has to be armed before kured's next check.
+        - alert: LonghornVolumeDegraded
+          expr: longhorn_volume_robustness{state="degraded"} == 1
+          labels:
+            severity: info
+            component: storage
+          annotations:
+            summary: {{ "Longhorn volume {{ $labels.pvc_namespace }}/{{ $labels.pvc }} is degraded" | quote }}
+            description: {{ "Longhorn volume {{ $labels.volume }} is missing a healthy replica. Automated node reboots are blocked until it is rebuilt." | quote }}
+        # Fails closed: if the metric disappears or changes shape, the gate
+        # above can no longer fire, so block reboots instead.
+        - alert: LonghornVolumeHealthUnknown
+          expr: absent(longhorn_volume_robustness{state="degraded"})
+          for: 10m
+          labels:
+            severity: warning
+            component: storage
+          annotations:
+            summary: "Longhorn volume robustness metrics are missing"
+            description: "longhorn_volume_robustness{state=\"degraded\"} is absent, so degraded volumes cannot be detected. Automated node reboots are blocked until the metric returns."
