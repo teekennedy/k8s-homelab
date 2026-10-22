@@ -41,7 +41,7 @@ dagger-helm:
     # Caps concurrent build steps engine-wide, however many clients connect.
     # Keep it well above the CPU count: module functions hold a slot while
     # waiting on nested calls, so low values can deadlock.
-    args: ["--oci-max-parallelism=50"]
+    args: ["--oci-max-parallelism=16"]
     containerPorts:
       - name: metrics
         containerPort: 8080
