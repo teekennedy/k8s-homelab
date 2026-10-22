@@ -2,6 +2,14 @@
 
 These modules contain everything externally needed to setup the k8s cluster. It uses OpenTofu for applying state.
 
+## Lock files
+
+Every module that declares `required_providers` has its own `.terraform.lock.hcl`, including child modules like `backup/`, `k8s-secret/` and `k8s-configmap/`. OpenTofu ignores a child module's lock file and only uses the lock file of the root module being applied. The child modules' lock files are there for Renovate.
+
+Renovate writes a provider update to the lock file in the module's own directory, or to the nearest parent directory's if it has none. When two modules share one lock file, Renovate lists that file twice in its commit. Its post-upgrade step (`dagger generate terraform --generator lock`) only replaces the first copy, and the stale second copy is what gets committed. The lock file then fails the `terraform/modules/lock/stale` check.
+
+`dagger generate terraform --generator lock -y` treats every directory with a lock file as a module. To add a lock file to a new module, create an empty `.terraform.lock.hcl` there and run that command.
+
 ## State
 
 State lives in S3 with DynamoDB locking, provisioned by the [`tfstate-backend/`](tfstate-backend) module:
