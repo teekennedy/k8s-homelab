@@ -2329,12 +2329,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithCheck().
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 130, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.lock", "!nix/modules/selfupdate/build-metrics/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}}))).
 			WithObject(
-				dag.TypeDef().WithObject("NixBuilders", dagger.TypeDefWithObjectOpts{Description: "NixBuilders hands the module's Nix and devenv builds to remote builders.\n\nA build uses them when the machines are set, the SSH agent is forwarded,\nand at least one machine answers a probe. Otherwise, or when the remote\nattempt fails for a reason that is not the build's own, it builds in the\ncontainer as it does without builders.", SourceMap: dag.SourceMap("nix_builders.go", 44, 6)}).
+				dag.TypeDef().WithObject("NixBuilders", dagger.TypeDefWithObjectOpts{Description: "NixBuilders hands the module's Nix and devenv builds to remote builders.\n\nA build uses them when the machines are set, the SSH agent is forwarded,\nand at least one machine answers a probe. Otherwise, or when the remote\nattempt fails for a reason that is not the build's own, it builds in the\ncontainer as it does without builders.", SourceMap: dag.SourceMap("nix_builders.go", 45, 6)}).
 					WithFunction(
 						dag.Function("Status",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
 							WithDescription("Status probes every configured builder and reports which ones a build\nwould use. It always probes afresh, unlike a build, which reuses a probe\nfor a few minutes.").
-							WithSourceMap(dag.SourceMap("nix_builders.go", 89, 1)))).
+							WithSourceMap(dag.SourceMap("nix_builders.go", 90, 1)))).
 			WithObject(
 				dag.TypeDef().WithObject("Python", dagger.TypeDefWithObjectOpts{Description: "Python runs Python checks over every project in the repo.", SourceMap: dag.SourceMap("python.go", 30, 6)}).
 					WithFunction(

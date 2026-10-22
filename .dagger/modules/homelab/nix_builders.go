@@ -9,6 +9,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -99,7 +100,18 @@ func (b *NixBuilders) Status(ctx context.Context) (string, error) {
 		out.WriteString("no SSH agent forwarded: set the sshAuthSock setting\n")
 		return out.String(), nil
 	}
-	probes, err := b.probe(ctx, time.Now().Format(time.RFC3339Nano))
+	machines, system, err := b.forEngine(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, skipped := range nixMachinesExcept(b.Machines, machines) {
+		fmt.Fprintf(&out, "%-11s %s: does not build %s, the engine's system\n", "skipped", nixMachineURI(skipped), system)
+	}
+	if len(machines) == 0 {
+		fmt.Fprintf(&out, "no builder builds %s: builds run in the container\n", system)
+		return out.String(), nil
+	}
+	probes, err := b.probe(ctx, machines, time.Now().Format(time.RFC3339Nano))
 	if err != nil {
 		return "", err
 	}
@@ -109,7 +121,7 @@ func (b *NixBuilders) Status(ctx context.Context) (string, error) {
 	if remote := newRemoteNix(b, probes); remote == nil {
 		out.WriteString("no builder answered: builds run in the container\n")
 	} else {
-		fmt.Fprintf(&out, "builds use %d of %d builders, %s\n", len(remote.machines), len(probes), remote.mode())
+		fmt.Fprintf(&out, "builds use %d of %d builders, %s\n", len(remote.machines), len(b.Machines), remote.mode())
 	}
 	return out.String(), nil
 }
@@ -206,13 +218,21 @@ func (r *remoteNix) mode() string {
 // remote probes the builders and returns the ones that answered, or nil when
 // none did.
 func (b *NixBuilders) remote(ctx context.Context) (*remoteNix, error) {
-	window := time.Now().Truncate(nixBuildersProbeWindow).Format(time.RFC3339)
-	probes, err := b.probe(ctx, window)
+	for _, warning := range b.Warnings {
+		warnf("nix builders: %s", warning)
+	}
+	machines, system, err := b.forEngine(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for _, warning := range b.Warnings {
-		warnf("nix builders: %s", warning)
+	if len(machines) == 0 {
+		infof("building in the container: no remote Nix builder builds %s, the engine's system", system)
+		return nil, nil
+	}
+	window := time.Now().Truncate(nixBuildersProbeWindow).Format(time.RFC3339)
+	probes, err := b.probe(ctx, machines, window)
+	if err != nil {
+		return nil, err
 	}
 	remote := newRemoteNix(b, probes)
 	if remote == nil {
@@ -235,11 +255,78 @@ type nixProbe struct {
 	detail  string
 }
 
-// probe asks every machine's daemon for its store info. window keys the
+// forEngine returns the machines that build for the engine's platform, which
+// is what every build in the module targets, and that platform's Nix system.
+// The others could only ever decline: an Apple-silicon engine's builds are
+// aarch64-linux, which an x86_64-linux builder cannot build.
+func (b *NixBuilders) forEngine(ctx context.Context) ([]string, string, error) {
+	platform, err := dag.DefaultPlatform(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading the engine's platform: %w", err)
+	}
+	system := nixSystem(platform)
+	if system == "" {
+		return b.Machines, string(platform), nil
+	}
+	var machines []string
+	for _, machine := range b.Machines {
+		if nixMachineBuilds(machine, system) {
+			machines = append(machines, machine)
+		}
+	}
+	return machines, system, nil
+}
+
+// nixSystem is the Nix system a Linux platform builds for, or "" for one this
+// module does not know, whose machines are then all kept.
+func nixSystem(platform dagger.Platform) string {
+	osArch := strings.Split(string(platform), "/")
+	if len(osArch) < 2 || osArch[0] != "linux" {
+		return ""
+	}
+	arch, ok := map[string]string{
+		"amd64":   "x86_64",
+		"arm64":   "aarch64",
+		"386":     "i686",
+		"riscv64": "riscv64",
+	}[osArch[1]]
+	if !ok {
+		return ""
+	}
+	return arch + "-linux"
+}
+
+// nixMachineBuilds reports whether a machine line lists system. A line with no
+// systems field, or "-" in it, builds for whatever the client is, as in Nix.
+func nixMachineBuilds(machine, system string) bool {
+	fields := strings.Fields(machine)
+	if len(fields) < 2 || fields[1] == "-" {
+		return true
+	}
+	for s := range strings.SplitSeq(fields[1], ",") {
+		if s == system {
+			return true
+		}
+	}
+	return false
+}
+
+// nixMachinesExcept returns the machines in all that are not in kept.
+func nixMachinesExcept(all, kept []string) []string {
+	var rest []string
+	for _, machine := range all {
+		if !slices.Contains(kept, machine) {
+			rest = append(rest, machine)
+		}
+	}
+	return rest
+}
+
+// probe asks each machine's daemon for its store info. window keys the
 // probe's cache: the same window reuses an earlier answer.
-func (b *NixBuilders) probe(ctx context.Context, window string) ([]nixProbe, error) {
+func (b *NixBuilders) probe(ctx context.Context, machines []string, window string) ([]nixProbe, error) {
 	out, err := b.withSSH(nixImage()).
-		WithNewFile(nixBuildersDir+"/candidates", strings.Join(b.Machines, "\n")+"\n").
+		WithNewFile(nixBuildersDir+"/candidates", strings.Join(machines, "\n")+"\n").
 		WithNewFile("/probe.sh", nixBuildersProbeScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
 		WithEnvVariable("HOMELAB_NIX_PROBE_WINDOW", window).
 		WithExec([]string{"/probe.sh"}).

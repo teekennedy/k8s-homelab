@@ -65,16 +65,22 @@ certificate's secret in `woodpecker`, and nothing else there.
 
 ## What happens in a build
 
-1. **Probe.** A small container asks every machine's daemon for its store
+1. **Match the engine.** Every build targets the engine's platform, so only
+   machines that list its Nix system are kept: on an Apple-silicon engine
+   (`aarch64-linux`), x86_64-linux builders are skipped. With none left the
+   build is exactly what it is without builders, cache keys included, so the
+   settings can stay on while you switch between engines. A machine that
+   lists no system is kept, as Nix treats it as the client's.
+2. **Probe.** A small container asks every machine's daemon for its store
    info over ssh, in parallel, and records whether it answered and whether
    it trusts the caller. Builds within the same five-minute window share one
    probe.
-2. **Build.** If any machine answered, the build runs with
+3. **Build.** If any machine answered, the build runs with
    `builders = @/etc/homelab-nix/machines`, `builders-use-substitutes = true`,
    and the agent and an ssh_config mounted. Images without an ssh client
    (devenv's) get the Nix image's, copied into their store from a binary
    cache.
-3. **Fallback.** If the build fails with something only a missing builder
+4. **Fallback.** If the build fails with something only a missing builder
    explains ("cannot build on", "failed to start SSH", a rejected signature,
    ...; `remoteNixFailures` in `nix_builders.go`), it runs again in the
    container, without builders. Any other failure, such as a compile error,

@@ -99,3 +99,34 @@ func TestNixBuildersSSHConfig(t *testing.T) {
 		t.Error("no ssh_config to include, but the config includes one")
 	}
 }
+
+func TestNixSystem(t *testing.T) {
+	for platform, want := range map[dagger.Platform]string{
+		"linux/amd64":    "x86_64-linux",
+		"linux/arm64/v8": "aarch64-linux",
+		"linux/arm64":    "aarch64-linux",
+		"linux/s390x":    "",
+		"darwin/arm64":   "",
+	} {
+		if got := nixSystem(platform); got != want {
+			t.Errorf("nixSystem(%q) = %q, want %q", platform, got, want)
+		}
+	}
+}
+
+func TestNixMachineBuilds(t *testing.T) {
+	for _, tc := range []struct {
+		machine string
+		builds  bool
+	}{
+		{"ssh-ng://borg-1 x86_64-linux - 4 4", false},
+		{"ssh-ng://mac aarch64-linux,x86_64-linux - 4 4", true},
+		{"ssh-ng://mac aarch64-linux", true},
+		{"ssh-ng://anything", true},
+		{"ssh-ng://anything - - 1", true},
+	} {
+		if got := nixMachineBuilds(tc.machine, "aarch64-linux"); got != tc.builds {
+			t.Errorf("nixMachineBuilds(%q, aarch64-linux) = %v, want %v", tc.machine, got, tc.builds)
+		}
+	}
+}
