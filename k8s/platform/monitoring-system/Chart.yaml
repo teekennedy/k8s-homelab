@@ -1,6 +1,6 @@
 apiVersion: v2
 name: kube-prometheus-stack
-version: 0.1.59
+version: 0.1.60
 dependencies:
   - name: kube-prometheus-stack
     version: 92.11.0
@@ -14,7 +14,7 @@ dependencies:
     repository: oci://ghcr.io/grafana/helm-charts
     condition: promtail.enabled
   - name: prometheus-blackbox-exporter
-    version: 11.20.1
+    version: 11.20.2
     repository: oci://ghcr.io/prometheus-community/charts
   - name: tempo
     version: 3.2.1
