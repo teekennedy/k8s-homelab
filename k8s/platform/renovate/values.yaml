@@ -102,6 +102,9 @@ renovate:
     # the child env, so kubectl falls back to localhost:8080 and every dial
     # fails. The .svc name is used rather than the ClusterIP so this does not
     # hardcode the service CIDR; it is covered by the apiserver cert SANs.
+    #
+    # NIX_CI_REPOSITORIES lists the repos whose dagger runs get the remote Nix
+    # builders; see files/dagger.sh.
     config: |
       {
         "platform": "forgejo",
@@ -115,7 +118,8 @@ renovate:
           "_EXPERIMENTAL_DAGGER_RUNNER_HOST": "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine",
           "DAGGER_NO_NAG": "1",
           "KUBERNETES_SERVICE_HOST": "kubernetes.default.svc",
-          "KUBERNETES_SERVICE_PORT": "443"
+          "KUBERNETES_SERVICE_PORT": "443",
+          "NIX_CI_REPOSITORIES": "ops/k8s-homelab"
         }
       }
     persistence:
@@ -178,3 +182,9 @@ renovate:
 daggerEngine:
   namespace: dagger-engine
   pod: dagger-engine-dagger-helm-engine-0
+
+# The nix-ci SSH certificate files/dagger.sh hands the remote Nix builders.
+# templates/dagger-rbac.yaml grants reading it; the wrapper's defaults match.
+nixBuilders:
+  certNamespace: woodpecker
+  certSecretName: nix-ci-ssh-cert

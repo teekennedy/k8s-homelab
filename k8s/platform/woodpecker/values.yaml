@@ -223,6 +223,10 @@ woodpecker-resources:
 daggerEngine:
   namespace: dagger-engine
   pod: dagger-engine-dagger-helm-engine-0
+  # The short-lived SSH certificate pipelines forward to Dagger for remote Nix
+  # builds, as the nix-ci login on the borg hosts. Written by the
+  # deploybot-ssh-cert-issuer CronJob in cert-system.
+  nixBuildersCertSecretName: nix-ci-ssh-cert
 
 # Ordered reboot rollout for the borg hosts. See
 # templates/nixos-rollout-cronjob.yaml and nix/modules/selfupdate.

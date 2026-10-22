@@ -304,7 +304,7 @@ four ways this goes wrong, and Alertmanager routes them to Discord by default:
 | host module, scripts | `nix/modules/selfupdate/` |
 | forge fetch account | `forgejo-resources.users` in `k8s/platform/forgejo/values.yaml` |
 | build metrics parser | `nix/modules/selfupdate/build-metrics/` |
-| peer substituters | `nix/modules/builders/` |
+| peer substituters, CI's `nix-ci` builder login | `nix/modules/builders/` |
 | SSH CA + issuer | `k8s/foundation/cert-system/templates/deploybot-ssh-ca.yaml` |
 | RBAC, rollout job, netpol | `k8s/platform/woodpecker/templates/` |
 | rollout script, known_hosts | `k8s/platform/woodpecker/files/` |

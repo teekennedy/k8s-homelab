@@ -38,7 +38,7 @@ every type a module defines with the module's name.
 dagger.toml                 # the workspace: the module, the Go SDK
 dagger.lock                 # pinned versions of remote modules and the Go SDK
 .dagger/
-  docs/                     # operating manuals: kubernetes.md, release.md
+  docs/                     # operating manuals: kubernetes.md, nix-builders.md, release.md
   modules/homelab/
     dagger-module.toml
     main.go                 # Homelab: the constructor and one accessor per toolchain
@@ -88,6 +88,7 @@ types too, through `dagger.Connect()`.
 | `kubernetes` | | | | `integration-test`, `integration-reports`, `dev-cluster`, `dev-cluster-delete` |
 | `lab` | | `build` | `update-vendor-hash` | `binary`, `binary-nix` |
 | `nix` | | `validate`, `validate-build-metrics` | `format` | `image` |
+| `nix-builders` | | | | `status` |
 | `python` | `projects` | per project: `test` | per project: `format`, `lock` | |
 | `release` | | `build-dockerfiles`, `test-scripts` | | `image`, `publish` |
 | `terraform` | `modules` | `lint`; per module: `validate` | `format`; per module: `lock` | |
@@ -95,8 +96,9 @@ types too, through `dagger.Connect()`.
 | `yaml` | | `lint` | | |
 
 `dagger api call <toolchain> <function> --help` documents each function's
-arguments. Two have operating manuals of their own:
-[kubernetes](docs/kubernetes.md) (integration tests and dev clusters) and
+arguments. Three have operating manuals of their own:
+[kubernetes](docs/kubernetes.md) (integration tests and dev clusters),
+[nix-builders](docs/nix-builders.md) (remote Nix builders) and
 [release](docs/release.md) (container releases).
 
 ## How the module is put together
@@ -117,7 +119,8 @@ func (h *Homelab) Go(ctx context.Context) *Go {
 ```
 
 `kubernetes` gets the `ci` and `integration` profiles instead, which add kubectl
-and curl, and `lab` also gets the plain Nix image for its Nix builds. The cache
+and curl, and `lab` and `nix` also get the remote Nix builders, if any are
+configured, for their Nix builds. The cache
 tests construct a toolchain directly, with a cheap stand-in for the container
 instead of a Nix build.
 
@@ -130,7 +133,9 @@ include that profile, reads all of `cmd/lab` from `devenvSource`.
 
 The exceptions build with plain Nix rather than devenv: `nix/validate`,
 `nix/validate-build-metrics`'s probe, and `lab/build`, `lab binary-nix` and
-`lab/update-vendor-hash`.
+`lab/update-vendor-hash`. All but the probe, which needs a cold store, keep
+their store and Nix's fetcher cache in cache volumes, and can hand their builds
+to [remote builders](docs/nix-builders.md), as can the devenv builds.
 
 ### The published devenv-ci image
 

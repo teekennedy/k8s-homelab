@@ -29,16 +29,18 @@ steps:
       kubernetes:
         serviceAccountName: dagger-pipeline
     commands:
-      - apk add --no-cache curl kubectl jq git git-cliff
+      - apk add --no-cache curl kubectl jq git git-cliff openssh-client
       # The CLI must match the in-cluster engine, so take its version from there.
       - export DAGGER_VERSION="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:v||p' k8s/platform/dagger-engine/values.yaml)"
       - test -n "$DAGGER_VERSION"
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       # Export the run's traces, logs and metrics to Grafana (Tempo/Loki/Prometheus).
       - . scripts/dagger-otel-env.sh
+      # Remote Nix builds on the borg hosts: dagger.toml's ci env.
+      - . scripts/nix-ci-ssh-agent.sh
       - git config --global --add safe.directory "$CI_WORKSPACE"
       - scripts/release-metadata.sh "$CI_COMMIT_TAG" > /tmp/release-metadata.json
-      - dagger api call release publish --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env:GHCR_ACCESS_TOKEN --metadata=/tmp/release-metadata.json
+      - dagger --env ci api call release publish --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env:GHCR_ACCESS_TOKEN --metadata=/tmp/release-metadata.json
       # Record the published devenv-ci image for the next step to commit.
       - |
         case "$CI_COMMIT_TAG" in

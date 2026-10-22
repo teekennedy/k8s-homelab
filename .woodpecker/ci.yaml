@@ -14,14 +14,16 @@ steps:
         serviceAccountName: dagger-pipeline
     commands:
       # kubectl is needed for dagger cli to communicate with the runner host
-      - apk add --no-cache curl git kubectl
+      - apk add --no-cache curl git kubectl openssh-client
       # The CLI must match the in-cluster engine, so take its version from there.
       - export DAGGER_VERSION="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:v||p' k8s/platform/dagger-engine/values.yaml)"
       - test -n "$DAGGER_VERSION"
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       # Export the run's traces, logs and metrics to Grafana (Tempo/Loki/Prometheus).
       - . scripts/dagger-otel-env.sh
+      # Remote Nix builds on the borg hosts: dagger.toml's ci env.
+      - . scripts/nix-ci-ssh-agent.sh
       # A warm run takes ~18m; a cold engine cache with other runs in flight can
       # take far longer. Kept well under the pipeline timeout so a check that
       # drifts this slow still fails loudly.
-      - timeout 40m dagger check --progress=report
+      - timeout 40m dagger --env ci check --progress=report

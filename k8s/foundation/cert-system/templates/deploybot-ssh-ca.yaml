@@ -144,26 +144,36 @@ spec:
                   set -eu
                   apk add --no-cache openssh-keygen >/dev/null 2>&1
 
-                  # A fresh keypair every run, so the private key rotates rather
-                  # than just the certificate over it.
-                  ssh-keygen -q -t ed25519 -N '' -C "woodpecker-deploybot" -f /tmp/id
+                  # Issues one credential: a fresh keypair every run, so the
+                  # private key rotates rather than just the certificate over it.
+                  issue() {
+                    secret=$1 principal=$2
+                    rm -f /tmp/id /tmp/id.pub /tmp/id-cert.pub
+                    ssh-keygen -q -t ed25519 -N '' -C "woodpecker-$principal" -f /tmp/id
 
-                  # Validity deliberately outruns the schedule so there is always
-                  # an overlap window; a pipeline that started just before a
-                  # reissue keeps working with the credential it already read.
-                  ssh-keygen -q -s /ca/ca \
-                    -I "woodpecker-$(date -u +%Y%m%dT%H%M%SZ)" \
-                    -n "$PRINCIPAL" \
-                    -V "-5m:+$VALIDITY" \
-                    -z "$(date +%s)" \
-                    /tmp/id.pub
+                    # Validity deliberately outruns the schedule so there is
+                    # always an overlap window; a pipeline that started just
+                    # before a reissue keeps working with the credential it
+                    # already read.
+                    ssh-keygen -q -s /ca/ca \
+                      -I "woodpecker-$principal-$(date -u +%Y%m%dT%H%M%SZ)" \
+                      -n "$principal" \
+                      -V "-5m:+$VALIDITY" \
+                      -z "$(date +%s)" \
+                      /tmp/id.pub
 
-                  kubectl -n "$TARGET_NAMESPACE" create secret generic "$SECRET_NAME" \
-                    --from-file=id_ed25519=/tmp/id \
-                    --from-file=id_ed25519-cert.pub=/tmp/id-cert.pub \
-                    --dry-run=client -o yaml | kubectl apply -f -
+                    kubectl -n "$TARGET_NAMESPACE" create secret generic "$secret" \
+                      --from-file=id_ed25519=/tmp/id \
+                      --from-file=id_ed25519-cert.pub=/tmp/id-cert.pub \
+                      --dry-run=client -o yaml | kubectl apply -f -
 
-                  ssh-keygen -L -f /tmp/id-cert.pub
+                    ssh-keygen -L -f /tmp/id-cert.pub
+                  }
+
+                  issue "$SECRET_NAME" "$PRINCIPAL"
+                  for cert in $EXTRA_CERTS; do
+                    issue "${cert%%=*}" "${cert#*=}"
+                  done
               env:
                 - name: TARGET_NAMESPACE
                   value: {{ $ca.targetNamespace | quote }}
@@ -173,6 +183,9 @@ spec:
                   value: {{ $ca.principal | quote }}
                 - name: VALIDITY
                   value: {{ $ca.validity | quote }}
+                # secret=principal pairs, one credential each.
+                - name: EXTRA_CERTS
+                  value: {{ $ca.extraCerts | join " " | quote }}
               volumeMounts:
                 - name: ca
                   mountPath: /ca

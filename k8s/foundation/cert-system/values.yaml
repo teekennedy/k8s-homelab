@@ -49,6 +49,11 @@ deploybotSshCa:
   # Must match services.nixos-selfupdate.user in nix/modules/selfupdate, which
   # is what sshd matches the certificate's principal against.
   principal: deploybot
+  # Further credentials from the same CA, as secret=principal, each published
+  # beside certSecretName. Each principal is a login of its own on the hosts.
+  extraCerts:
+    # Remote Nix builds from CI's Dagger checks; nix/modules/builders.
+    - nix-ci-ssh-cert=nix-ci
   # Reissued twice as often as it expires, so there is always an overlap window.
   schedule: "0 */6 * * *"
   validity: 12h

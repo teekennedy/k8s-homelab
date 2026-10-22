@@ -181,6 +181,16 @@ func (r *Homelab) Nix() *HomelabNix {
 	}
 }
 
+// NixBuilders reports on the remote Nix builders the Nix and devenv builds use.
+func (r *Homelab) NixBuilders() *HomelabNixBuilders {
+	q := r.query.Select("nixBuilders")
+
+	return &HomelabNixBuilders{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
 // Python tests and formats every Python project in the repo.
 func (r *Homelab) Python() *HomelabPython {
 	q := r.query.Select("python")
@@ -2734,6 +2744,102 @@ func (r *HomelabNix) ValidateBuildMetrics(ctx context.Context, opts ...HomelabNi
 	return q.Execute(ctx)
 }
 
+// NixBuilders hands the module's Nix and devenv builds to remote builders.
+//
+// A build uses them when the machines are set, the SSH agent is forwarded,
+// and at least one machine answers a probe. Otherwise, or when the remote
+// attempt fails for a reason that is not the build's own, it builds in the
+// container as it does without builders.
+type HomelabNixBuilders struct { // homelab (../../../../../:0:0)
+	query *querybuilder.Selection
+	// refetchID is set when this object is built through a field marked
+	// @reevaluate: it fetches its ID on every use, so each use evaluates that
+	// field again.
+	refetchID bool
+
+	id     *ID
+	status *string
+}
+
+func (r *HomelabNixBuilders) WithGraphQLQuery(q *querybuilder.Selection) *HomelabNixBuilders {
+	return &HomelabNixBuilders{
+		query: q,
+		// The query's origin is unknown: it may go through a field that
+		// must be reevaluated.
+		refetchID: true,
+	}
+}
+
+// A unique identifier for this HomelabNixBuilders.
+func (r *HomelabNixBuilders) ID(ctx context.Context) (ID, error) {
+	if r.id != nil {
+		return *r.id, nil
+	}
+	q := r.query.Select("id")
+
+	var response ID
+
+	q = q.Bind(&response)
+	if r.refetchID {
+		return response, q.Execute(ctx)
+	}
+	return memoizedID(ctx, r.query, func() (ID, error) {
+		err := q.Execute(ctx)
+		return response, err
+	})
+}
+
+// XXX_GraphQLType is an internal function. It returns the native GraphQL type name
+func (r *HomelabNixBuilders) XXX_GraphQLType() string {
+	return "HomelabNixBuilders"
+}
+
+// XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
+func (r *HomelabNixBuilders) XXX_GraphQLIDType() string {
+	return "ID"
+}
+
+// XXX_GraphQLID is an internal function. It returns the underlying type ID
+func (r *HomelabNixBuilders) XXX_GraphQLID(ctx context.Context) (string, error) {
+	id, err := r.ID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return string(id), nil
+}
+
+func (r *HomelabNixBuilders) MarshalJSON() ([]byte, error) {
+	id, err := r.ID(marshalCtx)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(id)
+}
+func (r *HomelabNixBuilders) UnmarshalJSON(bs []byte) error {
+	var id string
+	err := json.Unmarshal(bs, &id)
+	if err != nil {
+		return err
+	}
+	*r = HomelabNixBuilders{query: selectNode(dag.QueryBuilder(), id, "HomelabNixBuilders")}
+	return nil
+}
+
+// Status probes every configured builder and reports which ones a build
+// would use. It always probes afresh, unlike a build, which reuses a probe
+// for a few minutes.
+func (r *HomelabNixBuilders) Status(ctx context.Context) (string, error) {
+	if r.status != nil {
+		return *r.status, nil
+	}
+	q := r.query.Select("status")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
 // Python runs Python checks over every project in the repo.
 type HomelabPython struct { // homelab (../../../../../:0:0)
 	query *querybuilder.Selection
@@ -3927,6 +4033,23 @@ type HomelabOpts struct {
 	// derived from devenvSource would carry its identity, Go files and all.
 	// Keep it in step with toolchainFiles.
 	ToolchainSource *Directory
+	// Remote builders for the Nix and devenv builds, in the format of Nix's
+	// `builders` setting: one machine per line or per ";", such as the
+	// contents of /etc/nix/machines. Only ssh-ng:// and ssh:// machines are
+	// used, and they authenticate with sshAuthSock alone. Builds fall back to
+	// the container when no builder answers.
+	NixBuilders string
+	// The SSH agent the builders authenticate with, as unix:///path/to/socket.
+	// Only the agent is forwarded; no key leaves the host.
+	SSHAuthSock *Socket
+	// An ssh_config for reaching the builders, such as ~/.ssh/config. Its
+	// IdentityFile, known_hosts and connection-sharing options are overridden.
+	SSHConfig *File
+	// The user to log in to the builders as, where neither their machine URI
+	// nor sshConfig names one.
+	SSHUser string
+	// The builders' SSH host keys.
+	SSHKnownHosts *File
 }
 
 func (r *Query) Homelab(opts ...HomelabOpts) *Homelab { // homelab (../../../../../:0:0)
@@ -3939,6 +4062,26 @@ func (r *Query) Homelab(opts ...HomelabOpts) *Homelab { // homelab (../../../../
 		// `toolchainSource` optional argument
 		if !querybuilder.IsZeroValue(opts[i].ToolchainSource) {
 			q = q.Arg("toolchainSource", opts[i].ToolchainSource)
+		}
+		// `nixBuilders` optional argument
+		if !querybuilder.IsZeroValue(opts[i].NixBuilders) {
+			q = q.Arg("nixBuilders", opts[i].NixBuilders)
+		}
+		// `sshAuthSock` optional argument
+		if !querybuilder.IsZeroValue(opts[i].SSHAuthSock) {
+			q = q.Arg("sshAuthSock", opts[i].SSHAuthSock)
+		}
+		// `sshConfig` optional argument
+		if !querybuilder.IsZeroValue(opts[i].SSHConfig) {
+			q = q.Arg("sshConfig", opts[i].SSHConfig)
+		}
+		// `sshUser` optional argument
+		if !querybuilder.IsZeroValue(opts[i].SSHUser) {
+			q = q.Arg("sshUser", opts[i].SSHUser)
+		}
+		// `sshKnownHosts` optional argument
+		if !querybuilder.IsZeroValue(opts[i].SSHKnownHosts) {
+			q = q.Arg("sshKnownHosts", opts[i].SSHKnownHosts)
 		}
 	}
 

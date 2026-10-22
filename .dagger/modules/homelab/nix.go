@@ -24,6 +24,8 @@ var nixBuildMetricsProbe string
 type Nix struct {
 	// +private
 	Container *dagger.Container
+	// +private
+	Builders *NixBuilders
 }
 
 // Image returns the plain Nix image, for evaluating and building flakes.
@@ -34,6 +36,27 @@ func (m *Nix) Image() *dagger.Container {
 // nixImage is the plain Nix image, for evaluating and building flakes.
 func nixImage() *dagger.Container {
 	return dag.Container().From(nixImageRef)
+}
+
+// nixImageStore is the Nix image with a persistent store (see nixStore) and
+// Nix's fetcher and evaluation caches, so a build only fetches or builds what
+// changed since the last one. The volumes are keyed by the image, whose own
+// Nix lives in the store they are seeded from.
+func nixImageStore(signedOnly bool) *dagger.Container {
+	key := "homelab-nix-store-"
+	if signedOnly {
+		key = "homelab-nix-store-signed-"
+	}
+	return nixImage().
+		WithMountedCache("/nix", dag.CacheVolume(key+nixImageRef), dagger.ContainerWithMountedCacheOpts{
+			Source: nixImage().Directory("/nix"),
+		}).
+		WithMountedCache("/root/.cache/nix", dag.CacheVolume("homelab-nix-cache-home"))
+}
+
+// nixCommand is a nix invocation with the features every flake command needs.
+func nixCommand(args ...string) []string {
+	return append([]string{"nix", "--extra-experimental-features", "nix-command flakes"}, args...)
 }
 
 // Format formats Nix files with alejandra and removes dead code with deadnix.
@@ -81,11 +104,15 @@ func (m *Nix) Validate(ctx context.Context,
 	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"]
 	source *dagger.Directory,
 ) error {
-	_, err := m.Image().
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "flake", "check", "--no-build"}).
-		Sync(ctx)
+	checked, err := m.Builders.build(ctx, nixImageStore, func(env nixEnv) *dagger.Container {
+		return env.Container.
+			WithMountedDirectory("/src", source).
+			WithWorkdir("/src").
+			WithExec(env.Exec(nixCommand("flake", "check", "--no-build")))
+	})
+	if err == nil {
+		_, err = checked.Sync(ctx)
+	}
 	if err != nil {
 		return fmt.Errorf("nix flake check failed: %w", withExecOutput(err))
 	}

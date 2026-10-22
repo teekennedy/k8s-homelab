@@ -11,3 +11,16 @@ module = "dagger-go-sdk"
 
 [sdks.go.scopes.".dagger/modules/homelab"]
 is-module = true
+
+# `dagger --env ci`, which the Woodpecker pipelines run with: remote Nix builds
+# on the borg hosts as the untrusted nix-ci login (nix/modules/builders), with
+# the agent scripts/nix-ci-ssh-agent.sh starts. Job counts and speed factors
+# are the ones a workstation's /etc/nix/machines gives the same hosts.
+[env.ci.modules.homelab.settings]
+nixBuilders = """
+ssh-ng://nix-ci@10.69.80.10 x86_64-linux - 1 1 nixos-test,big-parallel,kvm
+ssh-ng://nix-ci@10.69.80.11 x86_64-linux - 4 4 nixos-test,big-parallel,kvm
+ssh-ng://nix-ci@10.69.80.12 x86_64-linux - 4 4 nixos-test,big-parallel,kvm
+ssh-ng://nix-ci@10.69.80.13 x86_64-linux - 2 2 nixos-test,big-parallel,kvm
+"""
+sshAuthSock = "unix:///tmp/nix-ci-agent.sock"

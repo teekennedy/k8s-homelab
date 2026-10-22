@@ -34,6 +34,8 @@ type Devenv struct {
 	// invalidate the container every check runs in.
 	// +private
 	ToolchainSource *dagger.Directory
+	// +private
+	Builders *NixBuilders
 }
 
 // ciProfiles are the profiles of the toolchain the checks run in, and of the
@@ -51,34 +53,41 @@ var ciProfiles = []string{"ci"}
 // It is built without the lab CLI's source, so it cannot build the
 // "interactive" profile, which installs the CLI; use Container for that.
 func (m *Devenv) Toolchain(
+	ctx context.Context,
 	// devenv profiles to activate (https://devenv.sh/profiles/).
 	// +optional
 	// +default=["ci"]
 	profiles []string,
-) *dagger.Container {
-	return withToolchainCaches(devenvShell(m.ToolchainSource, nil, profiles))
+) (*dagger.Container, error) {
+	shell, err := m.shell(ctx, m.ToolchainSource, nil, profiles)
+	if err != nil {
+		return nil, err
+	}
+	return withToolchainCaches(shell), nil
 }
 
 // CiToolchain is Toolchain for the "ci" profile, the container every check
 // runs in, taken from the published devenv-ci image when that image is what a
 // build would produce: see publishedCiShell. Otherwise it is built, as
 // Toolchain builds it.
-func (m *Devenv) CiToolchain(ctx context.Context) *dagger.Container {
+func (m *Devenv) CiToolchain(ctx context.Context) (*dagger.Container, error) {
 	shell, err := m.publishedCiShell(ctx)
 	if err != nil {
 		warnf("building the devenv ci toolchain from source: %v", err)
 	}
 	if shell == nil {
-		shell = devenvShell(m.ToolchainSource, nil, ciProfiles)
+		if shell, err = m.shell(ctx, m.ToolchainSource, nil, ciProfiles); err != nil {
+			return nil, err
+		}
 	}
-	return withToolchainCaches(shell)
+	return withToolchainCaches(shell), nil
 }
 
 // IntegrationToolchain is Toolchain for the "ci" and "integration" profiles:
 // the container the Kubernetes integration workflow runs in. No release
 // publishes it, so it is always built.
-func (m *Devenv) IntegrationToolchain() *dagger.Container {
-	return m.Toolchain([]string{"ci", "integration"})
+func (m *Devenv) IntegrationToolchain(ctx context.Context) (*dagger.Container, error) {
+	return m.Toolchain(ctx, []string{"ci", "integration"})
 }
 
 // Container builds the devenv nix environment as a minimal "from scratch"
@@ -87,6 +96,7 @@ func (m *Devenv) IntegrationToolchain() *dagger.Container {
 // (no build dependencies). The nix store is cached across runs so packages are
 // only built once.
 func (m *Devenv) Container(
+	ctx context.Context,
 	// Optional host nix daemon socket for faster builds on NixOS CI hosts.
 	// When provided, the host daemon's store is used as a substituter so
 	// pre-built packages are fetched rather than rebuilt from source.
@@ -103,15 +113,18 @@ func (m *Devenv) Container(
 	// +optional
 	// +default=["ci"]
 	profiles []string,
-) *dagger.Container {
+) (*dagger.Container, error) {
 	description := "Devenv shell profiles: " + strings.Join(profiles, ", ")
 	if len(profiles) == 1 && profiles[0] == "ci" {
 		description = "Devenv shell CI profile"
 	} else if len(profiles) == 0 {
 		description = "Devenv shell"
 	}
-	return withImageLabels(devenvShell(m.Source, nixDaemon, profiles),
-		imageLabels("Devenv shell", description, imageSource))
+	shell, err := m.shell(ctx, m.Source, nixDaemon, profiles)
+	if err != nil {
+		return nil, err
+	}
+	return withImageLabels(shell, imageLabels("Devenv shell", description, imageSource)), nil
 }
 
 // withImageLabels sets labels, and the OCI ones as manifest annotations too.
@@ -135,7 +148,15 @@ func withImageLabels(container *dagger.Container, labels map[string]string) *dag
 // cache volume name includes the image tag so it auto-invalidates when the
 // devenv image is updated (e.g. by Renovate).
 func devenvContainer() *dagger.Container {
+	return devenvStore(false)
+}
+
+// devenvStore is devenvContainer on either store; see nixStore.
+func devenvStore(signedOnly bool) *dagger.Container {
 	nixCacheKey := "devenv-nix-" + devenvImage
+	if signedOnly {
+		nixCacheKey = "devenv-nix-signed-" + devenvImage
+	}
 	baseNix := dag.Container().From(devenvImage).WithUser("root").Directory("/nix")
 
 	return dag.Container().
@@ -148,30 +169,25 @@ func devenvContainer() *dagger.Container {
 		WithEnvVariable("DEVENV_ZSH_DISABLE", "1")
 }
 
-// devenvShell builds the devenv shell for the given profiles as a minimal
-// "from scratch" container.
+// shell builds the devenv shell for the given profiles as a minimal "from
+// scratch" container, on the remote builders when they can be used.
 //
 // `devenv container copy shell` produces a nix2container image holding only the
 // runtime closure. That image's config carries devenv's own `env.*` settings
 // (SSL_CERT_FILE, the UV_PYTHON_* pins, DEVENV_PROFILE) but not PATH, so PATH
 // is set here by expanding DEVENV_PROFILE, which contains exactly the packages
 // the active profiles declare.
-func devenvShell(
+func (m *Devenv) shell(
+	ctx context.Context,
 	source *dagger.Directory,
 	nixDaemon *dagger.Socket,
 	profiles []string,
-) *dagger.Container {
-	builder := devenvContainer().
-		WithDirectory("/devenv", source).
-		WithWorkdir("/devenv")
-
+) (*dagger.Container, error) {
 	devenvOpts := []string{"--no-tui", "--option", "devenv.warnOnNewVersion:bool", "false"}
 	for _, p := range profiles {
 		devenvOpts = append(devenvOpts, "--profile", p)
 	}
 	if nixDaemon != nil {
-		builder = builder.
-			WithUnixSocket("/nix/var/nix/daemon-socket/socket", nixDaemon)
 		// Use the host daemon as a substituter. The "daemon" keyword connects
 		// to the socket at the default path (/nix/var/nix/daemon-socket/socket).
 		// This works on NixOS CI hosts where architecture matches the container.
@@ -187,14 +203,31 @@ func devenvShell(
 	// The --registry flag accepts any skopeo transport, including docker-archive.
 	// The container name ("shell") is appended to the registry path by devenv,
 	// so "docker-archive:/tmp/" produces the file "/tmp/shell".
-	tarball := builder.
-		WithExec(append([]string{"devenv", "build", "shell"}, devenvOpts...)).
-		WithExec(append([]string{"devenv", "container", "copy", "shell", "--registry", "docker-archive:/tmp/"}, devenvOpts...)).
-		File("/tmp/shell")
+	//
+	// The host daemon's paths are taken unsigned, which the remote store must
+	// never hold (see remoteNix.configure), so it rules out the builders.
+	builders := m.Builders
+	if nixDaemon != nil {
+		builders = nil
+	}
+	built, err := builders.build(ctx, devenvStore, func(env nixEnv) *dagger.Container {
+		builder := env.Container.
+			WithDirectory("/devenv", source).
+			WithWorkdir("/devenv")
+		if nixDaemon != nil {
+			builder = builder.WithUnixSocket("/nix/var/nix/daemon-socket/socket", nixDaemon)
+		}
+		return builder.
+			WithExec(env.Exec(append([]string{"devenv", "build", "shell"}, devenvOpts...))).
+			WithExec(env.Exec(append([]string{"devenv", "container", "copy", "shell", "--registry", "docker-archive:/tmp/"}, devenvOpts...)))
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	return dag.Container().Import(tarball).
+	return dag.Container().Import(built.File("/tmp/shell")).
 		WithEnvVariable("PATH", "$DEVENV_PROFILE/bin:/bin", dagger.ContainerWithEnvVariableOpts{Expand: true}).
-		WithWorkdir("/src")
+		WithWorkdir("/src"), nil
 }
 
 // withToolchainCaches attaches the caches every language toolchain in the ci

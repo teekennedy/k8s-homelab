@@ -9,6 +9,9 @@
 #   nix.builders.remoteClusters         — consumer: hand builds *to* peers
 #   nix.builders.substituteFromClusters — consumer: fetch already-built paths from peers
 #
+# Providers also accept builds from CI as the untrusted nix-ci user; see the
+# provider block below.
+#
 # A cluster with members that both accept and forward builds (the first two
 # options) leads to an infinite loop of build forwarding. Members of a build
 # cluster that substitute for one another (options 1 and 3) do not have this
@@ -46,6 +49,15 @@
 
   isClusterMember = cfg.cluster != null;
 
+  # CI logs in as ciUser with a short-lived OpenSSH certificate signed by the
+  # cluster's SSH user CA, the one the deploybot login trusts. Until its public
+  # key exists there is no CI login.
+  ciUser = "nix-ci";
+  userCaKeyFile =
+    if builtins.pathExists ../selfupdate/deploybot_user_ca.pub
+    then ../selfupdate/deploybot_user_ca.pub
+    else null;
+
   # Lower number wins. cache.nixos.org advertises 40, so this puts a peer on the
   # LAN ahead of the public cache for any path both of them have, which is the
   # point: the transfer is local and the path is already signed by the cluster
@@ -54,6 +66,10 @@
   peerPriority = 30;
 
   peerStore = host: "ssh-ng://nixbuilder@${host.address}?priority=${toString peerPriority}";
+
+  # Control sockets for the peer connections. Only root, which nix-daemon and
+  # its build hook run as, can use the nixbuilder key, so only root gets them.
+  controlDir = "/run/nix-builders-ssh";
   peerStores = hosts: lib.mapAttrsToList (_: peerStore) hosts;
 in {
   imports = [inputs.sops-nix.nixosModules.sops];
@@ -149,6 +165,32 @@ in {
         ["/run/secrets/cluster_signing_key"];
     })
 
+    # Provider: accept builds from CI.
+    #
+    # The CI pipeline's Dagger checks run code from the pull request, so the
+    # account they reach is not a trusted user: its daemon only builds
+    # derivations in the sandbox and only accepts signed or content-addressed
+    # paths, so it cannot place arbitrary contents at a store path the hosts
+    # might later use. The principal's options leave the certificate good for
+    # nothing but the daemon protocol: no shell, pty or forwarding.
+    (lib.mkIf (isClusterMember && userCaKeyFile != null) {
+      users.users.${ciUser} = {
+        isSystemUser = true;
+        group = ciUser;
+        # The forced command runs through the login shell, so it cannot be
+        # nologin.
+        shell = pkgs.bashInteractive;
+        home = "/var/empty";
+        description = "CI remote Nix builds";
+        openssh.authorizedPrincipals = [
+          ''restrict,command="/run/current-system/sw/bin/nix-daemon --stdio" ${ciUser}''
+        ];
+      };
+      users.groups.${ciUser} = {};
+
+      services.openssh.settings.TrustedUserCAKeys = "${userCaKeyFile}";
+    })
+
     # Trust signed paths from any cluster member (applies to providers and consumers)
     (lib.mkIf (builtins.pathExists ./cluster-signing_ed25519.pub) {
       nix.settings.trusted-public-keys = [
@@ -187,6 +229,13 @@ in {
     })
 
     # One ssh config for both consumer roles.
+    #
+    # Connections to a peer are shared. Nix opens one per store it talks to, and
+    # each derivation handed to a builder runs in a build hook process of its
+    # own, as does each daemon worker looking a path up in the peers, so
+    # without a master every one of them pays a full ssh handshake. Nix only
+    # starts a master itself for stores with more than one connection, and
+    # uses one ssh_config provides when `ssh -O check` finds it running.
     (lib.mkIf (sshHosts != {} && cfg.sshKeyFile != null) {
       programs.ssh.extraConfig = lib.concatStringsSep "\n" (lib.mapAttrsToList (_: host: ''
           Host ${host.address}
@@ -194,8 +243,14 @@ in {
             IdentityFile ${cfg.sshKeyFile}
             StrictHostKeyChecking no
             ConnectTimeout 5
+          Match host ${host.address} localuser root
+            ControlMaster auto
+            ControlPath ${controlDir}/%C
+            ControlPersist 120
         '')
         sshHosts);
+
+      systemd.tmpfiles.rules = ["d ${controlDir} 0700 root root -"];
     })
   ];
 }

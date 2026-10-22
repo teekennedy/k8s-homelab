@@ -40,12 +40,16 @@ func (m *Lab) UpdateVendorHash(
 	//
 	// Sync forces the exec here rather than when the caller evaluates the
 	// changeset, so a script failure surfaces with its output attached.
-	updated, err := m.Nix.
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src").
-		WithNewFile("/go-vendor-hash.sh", goVendorHashScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
-		WithExec([]string{"/go-vendor-hash.sh", labModuleDir, labFlakeAttr}).
-		Sync(ctx)
+	updated, err := m.Builders.build(ctx, nixImageStore, func(env nixEnv) *dagger.Container {
+		return env.Container.
+			WithMountedDirectory("/src", source).
+			WithWorkdir("/src").
+			WithNewFile("/go-vendor-hash.sh", goVendorHashScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
+			WithExec(env.Exec([]string{"/go-vendor-hash.sh", labModuleDir, labFlakeAttr}))
+	})
+	if err == nil {
+		updated, err = updated.Sync(ctx)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("recomputing %s vendor hash: %w", labModuleDir, err)
 	}

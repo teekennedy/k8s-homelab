@@ -31,3 +31,32 @@ roleRef:
   kind: Role
   name: renovate-dagger-exec
   apiGroup: rbac.authorization.k8s.io
+---
+# files/dagger.sh reads the short-lived nix-ci SSH certificate, which
+# cert-system publishes beside the pipelines' copy in woodpecker, to give the
+# post-upgrade tasks' Nix builds the remote builders. get on that one secret,
+# and nothing else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: renovate-nix-builders
+  namespace: {{ .Values.nixBuilders.certNamespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ .Values.nixBuilders.certSecretName | quote }}]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: renovate-nix-builders
+  namespace: {{ .Values.nixBuilders.certNamespace }}
+subjects:
+  - kind: ServiceAccount
+    name: renovate
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: renovate-nix-builders
+  apiGroup: rbac.authorization.k8s.io

@@ -18,7 +18,7 @@ type Lab struct {
 	// +private
 	Container *dagger.Container
 	// +private
-	Nix *dagger.Container
+	Builders *NixBuilders
 }
 
 // Build builds the lab CLI binary using Nix.
@@ -29,11 +29,10 @@ func (m *Lab) Build(ctx context.Context,
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
 ) error {
-	_, err := m.Nix.
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "build", "./cmd/lab", "--print-build-logs"}).
-		Sync(ctx)
+	built, err := m.nixBuild(ctx, source, "--no-link", "--print-build-logs")
+	if err == nil {
+		_, err = built.Sync(ctx)
+	}
 	if err != nil {
 		return fmt.Errorf("nix build failed: %w", err)
 	}
@@ -80,13 +79,28 @@ func splitPlatform(platform dagger.Platform) (goos, goarch string) {
 
 // BinaryNix returns the built lab CLI binary, built with Nix.
 func (m *Lab) BinaryNix(
+	ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!cmd/lab/**/*"]
 	source *dagger.Directory,
-) *dagger.File {
-	return m.Nix.
-		WithMountedDirectory("/src", source).
-		WithWorkdir("/src").
-		WithExec([]string{"nix", "--extra-experimental-features", "nix-command flakes", "build", "./cmd/lab"}).
-		File("/src/result/bin/lab")
+) (*dagger.File, error) {
+	built, err := m.nixBuild(ctx, source, "--out-link", "/tmp/result")
+	if err != nil {
+		return nil, err
+	}
+	// The result links into the store, a cache volume that is not part of the
+	// container's filesystem, so the binary is copied out of it.
+	return built.
+		WithExec([]string{"cp", "-L", "/tmp/result/bin/lab", "/tmp/lab"}).
+		File("/tmp/lab"), nil
+}
+
+// nixBuild builds the lab CLI's flake with args.
+func (m *Lab) nixBuild(ctx context.Context, source *dagger.Directory, args ...string) (*dagger.Container, error) {
+	return m.Builders.build(ctx, nixImageStore, func(env nixEnv) *dagger.Container {
+		return env.Container.
+			WithMountedDirectory("/src", source).
+			WithWorkdir("/src").
+			WithExec(env.Exec(nixCommand(append([]string{"build", "./cmd/lab"}, args...)...)))
+	})
 }

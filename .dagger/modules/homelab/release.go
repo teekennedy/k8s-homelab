@@ -178,7 +178,10 @@ func (m *Release) Image(
 	}
 	var container *dagger.Container
 	if len(artifact.Profiles) > 0 {
-		container = m.Devenv.Container(nil, artifact.Profiles)
+		var err error
+		if container, err = m.Devenv.Container(ctx, nil, artifact.Profiles); err != nil {
+			return nil, err
+		}
 	} else {
 		container = ws.Directory(project.Directory, dagger.WorkspaceDirectoryOpts{Gitignore: true}).DockerBuild()
 	}

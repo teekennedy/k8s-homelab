@@ -140,6 +140,14 @@ type HomelabNixValidateOpts = core.HomelabNixValidateOpts
 // HomelabNixValidateBuildMetricsOpts contains options for HomelabNix.ValidateBuildMetrics
 type HomelabNixValidateBuildMetricsOpts = core.HomelabNixValidateBuildMetricsOpts
 
+// NixBuilders hands the module's Nix and devenv builds to remote builders.
+//
+// A build uses them when the machines are set, the SSH agent is forwarded,
+// and at least one machine answers a probe. Otherwise, or when the remote
+// attempt fails for a reason that is not the build's own, it builds in the
+// container as it does without builders.
+type HomelabNixBuilders = core.HomelabNixBuilders
+
 // Python runs Python checks over every project in the repo.
 type HomelabPython = core.HomelabPython
 
