@@ -43,7 +43,7 @@ exporter:
     # fetch exporter.py's own dependencies. The bare `uv` image would download a
     # whole CPython first.
     repository: ghcr.io/astral-sh/uv
-    tag: python3.14-alpine@sha256:0cb69bb18ffcd57db04f045010b0234132a111da70dde5a393d26ad288d38e13
+    tag: python3.14-alpine@sha256:4ce2a2ef69130ffb97688c8446ae771415035406355fbcb7932c59a535f82888
   # Same non-root uid/gid as the jellyfin container. The exporter only ever
   # writes to its own emptyDir.
   runAsUser: 1200
@@ -72,7 +72,7 @@ app-template:
         jellyfin-debug:
           image:
             repository: alpine
-            tag: latest@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+            tag: latest@sha256:c6b073f8e9e58d881f6ffba6ebf3b9ebd60b9e7d6e8337018c0e68bb5c356873
           command:
             - sleep
             - infinity
