@@ -2211,8 +2211,8 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Update",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Update runs `devenv update` for every discovered devenv project and\nreturns the combined changeset. Each project runs in its own container\nwith only its own scoped source mounted, so a lock change in one project\ndoesn't invalidate the cache for the others.\n\nDeliberately not tagged +generate. +generate implies a reproducible step\nthat recomputes a value from other checked-in inputs (like\nlab's update-vendor-hash). devenv update instead fetches whatever the latest\ncommit happens to be for each input right now, so running it twice in a\nrow can produce different output — it belongs to CI as a scheduled\n\"refresh\" step, not as generated code to keep in sync.\nUse `dagger api call devenv update --auto-apply` to apply.").
-							WithSourceMap(dag.SourceMap("devenv_projects.go", 109, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("devenv_projects.go", 113, 2), DefaultPath: "/", Ignore: []string{"*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"}}))).
+							WithSourceMap(dag.SourceMap("devenv_projects.go", 112, 1)).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("devenv_projects.go", 116, 2), DefaultPath: "/", Ignore: []string{"*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"}}))).
 			WithObject(
 				dag.TypeDef().WithObject("Go", dagger.TypeDefWithObjectOpts{Description: "Go runs Go checks over every module in the repo.", SourceMap: dag.SourceMap("go.go", 31, 6)}).
 					WithFunction(

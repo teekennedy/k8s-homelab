@@ -91,7 +91,10 @@ func (p *DevenvProject) Update(ctx context.Context) (*dagger.Changeset, error) {
 		return nil, fmt.Errorf("devenv update failed in %s: %w", p.Path, err)
 	}
 
-	return updated.Directory("/src").Changes(p.Source), nil
+	// devenv also writes its (gitignored) .devenv state dir; only the lock
+	// file is an intended output.
+	lock := updated.File("/src/devenv.lock")
+	return p.Source.WithFile("devenv.lock", lock).Changes(p.Source), nil
 }
 
 // Update runs `devenv update` for every discovered devenv project and
