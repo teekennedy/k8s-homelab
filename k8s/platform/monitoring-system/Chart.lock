@@ -4,7 +4,7 @@ dependencies:
   version: 92.11.0
 - name: loki
   repository: oci://ghcr.io/grafana/helm-charts
-  version: 7.3.0
+  version: 7.5.0
 - name: promtail
   repository: oci://ghcr.io/grafana/helm-charts
   version: 6.17.1
@@ -17,5 +17,5 @@ dependencies:
 - name: opentelemetry-collector
   repository: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
   version: 0.176.1
-digest: sha256:9b601ba1b91215e67849de282b7e90794ef095cf7fb6289e59766d5411544071
-generated: "2026-10-21T23:24:46.462122643Z"
+digest: sha256:2fe9e8fda06e9bdd771a59e62f86d18eee7323aee2a0cc826ca13d8e25dbb324
+generated: "2026-10-22T13:26:02.691446972Z"
