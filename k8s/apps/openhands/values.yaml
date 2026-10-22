@@ -222,7 +222,7 @@ appServer:
   # The python-flavoured tag ships an interpreter, so a pod start only fetches
   # the locked dependencies in files/app-server/uv.lock.
   # renovate: datasource=docker depName=ghcr.io/astral-sh/uv
-  image: ghcr.io/astral-sh/uv:python3.13-alpine@sha256:e952f997ae794df0caf62bf814831d01b34e9141d1f3850d3cdc659c1790b18b
+  image: ghcr.io/astral-sh/uv:python3.13-alpine@sha256:1fd17509ae6051e6cad9dc1b83705483c0b24a15740b3c4d230b6b6f2e2a0241
   port: 8080
   # Sandbox webhooks only. A port of its own so the NetworkPolicy can admit
   # sandbox pods to it and to nothing else on this server.
