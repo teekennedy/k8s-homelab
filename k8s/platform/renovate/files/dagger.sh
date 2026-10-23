@@ -82,25 +82,6 @@ nix_ci_agent() {
 	rm -rf "${dir}"
 }
 
-# `dagger generate` has the --parallel of `dagger check` but not its
-# DAGGER_CHECK_PARALLEL default, so give it the same one: the generators'
-# containers share the engine pod's memory limit as the checks' do.
-args=()
-subcommand=
-for arg in "$@"; do
-	args+=("${arg}")
-	if [ -z "${subcommand}" ] && [ "${arg#-}" = "${arg}" ]; then
-		subcommand="${arg}"
-		if [ "${arg}" = generate ] && [ -n "${DAGGER_CHECK_PARALLEL:-}" ]; then
-			case " $* " in
-			*" -j "* | *" -j="* | *" --parallel "* | *" --parallel="*) ;;
-			*) args+=(--parallel "${DAGGER_CHECK_PARALLEL}") ;;
-			esac
-		fi
-	fi
-done
-set -- "${args[@]}"
-
 if nix_ci_repo; then
 	nix_ci_agent
 	# Not exec'd, so that the EXIT trap stops the agent.

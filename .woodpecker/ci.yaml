@@ -11,7 +11,7 @@ steps:
       DAGGER_NO_NAG: "1"
       # Checks at once. Their containers share the engine pod's memory limit,
       # and running all of them together OOM-kills it.
-      DAGGER_CHECK_PARALLEL: "12"
+      DAGGER_CHECK_PARALLEL: "24"
     backend_options:
       kubernetes:
         serviceAccountName: dagger-pipeline
