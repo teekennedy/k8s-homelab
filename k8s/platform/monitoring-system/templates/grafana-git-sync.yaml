@@ -3,8 +3,12 @@
 ---
 # Applies the Git Sync Repository to Grafana. The Repository lives in Grafana's
 # own API (provisioning.grafana.app), not in the cluster, so it can't be a
-# manifest here. Server-side apply keeps reruns idempotent, and re-sending the
-# token on every sync picks up a rotated one.
+# manifest here. Re-sending the token on every sync picks up a rotated one.
+#
+# Create must be a POST, not a server-side apply: on the apply-create path the
+# object reaches storage without apiVersion/kind, and Grafana 13.2 then rejects
+# the inline token's owner reference ("owner reference must have a valid API
+# group..."). Dry runs skip that step, so they don't catch it.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -79,15 +83,23 @@ spec:
               }
               EOF
 
+              repos="$GRAFANA_URL/apis/provisioning.grafana.app/v0alpha1/namespaces/default/repositories"
+              code=$(curl -sS -o /tmp/response.json -w '%{http_code}' \
+                -u "$GRAFANA_USER:$GRAFANA_PASSWORD" "$repos/{{ $cfg.name }}")
+              case "$code" in
+                404) method=POST; url="$repos"; type=application/json ;;
+                200) method=PATCH; url="$repos/{{ $cfg.name }}"; type=application/merge-patch+json ;;
+                *) echo "GET repository: HTTP $code"; cat /tmp/response.json; exit 1 ;;
+              esac
+
               if ! curl -sS --fail-with-body -o /tmp/response.json \
                 -u "$GRAFANA_USER:$GRAFANA_PASSWORD" \
-                -X PATCH -H 'Content-Type: application/apply-patch+yaml' \
-                --data-binary @/tmp/repository.json \
-                "$GRAFANA_URL/apis/provisioning.grafana.app/v0alpha1/namespaces/default/repositories/{{ $cfg.name }}?fieldManager=git-sync-bootstrap&force=true"
+                -X "$method" -H "Content-Type: $type" \
+                --data-binary @/tmp/repository.json "$url"
               then
                 cat /tmp/response.json; exit 1
               fi
-              echo "applied repository {{ $cfg.name }}"
+              echo "$method repository {{ $cfg.name }}: ok"
           volumeMounts:
             - name: tmp
               mountPath: /tmp
