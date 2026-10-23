@@ -1,7 +1,7 @@
 {
   "uid": "dagger",
   "title": "Dagger",
-  "description": "Dagger check and function durations, cache hits, CI flakes and in-cluster engine resource usage. See k8s/platform/dagger-engine/README.md.",
+  "description": "Dagger check and function durations, cache hit rate, CI failures and in-cluster engine resource usage. See k8s/platform/dagger-engine/README.md and docs/dagger-traces.md.",
   "tags": [
     "ci",
     "dagger"
@@ -130,8 +130,8 @@
     },
     {
       "type": "stat",
-      "title": "Checks that executed",
-      "description": "Share of check runs with at least one exec that ran instead of coming from the cache (Tempo).",
+      "title": "Cache hit rate",
+      "description": "Share of check runs that ran no process of their own: everything they needed came from the cache. Every check also runs its module's /runtime to define the check, which doesn't count (Tempo).",
       "datasource": {
         "type": "datasource",
         "uid": "-- Mixed --"
@@ -157,7 +157,7 @@
           },
           "refId": "B",
           "queryType": "traceql",
-          "query": "{name = \"Container.withExec\" && span.\"dagger.io/cache.outcome\" = \"executed\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time()",
+          "query": "{name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time()",
           "metricsQueryType": "instant",
           "limit": 50,
           "tableType": "traces",
@@ -192,7 +192,7 @@
           },
           "refId": "E",
           "type": "math",
-          "expression": "$D / $C"
+          "expression": "1 - $D / $C"
         }
       ],
       "options": {
@@ -217,11 +217,106 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 5,
         "x": 4,
         "y": 1
       },
       "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Executed check pass rate",
+      "description": "Share of check runs that ran a process (cache misses) and passed. Cached runs repeat an earlier result, so they are left out (Tempo).",
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time()",
+          "metricsQueryType": "instant",
+          "limit": 50,
+          "tableType": "traces",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "B",
+          "queryType": "traceql",
+          "query": "{name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil && span.\"dagger.io/check.passed\" = false} | count_over_time()",
+          "metricsQueryType": "instant",
+          "limit": 50,
+          "tableType": "traces",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "C",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "sum",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "D",
+          "type": "reduce",
+          "expression": "B",
+          "reducer": "sum",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "E",
+          "type": "math",
+          "expression": "1 - $D / $C"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "0",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 9,
+        "y": 1
+      },
+      "id": 30
     },
     {
       "type": "stat",
@@ -279,8 +374,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 5,
+        "x": 14,
         "y": 1
       },
       "id": 4
@@ -327,121 +422,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 5,
+        "x": 19,
         "y": 1
       },
       "id": 5
-    },
-    {
-      "type": "stat",
-      "title": "Flaky commits",
-      "description": "Commits with both a failed and a passing CI run, e.g. a restarted pipeline that went green.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "count((count by (vcs_ref_head_revision) (last_over_time(dagger_ci_runs_calls_total{status_code=\"STATUS_CODE_ERROR\"}[$__range])) and count by (vcs_ref_head_revision) (last_over_time(dagger_ci_runs_calls_total{status_code!=\"STATUS_CODE_ERROR\"}[$__range])))) or vector(0)",
-          "legendFormat": "",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "sum"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none",
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "text",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 1
-      },
-      "id": 6
-    },
-    {
-      "type": "stat",
-      "title": "Flake rate",
-      "description": "Flaky commits divided by commits with at least one failed CI run. A failure that a restart on the same commit fixed counts as a flake; one fixed by a new commit does not.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "(count((count by (vcs_ref_head_revision) (last_over_time(dagger_ci_runs_calls_total{status_code=\"STATUS_CODE_ERROR\"}[$__range])) and count by (vcs_ref_head_revision) (last_over_time(dagger_ci_runs_calls_total{status_code!=\"STATUS_CODE_ERROR\"}[$__range])))) or vector(0)) / count(count by (vcs_ref_head_revision) (last_over_time(dagger_ci_runs_calls_total{status_code=\"STATUS_CODE_ERROR\"}[$__range])))",
-          "legendFormat": "",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "sum"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "none",
-        "graphMode": "none",
-        "textMode": "value"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "noValue": "0",
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 1
-      },
-      "id": 7
     },
     {
       "type": "row",
@@ -459,7 +444,7 @@
     {
       "type": "timeseries",
       "title": "Check duration p90 (slowest 10)",
-      "description": "Wall clock of each check, cached and executed runs mixed. Prometheus, 7 days. Buckets are coarse (5s, 15s, 30s, 1m, ...), so values snap to them.",
+      "description": "Wall clock of each check, cached and executed runs mixed, including time spent waiting for inputs and for work other checks started. Prometheus, 7 days. Buckets are coarse (5s, 15s, 30s, 1m, 2m, 5m, 10m), so values snap to them: a single slow run between 5m and 10m shows as 7.5m. Legend: 90th percentile of the hourly values; the table below has the exact p90 over the range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -471,7 +456,7 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "topk(10, label_replace(histogram_quantile(0.9, sum by (le, dagger_io_check_name) (increase(traces_span_metrics_duration_seconds_bucket{dagger_io_check_name=~\"$check\"}[$__interval]))), \"check\", \"$1\", \"dagger_io_check_name\", \"dag://\\\\?check=(.*)\"))",
+          "expr": "topk(10, label_replace(histogram_quantile(0.9, sum by (le, dagger_io_check_name) (increase(traces_span_metrics_duration_seconds_bucket{dagger_io_check_name=~\"$check\"}[$__interval]))) >= 0, \"check\", \"$1\", \"dagger_io_check_name\", \"dag://\\\\?check=(.*)\"))",
           "legendFormat": "{{check}}"
         }
       ],
@@ -494,9 +479,10 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "max",
-            "mean"
-          ]
+            "p90"
+          ],
+          "sortBy": "90th %",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -506,7 +492,7 @@
       "interval": "1h",
       "gridPos": {
         "h": 9,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 6
       },
@@ -515,7 +501,7 @@
     {
       "type": "timeseries",
       "title": "Check duration p90 when executed (slowest 10)",
-      "description": "Only runs where at least one exec under the check ran, so this is the cost of a cache miss. Tempo, 7 days; quantiles come from power-of-two buckets.",
+      "description": "Only runs where a process ran under the check, so this is the cost of a cache miss. Tempo, 7 days; quantiles come from power-of-two buckets. Legend: 90th percentile of the plotted values.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -528,7 +514,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{name = \"Container.withExec\" && span.\"dagger.io/cache.outcome\" = \"executed\"} << {span.\"dagger.io/check.name\" != nil} | quantile_over_time(duration, .9) by (span.\"dagger.io/check.name\") | topk(10)",
+          "query": "{name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil} | quantile_over_time(duration, .9) by (span.\"dagger.io/check.name\") | topk(10)",
           "metricsQueryType": "range",
           "limit": 50,
           "tableType": "traces"
@@ -553,9 +539,10 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "max",
-            "mean"
-          ]
+            "p90"
+          ],
+          "sortBy": "90th %",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -564,16 +551,25 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 6
+        "w": 24,
+        "x": 0,
+        "y": 15
       },
-      "id": 10
+      "id": 10,
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*check=([^\"}]*).*",
+            "renamePattern": "$1"
+          }
+        }
+      ]
     },
     {
-      "type": "timeseries",
+      "type": "histogram",
       "title": "CI run duration",
-      "description": "Wall clock of a whole `dagger check` in Woodpecker (Tempo).",
+      "description": "Wall clock of each `dagger check` run in Woodpecker over the selected range, in 30s buckets (Tempo search, at most 1000 runs).",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -586,44 +582,52 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{nestedSetParent < 0 && resource.deployment.environment.name = \"ci\"} | quantile_over_time(duration, .5, .9)",
-          "metricsQueryType": "range",
-          "limit": 50,
+          "query": "{nestedSetParent < 0 && resource.deployment.environment.name = \"ci\" && name =~ \"dagger .*check.*\"}",
+          "limit": 1000,
           "tableType": "traces"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "pattern": "^(traceDuration|Duration)$"
+            }
+          }
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "ms",
           "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 0,
-            "pointSize": 6,
-            "showPoints": "always",
-            "spanNulls": false
+            "fillOpacity": 80,
+            "lineWidth": 1
           }
         },
         "overrides": []
       },
       "options": {
+        "bucketSize": 30000,
+        "combine": false,
         "legend": {
+          "showLegend": false,
           "displayMode": "list",
           "placement": "bottom",
           "calcs": []
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "sort": "none"
         }
       },
+      "id": 11,
       "gridPos": {
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 15
-      },
-      "id": 11
+        "y": 24
+      }
     },
     {
       "type": "timeseries",
@@ -665,7 +669,9 @@
           "calcs": [
             "max",
             "mean"
-          ]
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -677,7 +683,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 15
+        "y": 24
       },
       "id": 12
     },
@@ -721,7 +727,9 @@
           "calcs": [
             "max",
             "mean"
-          ]
+          ],
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "mode": "multi",
@@ -733,14 +741,14 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 15
+        "y": 24
       },
       "id": 13
     },
     {
       "type": "table",
       "title": "Checks in the selected range",
-      "description": "p90 and mean wall clock, runs and failures per check (Prometheus).",
+      "description": "p90 and mean wall clock, runs and failures per check (Prometheus). Checks with no runs in the range are left out.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -752,7 +760,7 @@
             "uid": "prometheus"
           },
           "refId": "p90",
-          "expr": "label_replace(histogram_quantile(0.9, sum by (le, dagger_io_check_name) (increase(traces_span_metrics_duration_seconds_bucket{dagger_io_check_name=~\"$check\"}[$__range]))), \"check\", \"$1\", \"dagger_io_check_name\", \"dag://\\\\?check=(.*)\")",
+          "expr": "label_replace(histogram_quantile(0.9, sum by (le, dagger_io_check_name) (increase(traces_span_metrics_duration_seconds_bucket{dagger_io_check_name=~\"$check\"}[$__range]))) >= 0, \"check\", \"$1\", \"dagger_io_check_name\", \"dag://\\\\?check=(.*)\")",
           "legendFormat": "",
           "instant": true,
           "range": false,
@@ -891,18 +899,36 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Check"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 900
+              }
+            ]
           }
         ]
       },
       "options": {
         "showHeader": true,
-        "cellHeight": "sm"
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "p90",
+            "desc": true
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 32
       },
       "id": 14
     },
@@ -914,7 +940,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 42
       },
       "panels": [],
       "id": 15
@@ -922,10 +948,10 @@
     {
       "type": "timeseries",
       "title": "Check runs: executed vs cached",
-      "description": "A check counts as executed when at least one exec under it ran; otherwise every exec was a cache hit (Tempo).",
+      "description": "Check runs that ran a process of their own (Executed) and ones that came entirely from the cache (Cached). The module's /runtime, which every check runs, doesn't count (Tempo).",
       "datasource": {
-        "type": "tempo",
-        "uid": "tempo"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "targets": [
         {
@@ -933,24 +959,44 @@
             "type": "tempo",
             "uid": "tempo"
           },
-          "refId": "executed",
+          "refId": "A",
           "queryType": "traceql",
-          "query": "{name = \"Container.withExec\" && span.\"dagger.io/cache.outcome\" = \"executed\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time()",
+          "query": "{span.\"dagger.io/check.name\" != nil} | count_over_time()",
           "metricsQueryType": "range",
           "limit": 50,
-          "tableType": "traces"
+          "tableType": "traces",
+          "hide": true
         },
         {
           "datasource": {
             "type": "tempo",
             "uid": "tempo"
           },
-          "refId": "cached",
+          "refId": "B",
           "queryType": "traceql",
-          "query": "{name = \"Container.withExec\" && span.\"dagger.io/cache.outcome\" = \"executed\"} !<< {span.\"dagger.io/check.name\" != nil} | count_over_time()",
+          "query": "{name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time()",
           "metricsQueryType": "range",
           "limit": 50,
-          "tableType": "traces"
+          "tableType": "traces",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "Executed",
+          "type": "math",
+          "expression": "$B"
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "Cached",
+          "type": "math",
+          "expression": "$A - $B"
         }
       ],
       "fieldConfig": {
@@ -961,7 +1007,7 @@
             "lineWidth": 2,
             "fillOpacity": 80,
             "pointSize": 6,
-            "showPoints": "always",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "mode": "normal",
@@ -973,7 +1019,7 @@
           {
             "matcher": {
               "id": "byFrameRefID",
-              "options": "executed"
+              "options": "Executed"
             },
             "properties": [
               {
@@ -985,7 +1031,7 @@
           {
             "matcher": {
               "id": "byFrameRefID",
-              "options": "cached"
+              "options": "Cached"
             },
             "properties": [
               {
@@ -1011,7 +1057,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 34
+        "y": 43
       },
       "id": 16
     },
@@ -1042,7 +1088,7 @@
             "lineWidth": 2,
             "fillOpacity": 80,
             "pointSize": 6,
-            "showPoints": "always",
+            "showPoints": "never",
             "spanNulls": false,
             "stacking": {
               "mode": "normal",
@@ -1068,14 +1114,14 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 34
+        "y": 43
       },
       "id": 17
     },
     {
       "type": "bargauge",
       "title": "Most often executed checks",
-      "description": "Check runs with at least one exec that ran, per check (Tempo). Checks that miss the cache on most runs have an input that changes every time.",
+      "description": "Check runs that ran a process of their own, per check (Tempo). Checks that miss the cache on most runs have an input that changes every time.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -1088,7 +1134,7 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{name = \"Container.withExec\" && span.\"dagger.io/cache.outcome\" = \"executed\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time() by (span.\"dagger.io/check.name\") | topk(15)",
+          "query": "{name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time() by (span.\"dagger.io/check.name\") | topk(15)",
           "metricsQueryType": "instant",
           "limit": 50,
           "tableType": "traces"
@@ -1099,18 +1145,15 @@
         "displayMode": "basic",
         "showUnfilled": true,
         "reduceOptions": {
-          "calcs": [
-            "sum"
-          ],
-          "fields": "",
-          "values": false
+          "calcs": [],
+          "fields": "/^Runs$/",
+          "values": true
         }
       },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "min": 0,
-          "displayName": "${__field.labels[\"span.dagger.io/check.name\"]}"
+          "min": 0
         },
         "overrides": []
       },
@@ -1118,9 +1161,48 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 34
+        "y": 43
       },
-      "id": 18
+      "id": 18,
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*check=([^\"}]*).*",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "mode": "seriesToRows",
+            "reducers": [
+              "lastNotNull"
+            ],
+            "includeTimeField": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Field": "Check",
+              "Last *": "Runs"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Runs",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "type": "row",
@@ -1130,7 +1212,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 51
       },
       "panels": [],
       "id": 19
@@ -1190,50 +1272,88 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 52
       },
-      "id": 20
+      "id": 20,
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*check=([^\"}]*).*",
+            "renamePattern": "$1"
+          }
+        }
+      ]
     },
     {
-      "type": "table",
-      "title": "Flaky commits",
-      "description": "CI runs of commits that had both a failed and a passing run.",
+      "type": "bargauge",
+      "title": "CI failure rate by check",
+      "description": "Failed runs divided by all runs of each check in Woodpecker, for checks that failed at least once in the range (Tempo).",
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "tempo",
+            "uid": "tempo"
           },
           "refId": "A",
-          "expr": "last_over_time(dagger_ci_runs_calls_total[$__range]) and on (vcs_ref_head_revision) (count by (vcs_ref_head_revision) (last_over_time(dagger_ci_runs_calls_total{status_code=\"STATUS_CODE_ERROR\"}[$__range])) and count by (vcs_ref_head_revision) (last_over_time(dagger_ci_runs_calls_total{status_code!=\"STATUS_CODE_ERROR\"}[$__range])))",
-          "legendFormat": "",
-          "instant": true,
-          "range": false,
-          "format": "table"
+          "queryType": "traceql",
+          "query": "{resource.deployment.environment.name = \"ci\"} >> {span.\"dagger.io/check.passed\" = false} | count_over_time() by (span.\"dagger.io/check.name\")",
+          "metricsQueryType": "instant",
+          "limit": 50,
+          "tableType": "traces",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "refId": "B",
+          "queryType": "traceql",
+          "query": "{resource.deployment.environment.name = \"ci\"} >> {span.\"dagger.io/check.name\" != nil} | count_over_time() by (span.\"dagger.io/check.name\")",
+          "metricsQueryType": "instant",
+          "limit": 50,
+          "tableType": "traces",
+          "hide": true
+        },
+        {
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "refId": "rate",
+          "type": "math",
+          "expression": "$A / $B"
         }
       ],
       "transformations": [
         {
+          "id": "renameByRegex",
+          "options": {
+            "regex": ".*check=([^\"}]*).*",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "mode": "seriesToRows",
+            "reducers": [
+              "lastNotNull"
+            ],
+            "includeTimeField": false
+          }
+        },
+        {
           "id": "organize",
           "options": {
-            "includeByName": {
-              "vcs_ref_head_revision": true,
-              "cicd_pipeline_run_id": true,
-              "status_code": true
-            },
             "renameByName": {
-              "vcs_ref_head_revision": "Commit",
-              "cicd_pipeline_run_id": "Pipeline",
-              "status_code": "Result"
-            },
-            "indexByName": {
-              "vcs_ref_head_revision": 0,
-              "cicd_pipeline_run_id": 1,
-              "status_code": 2
+              "Field": "Check",
+              "Last *": "Failure rate"
             }
           }
         },
@@ -1242,85 +1362,38 @@
           "options": {
             "sort": [
               {
-                "field": "Pipeline",
+                "field": "Failure rate",
                 "desc": true
               }
             ]
           }
         }
       ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Result"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "STATUS_CODE_ERROR": {
-                        "text": "failed",
-                        "color": "red",
-                        "index": 0
-                      },
-                      "STATUS_CODE_OK": {
-                        "text": "passed",
-                        "color": "green",
-                        "index": 1
-                      },
-                      "STATUS_CODE_UNSET": {
-                        "text": "passed",
-                        "color": "green",
-                        "index": 2
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Pipeline"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open pipeline",
-                    "url": "https://ci.msng.to/repos/1/pipeline/${__value.raw}"
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
       "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [],
+          "fields": "/^Failure rate$/",
+          "values": true
+        }
       },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "id": 31,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 43
-      },
-      "id": 21
+        "y": 52
+      }
     },
     {
       "type": "table",
@@ -1346,13 +1419,19 @@
       ],
       "options": {
         "showHeader": true,
-        "cellHeight": "sm"
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Start time",
+            "desc": true
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 60
       },
       "id": 22
     },
@@ -1364,7 +1443,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 68
       },
       "panels": [],
       "id": 23
@@ -1372,7 +1451,7 @@
     {
       "type": "timeseries",
       "title": "CPU",
-      "description": "Pod: the engine and every exec it runs (cAdvisor). Engine process: the engine alone, without its execs (telemetry.resourceMetrics).",
+      "description": "Pod: the engine and every exec it runs (cAdvisor). Engine process: the engine alone, without its execs (telemetry.resourceMetrics). Limit and Throttled (right axis, share of CFS periods that hit the limit) appear only while the pod has a CPU limit.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1404,6 +1483,15 @@
           "refId": "C",
           "expr": "sum(kube_pod_container_resource_limits{namespace=\"dagger-engine\", resource=\"cpu\"})",
           "legendFormat": "Limit"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "D",
+          "expr": "sum(rate(container_cpu_cfs_throttled_periods_total{namespace=\"dagger-engine\", container!=\"\"}[$__rate_interval])) / sum(rate(container_cpu_cfs_periods_total{namespace=\"dagger-engine\", container!=\"\"}[$__rate_interval]))",
+          "legendFormat": "Throttled"
         }
       ],
       "fieldConfig": {
@@ -1451,6 +1539,34 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Throttled"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
           }
         ]
       },
@@ -1469,14 +1585,14 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 60
+        "y": 69
       },
       "id": 24
     },
     {
       "type": "timeseries",
       "title": "Memory",
-      "description": "Pod working set (cAdvisor) and the engine process alone.",
+      "description": "Pod working set (cAdvisor), split into the engine process and everything else in the pod: execs, git and other helpers. The stack's top is the pod's working set, the number the kubelet compares with the limit. Working set leaves out inactive page cache, which the kernel reclaims before an OOM kill.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1488,8 +1604,8 @@
             "uid": "prometheus"
           },
           "refId": "A",
-          "expr": "sum(container_memory_working_set_bytes{namespace=\"dagger-engine\", container!=\"\"})",
-          "legendFormat": "Pod"
+          "expr": "clamp_min(sum(dagger_engine_memory_current_bytes{job=\"dagger-engine\"}) - sum(dagger_engine_memory_breakdown_bytes{job=\"dagger-engine\", memory_type=\"inactive_file\"}), 0)",
+          "legendFormat": "Engine process"
         },
         {
           "datasource": {
@@ -1497,8 +1613,8 @@
             "uid": "prometheus"
           },
           "refId": "B",
-          "expr": "sum(dagger_engine_memory_current_bytes{job=\"dagger-engine\"})",
-          "legendFormat": "Engine process"
+          "expr": "clamp_min(sum(container_memory_working_set_bytes{namespace=\"dagger-engine\", container!=\"\"}) - clamp_min(sum(dagger_engine_memory_current_bytes{job=\"dagger-engine\"}) - sum(dagger_engine_memory_breakdown_bytes{job=\"dagger-engine\", memory_type=\"inactive_file\"}), 0), 0)",
+          "legendFormat": "Execs and other"
         },
         {
           "datasource": {
@@ -1516,10 +1632,14 @@
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 10,
+            "fillOpacity": 40,
             "pointSize": 6,
             "showPoints": "never",
-            "spanNulls": false
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
           }
         },
         "overrides": [
@@ -1553,6 +1673,17 @@
                   "mode": "fixed",
                   "fixedColor": "text"
                 }
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none",
+                  "group": "A"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
               }
             ]
           }
@@ -1573,63 +1704,9 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 60
+        "y": 69
       },
       "id": 25
-    },
-    {
-      "type": "timeseries",
-      "title": "CPU throttling",
-      "description": "Share of CFS periods in which the pod hit its CPU limit.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A",
-          "expr": "sum(rate(container_cpu_cfs_throttled_periods_total{namespace=\"dagger-engine\", container!=\"\"}[$__rate_interval])) / sum(rate(container_cpu_cfs_periods_total{namespace=\"dagger-engine\", container!=\"\"}[$__rate_interval]))",
-          "legendFormat": "Throttled"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "pointSize": 6,
-            "showPoints": "never",
-            "spanNulls": false
-          },
-          "min": 0,
-          "max": 1
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": []
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 60
-      },
-      "id": 26
     },
     {
       "type": "timeseries",
@@ -1687,8 +1764,8 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 0,
-        "y": 68
+        "x": 16,
+        "y": 69
       },
       "id": 27
     },
@@ -1738,9 +1815,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 68
+        "w": 12,
+        "x": 0,
+        "y": 77
       },
       "id": 28
     },
@@ -1791,9 +1868,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 68
+        "w": 12,
+        "x": 12,
+        "y": 77
       },
       "id": 29
     }

@@ -74,19 +74,24 @@ and metrics when `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` and
 - A check's span is the parent of its function's span, not the same span:
 
   ```
-  dag://?check=yaml/lint        check.name, check.passed
-    Check.sync                  runs the check's execs
-      Container.withExec        cache.outcome: hit | executed
-    Artifact.value
-      Query.yaml                function.name, cache.outcome
-      Yaml.lint                 function.name, cache.outcome
+  dag://?check=yaml/lint          check.name, check.passed
+    Artifact.value                resolves the check's inputs
+      Query.yaml, Yaml.lint       function.name, cache.outcome
+    Check.sync
+      exec.run                    the module's /runtime, on every run
+    POST /query                   calls the check function makes
+      Container.withExec          cache.outcome
+        exec.run                  only when the exec really ran
+          exec.processRun         wcprof.exec.argv: ["yamllint", ...]
   ```
 
   Check functions return a lazy container, so the function span takes ~0s
-  and reports `executed` even when everything was cached; the work happens
-  under `Check.sync`. Whether a check really ran shows up only on its
-  `Container.withExec` descendants. Check span durations mix cached and real
-  runs (a cached check still takes a few seconds).
+  and reports `executed` even when everything was cached. A check really ran
+  when it has an `exec.processRun` other than the module's `["/runtime"]`.
+  Check span durations mix cached and real runs (a cached check still takes a
+  few seconds), and include time waiting for inputs and for work another
+  check started (`cache.outcome = joined`). The span tree and attributes are
+  covered in more depth in [docs/dagger-traces.md](../../../docs/dagger-traces.md).
 - TraceQL metrics reach back up to a week (`max_duration`), e.g. p90 duration
   and failure rate per check, and p90 of only the checks whose execs ran.
   Quantiles come from power-of-two buckets, so they read as e.g. 8.6s or
@@ -95,7 +100,7 @@ and metrics when `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` and
   ```
   {span."dagger.io/check.name" != nil} | quantile_over_time(duration, .9) by (span."dagger.io/check.name")
   {span."dagger.io/check.passed" = false} | rate() by (span."dagger.io/check.name")
-  {name = "Container.withExec" && span."dagger.io/cache.outcome" = "executed"} << {span."dagger.io/check.name" != nil}
+  {name = "exec.processRun" && span."wcprof.exec.argv" != "[\"/runtime\"]"} << {span."dagger.io/check.name" != nil}
     | quantile_over_time(duration, .9) by (span."dagger.io/check.name")
   ```
 
@@ -128,25 +133,24 @@ sum by (dagger_io_module_function_name) (increase(traces_span_metrics_duration_s
 ```
 
 These metrics can't separate cached from executed checks: that is only known
-from a check's `Container.withExec` descendants, and span metrics see one
+from a check's `exec.processRun` descendants, and span metrics see one
 span at a time. Use the TraceQL query above for that, within Tempo's
 retention. Per-function resource usage has no equivalent either: exec metrics
 are labelled only with their exec's span, which nothing joins back to a
 function name.
 
-### Dashboard and flakes
+### Dashboard
 
 The Dagger dashboard (`monitoring-system/dashboards/dagger.json`) combines the
-queries above: check and function durations, executed vs cached check runs,
-failures and flakes.
+queries above: check and function durations, cache hit rate, and failures.
+The CI failure rate per check is failed runs over all runs of that check
+under a CI root span, from TraceQL.
 
-A flake is a commit with both a failed and a passing CI run, e.g. a restarted
-pipeline that went green. Check spans don't carry the commit, so the
-collector turns each CI run's root `dagger-cli` span into its own
-`dagger_ci_runs_calls_total` series, labelled with `vcs_ref_head_revision`,
-`cicd_pipeline_run_id` and `status_code` (`STATUS_CODE_ERROR` when any check
-failed). It counts runs, not checks: which check flaked is in the failed
-check spans of that commit's runs.
+Check spans don't carry the commit or pipeline, so the collector turns each
+CI run's root `dagger-cli` span into its own `dagger_ci_runs_calls_total`
+series, labelled with `vcs_ref_head_revision`, `cicd_pipeline_run_id` and
+`status_code` (`STATUS_CODE_ERROR` when any check failed). The CI runs count
+comes from it.
 
 ### Engine resource metrics
 

@@ -913,6 +913,32 @@ opentelemetry-collector:
         limit_percentage: 80
         spike_limit_percentage: 25
       batch: {}
+      # Spans Dagger's own UI never shows and that have no children, so
+      # dropping them orphans nothing. See docs/dagger-traces.md.
+      filter/dagger-trace-noise:
+        error_mode: ignore
+        traces:
+          span:
+            # The engine's debug spans, one per pattern comparison, emitted
+            # whenever it resolves a dag:// address such as the modules'
+            # `container` setting. Over 80% of the spans in a CI run.
+            - 'attributes["dagger.io/dag.digest"] == nil and IsMatch(name, "\\.(Glob|Contains|Equals)\\(.* -> ")'
+            - 'attributes["dagger.io/dag.digest"] == nil and IsMatch(name, ": does not match \\[.*\\]\\. Skipping$")'
+            # Cache bookkeeping after every call.
+            - 'name == "dagql.publishResult" and attributes["dagger.io/ui.internal"] == true and status.code != STATUS_CODE_ERROR'
+      # Attributes for Dagger Cloud and the engine's offline profiler.
+      # cache.pairing_digest and the cache outcome, hit and miss attributes
+      # stay for cache analysis.
+      transform/dagger-trace-attributes:
+        error_mode: ignore
+        trace_statements:
+          - delete_matching_keys(span.attributes, "^dagger\\.io/cache\\.(structural_inputs|deps|lookup\\.at_unix_ns|self_digest|result\\.id)$")
+          - delete_key(span.attributes, "dagger.io/dag.content_preferred_digest")
+          # The base64 protobuf call; only Dagger's UI can decode it.
+          - delete_key(span.attributes, "dagger.io/dag.call")
+          # Marks spans for the profiler's completeness count, which the
+          # filter above already breaks.
+          - delete_key(span.attributes, "wcprof.engine_span")
       # Dagger sends client metrics as deltas, which Prometheus rejects.
       delta_to_cumulative: {}
       # Span metrics cover only Dagger module function calls and checks, the
@@ -999,7 +1025,7 @@ opentelemetry-collector:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, batch]
+          processors: [memory_limiter, filter/dagger-trace-noise, transform/dagger-trace-attributes, batch]
           exporters: [otlp_grpc/tempo]
         traces/span-metrics:
           receivers: [otlp]
