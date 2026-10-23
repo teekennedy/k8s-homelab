@@ -825,12 +825,21 @@ tempo:
           # every span past the limit (tempo_discarded_spans_total
           # reason=trace_too_large), including the root span.
           max_bytes_per_trace: 50000000
+    # A Dagger trace outlives the live-store's 30s blocks, so compaction
+    # rebuilds the whole trace in memory. Merging one ~50MB trace OOMed at 2Gi,
+    # and the scheduler hands the same job back after each restart for 24h
+    # (dead_job_timeout).
     resources:
       requests:
         cpu: 100m
-        memory: 512Mi
+        memory: 1Gi
       limits:
-        memory: 2Gi
+        memory: 6Gi
+    extraEnv:
+      # Makes the Go GC work harder near the limit instead of getting OOMKilled
+      # while compaction garbage piles up.
+      - name: GOMEMLIMIT
+        value: 5400MiB
     securityContext:
       allowPrivilegeEscalation: false
       readOnlyRootFilesystem: true
