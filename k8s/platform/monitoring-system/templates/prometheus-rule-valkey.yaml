@@ -36,7 +36,7 @@ spec:
             component: valkey
           annotations:
             summary: {{ "Valkey in {{ $labels.namespace }} has no primary" | quote }}
-            description: {{ "No Valkey instance in {{ $labels.namespace }} reports the primary role, so writes are failing. Check Sentinel: `kubectl -n {{ $labels.namespace }} exec valkey-0 -c sentinel -- valkey-cli -p 26379 -a \"$SENTINEL_PASSWORD\" sentinel masters`." | quote }}
+            description: {{ "No Valkey instance in {{ $labels.namespace }} reports the primary role, so writes are failing. Check Sentinel: `kubectl -n {{ $labels.namespace }} exec valkey-0 -c sentinel -- sh -c 'REDISCLI_AUTH=\"$SENTINEL_PASSWORD\" valkey-cli -p 26379 sentinel masters'`." | quote }}
 
         - alert: ValkeyMultiplePrimaries
           expr: count by (namespace) (redis_instance_info{role="master"}) > 1
