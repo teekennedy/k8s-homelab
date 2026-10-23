@@ -5,5 +5,8 @@ dependencies:
 - name: oauth2-proxy-instance
   repository: file://../../charts/oauth2-proxy-instance
   version: 0.1.0
-digest: sha256:731a93478a1222f88b9625c94b9efb05de437c8dfcc92c03667682a5d9448df7
-generated: "2026-10-21T12:22:37.991241-06:00"
+- name: valkey-instance
+  repository: file://../../charts/valkey-instance
+  version: 0.1.0
+digest: sha256:6f20a6b94d9c36d611a94d6e1b46c3aeb0518d2f9b53cdd1eb6b278ad0131c6a
+generated: "2026-10-22T20:31:31.432776-06:00"

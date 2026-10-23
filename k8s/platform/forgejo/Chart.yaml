@@ -1,8 +1,12 @@
 apiVersion: v2
 name: forgejo
-version: 0.0.8
+version: 0.0.9
 appVersion: 16.0.6
 dependencies:
   - name: forgejo
     version: 17.3.1
     repository: oci://code.forgejo.org/forgejo-helm
+  # Cache and session store. Library chart, renders nothing itself.
+  - name: valkey-instance
+    version: 0.1.0
+    repository: file://../../charts/valkey-instance

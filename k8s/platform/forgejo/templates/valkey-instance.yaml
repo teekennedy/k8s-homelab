@@ -1,0 +1,6 @@
+{{/*
+Forgejo's cache and session store: a Valkey replication set + Sentinel from
+the valkey-instance library chart. Configured under `valkeyInstance` in
+values.yaml.
+*/}}
+{{- include "valkeyInstance.all" . }}

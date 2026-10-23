@@ -8,18 +8,14 @@ called out below.
 
 **Valkey is not bundled.** The Forgejo chart dropped the `valkey-cluster`
 dependency the Gitea chart had (`Chart.lock` here has only `common`), so
-cache/session storage is ours to provide. `templates/valkey-*.yaml` is a port of
-the replication-set + Sentinel setup from `k8s/platform/auth-system`, running as
-a **separate instance** rather than sharing Authelia's:
+cache/session storage is ours to provide. `templates/valkey-instance.yaml`
+renders a replication set + Sentinel from the shared
+[`valkey-instance`](../../charts/valkey-instance) library chart, as a
+**separate instance** rather than sharing Authelia's:
 
 - `maxmemory-policy` is instance-wide, and Forgejo's cache is exactly the kind
   of churn that would start evicting Authelia's session keys under pressure.
 - A Valkey incident shouldn't take out login and git simultaneously.
-
-It uses `longhorn-rc1` (single replica) because Valkey's own replication is the
-redundancy; cross-node Longhorn replication would only add write amplification.
-Note `auth-system`'s equivalent still uses plain `longhorn` — deliberately not
-changed here, but worth revisiting.
 
 **The queue stays on leveldb, not Valkey.** `[queue] TYPE=level`. The Valkey
 instance runs `allkeys-lru`, and an evicted queue key is a silently lost job.
@@ -33,8 +29,8 @@ Valkey as a `redis+sentinel://` URI with the password inline, and neither
 `SENTINEL_PASSWORD` first, then references them as `$(VALKEY_PASSWORD)` in the
 URI — Kubernetes expands `$(VAR)` from env vars declared *earlier in the same
 container's list*, so **the order of that list is load-bearing**. The passwords
-are hex-encoded (`valkey-secret.yaml`) so they can never contain a character
-that would corrupt the URI. These vars land only in the `init-app-ini` init
+are hex-encoded (the library creates the `forgejo-valkey` Secret) so they can
+never contain a character that would corrupt the URI. These vars land only in the `init-app-ini` init
 container, so the running Forgejo container carries no credentials.
 
 Query-parameter spelling is `mastername` — Forgejo strips `_` and `-` from query

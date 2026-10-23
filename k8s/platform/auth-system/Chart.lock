@@ -5,5 +5,8 @@ dependencies:
 - name: app-template
   repository: oci://ghcr.io/bjw-s-labs/helm
   version: 5.3.0
-digest: sha256:7c91291f25dd58566f6d396604d3e534a3ac754624621a56fe2a16cd106c8b01
-generated: "2026-10-21T19:29:47.771920792Z"
+- name: valkey-instance
+  repository: file://../../charts/valkey-instance
+  version: 0.1.0
+digest: sha256:0672a0daccf11ce03623039bbf8dc0a210ce22948e6daaf15200dc1bdb7d07e4
+generated: "2026-10-22T20:31:26.747549-06:00"

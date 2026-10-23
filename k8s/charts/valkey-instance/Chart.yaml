@@ -1,0 +1,8 @@
+apiVersion: v2
+name: valkey-instance
+description: Library chart rendering a hardened Valkey instance, either a Sentinel replication set or a single in-memory store.
+# Library chart: templates only, renders nothing on its own. Consumers include
+# "valkeyInstance.all" from a one-line template file.
+type: library
+# Bump on any change to the named templates.
+version: 0.1.0

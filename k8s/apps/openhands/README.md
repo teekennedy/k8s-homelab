@@ -51,7 +51,7 @@ to pass `--lock-to-cloud`.
 `internal-gateway-access: "true"`, never `external-gateway-access`.
 
 oauth2-proxy keeps its sessions in a Valkey of its own
-(`templates/auth-sessions.yaml`), not in the cookie. A session is renewed with
+(`templates/valkey-instance.yaml`), not in the cookie. A session is renewed with
 a refresh token that Authelia rotates on every use and revokes, session and
 all, on a second use. With the session in a cookie, each of the requests a
 page makes in parallel redeems that token for itself, on whichever replica it
