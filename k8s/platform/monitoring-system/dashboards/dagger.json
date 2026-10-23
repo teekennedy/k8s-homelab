@@ -1047,7 +1047,56 @@
                   },
                   "unit": "none"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "executed",
+                      "scope": "series"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "yellow",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "hit",
+                      "scope": "series"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "green",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "joined",
+                      "scope": "series"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "blue",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "legend": {
@@ -1300,6 +1349,7 @@
                         "metricsQueryType": "range",
                         "query": "{span.\"dagger.io/check.passed\" = false} | count_over_time() by (span.\"dagger.io/check.name\")",
                         "queryType": "traceql",
+                        "serviceMapUseNativeHistograms": false,
                         "tableType": "traces"
                       },
                       "version": "v0"
@@ -1359,7 +1409,7 @@
                     "scaleDistribution": {
                       "type": "linear"
                     },
-                    "showPoints": "always",
+                    "showPoints": "never",
                     "showValues": false,
                     "spanNulls": false,
                     "stacking": {
@@ -1778,8 +1828,10 @@
                       "group": "prometheus",
                       "kind": "DataQuery",
                       "spec": {
-                        "expr": "sum(kube_pod_container_resource_limits{namespace=\"dagger-engine\", resource=\"memory\"})",
-                        "legendFormat": "Limit"
+                        "editorMode": "code",
+                        "expr": "max(kube_pod_container_resource_limits{namespace=\"dagger-engine\", resource=\"memory\"})",
+                        "legendFormat": "Limit",
+                        "range": true
                       },
                       "version": "v0"
                     },
@@ -2030,7 +2082,21 @@
                   },
                   "unit": "Bps"
                 },
-                "overrides": []
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Receive",
+                      "scope": "series"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.transform",
+                        "value": "negative-Y"
+                      }
+                    ]
+                  }
+                ]
               },
               "options": {
                 "legend": {
@@ -2081,7 +2147,7 @@
               "transformations": []
             }
           },
-          "description": "Disk used by the engine's local cache. GC keeps it under 150GB and 15% free space on the 200Gi volume.",
+          "description": "Disk used by the engine's local cache. Controlled by GC settings in dagger-engine's config.json.",
           "id": 28,
           "links": [],
           "title": "Local cache size",
@@ -2321,6 +2387,7 @@
                         "metricsQueryType": "instant",
                         "query": "{name = \"exec.processRun\" \u0026\u0026 span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} \u003c\u003c {span.\"dagger.io/check.name\" != nil} | count_over_time()",
                         "queryType": "traceql",
+                        "serviceMapUseNativeHistograms": false,
                         "tableType": "traces"
                       },
                       "version": "v0"
@@ -2402,6 +2469,9 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "continuous-RdYlGr"
+                  },
                   "decimals": 1,
                   "max": 1,
                   "min": 0,
@@ -2412,10 +2482,6 @@
                       {
                         "color": "green",
                         "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
                       }
                     ]
                   },
@@ -2424,7 +2490,7 @@
                 "overrides": []
               },
               "options": {
-                "colorMode": "none",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "auto",
                 "orientation": "auto",
@@ -2489,6 +2555,7 @@
                         "metricsQueryType": "instant",
                         "query": "{name = \"exec.processRun\" \u0026\u0026 span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} \u003c\u003c {span.\"dagger.io/check.name\" != nil \u0026\u0026 span.\"dagger.io/check.passed\" = false} | count_over_time()",
                         "queryType": "traceql",
+                        "serviceMapUseNativeHistograms": false,
                         "tableType": "traces"
                       },
                       "version": "v0"
@@ -2570,10 +2637,12 @@
             "spec": {
               "fieldConfig": {
                 "defaults": {
+                  "color": {
+                    "mode": "continuous-RdYlGr"
+                  },
                   "decimals": 1,
                   "max": 1,
                   "min": 0,
-                  "noValue": "0",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -2592,7 +2661,7 @@
                 "overrides": []
               },
               "options": {
-                "colorMode": "none",
+                "colorMode": "value",
                 "graphMode": "none",
                 "justifyMode": "auto",
                 "orientation": "auto",
@@ -2764,6 +2833,7 @@
                         "metricsQueryType": "instant",
                         "query": "{span.\"dagger.io/check.passed\" = false} | count_over_time()",
                         "queryType": "traceql",
+                        "serviceMapUseNativeHistograms": false,
                         "tableType": "traces"
                       },
                       "version": "v0"
@@ -2791,7 +2861,7 @@
                     "mode": "absolute",
                     "steps": [
                       {
-                        "color": "text",
+                        "color": "green",
                         "value": 0
                       },
                       {
@@ -2973,12 +3043,12 @@
                     },
                     "insertNulls": false,
                     "lineInterpolation": "linear",
-                    "lineWidth": 2,
-                    "pointSize": 6,
+                    "lineWidth": 1,
+                    "pointSize": 5,
                     "scaleDistribution": {
                       "type": "linear"
                     },
-                    "showPoints": "always",
+                    "showPoints": "auto",
                     "showValues": false,
                     "spanNulls": false,
                     "stacking": {
@@ -3012,15 +3082,14 @@
                     "p90"
                   ],
                   "displayMode": "table",
+                  "enableFacetedFilter": false,
                   "placement": "right",
-                  "showLegend": true,
-                  "sortBy": "90th %",
-                  "sortDesc": true
+                  "showLegend": true
                 },
                 "tooltip": {
                   "hideZeros": false,
-                  "mode": "multi",
-                  "sort": "desc"
+                  "mode": "single",
+                  "sort": "none"
                 }
               }
             },
