@@ -357,7 +357,7 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger --progress=report api call devenv update -y",
+          "dagger --progress=report api call nix devenv update -y",
           "dagger --progress=report lock update"
         ],
         "fileFilters": [
@@ -570,7 +570,7 @@
       "enabled": false
     },
     {
-      "description": "Tidy go.mod/go.sum and apply golangci-lint autofixes after any gomod update, for Go modules that need no other generated artifact. cmd/lab (nix vendorHash) and .dagger (SDK codegen via the dagger-go-sdk generator) have their own rules below with extra steps beyond go:lint, so they're excluded here — matchFileNames uses negative patterns rather than rule ordering because postUpgradeTasks isn't a mergeable config option: if two matching packageRules both set it, the later match fully replaces the earlier one's commands rather than combining them. Without this rule, a bumped dependency can leave go.sum untidy (extra/stale checksum lines) and fail the `dagger check` gomod-tidy gate, blocking automerge — this is how secret-sync's go.sum went untidy in the first place. go:lint operates on every discovered Go module in the repo, not just the one that triggered it (same as the other `dagger generate` rules below), so fileFilters isn't scoped to a single directory.",
+      "description": "Tidy go.mod/go.sum and apply golangci-lint autofixes after any gomod update, for Go modules that need no other generated artifact. cmd/lab (nix vendorHash) and .dagger (SDK codegen via the dagger-go-sdk generator) have their own rules below with extra steps beyond go/modules/fix, so they're excluded here — matchFileNames uses negative patterns rather than rule ordering because postUpgradeTasks isn't a mergeable config option: if two matching packageRules both set it, the later match fully replaces the earlier one's commands rather than combining them. Without this rule, a bumped dependency can leave go.sum untidy (extra/stale checksum lines) and fail the `dagger check` gomod-tidy gate, blocking automerge — this is how secret-sync's go.sum went untidy in the first place. go/modules/fix operates on every discovered Go module in the repo, not just the one that triggered it (same as the other `dagger generate` rules below), so fileFilters isn't scoped to a single directory.",
       "matchManagers": [
         "gomod"
       ],
@@ -580,7 +580,7 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger --progress=report generate go --generator lint -y"
+          "dagger --progress=report generate go --generator fix -y"
         ],
         "fileFilters": [
           "**/go.mod",
@@ -591,14 +591,14 @@
       }
     },
     {
-      "description": "Recompute the nix buildGoModule vendorHash after anything under cmd/lab changes. Renovate rewrites go.mod/go.sum which breaks the nix package. go:lint runs first (tidying go.mod/go.sum and applying any golangci-lint autofixes a dependency bump requires, e.g. import changes) so the vendor hash is computed from the final, tidy go.mod/go.sum rather than Renovate's raw edit. go:lint also touches every other Go module in the repo, hence the broad fileFilters alongside cmd/lab/** (needed for gomod.json, which holds the vendor hash).",
+      "description": "Recompute the nix buildGoModule vendorHash after anything under cmd/lab changes. Renovate rewrites go.mod/go.sum which breaks the nix package. go/modules/fix runs first (tidying go.mod/go.sum and applying any golangci-lint autofixes a dependency bump requires, e.g. import changes) so the vendor hash is computed from the final, tidy go.mod/go.sum rather than Renovate's raw edit. go/modules/fix also touches every other Go module in the repo, hence the broad fileFilters alongside cmd/lab/** (needed for gomod.json, which holds the vendor hash).",
       "matchFileNames": [
         "cmd/lab/**"
       ],
       "postUpgradeTasks": {
         "commands": [
-          "dagger --progress=report generate go --generator lint -y",
-          "dagger --progress=report generate lab:update-vendor-hash -y"
+          "dagger --progress=report generate go --generator fix -y",
+          "dagger --progress=report generate nix/lab/vendor-hash -y"
         ],
         "fileFilters": [
           "cmd/lab/**",
@@ -610,14 +610,14 @@
       }
     },
     {
-      "description": "Regenerate dagger's own artifacts after any update inside .dagger. The dagger-go-sdk generator (Dagger 1.0's replacement for `dagger develop`) regenerates the SDK bindings (dagger.gen.go, internal/dagger/**) of the module under .dagger/modules and runs first so codegen matches the new dependency version. go:lint (mod tidy + golangci-lint --fix, which supersedes format-go since --fix also applies formatter fixes) then tidies and lints every Go module in the repo, not just .dagger, since a Go toolchain or golangci-lint bump can affect all of them. The remaining `dagger generate` targets handle non-Go source regenerated by other tooling updates, e.g. when an updated cue formats files differently than the previous version.",
+      "description": "Regenerate dagger's own artifacts after any update inside .dagger. The dagger-go-sdk generator (Dagger 1.0's replacement for `dagger develop`) regenerates the SDK bindings (dagger.gen.go, internal/dagger/**) of every module under .dagger/modules and runs first so codegen matches the new dependency version. go/modules/fix (mod tidy + golangci-lint --fix, which supersedes format-go since --fix also applies formatter fixes) then tidies and lints every Go module in the repo, not just .dagger, since a Go toolchain or golangci-lint bump can affect all of them. The remaining `dagger generate` targets handle non-Go source regenerated by other tooling updates, e.g. when an updated cue formats files differently than the previous version.",
       "matchFileNames": [
         ".dagger/**"
       ],
       "postUpgradeTasks": {
         "commands": [
           "dagger --progress=report generate dagger-go-sdk:generate -y",
-          "dagger --progress=report generate go --generator lint -y",
+          "dagger --progress=report generate go --generator fix -y",
           "dagger --progress=report generate cue nix python --generator export --generator fix --generator format -y"
         ],
         "fileFilters": [

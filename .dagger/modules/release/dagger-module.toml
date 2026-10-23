@@ -1,0 +1,13 @@
+name = "release"
+engineVersion = "v1.0.0-beta.20"
+include = ["../../lib"]
+
+[runtime]
+  source = "go"
+
+[[dependencies]]
+  name = "nix"
+  source = "../nix"
+
+[codegen]
+  automaticGitignore = false

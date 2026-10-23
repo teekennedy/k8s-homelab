@@ -1,0 +1,9 @@
+name = "yaml"
+engineVersion = "v1.0.0-beta.20"
+include = ["../../lib"]
+
+[runtime]
+  source = "go"
+
+[codegen]
+  automaticGitignore = false

@@ -1,11 +1,11 @@
 #!/bin/sh
 # Commit the devenv-ci release record to main. Run from the release tag's
-# checkout, after `dagger api call devenv ci-release` wrote the record there.
+# checkout, after `dagger api call nix devenv ci-release` wrote the record there.
 # Needs git, CI_COMMIT_TAG, and FORGEJO_TOKEN with Woodpecker's CI_FORGE_URL
 # and CI_REPO, or RELEASE_REMOTE to push somewhere else.
 set -eu
 
-record=.dagger/modules/homelab/devenv-ci.json
+record=.dagger/modules/nix/devenv-ci.json
 tag=${CI_COMMIT_TAG:?release tag required}
 remote=${RELEASE_REMOTE:-"https://release-bot:$FORGEJO_TOKEN@${CI_FORGE_URL#*://}/$CI_REPO.git"}
 saved=$(mktemp)

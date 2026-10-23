@@ -1,6 +1,6 @@
-# nix-builders
+# nix builders
 
-The module's Nix and devenv builds can run on remote Nix builders over
+The `nix` module's Nix and devenv builds can run on remote Nix builders over
 `ssh-ng`, authenticated through a forwarded SSH agent. When the builders can't
 be used, builds run in the Dagger engine's container as they always have.
 
@@ -8,16 +8,18 @@ be used, builds run in the Dagger engine's container as they always have.
 | --- | --- |
 | `status` | Probe every configured builder and say which ones a build would use |
 
-Builds that use the builders: `nix/validate`, `lab/build`, `lab binary-nix`,
-`lab/update-vendor-hash`, and every devenv shell built from source (the ci
-toolchain when no published image applies, `devenv toolchain`,
-`devenv container`, and so the devenv releases). `nix/validate-build-metrics`
+Builds that use the builders: `nix/validate`, `nix/lab/build`,
+`nix lab binary-nix`, `nix/lab/vendor-hash`, and every devenv shell built from
+source (the ci toolchain when no published image applies, `nix devenv
+toolchain`, `nix devenv container`, and so the devenv releases). `nix/test`
 never uses them: its assertions need a cold, local store.
 
 ## Settings
 
-Builders are constructor settings, so they apply to `dagger check` and
-`dagger api call` alike.
+Builders are settings of the `nix` module's constructor, so they apply to
+`dagger check` and `dagger api call` alike. The `release` module builds the
+devenv images by calling `nix` as a dependency, which workspace settings do not
+reach, so it takes the same settings and passes them on: set both.
 
 | Setting | Value |
 | --- | --- |
@@ -32,11 +34,11 @@ Builders are constructor settings, so they apply to `dagger check` and
 Store them in your user-level Dagger config (`-g`), not in `dagger.toml`:
 
 ```sh
-dagger settings -g homelab nixBuilders "$(cat /etc/nix/machines)"
-dagger settings -g homelab sshAuthSock "unix://$HOME/.ssh/agents/s.user"
-dagger settings -g homelab sshConfig "$HOME/.ssh/config"
-dagger settings -g homelab sshUser "$USER"
-dagger api call nix-builders status
+dagger settings -g nix nixBuilders "$(cat /etc/nix/machines)"
+dagger settings -g nix sshAuthSock "unix://$HOME/.ssh/agents/s.user"
+dagger settings -g nix sshConfig "$HOME/.ssh/config"
+dagger settings -g nix sshUser "$USER"
+dagger api call nix builders status
 ```
 
 Give `sshAuthSock` a path that stays the same across logins: on macOS
@@ -44,7 +46,7 @@ Give `sshAuthSock` a path that stays the same across logins: on macOS
 the cache key of every build that uses it. A changed path doesn't break
 anything; it reruns those builds once.
 
-Remove them with `dagger settings -g -u homelab <setting>`.
+Remove them with `dagger settings -g -u nix <setting>`.
 
 ### In CI and Renovate
 
@@ -198,7 +200,7 @@ which only the `dagger-pipeline` service account can read.
    `kubectl -n cert-system create job --from=cronjob/deploybot-ssh-cert-issuer deploybot-ssh-cert-issuer-manual`.
 2. Deploy the hosts (the self-update pipeline does it on merge).
 3. A PR's `dagger --env ci check` logs which builders it used; or, from a
-   Woodpecker step, `dagger --env ci api call nix-builders status`.
+   Woodpecker step, `dagger --env ci api call nix builders status`.
 
 Until the hosts have the `nix-ci` user, the probe is refused and CI builds in
 the engine, exactly as before.

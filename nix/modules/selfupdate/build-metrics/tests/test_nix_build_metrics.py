@@ -483,7 +483,7 @@ def test_real_build_produces_every_series_the_exporter_exists_for(tmp_path):
     rather than just saying the numbers are wrong.
 
     The json log and timings sidecar default to a fixture captured from a
-    real ``nix build --json-log-path`` run; ``nix:validate-build-metrics`` in
+    real ``nix build --json-log-path`` run; ``nix/test`` in
     ``.dagger/modules/nix`` points both at a build it just ran instead, via
     environment variable, so this same contract is checked against current
     Nix in CI.

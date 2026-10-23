@@ -1,22 +1,130 @@
-[modules.homelab]
-source = ".dagger/modules/homelab"
+# One module per language or platform. Every module but nix runs in the
+# devenv toolchain the nix module builds, wired in through its `container`
+# setting.
+
+[modules.cue]
+source = ".dagger/modules/cue"
 legacy-default-path = true
 main = true
 
+[modules.cue.settings]
+container = "dag://nix/devenv/ci-toolchain"
+
+[modules.go]
+source = ".dagger/modules/go"
+legacy-default-path = true
+
+[modules.go.settings]
+container = "dag://nix/devenv/ci-toolchain"
+
+[modules.helmfile]
+source = ".dagger/modules/helmfile"
+legacy-default-path = true
+
+[modules.helmfile.settings]
+container = "dag://nix/devenv/ci-toolchain"
+
+[modules.kubernetes]
+source = ".dagger/modules/kubernetes"
+legacy-default-path = true
+
+[modules.kubernetes.settings]
+container = "dag://nix/devenv/integration-toolchain"
+
+[modules.nix]
+source = ".dagger/modules/nix"
+legacy-default-path = true
+
+[modules.python]
+source = ".dagger/modules/python"
+legacy-default-path = true
+
+[modules.python.settings]
+container = "dag://nix/devenv/ci-toolchain"
+
+[modules.release]
+source = ".dagger/modules/release"
+legacy-default-path = true
+
+[modules.release.settings]
+container = "dag://nix/devenv/ci-toolchain"
+
+[modules.terraform]
+source = ".dagger/modules/terraform"
+legacy-default-path = true
+
+[modules.terraform.settings]
+container = "dag://nix/devenv/ci-toolchain"
+
+[modules.woodpecker]
+source = ".dagger/modules/woodpecker"
+legacy-default-path = true
+
+[modules.woodpecker.settings]
+container = "dag://nix/devenv/ci-toolchain"
+
+[modules.yaml]
+source = ".dagger/modules/yaml"
+legacy-default-path = true
+
+[modules.yaml.settings]
+container = "dag://nix/devenv/ci-toolchain"
+
 [modules.dagger-go-sdk]
 source = "github.com/dagger/go-sdk"
+check.skip = ["generate/stale"]
 
 [sdks.go]
 module = "dagger-go-sdk"
 
-[sdks.go.scopes.".dagger/modules/homelab"]
+[sdks.go.scopes.".dagger/modules/cue"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/go"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/helmfile"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/kubernetes"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/nix"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/python"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/release"]
+clients = ["./.dagger/modules/nix"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/terraform"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/woodpecker"]
+is-module = true
+
+[sdks.go.scopes.".dagger/modules/yaml"]
 is-module = true
 
 # `dagger --env ci`, which the Woodpecker pipelines run with: remote Nix builds
 # on the borg hosts as the untrusted nix-ci login (nix/modules/builders), with
 # the agent scripts/nix-ci-ssh-agent.sh starts. Job counts and speed factors
 # are the ones a workstation's /etc/nix/machines gives the same hosts.
-[env.ci.modules.homelab.settings]
+[env.ci.modules.nix.settings]
+nixBuilders = """
+ssh-ng://nix-ci@10.69.80.10 x86_64-linux - 1 1 nixos-test,big-parallel,kvm
+ssh-ng://nix-ci@10.69.80.11 x86_64-linux - 4 4 nixos-test,big-parallel,kvm
+ssh-ng://nix-ci@10.69.80.12 x86_64-linux - 4 4 nixos-test,big-parallel,kvm
+ssh-ng://nix-ci@10.69.80.13 x86_64-linux - 2 2 nixos-test,big-parallel,kvm
+"""
+sshAuthSock = "unix:///tmp/nix-ci-agent.sock"
+
+# release builds the devenv images through the nix module as a dependency,
+# which these settings do not reach, so it takes the same ones and passes them
+# on. Keep the two in step.
+[env.ci.modules.release.settings]
 nixBuilders = """
 ssh-ng://nix-ci@10.69.80.10 x86_64-linux - 1 1 nixos-test,big-parallel,kvm
 ssh-ng://nix-ci@10.69.80.11 x86_64-linux - 4 4 nixos-test,big-parallel,kvm

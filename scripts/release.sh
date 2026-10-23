@@ -4,7 +4,7 @@
 set -eu
 
 root=$(git rev-parse --show-toplevel)
-manifest="$root/.dagger/modules/homelab/releases.json"
+manifest="$root/.dagger/modules/release/releases.json"
 api="$CI_FORGE_URL/api/v1/repos/$CI_REPO"
 response=$(mktemp)
 context=$(mktemp)

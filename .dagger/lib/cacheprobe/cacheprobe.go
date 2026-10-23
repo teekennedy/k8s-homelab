@@ -1,0 +1,70 @@
+// Package cacheprobe makes the generated Dagger SDK importable from a plain
+// `go test` binary.
+//
+// internal/dagger's init() reads DAGGER_SESSION_PORT and DAGGER_SESSION_TOKEN
+// and panics when they are unset, so a test binary that links the module dies
+// before TestMain ever runs. The panic is unconditional and happens in an
+// imported package, so it cannot be recovered from — the only fix is to have
+// the variables already set. Blank-importing this package from a _test.go file
+// does that.
+//
+// The values are deliberately unusable: the tests replace the package-level
+// `dag` client with one backed by dagger/lib/daggerfake, so the HTTP client this
+// env builds is never dialled. The tests that do need an engine skip unless
+// RealSession says the process inherited one; see dagger/lib/enginetest.
+// The guard means a real `dagger api call` (where the CLI sets both variables) is
+// unaffected, and because only _test.go files import this package it is never
+// linked into the module binary at all.
+//
+// # Why the init order works out
+//
+// Go does not specify the initialization order of two packages that don't
+// import each other, but the linker does. cmd/link/internal/ld/inittask.go
+// computes "an ordering of all of the inittask records so that the order
+// respects all the dependencies, and given that restriction, orders the
+// inittasks in lexicographic order": a topological sort that, at each step,
+// pops the lexicographically smallest package whose imports are all scheduled.
+//
+// Two properties make this package win the race against a module's
+// internal/dagger:
+//
+//  1. Its only import is "os". So it is schedulable as soon as "os" is, which
+//     is before internal/dagger can be: that imports genqlient, otel and the
+//     rest, all of which import "os" themselves.
+//  2. Between "os" and internal/dagger, at least one github.com/... package has
+//     to be popped, and "dagger/lib/cacheprobe" sorts before every github.com/,
+//     go.opentelemetry.io/ and golang.org/ path. So whenever such a package is
+//     the next candidate, this one is ready and pops first.
+//
+// Keep this package's import path sorting before "github.com" and keep this
+// file free of imports other than "os", and the ordering holds. If it ever
+// stops holding, the symptom is loud: the panic above, naming
+// DAGGER_SESSION_PORT.
+package cacheprobe
+
+import "os"
+
+// faked records whether this package had to invent a session, i.e. whether the
+// process was started outside `dagger run`.
+var faked bool
+
+// RealSession reports whether the process inherited a real Dagger session, and
+// so whether `dag` can talk to an engine. Tests that need an engine skip when
+// it returns false.
+func RealSession() bool { return !faked }
+
+// An init function is the whole point of this package: the environment has to
+// be in place before any other package's init runs, which rules out TestMain.
+//
+//nolint:gochecknoinits // see the package doc; this must run before internal/dagger's own init
+func init() {
+	if os.Getenv("DAGGER_SESSION_PORT") != "" {
+		return
+	}
+	// Errors here can only mean the runtime refused to set an environment
+	// variable, in which case internal/dagger's init is about to panic with a
+	// far clearer message than anything this package could report.
+	faked = true
+	_ = os.Setenv("DAGGER_SESSION_PORT", "1")
+	_ = os.Setenv("DAGGER_SESSION_TOKEN", "offline-cacheprobe")
+}

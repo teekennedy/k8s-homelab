@@ -26,7 +26,11 @@ steps:
       - . scripts/dagger-otel-env.sh
       # Remote Nix builds on the borg hosts: dagger.toml's ci env.
       - . scripts/nix-ci-ssh-agent.sh
+      # Regenerate module code and error if any files get changed.
+      # dagger-go-sdk takes over 30 seconds to run and doesn't seem to ever cache its result.
+      # Having fewer dagger modules would reduce but not eliminate the problem.
+      - dagger generate dagger-go-sdk -y && git diff --exit-code
       # A warm run takes ~18m; a cold engine cache with other runs in flight can
       # take far longer. Kept well under the pipeline timeout so a check that
       # drifts this slow still fails loudly.
-      - timeout 40m dagger --env ci check --progress=report
+      - timeout 40m dagger --env ci check --progress=plain

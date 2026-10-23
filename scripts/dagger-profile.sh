@@ -23,8 +23,12 @@ Options:
   -h            Show this help
 
 Environment:
-  DAGGER_ENGINE_CONTAINER   Engine container name (default: the running
-                            dagger-engine-v<cli version> container)
+  _EXPERIMENTAL_DAGGER_RUNNER_HOST
+                            A kube-pod://POD?namespace=NS[&context=CTX]
+                            runner is profiled through kubectl; anything else
+                            through a local Docker engine container
+  DAGGER_ENGINE_CONTAINER   Docker engine container name (default: the
+                            running dagger-engine-v<cli version> container)
 
 Examples:
   $0 check
@@ -57,26 +61,74 @@ if [ -z "$out" ]; then
 fi
 mkdir -p "$out"
 
-# Metrics come from the engine container, so they are only collected for a
-# local Docker engine (a kube-pod:// or remote runner host is skipped).
-engine=${DAGGER_ENGINE_CONTAINER:-}
-if [ -z "$engine" ] && command -v docker >/dev/null &&
-  case ${_EXPERIMENTAL_DAGGER_RUNNER_HOST:-} in "" | docker-container://* | image://*) true ;; *) false ;; esac; then
-  version=$(dagger version 2>/dev/null | sed -n 's/^version: *//p')
-  engine=$(docker ps --format '{{.Names}}' --filter "name=^dagger-engine-${version}\$" | head -1)
-  [ -n "$engine" ] || engine=$(docker ps --format '{{.Names}}' --filter 'name=^dagger-engine-' | head -1)
-fi
+# Metrics come from the engine itself: a local Docker container, or the pod a
+# kube-pod:// runner host names. Any other runner host records the log only.
+engine=""     # a label for the summary
+kube=()       # kubectl args selecting the engine pod's namespace and context
+pod=""
+runner=${_EXPERIMENTAL_DAGGER_RUNNER_HOST:-}
+case $runner in
+kube-pod://*)
+  rest=${runner#kube-pod://}
+  pod=${rest%%\?*}
+  query=""
+  [ "$rest" != "$pod" ] && query=${rest#*\?}
+  IFS='&' read -ra params <<<"$query"
+  for param in "${params[@]}"; do
+    case $param in
+    namespace=*) kube+=(--namespace "${param#namespace=}") ;;
+    context=*) kube+=(--context "${param#context=}") ;;
+    container=*) kube_container=${param#container=} ;;
+    esac
+  done
+  if command -v kubectl >/dev/null && kubectl "${kube[@]}" get pod "$pod" >/dev/null 2>&1; then
+    engine="pod/$pod"
+  fi
+  ;;
+"" | docker-container://* | image://*)
+  engine=${DAGGER_ENGINE_CONTAINER:-}
+  if [ -z "$engine" ] && command -v docker >/dev/null; then
+    version=$(dagger version 2>/dev/null | sed -n 's/^version: *//p')
+    engine=$(docker ps --format '{{.Names}}' --filter "name=^dagger-engine-${version}\$" | head -1)
+    [ -n "$engine" ] || engine=$(docker ps --format '{{.Names}}' --filter 'name=^dagger-engine-' | head -1)
+  fi
+  ;;
+esac
 if [ -z "$engine" ]; then
-  echo "warning: no local engine container found; recording the log only" >&2
+  echo "warning: no engine container or pod found; recording the log only" >&2
 fi
 
+# engine_sh runs a shell script in the engine.
+engine_sh() {
+  if [ -n "$pod" ]; then
+    kubectl "${kube[@]}" exec "$pod" ${kube_container:+-c "$kube_container"} -- sh -c "$1"
+  else
+    docker exec "$engine" sh -c "$1"
+  fi
+}
+
+# engine_logs prints the engine's log since an RFC 3339 time.
+engine_logs() {
+  if [ -n "$pod" ]; then
+    kubectl "${kube[@]}" logs "$pod" ${kube_container:+-c "$kube_container"} --since-time "$1"
+  else
+    docker logs --since "$1" "$engine"
+  fi
+}
+
 # One line of engine metrics: memory in bytes (cgroup total, anonymous, page
-# cache) and the disk backing /var/lib/dagger in bytes.
+# cache) and the disk backing /var/lib/dagger in bytes. A privileged engine
+# pod sees the host's cgroup root at /sys/fs/cgroup, so the engine's own
+# cgroup is the one /proc/1/cgroup names (less the /init leaf the engine
+# moves itself into).
 engine_metrics() {
-  docker exec "$engine" sh -c '
-    cur=$(cat /sys/fs/cgroup/memory.current)
-    anon=$(sed -n "s/^anon //p" /sys/fs/cgroup/memory.stat)
-    file=$(sed -n "s/^file //p" /sys/fs/cgroup/memory.stat)
+  engine_sh '
+    cg=$(sed -n "s/^0:://p" /proc/1/cgroup)
+    d=/sys/fs/cgroup${cg%/init}
+    [ -f "$d/memory.current" ] || d=/sys/fs/cgroup
+    cur=$(cat "$d/memory.current")
+    anon=$(sed -n "s/^anon //p" "$d/memory.stat")
+    file=$(sed -n "s/^file //p" "$d/memory.stat")
     set -- $(df -B1 /var/lib/dagger | tail -1)
     printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$cur" "$anon" "$file" "$2" "$3" "$4"
   ' 2>/dev/null
@@ -140,7 +192,7 @@ sampler=""
 snapshot after
 
 if [ -n "$engine" ]; then
-  docker logs --since "$start_iso" "$engine" >"$out/engine.log" 2>&1
+  engine_logs "$start_iso" >"$out/engine.log" 2>&1
 fi
 
 {

@@ -10,7 +10,7 @@ buildGoModule {
 
   # vendorHash lives in gomod.json so it can be rewritten programmatically
   # when Renovate bumps a Go dependency. Regenerate with:
-  #   dagger generate lab:update-vendor-hash -y
+  #   dagger generate nix/lab/vendor-hash -y
   vendorHash = (lib.importJSON ./gomod.json).vendorHash;
 
   postInstall = ''

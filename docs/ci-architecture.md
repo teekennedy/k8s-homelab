@@ -66,7 +66,7 @@ lab host deploy borg-0
 # CI runs in containers.ci environment (no lab pre-installed)
 # Dagger pipeline builds lab as first step
 
-dagger check lab
+dagger check nix
 dagger check go python
 dagger check
 ```
@@ -77,7 +77,7 @@ dagger check
 # go.mod/go.sum (Renovate bumping a dependency is the usual cause):
 
 # Option 1: Regenerate the hash (run from the repo root)
-dagger generate lab:update-vendor-hash -y
+dagger generate nix/lab/vendor-hash -y
 # Rewrites cmd/lab/gomod.json, which cmd/lab/default.nix imports.
 # `dagger check` runs the generator and fails on a stale hash, and Renovate
 # runs it as a post-upgrade task on cmd/lab dependency PRs.
@@ -90,7 +90,7 @@ nix build
 nix build  # Should succeed now
 
 # Option 3: Use Dagger directly (doesn't need lab)
-dagger api call lab build
+dagger check nix/lab/build
 # Dagger builds lab using Nix in a clean container
 ```
 
@@ -141,18 +141,15 @@ dagger check
 
 # Run one toolchain's checks, or one item's
 dagger check go
-dagger check go --homelab-go-module=cmd/lab
+dagger check go --go-module=cmd/lab
 
 # Run a specific check
-dagger check nix:validate
-dagger check lab:build
-
-# Build lab using Nix (production build)
-dagger api call lab build
+dagger check nix/validate
+dagger check nix/lab/build
 
 # Get the binary, built with Go (faster) or Nix
-dagger api call lab binary export --path=./lab
-dagger api call lab binary-nix export --path=./lab
+dagger api call nix lab binary export --path=./lab
+dagger api call nix lab binary-nix export --path=./lab
 ```
 
 ## Benefits
@@ -166,5 +163,5 @@ dagger api call lab binary-nix export --path=./lab
 ## Related Files
 
 - `devenv.nix` - Defines both dev shell and CI container
-- `.dagger/modules/homelab` - the Dagger module CI runs; see `.dagger/README.md`
+- `.dagger/modules` - the Dagger modules CI runs, one per language or platform; see `.dagger/README.md`
 - `cmd/lab/flake.nix` - Lab's Nix build configuration

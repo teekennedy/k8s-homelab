@@ -63,10 +63,10 @@ and metrics when `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` and
   Each exec is a new series, so these stay in Prometheus' 7-day window
   (VictoriaMetrics' allowlist leaves them out).
 - Each check is a span named after its `dag://` URL, e.g.
-  `dag://?check=helmfile/environments/releases/build&homelab-helmfile-environment=production&homelab-helmfile-release=dagger-engine`,
+  `dag://?check=helmfile/releases/render&helmfile-release=dagger-engine`,
   with the same value in `dagger.io/check.name` and `dagger.io/check.passed`.
   Each module function call is a span with `dagger.io/module.function.name`
-  (e.g. `HomelabYaml.lint`) and `dagger.io/cache.outcome` (`hit`, `executed`,
+  (e.g. `Yaml.lint`) and `dagger.io/cache.outcome` (`hit`, `executed`,
   `joined` or `uncached`). Both names are stable across runs. Check and
   function spans carry the engine's resource, not the CLI's
   `deployment.environment.name` and `cicd.*` tags; only the trace's root
@@ -78,9 +78,8 @@ and metrics when `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` and
     Check.sync                  runs the check's execs
       Container.withExec        cache.outcome: hit | executed
     Artifact.value
-      Query.homelab             function.name, cache.outcome
-      Homelab.yaml              function.name, cache.outcome
-      HomelabYaml.lint          function.name, cache.outcome
+      Query.yaml                function.name, cache.outcome
+      Yaml.lint                 function.name, cache.outcome
   ```
 
   Check functions return a lazy container, so the function span takes ~0s
