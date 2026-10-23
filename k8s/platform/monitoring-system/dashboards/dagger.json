@@ -950,8 +950,8 @@
       "title": "Check runs: executed vs cached",
       "description": "Check runs that ran a process of their own (Executed) and ones that came entirely from the cache (Cached). The module's /runtime, which every check runs, doesn't count (Tempo).",
       "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
+        "type": "tempo",
+        "uid": "tempo"
       },
       "targets": [
         {
@@ -959,44 +959,26 @@
             "type": "tempo",
             "uid": "tempo"
           },
-          "refId": "A",
+          "refId": "executed",
           "queryType": "traceql",
-          "query": "{span.\"dagger.io/check.name\" != nil} | count_over_time()",
+          "query": "{name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time()",
           "metricsQueryType": "range",
           "limit": 50,
           "tableType": "traces",
-          "hide": true
+          "exemplars": 1
         },
         {
           "datasource": {
             "type": "tempo",
             "uid": "tempo"
           },
-          "refId": "B",
+          "refId": "cached",
           "queryType": "traceql",
-          "query": "{name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time()",
+          "query": "({span.\"dagger.io/check.name\" != nil} | count_over_time()) - ({name = \"exec.processRun\" && span.\"wcprof.exec.argv\" != \"[\\\"/runtime\\\"]\"} << {span.\"dagger.io/check.name\" != nil} | count_over_time())",
           "metricsQueryType": "range",
           "limit": 50,
           "tableType": "traces",
-          "hide": true
-        },
-        {
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "refId": "Executed",
-          "type": "math",
-          "expression": "$B"
-        },
-        {
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "refId": "Cached",
-          "type": "math",
-          "expression": "$A - $B"
+          "exemplars": 1
         }
       ],
       "fieldConfig": {
@@ -1018,8 +1000,8 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byFrameRefID",
-              "options": "Executed"
+              "id": "byName",
+              "options": "count_over_time"
             },
             "properties": [
               {
@@ -1030,8 +1012,8 @@
           },
           {
             "matcher": {
-              "id": "byFrameRefID",
-              "options": "Cached"
+              "id": "byName",
+              "options": "(count_over_time - count_over_time)"
             },
             "properties": [
               {
@@ -1146,7 +1128,7 @@
         "showUnfilled": true,
         "reduceOptions": {
           "calcs": [],
-          "fields": "/^Runs$/",
+          "fields": "",
           "values": true
         }
       },
@@ -1183,20 +1165,11 @@
           }
         },
         {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Field": "Check",
-              "Last *": "Runs"
-            }
-          }
-        },
-        {
           "id": "sortBy",
           "options": {
             "sort": [
               {
-                "field": "Runs",
+                "field": "Last *",
                 "desc": true
               }
             ]
@@ -1290,8 +1263,8 @@
       "title": "CI failure rate by check",
       "description": "Failed runs divided by all runs of each check in Woodpecker, for checks that failed at least once in the range (Tempo).",
       "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
+        "type": "tempo",
+        "uid": "tempo"
       },
       "targets": [
         {
@@ -1301,33 +1274,10 @@
           },
           "refId": "A",
           "queryType": "traceql",
-          "query": "{resource.deployment.environment.name = \"ci\"} >> {span.\"dagger.io/check.passed\" = false} | count_over_time() by (span.\"dagger.io/check.name\")",
+          "query": "({resource.deployment.environment.name = \"ci\"} >> {span.\"dagger.io/check.passed\" = false} | count_over_time() by (span.\"dagger.io/check.name\")) / ({resource.deployment.environment.name = \"ci\"} >> {span.\"dagger.io/check.name\" != nil} | count_over_time() by (span.\"dagger.io/check.name\"))",
           "metricsQueryType": "instant",
           "limit": 50,
-          "tableType": "traces",
-          "hide": true
-        },
-        {
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "refId": "B",
-          "queryType": "traceql",
-          "query": "{resource.deployment.environment.name = \"ci\"} >> {span.\"dagger.io/check.name\" != nil} | count_over_time() by (span.\"dagger.io/check.name\")",
-          "metricsQueryType": "instant",
-          "limit": 50,
-          "tableType": "traces",
-          "hide": true
-        },
-        {
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "refId": "rate",
-          "type": "math",
-          "expression": "$A / $B"
+          "tableType": "traces"
         }
       ],
       "transformations": [
@@ -1349,20 +1299,11 @@
           }
         },
         {
-          "id": "organize",
-          "options": {
-            "renameByName": {
-              "Field": "Check",
-              "Last *": "Failure rate"
-            }
-          }
-        },
-        {
           "id": "sortBy",
           "options": {
             "sort": [
               {
-                "field": "Failure rate",
+                "field": "Last *",
                 "desc": true
               }
             ]
@@ -1375,7 +1316,7 @@
         "showUnfilled": true,
         "reduceOptions": {
           "calcs": [],
-          "fields": "/^Failure rate$/",
+          "fields": "",
           "values": true
         }
       },
