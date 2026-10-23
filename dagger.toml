@@ -1,7 +1,7 @@
 [modules.homelab]
 source = ".dagger/modules/homelab"
 legacy-default-path = true
-entrypoint = true
+main = true
 
 [modules.dagger-go-sdk]
 source = "github.com/dagger/go-sdk"

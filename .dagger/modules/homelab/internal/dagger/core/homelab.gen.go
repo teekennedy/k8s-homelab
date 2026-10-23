@@ -10,7 +10,7 @@ import (
 )
 
 // Homelab is the repo's CI.
-type Homelab struct { // homelab (../../../../../:0:0)
+type Homelab struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -256,7 +256,7 @@ func (r *Homelab) Yaml() *HomelabYaml {
 }
 
 // Ci checks the Dagger module under .dagger.
-type HomelabCi struct { // homelab (../../../../../:0:0)
+type HomelabCi struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -362,7 +362,7 @@ func (r *HomelabCi) IntegrationTest(ctx context.Context, opts ...HomelabCiIntegr
 }
 
 // Cue runs CUE generators over config/.
-type HomelabCue struct { // homelab (../../../../../:0:0)
+type HomelabCue struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -522,7 +522,7 @@ func (r *HomelabCue) Trim(opts ...HomelabCueTrimOpts) *Changeset {
 }
 
 // Devenv builds containers from the repo's devenv definition.
-type HomelabDevenv struct { // homelab (../../../../../:0:0)
+type HomelabDevenv struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -794,7 +794,7 @@ func (r *HomelabDevenv) Update(opts ...HomelabDevenvUpdateOpts) *Changeset {
 // Each DevenvProject carries only the files for its project, enabling
 // per-project caching: changing files in one project won't invalidate
 // the cache for other projects.
-type HomelabDevenvProject struct { // homelab (../../../../../:0:0)
+type HomelabDevenvProject struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -905,7 +905,7 @@ func (r *HomelabDevenvProject) Update() *Changeset {
 }
 
 // Go runs Go checks over every module in the repo.
-type HomelabGo struct { // homelab (../../../../../:0:0)
+type HomelabGo struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -1004,7 +1004,7 @@ func (r *HomelabGo) Modules(opts ...HomelabGoModulesOpts) *HomelabGoModules {
 }
 
 // GoModule is one Go module.
-type HomelabGoModule struct { // homelab (../../../../../:0:0)
+type HomelabGoModule struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -1116,7 +1116,7 @@ func (r *HomelabGoModule) Test(ctx context.Context) error {
 }
 
 // GoModules are the repo's Go modules.
-type HomelabGoModules struct { // homelab (../../../../../:0:0)
+type HomelabGoModules struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -1262,7 +1262,7 @@ func (r *HomelabGoModules) Subset(keys []string) *HomelabGoModules {
 }
 
 // Helmfile runs helmfile checks over every chart.
-type HomelabHelmfile struct { // homelab (../../../../../:0:0)
+type HomelabHelmfile struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -1361,7 +1361,7 @@ func (r *HomelabHelmfile) UnmarshalJSON(bs []byte) error {
 }
 
 // HelmfileEnvironment is one helmfile environment.
-type HomelabHelmfileEnvironment struct { // homelab (../../../../../:0:0)
+type HomelabHelmfileEnvironment struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -1474,7 +1474,7 @@ func (r *HomelabHelmfileEnvironment) Releases() *HomelabHelmfileReleases {
 }
 
 // HelmfileEnvironments are the helmfile environments the checks run in.
-type HomelabHelmfileEnvironments struct { // homelab (../../../../../:0:0)
+type HomelabHelmfileEnvironments struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -1619,7 +1619,7 @@ func (r *HomelabHelmfileEnvironments) Subset(keys []string) *HomelabHelmfileEnvi
 }
 
 // HelmfileRelease is one release of the helmfile in one environment.
-type HomelabHelmfileRelease struct { // homelab (../../../../../:0:0)
+type HomelabHelmfileRelease struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -1790,7 +1790,7 @@ func (r *HomelabHelmfileRelease) Validate(ctx context.Context) error {
 }
 
 // HelmfileReleases are one environment's releases.
-type HomelabHelmfileReleases struct { // homelab (../../../../../:0:0)
+type HomelabHelmfileReleases struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -1935,7 +1935,7 @@ func (r *HomelabHelmfileReleases) Subset(keys []string) *HomelabHelmfileReleases
 }
 
 // Kubernetes runs releases on k3s clusters.
-type HomelabKubernetes struct { // homelab (../../../../../:0:0)
+type HomelabKubernetes struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -2174,7 +2174,7 @@ func (r *HomelabKubernetes) IntegrationTest(ctx context.Context, opts ...Homelab
 }
 
 // KubernetesIntegrationReport is one release's JUnit XML report.
-type HomelabKubernetesIntegrationReport struct { // homelab (../../../../../:0:0)
+type HomelabKubernetesIntegrationReport struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -2279,7 +2279,7 @@ func (r *HomelabKubernetesIntegrationReport) XML(ctx context.Context) (string, e
 // KubernetesIntegrationRun is the outcome of one workflow run that got as far
 // as running tests. It is plain data, with no Directory, so that the call is
 // cached; see Caching in .dagger/docs/kubernetes.md.
-type HomelabKubernetesIntegrationRun struct { // homelab (../../../../../:0:0)
+type HomelabKubernetesIntegrationRun struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -2413,7 +2413,7 @@ func (r *HomelabKubernetesIntegrationRun) Summary(ctx context.Context) (string, 
 }
 
 // Lab builds the lab CLI.
-type HomelabLab struct { // homelab (../../../../../:0:0)
+type HomelabLab struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -2586,7 +2586,7 @@ func (r *HomelabLab) UpdateVendorHash(opts ...HomelabLabUpdateVendorHashOpts) *C
 }
 
 // Nix runs Nix checks over the repo.
-type HomelabNix struct { // homelab (../../../../../:0:0)
+type HomelabNix struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -2750,7 +2750,7 @@ func (r *HomelabNix) ValidateBuildMetrics(ctx context.Context, opts ...HomelabNi
 // and at least one machine answers a probe. Otherwise, or when the remote
 // attempt fails for a reason that is not the build's own, it builds in the
 // container as it does without builders.
-type HomelabNixBuilders struct { // homelab (../../../../../:0:0)
+type HomelabNixBuilders struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -2841,7 +2841,7 @@ func (r *HomelabNixBuilders) Status(ctx context.Context) (string, error) {
 }
 
 // Python runs Python checks over every project in the repo.
-type HomelabPython struct { // homelab (../../../../../:0:0)
+type HomelabPython struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -2938,7 +2938,7 @@ func (r *HomelabPython) Projects(opts ...HomelabPythonProjectsOpts) *HomelabPyth
 }
 
 // PythonProject is one Python project.
-type HomelabPythonProject struct { // homelab (../../../../../:0:0)
+type HomelabPythonProject struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -3068,7 +3068,7 @@ func (r *HomelabPythonProject) Test(ctx context.Context) error {
 }
 
 // PythonProjects are the repo's Python projects.
-type HomelabPythonProjects struct { // homelab (../../../../../:0:0)
+type HomelabPythonProjects struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -3214,7 +3214,7 @@ func (r *HomelabPythonProjects) Subset(keys []string) *HomelabPythonProjects {
 }
 
 // Release builds and publishes the repo's container images.
-type HomelabRelease struct { // homelab (../../../../../:0:0)
+type HomelabRelease struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -3392,7 +3392,7 @@ func (r *HomelabRelease) TestScripts(ctx context.Context, opts ...HomelabRelease
 }
 
 // Terraform runs OpenTofu checks over terraform/.
-type HomelabTerraform struct { // homelab (../../../../../:0:0)
+type HomelabTerraform struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -3543,7 +3543,7 @@ func (r *HomelabTerraform) Modules(opts ...HomelabTerraformModulesOpts) *Homelab
 }
 
 // TerraformModule is one OpenTofu module.
-type HomelabTerraformModule struct { // homelab (../../../../../:0:0)
+type HomelabTerraformModule struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -3659,7 +3659,7 @@ func (r *HomelabTerraformModule) Validate(ctx context.Context) error {
 }
 
 // TerraformModules are the repo's OpenTofu modules.
-type HomelabTerraformModules struct { // homelab (../../../../../:0:0)
+type HomelabTerraformModules struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -3805,7 +3805,7 @@ func (r *HomelabTerraformModules) Subset(keys []string) *HomelabTerraformModules
 }
 
 // Woodpecker lints the repo's Woodpecker pipelines.
-type HomelabWoodpecker struct { // homelab (../../../../../:0:0)
+type HomelabWoodpecker struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -3909,7 +3909,7 @@ func (r *HomelabWoodpecker) Lint(ctx context.Context, opts ...HomelabWoodpeckerL
 }
 
 // Yaml runs yamllint over the repo.
-type HomelabYaml struct { // homelab (../../../../../:0:0)
+type HomelabYaml struct { // homelab (../../../../../../:0:0)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -4052,7 +4052,7 @@ type HomelabOpts struct {
 	SSHKnownHosts *File
 }
 
-func (r *Query) Homelab(opts ...HomelabOpts) *Homelab { // homelab (../../../../../:0:0)
+func (r *Query) Homelab(opts ...HomelabOpts) *Homelab { // homelab (../../../../../../:0:0)
 	q := r.query.Select("homelab")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `devenvSource` optional argument
