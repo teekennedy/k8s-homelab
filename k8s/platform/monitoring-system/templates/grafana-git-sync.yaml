@@ -57,6 +57,19 @@ spec:
                 echo "waiting for Grafana"; sleep 5
               done
 
+              repos="$GRAFANA_URL/apis/provisioning.grafana.app/v0alpha1/namespaces/default/repositories"
+              code=$(curl -sS -o /tmp/response.json -w '%{http_code}' \
+                -u "$GRAFANA_USER:$GRAFANA_PASSWORD" "$repos/{{ $cfg.name }}")
+              case "$code" in
+                404) method=POST; url="$repos"; type=application/json; replace_token= ;;
+                # The stored token is a reference ({"name": "inline-..."}), and a
+                # token may hold only one of name/create/remove, so the patch
+                # nulls the reference while creating the new value.
+                200) method=PATCH; url="$repos/{{ $cfg.name }}"; type=application/merge-patch+json
+                  replace_token='"name": null, ' ;;
+                *) echo "GET repository: HTTP $code"; cat /tmp/response.json; exit 1 ;;
+              esac
+
               # Forgejo tokens are hex, so they're safe to embed in JSON as-is.
               cat > /tmp/repository.json <<EOF
               {
@@ -79,18 +92,9 @@ spec:
                   },
                   "workflows": ["branch"]
                 },
-                "secure": { "token": { "create": "$GIT_TOKEN" } }
+                "secure": { "token": { ${replace_token}"create": "$GIT_TOKEN" } }
               }
               EOF
-
-              repos="$GRAFANA_URL/apis/provisioning.grafana.app/v0alpha1/namespaces/default/repositories"
-              code=$(curl -sS -o /tmp/response.json -w '%{http_code}' \
-                -u "$GRAFANA_USER:$GRAFANA_PASSWORD" "$repos/{{ $cfg.name }}")
-              case "$code" in
-                404) method=POST; url="$repos"; type=application/json ;;
-                200) method=PATCH; url="$repos/{{ $cfg.name }}"; type=application/merge-patch+json ;;
-                *) echo "GET repository: HTTP $code"; cat /tmp/response.json; exit 1 ;;
-              esac
 
               if ! curl -sS --fail-with-body -o /tmp/response.json \
                 -u "$GRAFANA_USER:$GRAFANA_PASSWORD" \
