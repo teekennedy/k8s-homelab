@@ -2,7 +2,7 @@
 dagger-helm:
   engine:
     image:
-      ref: registry.dagger.io/engine:v1.0.0-beta.17
+      ref: registry.dagger.io/engine:v1.0.0-beta.20
     # https://docs.dagger.io/reference/configuration/engine/
     # insecureRootCapabilities: effectively equivalent to running actions with `docker run --privileged`
     configJson: |
@@ -13,8 +13,8 @@ dagger-helm:
         },
         "gc": {
           "enabled": true,
-          "maxUsedSpace": "150GB",
-          "minFreeSpace": "15%"
+          "maxUsedSpace": "180GB",
+          "minFreeSpace": "10%"
         },
         "telemetry": {
           "resourceMetrics": true

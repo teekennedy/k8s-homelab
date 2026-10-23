@@ -129,7 +129,7 @@ in {
       env.KUBECONFIG = "${config.env.DEVENV_STATE}/kube/config";
       # Don't prompt me to sign up for dagger cloud
       env.DAGGER_NO_NAG = "1";
-      env.DAGGER_X_RELEASE = "v1.0.0-beta.17";
+      env.DAGGER_X_RELEASE = "v1.0.0-beta.20";
 
       enterShell = ''
         mkdir -p "$(dirname "$KUBECONFIG")"
