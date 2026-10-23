@@ -263,6 +263,19 @@ forgejo-resources:
             - read:user
             - write:issue
             - read:organization
+    # Identity Grafana Git Sync pulls ops/k8s-homelab and pushes dashboard
+    # branches as (k8s/platform/monitoring-system). Git Sync speaks plain git
+    # over HTTP, so repository write is the only scope it uses. The
+    # `Dashboards` team below limits that write to this one repo.
+    - name: grafana
+      fullName: Grafana
+      email: grafana@msng.to
+      secretName: grafana-forgejo-user
+      secretNamespace: monitoring-system
+      accessTokens:
+        - name: grafana
+          scopes:
+            - write:repository
     # The account the woodpecker-resources Job authenticates as. Woodpecker has
     # no API that mints a token for another user, so that job logs in through
     # this account's Forgejo password (the OAuth redirect chain) to get one.
@@ -341,6 +354,13 @@ forgejo-resources:
             - k8s-homelab
           members:
             - openhands
+        # Grafana Git Sync. Scoped to exactly the repo it syncs, like Agents.
+        - name: Dashboards
+          permission: write
+          repositories:
+            - k8s-homelab
+          members:
+            - grafana
         # Separate from Bots because of the permission: `admin` is what
         # Woodpecker's repo activation requires, and nothing else here needs it.
         - name: CI

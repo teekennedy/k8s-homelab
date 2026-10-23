@@ -1,0 +1,96 @@
+{{- $cfg := .Values.gitSync }}
+{{- $grafanaSvc := printf "http://%s-grafana.%s.svc" .Release.Name .Release.Namespace }}
+---
+# Applies the Git Sync Repository to Grafana. The Repository lives in Grafana's
+# own API (provisioning.grafana.app), not in the cluster, so it can't be a
+# manifest here. Server-side apply keeps reruns idempotent, and re-sending the
+# token on every sync picks up a rotated one.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grafana-git-sync
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    helm.sh/hook: post-install,post-upgrade
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: apply
+          image: "{{ $cfg.image.repository }}:{{ $cfg.image.tag }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
+          env:
+            - name: GRAFANA_URL
+              value: {{ $grafanaSvc | quote }}
+            - name: GRAFANA_USER
+              valueFrom: { secretKeyRef: { name: {{ index .Values "kube-prometheus-stack" "grafana" "admin" "existingSecret" }}, key: username } }
+            - name: GRAFANA_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ index .Values "kube-prometheus-stack" "grafana" "admin" "existingSecret" }}, key: password } }
+            - name: GIT_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $cfg.tokenSecretName }}, key: token } }
+          command: ["/bin/sh", "-euc"]
+          args:
+            - |
+              until curl -fsS "$GRAFANA_URL/api/health" >/dev/null; do
+                echo "waiting for Grafana"; sleep 5
+              done
+
+              # Forgejo tokens are hex, so they're safe to embed in JSON as-is.
+              cat > /tmp/repository.json <<EOF
+              {
+                "apiVersion": "provisioning.grafana.app/v0alpha1",
+                "kind": "Repository",
+                "metadata": { "name": {{ $cfg.name | quote }} },
+                "spec": {
+                  "title": {{ $cfg.name | quote }},
+                  "type": "git",
+                  "git": {
+                    "url": {{ $cfg.url | quote }},
+                    "branch": {{ $cfg.branch | quote }},
+                    "path": {{ $cfg.path | quote }},
+                    "tokenUser": {{ $cfg.tokenUser | quote }}
+                  },
+                  "sync": {
+                    "enabled": true,
+                    "target": "folder",
+                    "intervalSeconds": {{ $cfg.intervalSeconds }}
+                  },
+                  "workflows": ["branch"]
+                },
+                "secure": { "token": { "create": "$GIT_TOKEN" } }
+              }
+              EOF
+
+              if ! curl -sS --fail-with-body -o /tmp/response.json \
+                -u "$GRAFANA_USER:$GRAFANA_PASSWORD" \
+                -X PATCH -H 'Content-Type: application/apply-patch+yaml' \
+                --data-binary @/tmp/repository.json \
+                "$GRAFANA_URL/apis/provisioning.grafana.app/v0alpha1/namespaces/default/repositories/{{ $cfg.name }}?fieldManager=git-sync-bootstrap&force=true"
+              then
+                cat /tmp/response.json; exit 1
+              fi
+              echo "applied repository {{ $cfg.name }}"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -3020,8 +3020,8 @@
       {
         "current": {
           "selected": false,
-          "text": "${DS_PROMETHEUS}",
-          "value": "${DS_PROMETHEUS}"
+          "text": "Prometheus",
+          "value": "prometheus"
         },
         "description": null,
         "error": null,

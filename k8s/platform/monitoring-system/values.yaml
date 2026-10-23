@@ -116,6 +116,12 @@ kube-prometheus-stack:
     grafana.ini:
       server:
         root_url: https://grafana.msng.to
+      # Git Sync (templates/grafana-git-sync.yaml). Forgejo is a "pure git"
+      # repository type, and git.msng.to resolves to a LAN address, which Git
+      # Sync rejects unless the host is allowlisted.
+      provisioning:
+        repository_types: git|local
+        allowed_git_urls: git.msng.to
       plugins:
         # Pin the Grafana Drilldown app plugins so they are reinstalled to these
         # exact versions on startup. The default preinstall list installs the
@@ -602,6 +608,23 @@ blackboxProbes:
   - https://jellyfin.msng.to
   - https://rss.msng.to
   - https://terraria.msng.to
+
+# Grafana Git Sync repository, applied to Grafana's API by
+# templates/grafana-git-sync.yaml. Dashboards under `path` are pulled from
+# `branch`; UI saves are pushed to a new branch for review (no direct commits).
+gitSync:
+  name: k8s-homelab
+  url: https://git.msng.to/ops/k8s-homelab.git
+  branch: main
+  path: k8s/platform/monitoring-system/dashboards/
+  intervalSeconds: 60
+  # Forgejo account and token Secret, created by forgejo-resources
+  # (k8s/platform/forgejo, users[name=grafana]).
+  tokenUser: grafana
+  tokenSecretName: grafana-forgejo-user
+  image:
+    repository: alpine/curl
+    tag: "8.21.0@sha256:a1c44bab54d88e18ea9a6a4ecefab7f2d230b968567b78960fcaff8d51b7f067"
 
 loki:
   enabled: true
