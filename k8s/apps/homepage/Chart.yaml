@@ -2,9 +2,9 @@ apiVersion: v2
 name: homepage
 description: Homepage dashboard
 type: application
-version: 0.3.8
+version: 0.3.9
 appVersion: "v2.0.0"
 dependencies:
   - name: homepage
-    version: 5.7.0
+    version: 5.8.0
     repository: oci://ghcr.io/m0nsterrr/helm-charts
