@@ -253,9 +253,12 @@ nixosRollout:
   # Safety net for generations staged by the hosts' own fallback timer without
   # a pipeline ever running. A no-op when every host is already up to date.
   schedule: "0 5 * * *"
-  # Per host. kured's drainTimeout is 30m and lockReleaseDelay 5m, and an
-  # unrelated pipeline can re-arm the kured gate mid-rollout, so leave room.
+  # Per host, counted from when kured cordons it rather than from when its
+  # sentinel is created. kured's drainTimeout is 30m and lockReleaseDelay 5m,
+  # and an unrelated pipeline can re-arm the kured gate mid-rollout, so leave
+  # room.
   rebootTimeoutSeconds: 3600
   pollIntervalSeconds: 30
-  # Four hosts at the per-host worst case, plus slack.
-  activeDeadlineSeconds: 16200
+  # The whole rollout, including however long firing alerts keep kured from
+  # starting. 4 days leaves alerts time to clear before the next weekly update.
+  activeDeadlineSeconds: 345600

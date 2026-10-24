@@ -21,15 +21,22 @@ setup_ssh() {
 
   mkdir -p "$SSH_DIR"
   chmod 700 "$SSH_DIR"
+  install -m 0644 /known-hosts/known_hosts "$SSH_DIR/known_hosts"
+}
+
+# The certificate is reissued every 6h with a 12h validity and the mounted
+# Secret follows along, so copy it fresh for every connection: a rollout can
+# spend days waiting on kured.
+load_creds() {
   install -m 0600 /creds/id_ed25519 "$SSH_DIR/id_ed25519"
   install -m 0644 /creds/id_ed25519-cert.pub "$SSH_DIR/id_ed25519-cert.pub"
-  install -m 0644 /known-hosts/known_hosts "$SSH_DIR/known_hosts"
 }
 
 # Runs one of the deploybot verbs on a host. StrictHostKeyChecking stays on
 # against the committed known_hosts: the credential is short-lived but it is
 # still a credential, and there is no reason to hand it to an unverified host.
 trigger() {
+  load_creds
   ssh -n \
     -o BatchMode=yes \
     -o IdentitiesOnly=yes \
@@ -41,13 +48,18 @@ trigger() {
     "$SSH_USER@$2" "$1"
 }
 
-# kured cordons before draining and uncordons once the node is back, so an
-# uncordoned Ready node is the signal that it is done with this host. Both
-# fields come from one GET so they cannot disagree with each other.
-node_ready() {
-  state=$(kubectl get node "$1" \
+# Prints "<Ready status> <unschedulable>" from a single GET so the two fields
+# cannot disagree, or nothing if the API call failed.
+node_state() {
+  kubectl get node "$1" \
     -o jsonpath='{.status.conditions[?(@.type=="Ready")].status} {.spec.unschedulable}' \
-    2>/dev/null || echo "")
+    2>/dev/null || true
+}
+
+# kured cordons before draining and uncordons once the node is back, so an
+# uncordoned Ready node is the signal that it is done with this host.
+node_ready() {
+  state=$(node_state "$1")
   ready=${state%% *}
   unsched=${state#* }
 
@@ -55,13 +67,30 @@ node_ready() {
   [ -z "$unsched" ] || [ "$unsched" = "false" ]
 }
 
+# True once kured has visibly started on the node: cordoned, or already down.
+# An API error is not evidence either way, so it counts as not started.
+node_reboot_started() {
+  case "$(node_state "$1")" in
+  *" true" | "False "* | "Unknown "*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+# Firing alerts can hold kured off for days, so there is no limit on waiting
+# for it to start; the Job's activeDeadlineSeconds bounds that. Once kured has
+# started on the host, it gets REBOOT_TIMEOUT to drain, reboot and come back.
 wait_for_host() {
   name=$1
   ip=$2
-  deadline=$(($(date +%s) + REBOOT_TIMEOUT))
+  deadline=""
 
-  while [ "$(date +%s)" -lt "$deadline" ]; do
+  while [ -z "$deadline" ] || [ "$(date +%s)" -lt "$deadline" ]; do
     sleep "$POLL_INTERVAL"
+
+    if [ -z "$deadline" ] && node_reboot_started "$name"; then
+      deadline=$(($(date +%s) + REBOOT_TIMEOUT))
+      echo "kured has started on $name; allowing ${REBOOT_TIMEOUT}s for it to come back"
+    fi
 
     # The host itself is the authority on whether it came back on the generation
     # that was staged for it. Re-asking is safe: once booted == staged the verb

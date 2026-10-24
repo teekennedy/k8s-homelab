@@ -42,11 +42,11 @@ spec:
             summary: {{ "borg hosts are built from {{ $value }} different commits" | quote }}
             description: {{ "The NixOS hosts have not converged on a single revision. A stage did not reach every host -- check the last deploy-hosts pipeline and `nixos_selfupdate_info` for which host is behind." | quote }}
 
-        # Staged but never booted. The rollout Job allows an hour per host and
-        # gives up after 4.5h total (nixosRollout.activeDeadlineSeconds), so
-        # anything still pending at six hours outlived the rollout that was meant
-        # to clear it -- or no rollout was ever created, which is what happens
-        # when the stage step fails and `rollout` never runs.
+        # Staged but never booted. Either no rollout was ever created, which is
+        # what happens when the stage step fails and `rollout` never runs, or
+        # firing alerts are keeping kured from rebooting. The rollout Job keeps
+        # waiting on kured for up to nixosRollout.activeDeadlineSeconds, and
+        # kured ignores this alert, so it cannot block the reboot itself.
         - alert: NixosRebootPendingTooLong
           expr: nixos_selfupdate_reboot_pending == 1
           for: 6h
@@ -55,7 +55,7 @@ spec:
             component: nixos-cd
           annotations:
             summary: {{ "{{ $labels.instance }} has had a NixOS generation staged for 6h without rebooting" | quote }}
-            description: {{ "A new system generation is staged but not booted. Either no rollout Job was created, or kured never got to this host. `kubectl -n woodpecker create job --from=cronjob/nixos-rollout nixos-rollout-manual` rolls it out." | quote }}
+            description: {{ "A new system generation is staged but not booted. Either no rollout Job was created, or kured is blocked (check the firing alerts) or never got to this host. `kubectl -n woodpecker create job --from=cronjob/nixos-rollout nixos-rollout-manual` rolls it out." | quote }}
 
         # One of the build/stage/fallback units failed on the host. Distinct
         # from drift: this catches the build or stage that broke rather than
