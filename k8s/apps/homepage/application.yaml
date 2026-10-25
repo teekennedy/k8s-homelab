@@ -21,11 +21,6 @@ spec:
     - jsonPointers:
         - /data
       kind: Secret
-      name: homepage-secrets
-      namespace: homepage
-    - jsonPointers:
-        - /data
-      kind: Secret
       name: homepage-oauth2-proxy-secrets
       namespace: homepage
     - jsonPointers:

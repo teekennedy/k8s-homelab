@@ -201,7 +201,9 @@ forgejo-resources:
       fullName: Homepage
       email: homepage@msng.to
       secretName: homepage-forgejo-credentials
-      secretNamespace: forgejo
+      # Written straight to its consumer's namespace (a non-admin, read-only
+      # user), so no copy step is needed.
+      secretNamespace: homepage
       accessTokens:
         - name: homepage
           scopes:

@@ -83,48 +83,16 @@ homepage:
           key: client-secret
     - name: HOMEPAGE_OIDC_NAME
       value: Authelia
-  extraEnvFrom:
-    - secretRef:
-        name: homepage-secrets
+    # Read-only token for the unprivileged `homepage` Forgejo user. Written
+    # into this namespace by forgejo-resources (k8s/platform/forgejo/values.yaml).
+    - name: HOMEPAGE_VAR_FORGEJO_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: homepage-forgejo-credentials
+          key: token
   resources:
     requests:
       cpu: 50m
       memory: 384Mi
     limits:
       memory: 512Mi
-
-# Assembles homepage-secrets from API keys owned by other namespaces. Runs as an
-# ArgoCD PostSync hook (templates/secret-sync.yaml). This used to be triggered
-# lazily by an Argo Events EventBus/EventSource/Sensor watching the source
-# Secrets; that was removed as more machinery than the problem warranted.
-secret-sync:
-  enabled: true
-  image:
-    repository: golang
-    tag: 1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d
-  rollout:
-    enabled: true
-    namespace: homepage
-    deployment: homepage
-    annotation: homepage-secret-sync/restarted-at
-  output-secret:
-    name: homepage-secrets
-    namespace: homepage
-    type: Opaque
-  mappings:
-    - env: HOMEPAGE_VAR_SEERR_API_KEY
-      source:
-        namespace: jellyfin
-        name: api-keys
-        key: SEERR_API_KEY
-    - env: HOMEPAGE_VAR_FORGEJO_API_KEY
-      source:
-        namespace: forgejo
-        name: homepage-forgejo-credentials
-        key: token
-    - env: HOMEPAGE_VAR_JELLYFIN_API_KEY
-      source:
-        namespace: jellyfin
-        name: jellyfin-homepage-api-key
-        key: api-key
-      optional: true

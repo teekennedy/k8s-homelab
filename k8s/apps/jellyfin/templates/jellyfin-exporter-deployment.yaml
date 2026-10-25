@@ -91,6 +91,12 @@ spec:
             # exits, which for a long-running server means forever.
             - name: PYTHONUNBUFFERED
               value: "1"
+            {{- with .Values.exporter.media }}
+            - name: MEDIA_PATH
+              value: /media
+            - name: MEDIA_INTERVAL
+              value: {{ .interval | quote }}
+            {{- end }}
           ports:
             - name: metrics
               containerPort: {{ .Values.exporter.port }}
@@ -132,6 +138,12 @@ spec:
               readOnly: true
             - name: jellyfin-exporter-project
               mountPath: /project
+            {{- with .Values.exporter.media }}
+            - name: media
+              mountPath: /media
+              subPath: {{ .subPath }}
+              readOnly: true
+            {{- end }}
       volumes:
         - name: jellyfin-exporter
           configMap:
@@ -141,4 +153,10 @@ spec:
         # here.
         - name: jellyfin-exporter-project
           emptyDir: {}
+        {{- with .Values.exporter.media }}
+        - name: media
+          persistentVolumeClaim:
+            claimName: {{ .claimName }}
+            readOnly: true
+        {{- end }}
 {{- end }}

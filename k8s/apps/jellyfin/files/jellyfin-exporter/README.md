@@ -17,6 +17,8 @@ Prometheus exporter for Jellyfin.
 | `jellyfin_active_video_transcodes` | unpaused sessions re-encoding video |
 | `jellyfin_active_audio_transcodes` | unpaused sessions re-encoding audio |
 | `jellyfin_session_info` | per-session labels, always `1` |
+| `jellyfin_library_items` | library size by `type` (`movie`, `series`, `episode`, …) |
+| `jellyfin_media_size_bytes` | apparent size of the media directory, by top-level `folder` |
 | `jellyfin_up` | whether the last Jellyfin query succeeded |
 | `jellyfin_exporter_last_success_timestamp_seconds` | freshness |
 
@@ -52,6 +54,18 @@ A WebSocket to Jellyfin's `/socket`, subscribed with `SessionsStart`, plus a
 60-second `GET /Sessions` reconcile for drift correction and as a fallback when
 the socket flaps. State expires after `STALE_AFTER` seconds so a silently dead
 socket cannot pin the reboot gate open.
+
+Library counts come from a separate, slower `GET /Items/Counts` poll. They are
+for dashboards (homepage's Jellyfin tile reads them from Prometheus, so homepage
+needs no Jellyfin API key). They never affect `jellyfin_up` or the stream
+gauges, and they are omitted, not zeroed, after three failed polls.
+
+Media size comes from walking `MEDIA_PATH`, the `media` subPath of the
+`jellyfin-data` SMB volume mounted read-only. No existing metric covers it: the
+smallest ZFS dataset holding it is `storage/nas`, which also holds every other
+share. It sums apparent file sizes like `du -sb`, so ZFS compression is not
+reflected. The mount means the exporter cannot start while the SMB share is
+unavailable, which is also when Jellyfin has nothing to stream.
 
 ## How it runs
 
@@ -89,6 +103,9 @@ see `JellyfinExporterDown` below.
 | `LISTEN_PORT` | `9101` | metrics port |
 | `RECONCILE_INTERVAL` | `60` | REST poll interval, seconds |
 | `STALE_AFTER` | `max(90, interval × 2.5)` | state expiry, seconds |
+| `LIBRARY_INTERVAL` | `300` | library count poll interval, seconds |
+| `MEDIA_PATH` | *(unset: disabled)* | directory to measure for `jellyfin_media_size_bytes` |
+| `MEDIA_INTERVAL` | `900` | media scan interval, seconds |
 | `DEVICE_ID` | `jellyfin-exporter` | shown in Jellyfin's device list |
 | `LOG_LEVEL` | `INFO` | |
 

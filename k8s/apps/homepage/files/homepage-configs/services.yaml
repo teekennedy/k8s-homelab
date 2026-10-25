@@ -6,12 +6,31 @@
         namespace: jellyfin
         app: jellyfin
         podSelector: "app.kubernetes.io/controller=main"
+        # From jellyfin-exporter via Prometheus. The native jellyfin widget
+        # needs a Jellyfin API key, and those are always full admin.
         widget:
-          type: jellyfin
-          url: https://jellyfin.msng.to
-          key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
-          version: 2
-          cache: 3
+          type: prometheusmetric
+          url: https://prometheus.msng.to
+          refreshInterval: 30000
+          metrics:
+            - label: Streaming
+              query: sum(jellyfin_active_streams)
+            # prometheusmetric shows at most four metrics.
+            - label: Library
+              query: sum(jellyfin_media_size_bytes)
+              format:
+                type: bytes
+                options:
+                  maximumFractionDigits: 1
+            - label: Movies
+              query: max(jellyfin_library_items{type="movie"})
+              format:
+                type: number
+            - label: Shows
+              query: max(jellyfin_library_items{type="series"})
+              format:
+                type: number
+    # No widget: Seerr's API key is admin-level and Seerr has no metrics.
     - Seerr:
         icon: sh-seerr.svg
         href: https://seerr.msng.to
@@ -19,11 +38,6 @@
         namespace: jellyfin
         app: jellyfin
         podSelector: "app.kubernetes.io/controller=seerr"
-        widget:
-          type: seerr
-          url: https://seerr.msng.to
-          key: "{{HOMEPAGE_VAR_SEERR_API_KEY}}"
-          cache: 3
 - Apps:
     - Forgejo:
         icon: sh-forgejo.svg

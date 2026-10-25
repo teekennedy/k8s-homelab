@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import stat
 import sys
 import threading
 import time
@@ -128,6 +129,34 @@ _GAUGES = (
 )
 
 
+# GET /Items/Counts keys, mapped to the `type` label of jellyfin_library_items.
+# ItemCount is left out: it counts every item (seasons, folders, extras), not
+# anything a person would call "the library".
+_LIBRARY_TYPES = (
+    ("MovieCount", "movie"),
+    ("SeriesCount", "series"),
+    ("EpisodeCount", "episode"),
+    ("SongCount", "song"),
+    ("AlbumCount", "album"),
+    ("ArtistCount", "artist"),
+    ("MusicVideoCount", "music_video"),
+    ("BoxSetCount", "box_set"),
+    ("BookCount", "book"),
+    ("TrailerCount", "trailer"),
+    ("ProgramCount", "program"),
+)
+
+
+def library_counts(raw: dict[str, Any]) -> dict[str, int]:
+    """Turn an ItemCounts DTO into {type label: count}, skipping missing keys."""
+    counts = {}
+    for key, label in _LIBRARY_TYPES:
+        value = raw.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            counts[label] = value
+    return counts
+
+
 def _escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
@@ -137,7 +166,12 @@ def _labels(pairs: Iterable[tuple[str, str]]) -> str:
 
 
 def render(
-    raw_sessions: Iterable[dict[str, Any]], *, up: bool, last_success: float
+    raw_sessions: Iterable[dict[str, Any]],
+    *,
+    up: bool,
+    last_success: float,
+    library: dict[str, int] | None = None,
+    media: dict[str, int] | None = None,
 ) -> str:
     """Render exposition text.
 
@@ -145,6 +179,10 @@ def render(
     rather than replaying stale state. A stuck exporter must not hold the
     kured reboot gate shut indefinitely; `jellyfin_up` is what tells you
     the difference between "nobody is watching" and "we cannot tell".
+
+    `library` and `media` are independent of `up`. When either is None
+    (never fetched, or stale) its gauge is omitted rather than zeroed, since
+    a zero would read as an emptied library.
     """
     sessions = [classify(s) for s in raw_sessions] if up else []
     playing = [s for s in sessions if s.playing]
@@ -179,6 +217,24 @@ def render(
     )
     lines.append("# TYPE jellyfin_exporter_last_success_timestamp_seconds gauge")
     lines.append(f"jellyfin_exporter_last_success_timestamp_seconds {last_success}")
+
+    if library:
+        lines.append("# HELP jellyfin_library_items Library items, by type.")
+        lines.append("# TYPE jellyfin_library_items gauge")
+        for label, count in library.items():
+            lines.append(
+                f"jellyfin_library_items{{{_labels([('type', label)])}}} {count}"
+            )
+
+    if media:
+        lines.append(
+            "# HELP jellyfin_media_size_bytes Apparent size of the media"
+            " directory, by top-level folder."
+        )
+        lines.append("# TYPE jellyfin_media_size_bytes gauge")
+        for folder, size in media.items():
+            labels = _labels([("folder", folder)])
+            lines.append(f"jellyfin_media_size_bytes{{{labels}}} {size}")
 
     if playing:
         lines.append(
@@ -265,6 +321,30 @@ class State:
             return list(self._sessions), fresh, self._last_success
 
 
+class ExpiringCounts:
+    """Last known {label: value} gauges, or None once too old to trust."""
+
+    def __init__(self, stale_after: float = 900.0, clock=time.time):
+        self._stale_after = stale_after
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._counts: dict[str, int] = {}
+        self._last_success: float = 0.0
+
+    def update(self, counts: dict[str, int]) -> None:
+        with self._lock:
+            self._counts = dict(counts)
+            self._last_success = self._clock()
+
+    def snapshot(self) -> dict[str, int] | None:
+        with self._lock:
+            if self._last_success <= 0:
+                return None
+            if self._clock() - self._last_success > self._stale_after:
+                return None
+            return dict(self._counts)
+
+
 # --------------------------------------------------------------------------
 # Jellyfin REST client
 # --------------------------------------------------------------------------
@@ -277,8 +357,15 @@ class JellyfinClient:
         self.timeout = timeout
 
     def get_sessions(self) -> list[dict[str, Any]]:
+        return self._get("/Sessions")
+
+    def get_item_counts(self) -> dict[str, Any]:
+        # With an API key (no user) this counts the whole server.
+        return self._get("/Items/Counts")
+
+    def _get(self, path: str) -> Any:
         request = urllib.request.Request(
-            f"{self.base_url}/Sessions",
+            f"{self.base_url}{path}",
             # Passing the key as a header keeps it out of Jellyfin's
             # request log, unlike the ApiKey query parameter. The MediaBrowser
             # scheme is the only header form Jellyfin 12.0 still accepts:
@@ -392,12 +479,101 @@ def reconcile_loop(
         stop.wait(interval)
 
 
+def library_loop(
+    client: JellyfinClient,
+    library: ExpiringCounts,
+    stop: threading.Event,
+    interval: float = 300.0,
+) -> None:
+    """Periodic library count poll. Counts change slowly, so this runs rarely."""
+    while not stop.wait(interval):
+        refresh_library(client, library)
+
+
+def refresh_library(client: JellyfinClient, library: ExpiringCounts) -> None:
+    try:
+        library.update(library_counts(client.get_item_counts()))
+    except Exception as exc:  # noqa: BLE001 - keep polling
+        log.warning("library count query failed: %s", exc)
+
+
+# --------------------------------------------------------------------------
+# Media disk usage
+# --------------------------------------------------------------------------
+
+
+def media_sizes(root: str) -> dict[str, int]:
+    """Sum apparent file sizes under `root`, keyed by top-level folder.
+
+    Files directly under `root` are keyed ".". Symlinks are not followed,
+    and files that vanish or cannot be read mid-walk are skipped. Hardlinks
+    are counted once per path: the SMB mount uses `noserverino`, so inode
+    numbers cannot tell two links to one file apart.
+
+    Raises if `root` itself cannot be listed, so that an unmounted volume
+    reads as a failed scan rather than an empty library.
+    """
+    sizes: dict[str, int] = {}
+    with os.scandir(root) as entries:
+        top = list(entries)
+    for entry in top:
+        try:
+            if entry.is_dir(follow_symlinks=False):
+                sizes[entry.name] = _tree_size(entry.path)
+            elif entry.is_file(follow_symlinks=False):
+                sizes["."] = (
+                    sizes.get(".", 0) + entry.stat(follow_symlinks=False).st_size
+                )
+        except OSError:
+            continue
+    return sizes
+
+
+def _tree_size(path: str) -> int:
+    total = 0
+    for dirpath, _, filenames in os.walk(path):
+        for name in filenames:
+            try:
+                st = os.lstat(os.path.join(dirpath, name))
+            except OSError:
+                continue
+            if stat.S_ISREG(st.st_mode):
+                total += st.st_size
+    return total
+
+
+def media_loop(
+    root: str, media: ExpiringCounts, stop: threading.Event, interval: float = 900.0
+) -> None:
+    """Scan now, then every `interval` seconds."""
+    while True:
+        refresh_media(root, media)
+        if stop.wait(interval):
+            return
+
+
+def refresh_media(root: str, media: ExpiringCounts) -> None:
+    started = time.monotonic()
+    try:
+        media.update(media_sizes(root))
+    except Exception as exc:  # noqa: BLE001 - keep scanning
+        log.warning("media scan of %s failed: %s", root, exc)
+        return
+    log.info("scanned %s in %.1fs", root, time.monotonic() - started)
+
+
 # --------------------------------------------------------------------------
 # HTTP server
 # --------------------------------------------------------------------------
 
 
-def build_metrics_server(host: str, port: int, state: State) -> ThreadingHTTPServer:
+def build_metrics_server(
+    host: str,
+    port: int,
+    state: State,
+    library: ExpiringCounts | None = None,
+    media: ExpiringCounts | None = None,
+) -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -405,7 +581,13 @@ def build_metrics_server(host: str, port: int, state: State) -> ThreadingHTTPSer
             path = urllib.parse.urlsplit(self.path).path
             if path == "/metrics":
                 sessions, up, last_success = state.snapshot()
-                body = render(sessions, up=up, last_success=last_success).encode()
+                body = render(
+                    sessions,
+                    up=up,
+                    last_success=last_success,
+                    library=library.snapshot() if library else None,
+                    media=media.snapshot() if media else None,
+                ).encode()
                 self._respond(200, "text/plain; version=0.0.4; charset=utf-8", body)
             elif path == "/healthz":
                 # Liveness reflects this process only.
@@ -438,6 +620,8 @@ def start_collectors(
     state: State,
     stop: threading.Event,
     reconcile_interval: float = 60.0,
+    library: ExpiringCounts | None = None,
+    library_interval: float = 300.0,
 ) -> bool:
     """Start the WebSocket and reconcile threads, if we have credentials.
 
@@ -469,6 +653,13 @@ def start_collectors(
         args=(client, state, stop, reconcile_interval),
         daemon=True,
     ).start()
+    if library is not None:
+        refresh_library(client, library)
+        threading.Thread(
+            target=library_loop,
+            args=(client, library, stop, library_interval),
+            daemon=True,
+        ).start()
     return True
 
 
@@ -496,11 +687,36 @@ def main(serve=None) -> int:
         os.environ.get("STALE_AFTER", str(max(90.0, reconcile_interval * 2.5)))
     )
 
-    state = State(stale_after=stale_after)
-    stop = threading.Event()
-    start_collectors(base_url, api_key, device_id, state, stop, reconcile_interval)
+    library_interval = float(os.environ.get("LIBRARY_INTERVAL", "300"))
 
-    server = build_metrics_server(listen_host, listen_port, state)
+    state = State(stale_after=stale_after)
+    # Three missed polls before the counts are dropped.
+    library = ExpiringCounts(stale_after=library_interval * 3)
+    stop = threading.Event()
+    start_collectors(
+        base_url,
+        api_key,
+        device_id,
+        state,
+        stop,
+        reconcile_interval,
+        library=library,
+        library_interval=library_interval,
+    )
+
+    # Needs no Jellyfin credentials, so it runs even when the collectors don't.
+    media_path = os.environ.get("MEDIA_PATH", "").strip()
+    media_interval = float(os.environ.get("MEDIA_INTERVAL", "900"))
+    media = None
+    if media_path:
+        media = ExpiringCounts(stale_after=media_interval * 3)
+        threading.Thread(
+            target=media_loop,
+            args=(media_path, media, stop, media_interval),
+            daemon=True,
+        ).start()
+
+    server = build_metrics_server(listen_host, listen_port, state, library, media)
     log.info("serving metrics on %s:%s", listen_host, server.server_port)
     if serve is None:
 

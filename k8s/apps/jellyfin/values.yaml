@@ -55,6 +55,12 @@ exporter:
   apiKeySecret:
     name: jellyfin-exporter-api-key
     key: JELLYFIN_API_KEY
+  # Mounted read-only to export jellyfin_media_size_bytes. Remove to disable.
+  media:
+    claimName: jellyfin-data
+    subPath: media
+    # Seconds between scans. A full scan took ~1s over SMB in Oct 2026.
+    interval: 900
   resources:
     requests:
       cpu: 10m

@@ -236,7 +236,7 @@ that directory, so each unit's check caches on its own files:
 ```
 dagger check go
 ├─ go-module=cmd/lab                    → cached (unchanged)
-├─ go-module=k8s/.../secret-sync         → re-runs (file changed)
+├─ go-module=k8s/.../woodpecker-resources → re-runs (file changed)
 └─ go-module=.dagger/modules/go          → cached (unchanged)
 ```
 

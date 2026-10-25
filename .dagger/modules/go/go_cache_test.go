@@ -55,10 +55,10 @@ func goFixture() cachetest.Repo {
 		"cmd/lab/go.mod": "module lab\n\ngo 1.26\n",
 		"cmd/lab/lab.go": body,
 
-		"k8s/apps/homepage/files/secret-sync/go.mod":                    "module secret-sync\n\ngo 1.26\n",
-		"k8s/apps/homepage/files/secret-sync/secretsync.go":             body,
-		"k8s/platform/forgejo/files/forgejo-resources/go.mod":           "module config\n\ngo 1.26\n",
-		"k8s/platform/forgejo/files/forgejo-resources/forgejoconfig.go": body,
+		"k8s/platform/woodpecker/files/woodpecker-resources/go.mod":              "module woodpecker-resources\n\ngo 1.26\n",
+		"k8s/platform/woodpecker/files/woodpecker-resources/woodpeckerconfig.go": body,
+		"k8s/platform/forgejo/files/forgejo-resources/go.mod":                    "module config\n\ngo 1.26\n",
+		"k8s/platform/forgejo/files/forgejo-resources/forgejoconfig.go":          body,
 
 		// A module that builds against a sibling through a local replace.
 		".dagger/lib/go.mod":           "module dagger/lib\n\ngo 1.26\n",
@@ -77,7 +77,7 @@ func goFixture() cachetest.Repo {
 // unitByScopedGoModule.
 const (
 	labUnit        = "lab.go"
-	secretSyncUnit = "secretsync.go"
+	woodpeckerUnit = "woodpeckerconfig.go"
 	forgejoUnit    = "forgejoconfig.go"
 	toolUnit       = "tool.go"
 	libUnit        = "lib.go"
@@ -86,9 +86,8 @@ const (
 	// libPath is the local replace target the replace scenario edits.
 	libPath = ".dagger/lib/lib.go"
 
-	// secretSyncPath is the file the isolation scenarios edit.
-	//nolint:gosec // G101 reads this fixture path as a credential; it is a file name
-	secretSyncPath = "k8s/apps/homepage/files/secret-sync/secretsync.go"
+	// woodpeckerPath is the file the isolation scenarios edit.
+	woodpeckerPath = "k8s/platform/woodpecker/files/woodpecker-resources/woodpeckerconfig.go"
 )
 
 // goUnitFiles is what each unit must have mounted: its own files and
@@ -96,7 +95,7 @@ const (
 // which rides along inside the module directory by design.
 var goUnitFiles = map[string][]string{
 	labUnit:        {"go.mod", "lab.go", "vendor/example.com/dep/dep.go", "vendor/example.com/dep/go.mod"},
-	secretSyncUnit: {"go.mod", "secretsync.go"},
+	woodpeckerUnit: {"go.mod", "woodpeckerconfig.go"},
 	forgejoUnit:    {"forgejoconfig.go", "go.mod"},
 	toolUnit:       {"go.mod", "tool.go"},
 	libUnit:        {"go.mod", "lib.go"},
@@ -180,8 +179,8 @@ func goScenarios() []cachetest.Scenario {
 			// The core assertion. Editing one module's source must leave every
 			// other module's work untouched.
 			Name:   "editing one module invalidates only that module",
-			Edit:   cachetest.Edit(secretSyncPath, "package main // edited\n\nfunc main() { println(1) }\n"),
-			Rerun:  []string{secretSyncUnit},
+			Edit:   cachetest.Edit(woodpeckerPath, "package main // edited\n\nfunc main() { println(1) }\n"),
+			Rerun:  []string{woodpeckerUnit},
 			Cached: []string{labUnit, forgejoUnit, toolUnit, libUnit},
 		},
 		{
@@ -189,7 +188,7 @@ func goScenarios() []cachetest.Scenario {
 			Name:   "editing another module invalidates only that module",
 			Edit:   cachetest.Edit("k8s/platform/forgejo/files/forgejo-resources/forgejoconfig.go", "package main\n\nfunc main() { _ = 1 }\n"),
 			Rerun:  []string{forgejoUnit},
-			Cached: []string{labUnit, secretSyncUnit, toolUnit, libUnit},
+			Cached: []string{labUnit, woodpeckerUnit, toolUnit, libUnit},
 		},
 		{
 			// Discovery growing a new module must not itself be a
@@ -197,7 +196,7 @@ func goScenarios() []cachetest.Scenario {
 			Name:   "adding a module leaves the existing modules cached",
 			Edit:   cachetest.AddFiles(addedGoModule),
 			Rerun:  []string{addedUnit},
-			Cached: []string{labUnit, secretSyncUnit, forgejoUnit, toolUnit, libUnit},
+			Cached: []string{labUnit, woodpeckerUnit, forgejoUnit, toolUnit, libUnit},
 		},
 		{
 			// A module that replaces another with a local path builds against
@@ -205,7 +204,7 @@ func goScenarios() []cachetest.Scenario {
 			Name:   "editing a local replace target invalidates it and the modules replacing it",
 			Edit:   cachetest.Edit(libPath, "package lib\n\nconst X = 2\n"),
 			Rerun:  []string{libUnit, toolUnit},
-			Cached: []string{labUnit, secretSyncUnit, forgejoUnit},
+			Cached: []string{labUnit, woodpeckerUnit, forgejoUnit},
 		},
 	}
 }

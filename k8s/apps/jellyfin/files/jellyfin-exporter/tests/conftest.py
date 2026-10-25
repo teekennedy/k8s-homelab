@@ -24,6 +24,22 @@ from websockets.sync.server import ServerConnection, serve
 
 STUB_API_KEY = "stub-api-key"
 
+# Shape of a real GET /Items/Counts response.
+ITEM_COUNTS = {
+    "MovieCount": 298,
+    "SeriesCount": 138,
+    "EpisodeCount": 6583,
+    "ArtistCount": 0,
+    "ProgramCount": 0,
+    "TrailerCount": 0,
+    "SongCount": 0,
+    "AlbumCount": 0,
+    "MusicVideoCount": 0,
+    "BoxSetCount": 1,
+    "BookCount": 0,
+    "ItemCount": 27844,
+}
+
 
 def transcoding_session(user: str = "alice") -> dict:
     """A session doing real video work, with the fields the exporter reads."""
@@ -71,6 +87,7 @@ class FakeJellyfin:
         self.sessions = (
             list(sessions) if sessions is not None else [transcoding_session()]
         )
+        self.item_counts = dict(ITEM_COUNTS)
         # Lets a test force a REST failure without stopping the server.
         self.rest_status = rest_status
         # (path, headers); headers stay a Headers so lookups are
@@ -135,11 +152,14 @@ class FakeJellyfin:
             != f'MediaBrowser Token="{self.api_key}"'
         ):
             return _json_response(401, "Unauthorized", {"error": "bad api key"})
-        if path.rstrip("/") != "/Sessions":
+        path = path.rstrip("/")
+        if path not in ("/Sessions", "/Items/Counts"):
             return _json_response(404, "Not Found", {"error": "no such endpoint"})
         if self.rest_status != 200:
             return _json_response(self.rest_status, "Error", {"error": "forced"})
         with self._lock:
+            if path == "/Items/Counts":
+                return _json_response(200, "OK", dict(self.item_counts))
             return _json_response(200, "OK", list(self.sessions))
 
     def _handle(self, connection: ServerConnection) -> None:
