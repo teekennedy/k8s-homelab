@@ -643,6 +643,9 @@ loki:
       periodSeconds: 30
       failureThreshold: 5
     auth_enabled: false
+    # At info, Loki logs every query, flush and table lookup (~400MiB/day).
+    server:
+      log_level: warn
     commonConfig:
       replication_factor: 1
     # Pattern ingester adds CPU/memory overhead; disable if it is too expensive.
