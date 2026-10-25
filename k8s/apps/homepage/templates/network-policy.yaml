@@ -54,7 +54,10 @@ spec:
           port: 6443
     # Widget API calls and OIDC requests go through Traefik.
     # servicelb DNATs node-IP:443 to Traefik pod IPs, so we target
-    # the pods directly rather than the pre-DNAT node IPs
+    # the pods directly rather than the pre-DNAT node IPs.
+    # Ports are post-DNAT container ports: widget hosts resolve to the internal
+    # VIP (websecure), while authelia.msng.to resolves to the public VIP
+    # (wspublic).
     - to:
         - namespaceSelector:
             matchLabels:
@@ -62,3 +65,8 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: websecure
+        - protocol: TCP
+          port: wspublic
