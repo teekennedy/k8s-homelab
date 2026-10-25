@@ -1,6 +1,6 @@
 dependencies:
 - name: reflector
   repository: oci://ghcr.io/emberstack/helm-charts
-  version: 10.0.65
-digest: sha256:0f8d607f55f374f98278921b9c981c4c1960c84aecf533e61317d1e0caf07dbc
-generated: "2026-08-15T11:23:26.00497784Z"
+  version: 10.0.68
+digest: sha256:c2d392dba06c9aa89f0e7fc2a1970b36665a02339e26fdb12d8049d80d4f4840
+generated: "2026-10-25T11:25:18.269308998Z"
