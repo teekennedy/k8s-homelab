@@ -57,9 +57,18 @@ spec:
     spec:
       # Bounds the whole rollout, including waiting for kured to be unblocked.
       activeDeadlineSeconds: {{ $rollout.activeDeadlineSeconds }}
-      # Waiting on kured does not fail the pod, so retries only cover real
+      # Waiting on kured does not fail the job, so retries only cover real
       # failures: an unreachable host, or one that never came back.
       backoffLimit: 6
+      # kured evicts this pod when it drains the node the pod runs on. That is
+      # expected, so it does not count against backoffLimit. Setting a policy
+      # also makes the replacement wait until the evicted pod has exited, so
+      # two pods never drive the rollout at once.
+      podFailurePolicy:
+        rules:
+          - action: Ignore
+            onPodConditions:
+              - type: DisruptionTarget
       template:
         metadata:
           labels:
@@ -67,7 +76,8 @@ spec:
             app.kubernetes.io/instance: nixos-rollout
         spec:
           serviceAccountName: nixos-rollout
-          restartPolicy: OnFailure
+          # Required by podFailurePolicy.
+          restartPolicy: Never
           volumes:
             - name: script
               configMap:

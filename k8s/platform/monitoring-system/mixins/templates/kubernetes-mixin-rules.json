@@ -188,7 +188,7 @@
                      "runbook_url": "https://github.com/kubernetes-sigs/kubernetes-mixin/tree/master/runbook.md#alert-name-kubejobfailed",
                      "summary": "Job failed to complete."
                   },
-                  "expr": "kube_job_failed{job=\"kube-state-metrics\"}  > 0\n",
+                  "expr": "kube_job_failed{job=\"kube-state-metrics\", job_name!~\"nixos-rollout-.*\"}  > 0\n",
                   "for": "15m",
                   "labels": {
                      "severity": "warning"

@@ -17,6 +17,22 @@ local kubernetesMixin = addMixin({
         grafanaTimezone: 'browser',
       },
     },
+    # KubeJobFailed blocks kured, and nixos-rollout waits on kured: a failed
+    # rollout would hold off the reboots the next rollout needs. A stalled
+    # rollout is reported by NixosRebootPendingTooLong instead.
+    prometheusAlerts+:: {
+      groups: [
+        g {
+          rules: [
+            if std.objectHas(r, 'alert') && r.alert == 'KubeJobFailed' then
+              r { expr: std.strReplace(r.expr, 'job="kube-state-metrics"', 'job="kube-state-metrics", job_name!~"nixos-rollout-.*"') }
+            else r
+            for r in g.rules
+          ],
+        }
+        for g in super.groups
+      ],
+    },
   },
 });
 
