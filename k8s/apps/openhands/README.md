@@ -366,11 +366,18 @@ an imagePullSecret).
 
 ### Claude models
 
-The model picker's entries are fixed in the frontend, and all but one are
-aliases — `opus[1m]`, `sonnet`, `haiku` — that the Claude Code CLI in the
-sandbox resolves to the newest model it knows. The CLI also refuses a model
-newer than itself. So which models a sandbox runs is a matter of which CLI it
-has, and nothing here names a model.
+Which models a sandbox runs is a matter of which Claude Code CLI it has: the
+aliases `opus[1m]`, `sonnet` and `haiku` resolve to the newest model the CLI
+knows, and the CLI refuses a model newer than itself. Nothing here names a
+model.
+
+A conversation's model picker lists the models its running agent reports.
+The agent profile form in Settings cannot ask an agent: the canvas only
+discovers models live against a local backend. Instead it lists the models
+this browser saw in its last running Claude Code conversation (kept in the
+browser's localStorage, so per device), plus the profile's current model. A
+browser that has never had a Claude Code conversation running shows only the
+current model (`sonnet`, from `model` below) until it starts one.
 
 The Claude Code ACP adapter, which carries the CLI, is baked into the sandbox
 image (`CLAUDE_ADAPTER_VERSION` in `files/sandbox/Dockerfile`), so a sandbox
