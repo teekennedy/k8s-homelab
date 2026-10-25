@@ -129,7 +129,7 @@ traefik:
           - |
             set -eu
             # renovate: datasource=github-releases depName=maxlerebourg/crowdsec-bouncer-traefik-plugin
-            PLUGIN_VERSION=v1.7.1
+            PLUGIN_VERSION=v1.8.0
             PLUGIN_DIR=/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
             for attempt in 1 2 3 4 5; do
               rm -rf "$PLUGIN_DIR"
