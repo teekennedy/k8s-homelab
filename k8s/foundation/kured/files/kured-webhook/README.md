@@ -39,6 +39,8 @@ When the node comes back:
    - Set node `allowScheduling: true` and `evictionRequested: false`
    - Set all disks to `allowScheduling: true` and `evictionRequested: false`
 3. **Silence Expected Post-reboot Alerts**: Kured creates timed silences for alerts like `KubePodNotReady` that are expected to fire after a reboot.
+   The `KuredNodeRebooting` alert is resolved here, not on kured's `event=reboot` (sent just before rebooting).
+   Kured skips the uncordon event if the node was already cordoned before the drain; the alert then expires after `rebootAlertTtl`.
 4. **Replicas Rebuild**: Longhorn automatically rebuilds replicas on the restored node
 
 ## RBAC Permissions

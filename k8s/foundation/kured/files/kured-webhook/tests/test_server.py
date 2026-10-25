@@ -64,6 +64,44 @@ def test_build_silence_payload_timestamps():
     assert payload["endsAt"].endswith("Z")
 
 
+@patch.object(server, "config")
+def test_build_reboot_alert_payload_firing(mock_config):
+    mock_config.return_value = Mock(reboot_alert_ttl="6h")
+    now = datetime(2026, 1, 20, 7, 0, 0, tzinfo=timezone.utc)
+    [alert] = server.build_reboot_alert_payload("borg-1", resolved=False, now=now)
+    assert alert["labels"]["node"] == "borg-1"
+    assert alert["startsAt"] == "2026-01-20T07:00:00Z"
+    assert alert["endsAt"] == "2026-01-20T13:00:00Z"
+
+
+def test_build_reboot_alert_payload_resolved_is_backdated():
+    # endsAt must already be in the past on a replica whose clock is behind
+    # ours, or Alertmanager keeps the alert firing.
+    now = datetime(2026, 1, 20, 7, 0, 0, tzinfo=timezone.utc)
+    [alert] = server.build_reboot_alert_payload("borg-1", resolved=True, now=now)
+    assert alert["startsAt"] == "2026-01-20T06:59:00Z"
+    assert alert["endsAt"] == "2026-01-20T06:59:00Z"
+
+
+@patch.object(server, "set_reboot_alert")
+def test_reboot_event_leaves_reboot_alert_firing(mock_set_reboot_alert):
+    assert server.handle_event("reboot", "borg-1") is True
+    mock_set_reboot_alert.assert_not_called()
+
+
+@patch.object(server, "create_silence")
+@patch.object(server, "set_reboot_alert")
+@patch.object(server, "config")
+def test_uncordon_event_resolves_reboot_alert(
+    mock_config, mock_set_reboot_alert, _mock_create_silence
+):
+    mock_config.return_value = Mock(
+        post_reboot_silence_duration="15m", post_reboot_silence_alerts=[]
+    )
+    assert server.handle_event("uncordon", "borg-1") is True
+    mock_set_reboot_alert.assert_called_once_with("borg-1", resolved=True)
+
+
 @patch.dict(
     "os.environ",
     {"KUBERNETES_SERVICE_HOST": "kubernetes.test", "KUBERNETES_SERVICE_PORT": "443"},

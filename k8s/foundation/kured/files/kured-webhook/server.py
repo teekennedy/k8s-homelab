@@ -78,11 +78,22 @@ def build_silence_payload(
     }
 
 
+# How far a resolve's endsAt is backdated. Alertmanager treats an alert whose
+# endsAt is after its own clock as still firing, and when that merges with the
+# stored alert, the stored alert's later endsAt wins and the resolve is lost.
+# endsAt=now loses that race on any replica whose clock is a few ms behind ours.
+RESOLVE_BACKDATE = timedelta(minutes=1)
+
+
 def build_reboot_alert_payload(
     node: str, resolved: bool, now: Optional[datetime] = None
 ) -> list[dict]:
     now = now or datetime.now(timezone.utc)
-    ends_at = now if resolved else now + parse_duration(config().reboot_alert_ttl)
+    if resolved:
+        starts_at = ends_at = now - RESOLVE_BACKDATE
+    else:
+        starts_at = now
+        ends_at = now + parse_duration(config().reboot_alert_ttl)
     return [
         {
             "labels": {
@@ -95,7 +106,7 @@ def build_reboot_alert_payload(
                 "summary": f"Node {node} is rebooting",
                 "description": f"Kured is rebooting node {node}",
             },
-            "startsAt": isoformat(now),
+            "startsAt": isoformat(starts_at),
             "endsAt": isoformat(ends_at),
         }
     ]
@@ -241,8 +252,8 @@ def handle_event(event: str, node: str) -> bool:
         set_reboot_alert(node, resolved=False)
         return True
     if event == "reboot":
-        # Resolve reboot alert
-        set_reboot_alert(node, resolved=True)
+        # Sent just before the reboot. The reboot alert stays firing until
+        # uncordon, which kured sends once the node is back up.
         return True
     if event == "uncordon":
         # Silence alerts

@@ -1,5 +1,6 @@
 {...}: {
   imports = [
+    ./chrony.nix
     ./disko.nix
     ./impermanence.nix
     ./journald.nix
