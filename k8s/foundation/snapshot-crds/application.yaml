@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: snapshot-crds
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    # Everything here is a cluster-scoped CRD; the namespace is only used for
+    # ArgoCD tracking metadata.
+    namespace: kube-system
+  # This Application OWNS the snapshot CRDs, so it intentionally does NOT
+  # ignore differences on apiextensions.k8s.io/CustomResourceDefinition --
+  # doing so would stop it from ever reconciling a CRD upgrade.
+  project: default
+  source:
+    path: k8s/foundation/snapshot-crds
+    repoURL: https://git.msng.to/ops/k8s-homelab
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      # Keeps large CRDs clear of the 262144-byte client-side-apply
+      # annotation limit.
+      - ServerSideApply=true
