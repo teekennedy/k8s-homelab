@@ -5,5 +5,7 @@ metadata:
 data:
   pyproject.toml: |
 {{ .Files.Get "files/discord-bot/pyproject.toml" | indent 4 }}
+  .python-version: |
+{{ .Files.Get "files/discord-bot/.python-version" | indent 4 }}
   server.py: |
 {{ .Files.Get "files/discord-bot/server.py" | indent 4 }}

@@ -105,9 +105,11 @@ app-template:
         automountServiceAccountToken: true
       containers:
         discord-bot:
+          # The python-flavoured tag ships an interpreter, which must match
+          # files/discord-bot/.python-version: uv never downloads one.
           image:
             repository: ghcr.io/astral-sh/uv
-            tag: alpine@sha256:6ba9c830aa848d21e1e9d8028ae01ed02b08980b25aeabef9a6683c5743c6d0f
+            tag: python3.14-alpine@sha256:4ce2a2ef69130ffb97688c8446ae771415035406355fbcb7932c59a535f82888
             pullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -115,6 +117,7 @@ app-template:
             - uv
             - run
             - --no-cache
+            - --no-python-downloads
             - --link-mode
             - copy
             - --directory
@@ -290,6 +293,9 @@ app-template:
               readOnly: true
             - path: /app/pyproject.toml
               subPath: pyproject.toml
+              readOnly: true
+            - path: /app/.python-version
+              subPath: .python-version
               readOnly: true
 
   secrets:

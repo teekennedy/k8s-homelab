@@ -16,4 +16,6 @@ metadata:
 data:
   exporter.py: |-
     {{- .Files.Get "files/jellyfin-exporter/exporter.py" | nindent 4 }}
+  .python-version: |-
+    {{- .Files.Get "files/jellyfin-exporter/.python-version" | nindent 4 }}
 {{- end }}

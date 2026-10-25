@@ -71,7 +71,7 @@ spec:
               cp -rL /app/. /project/
               mkdir -p /project/tmp
               cd /project
-              uv run --no-cache --link-mode copy --script exporter.py
+              uv run --no-cache --no-python-downloads --link-mode copy --script exporter.py
           env:
             - name: JELLYFIN_URL
               value: {{ .Values.exporter.jellyfinUrl | quote }}

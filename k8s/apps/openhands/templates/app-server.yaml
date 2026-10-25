@@ -17,6 +17,8 @@ data:
     {{- .Files.Get "files/app-server/pyproject.toml" | nindent 4 }}
   uv.lock: |-
     {{- .Files.Get "files/app-server/uv.lock" | nindent 4 }}
+  .python-version: |-
+    {{- .Files.Get "files/app-server/.python-version" | nindent 4 }}
   {{- range $path, $_ := .Files.Glob "files/app-server/app_server/*.py" }}
   {{ printf "app_server.%s" (base $path) }}: |-
     {{- $.Files.Get $path | nindent 4 }}
@@ -198,7 +200,7 @@ spec:
               cp -rL /app/. /project/
               mkdir -p /project/tmp
               cd /project
-              exec uv run --frozen --no-dev --no-cache --link-mode copy \
+              exec uv run --frozen --no-dev --no-cache --no-python-downloads --link-mode copy \
                 python -m app_server.main
           env:
             - name: POD_NAMESPACE

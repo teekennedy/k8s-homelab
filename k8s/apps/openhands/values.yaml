@@ -220,7 +220,8 @@ metrics:
 # Sandbox per conversation from the specs below. See README.md, "App server".
 appServer:
   # The python-flavoured tag ships an interpreter, so a pod start only fetches
-  # the locked dependencies in files/app-server/uv.lock.
+  # the locked dependencies in files/app-server/uv.lock. Its Python must match
+  # files/app-server/.python-version: uv never downloads one.
   # renovate: datasource=docker depName=ghcr.io/astral-sh/uv
   image: ghcr.io/astral-sh/uv:python3.13-alpine@sha256:1fd17509ae6051e6cad9dc1b83705483c0b24a15740b3c4d230b6b6f2e2a0241
   port: 8080

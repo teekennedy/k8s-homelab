@@ -16,3 +16,7 @@ result
 
 # locally generated helm charts
 *.tgz
+
+# Python pins that in-cluster uv workloads read; they must be committed even
+# when a global gitignore excludes them.
+!.python-version

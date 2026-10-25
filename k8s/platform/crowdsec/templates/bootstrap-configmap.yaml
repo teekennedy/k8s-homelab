@@ -18,4 +18,6 @@ data:
 {{ .Files.Get "files/bootstrap-middleware/bootstrap.py" | indent 4 }}
   pyproject.toml: |
 {{ .Files.Get "files/bootstrap-middleware/pyproject.toml" | indent 4 }}
+  .python-version: |
+{{ .Files.Get "files/bootstrap-middleware/.python-version" | indent 4 }}
 {{- end }}
