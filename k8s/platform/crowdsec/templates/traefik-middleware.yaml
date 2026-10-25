@@ -48,6 +48,26 @@ spec:
       # Default ban time in seconds (for stream mode)
       defaultDecisionSeconds: 3600
 
+      {{- with .Values.traefikBouncer.appsec }}
+      {{- if .enabled }}
+
+      # AppSec (WAF). Authenticates with CrowdsecLapiKey. Only an in-band rule
+      # match blocks a request; everything below fails open so a slow,
+      # broken, or missing AppSec never does.
+      crowdsecAppsecEnabled: true
+      crowdsecAppsecScheme: http
+      crowdsecAppsecHost: crowdsec-appsec-service.{{ $.Release.Namespace }}.svc.cluster.local:7422
+      crowdsecAppsecFailureBlock: false
+      crowdsecAppsecUnreachableBlock: false
+      # HTTP/2+ bodies without a Content-Length (streaming uploads, gRPC)
+      # can't be buffered; forward them without inspection instead of 403.
+      crowdsecAppsecUnreadableBodyBlock: false
+      # The plugin reads this much of the request body into memory before
+      # passing the request on, so it delays uploads by up to this amount.
+      crowdsecAppsecBodyLimit: {{ int .bodyLimit }}
+      {{- end }}
+      {{- end }}
+
       # Trust X-Forwarded-For from these IPs (your load balancers/proxies)
       forwardedHeadersTrustedIPs:
         - "10.0.0.0/8"

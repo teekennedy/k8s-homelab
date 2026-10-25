@@ -17,10 +17,17 @@ exemptions:
       - crowdsec-agent
     rules:
       - runAsRootAllowed
+  # CrowdSec AppSec runs the same image, whose start script installs hub items
+  # under /etc/crowdsec as root (both the register initContainer and the main container).
+  - controllerNames:
+      - crowdsec-appsec
+    rules:
+      - runAsRootAllowed
   # Helm test pods use curl/wget without pinned tags and run as root.
   - controllerNames:
       - crowdsec-test-agent
       - crowdsec-test-lapi-up
+      - crowdsec-test-appsec-up
     rules:
       - runAsRootAllowed
       - privilegeEscalationAllowed
@@ -34,6 +41,7 @@ exemptions:
   - controllerNames:
       - crowdsec-test-agent
       - crowdsec-test-lapi-up
+      - crowdsec-test-appsec-up
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
@@ -41,6 +49,7 @@ exemptions:
   - controllerNames:
       - crowdsec-test-agent
       - crowdsec-test-lapi-up
+      - crowdsec-test-appsec-up
     rules:
       - cpuRequestsMissing
       - memoryRequestsMissing

@@ -5,24 +5,31 @@ CrowdSec is a free, open-source security engine that detects and blocks maliciou
 ## Architecture
 
 ```
-Internet → Traefik (CrowdSec Plugin) → Backend
-           ↓
-           CrowdSec LAPI ← CrowdSec Agent (reads Traefik logs)
+Internet → Traefik (CrowdSec Plugin) ──────────────→ Backend
+             │  ↑ decisions (pulled every 60s)
+             │  CrowdSec LAPI ← CrowdSec Agent (reads Traefik logs)
+             │       ↑ alerts
+             └→ CrowdSec AppSec (WAF)
 ```
 
-**How it works**: CrowdSec blocks known bad IPs at Traefik (fast, binary decision)
+**How it works**: CrowdSec blocks known bad IPs at Traefik (fast, binary decision).
+Each request is also checked by the AppSec component (WAF): targeted exploit
+rules block in-line, and the broader OWASP CRS runs afterwards and only
+contributes to bans.
 
 ## How It Works
 
 1. **Agent**: Parses Traefik access logs and detects attacks (brute force, web scans, etc.)
-2. **LAPI**: Receives alerts from agents and makes ban decisions
-3. **Bouncer**: Traefik plugin that blocks IPs based on LAPI decisions
-4. **Community Blocklist**: (Optional) Subscribe to global threat intelligence
+2. **AppSec**: Runs WAF rules (virtual patching, generic rules, OWASP CRS) against request headers and bodies
+3. **LAPI**: Receives alerts from agents and AppSec and makes ban decisions
+4. **Bouncer**: Traefik plugin that blocks IPs based on LAPI decisions
+5. **Community Blocklist**: (Optional) Subscribe to global threat intelligence
 
 ## Components
 
 - **CrowdSec LAPI**: Local API server that stores decisions (1Gi PVC on Longhorn)
 - **CrowdSec Agent**: DaemonSet that monitors Traefik pod logs
+- **CrowdSec AppSec**: 2-replica Deployment serving the WAF on port 7422
 - **Traefik Bouncer Plugin**: Runs inside Traefik, blocks bad IPs
 - **Bootstrap Job**: Post-install job that configures the bouncer automatically
 
@@ -145,17 +152,18 @@ kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli alerts inspect <alert
 
 ### Test the Bouncer
 
-Simulate an attack to verify CrowdSec is working:
+Traefik sees the real client IP (the public Service uses
+`externalTrafficPolicy: Local`), so a spoofed `X-Forwarded-For` header has no
+effect. Test from a machine outside the LAN, such as a phone on mobile data:
 
 ```bash
-# Manually add a test ban
-kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli decisions add --ip 1.2.3.4 --duration 5m
+# Ban the external IP of the test device
+kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli decisions add --ip <test-device-ip> --duration 5m
 
-# Try accessing your site from that IP (or check with curl)
-curl -H "X-Forwarded-For: 1.2.3.4" https://msng.to
+# Load any public site from that device; expect a 403 within updateInterval (60s)
 
 # Remove the test ban
-kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli decisions delete --ip 1.2.3.4
+kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli decisions delete --ip <test-device-ip>
 ```
 
 ### Check Traefik Plugin Logs
@@ -164,6 +172,71 @@ kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli decisions delete --ip
 # Traefik logs with plugin debug output
 kubectl -n kube-system logs -f deployment/traefik | grep -i crowdsec
 ```
+
+## AppSec (WAF)
+
+The Traefik plugin sends every request to the AppSec component before passing
+it on. The `homelab/appsec` config in `values.yaml` splits the rules in two:
+
+- **In-band** (blocking): `crowdsecurity/vpatch-*` (virtual patches for
+  specific CVEs) and `crowdsecurity/generic-*`. These are narrow, cheap and
+  rarely misfire, so a match returns a 403 for that request.
+- **Out-of-band** (async): the OWASP Core Rule Set (CRS), a broad,
+  signature-based rule set for SQL injection, XSS, path traversal, RCE and
+  similar attacks. It is noisier and more expensive, so AppSec replies to the
+  bouncer before running it. A CRS match never blocks a request; it only
+  counts toward a ban.
+
+| Scenario | Rules | Bans after |
+|---|---|---|
+| `crowdsecurity/appsec-vpatch` | In-band matches | 2 different rules within 60s |
+| `crowdsecurity/crowdsec-appsec-outofband` | Out-of-band (CRS) matches | 6 matches within ~30s |
+
+A ban reaches Traefik on its next decision pull (`updateInterval`).
+
+### Cost
+
+Measured with CrowdSec v1.8.1 limited to 1 CPU. "Reply" is the time the
+bouncer waits; CRS time is spent after the reply.
+
+| Request body | Reply | CRS (async) |
+|---|---|---|
+| None | ~2ms | <1ms |
+| 64 KiB or larger (truncated to 64 KiB) | 2-4ms | <1ms |
+
+Only the first 64 KiB of a body is sent (`traefikBouncer.appsec.bodyLimit`),
+which caps the in-band cost (it was ~5ms at 256 KiB and ~20ms at 1 MiB). The
+plugin holds that much of an upload in memory before forwarding it. CRS skips body inspection for content types it can't
+parse (`homelab/crs-skip-unparsed-body`); without that, scanning a 1 MiB
+`application/octet-stream` upload took 9s of CPU.
+
+Each AppSec routine finishes a request's CRS pass before taking the next
+request, so sustained heavy traffic can queue requests behind CRS work.
+
+The plugin's AppSec settings all fail open. If AppSec is down, returns an
+error, or gets a body it can't buffer, the request passes through.
+
+### Operations
+
+```bash
+# AppSec hits, by rule
+kubectl -n crowdsec exec deployment/crowdsec-appsec -- cscli metrics show appsec
+
+# Bans from AppSec scenarios
+kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli alerts list -s crowdsecurity/appsec-vpatch
+kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli alerts list -s crowdsecurity/crowdsec-appsec-outofband
+```
+
+If a rule falsely flags an app's traffic, disable it by ID in `homelab/appsec`:
+
+```yaml
+on_load:
+  - apply:
+      - RemoveOutBandRuleByID(942100)   # CRS rule
+      - RemoveInBandRuleByName("crowdsecurity/vpatch-env-access")
+```
+
+The rule ID or name is in `cscli alerts inspect -d <alert-id>`.
 
 ## Optional: CrowdSec Console Enrollment
 

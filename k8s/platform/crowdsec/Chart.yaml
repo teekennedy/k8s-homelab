@@ -2,7 +2,7 @@ apiVersion: v2
 name: crowdsec
 description: CrowdSec Security Engine with Traefik bouncer integration
 type: application
-version: 0.1.5
+version: 0.1.6
 appVersion: "1.8.1"
 dependencies:
   - name: crowdsec
