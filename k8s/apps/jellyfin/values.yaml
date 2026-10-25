@@ -615,7 +615,7 @@ app-template:
         qbittorrent-metrics:
           image:
             repository: ghcr.io/martabal/qbittorrent-exporter
-            tag: v2.0.3@sha256:bc4fa09481634ee894ebfb4d47c8aa239a32a12567b043afa01fa42a3075d1a5
+            tag: v2.0.4@sha256:9289fc5ad5cef7af6af5af5ab5ed7b8d609827490ba374df858905d66da7ec5f
           probes:
             # TCP: /metrics fails whenever qBittorrent itself is unreachable.
             liveness:
@@ -682,7 +682,7 @@ app-template:
         configarr:
           image:
             repository: ghcr.io/raydak-labs/configarr
-            tag: 1.36.0@sha256:0d15c74cf74cd980bb2f9e9dd0cfdde1655a8f928e481c3258d7ccd4cde9dcbc
+            tag: 1.37.0@sha256:49f891499efbbec6631c621980faaadae5ac7d1be15222779a914d22c703b6ec
             pullPolicy: IfNotPresent
           tty: true # for color support
           env:
