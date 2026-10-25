@@ -13,6 +13,12 @@ spec:
   enablePDB: false
   imageName: {{ .Values.psql.image }}
   primaryUpdateStrategy: unsupervised
+  # CNPG copies these labels onto the PVCs it creates. Postgres is recovered
+  # through CNPG, not Longhorn backups, so the volumes only get trimmed.
+  inheritedMetadata:
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/ephemeral: "enabled"
   storage:
     size: 5Gi
     storageClass: longhorn-strict-local

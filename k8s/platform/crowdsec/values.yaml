@@ -67,19 +67,14 @@ crowdsec:
         cpu: 125m
         memory: 128Mi
 
-    # Persistent storage for LAPI database
+    # Persistent storage for LAPI database. The chart cannot label its PVCs,
+    # so they are defined in templates/lapi-pvcs.yaml instead.
     persistentVolume:
       config:
-        labels:
-          recurring-job.longhorn.io/source: "enabled"
-          recurring-job-group.longhorn.io/backup: "enabled"
+        existingClaim: crowdsec-config-pvc
       data:
         enabled: true
-        storageClassName: longhorn
-        size: 1Gi
-        labels:
-          recurring-job.longhorn.io/source: "enabled"
-          recurring-job-group.longhorn.io/backup: "enabled"
+        existingClaim: crowdsec-db-pvc
 
     # Environment variables for LAPI
     env:

@@ -1,0 +1,25 @@
+# The LAPI PVCs, in place of the chart's own: its template has no way to set
+# labels, and Longhorn needs them to put the volumes in the backup group.
+# Names, labels and specs match what the chart used to render, so the existing
+# claims are adopted unchanged.
+{{- range $name, $size := dict "db" "1Gi" "config" "100Mi" }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: crowdsec-{{ $name }}-pvc
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    k8s-app: crowdsec
+    type: lapi
+    version: v1
+    recurring-job.longhorn.io/source: "enabled"
+    recurring-job-group.longhorn.io/backup: "enabled"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: {{ $size }}
+{{- end }}

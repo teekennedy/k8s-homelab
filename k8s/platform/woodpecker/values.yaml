@@ -124,6 +124,15 @@ woodpecker:
       # TODO get a base image with dagger CLI preinstalled and use that with a non-root user
       # WOODPECKER_BACKEND_K8S_SECCTX_NONROOT: "true"
       WOODPECKER_BACKEND_K8S_VOLUME_SIZE: "1G"
+    # Holds the agent's registration (agent ID). volumeClaimTemplates are
+    # immutable: changing this needs
+    # `kubectl -n woodpecker delete sts woodpecker-agent --cascade=orphan`
+    # before ArgoCD can apply it, and only new PVCs pick up the change.
+    persistence:
+      storageClass: longhorn
+      labels:
+        recurring-job.longhorn.io/source: "enabled"
+        recurring-job-group.longhorn.io/backup: "enabled"
     resources:
       requests:
         cpu: 10m

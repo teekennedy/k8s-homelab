@@ -44,3 +44,9 @@ exemptions:
       - cpuRequestsMissing
       - memoryRequestsMissing
       - memoryLimitsMissing
+  # The Tempo chart cannot label its volumeClaimTemplate; the labelled PVC it
+  # adopts is declared in templates/tempo-pvc.yaml.
+  - controllerNames:
+      - monitoring-system-tempo
+    rules:
+      - longhornGroupStatefulSet

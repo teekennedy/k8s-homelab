@@ -28,6 +28,14 @@ checks:
   # pullPolicyAlways.
   pullPolicyNotAlways: ignore
   pullPolicyAlways: danger
+  # Every Longhorn volume must be explicitly opted into a recurring-job group.
+  # Longhorn puts unlabelled volumes in its `default` group, which no recurring
+  # job targets, so they are silently never backed up or trimmed.
+  longhornGroupPVC: danger
+  longhornGroupStatefulSet: danger
+  longhornGroupCNPG: danger
+  longhornGroupAlertmanager: danger
+  longhornGroupPrometheus: danger
 
   # efficiency
   cpuRequestsMissing: warning
@@ -98,3 +106,105 @@ customChecks:
         image:
           type: string
           pattern: '@sha256:[a-f0-9]{64}$'
+  longhornGroupPVC:
+    successMessage: Longhorn PVC is in a recurring-job group
+    failureMessage: &lhFail >-
+      Longhorn volume must set recurring-job.longhorn.io/source=enabled and
+      join the backup or ephemeral recurring-job group
+    category: Reliability
+    target: PersistentVolumeClaim
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      # An unset class means the cluster default, which is Longhorn. An empty
+      # string binds a static PV and is not checked.
+      if: &lhPvcSpec
+        required: [spec]
+        properties:
+          spec:
+            anyOf:
+              - not:
+                  required: [storageClassName]
+              - properties:
+                  storageClassName:
+                    pattern: ^longhorn
+      then: &lhLabeled
+        required: [metadata]
+        properties:
+          metadata: &lhMetadata
+            required: [labels]
+            properties:
+              labels:
+                type: object
+                required: [recurring-job.longhorn.io/source]
+                properties:
+                  recurring-job.longhorn.io/source:
+                    const: enabled
+                anyOf:
+                  - required: [recurring-job-group.longhorn.io/backup]
+                  - required: [recurring-job-group.longhorn.io/ephemeral]
+  longhornGroupStatefulSet:
+    successMessage: Longhorn volumeClaimTemplates are in a recurring-job group
+    failureMessage: *lhFail
+    category: Reliability
+    target: apps/StatefulSet
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      properties:
+        spec:
+          properties:
+            volumeClaimTemplates:
+              items:
+                if: *lhPvcSpec
+                then: *lhLabeled
+  longhornGroupCNPG:
+    successMessage: Longhorn-backed CNPG cluster is in a recurring-job group
+    failureMessage: *lhFail
+    category: Reliability
+    target: postgresql.cnpg.io/Cluster
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      if:
+        required: [spec]
+        properties:
+          spec:
+            required: [storage]
+            properties:
+              storage:
+                anyOf:
+                  - not:
+                      required: [storageClass]
+                  - properties:
+                      storageClass:
+                        pattern: ^longhorn
+      then:
+        required: [spec]
+        properties:
+          spec:
+            required: [inheritedMetadata]
+            properties:
+              inheritedMetadata: *lhMetadata
+  longhornGroupAlertmanager:
+    successMessage: Longhorn volumeClaimTemplate is in a recurring-job group
+    failureMessage: *lhFail
+    category: Reliability
+    target: monitoring.coreos.com/Alertmanager
+    schema: &lhOperatorStorage
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      properties:
+        spec:
+          properties:
+            storage:
+              properties:
+                volumeClaimTemplate:
+                  if: *lhPvcSpec
+                  then: *lhLabeled
+  longhornGroupPrometheus:
+    successMessage: Longhorn volumeClaimTemplate is in a recurring-job group
+    failureMessage: *lhFail
+    category: Reliability
+    target: monitoring.coreos.com/Prometheus
+    schema: *lhOperatorStorage
