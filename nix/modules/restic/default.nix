@@ -22,7 +22,7 @@ in {
       group = config.users.users.root.group;
       mode = "0400";
     };
-    sops.secrets.restic_persistent_password = {
+    sops.secrets.restic_hosts_password = {
       sopsFile = ./secrets.enc.yaml;
       owner = config.users.users.root.name;
       group = config.users.users.root.group;
@@ -33,7 +33,7 @@ in {
       # The repository is initialized once by hand; concurrent `restic init`
       # from several hosts could race on its config.
       initialize = false;
-      passwordFile = config.sops.secrets.restic_persistent_password.path;
+      passwordFile = config.sops.secrets.restic_hosts_password.path;
       environmentFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.restic_env_file.path;
       inherit repository;
       paths = ["/persistent"];
