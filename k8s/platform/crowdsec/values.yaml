@@ -188,8 +188,10 @@ crowdsec:
           - crowdsecurity/crs
     rules:
       # The bundled CRS only allows HTTP/1.x and HTTP/2, so every HTTP/3
-      # request matches rule 920430 and a single page load from a phone is
-      # enough to get banned. CRS keeps this list if it is already set.
+      # request matches rule 920430 and a single page load is enough to get
+      # banned. This custom rule adds HTTP/3 to the list of allowed versions.
+      # TODO: remove this once CRS rules are updated upstream. See
+      # https://github.com/crowdsecurity/hub/issues/1939 for context.
       crs-allow-http3.yaml: |
         name: homelab/crs-allow-http3
         description: "Add HTTP/3 to the CRS allowed HTTP versions"
