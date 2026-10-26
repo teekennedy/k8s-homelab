@@ -1,9 +1,9 @@
 dependencies:
 - name: forgejo
   repository: oci://code.forgejo.org/forgejo-helm
-  version: 17.3.1
+  version: 17.3.2
 - name: valkey-instance
   repository: file://../../charts/valkey-instance
   version: 0.1.0
-digest: sha256:91f886de211889363a52bd30c539313aa1653185057b8447cda5d4df0efbbfd5
-generated: "2026-10-22T20:31:22.067271-06:00"
+digest: sha256:eedc3a7905abcbcb926ab29d0ac2030cf5163376d2bd2787e9d6f13ddeeec6c6
+generated: "2026-10-26T20:26:33.265064428Z"
