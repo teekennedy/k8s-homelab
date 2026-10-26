@@ -183,9 +183,18 @@ crowdsec:
           - crowdsecurity/vpatch-*
           - crowdsecurity/generic-*
         outofband_rules:
+          - homelab/crs-allow-http3
           - homelab/crs-skip-unparsed-body
           - crowdsecurity/crs
     rules:
+      # The bundled CRS only allows HTTP/1.x and HTTP/2, so every HTTP/3
+      # request matches rule 920430 and a single page load from a phone is
+      # enough to get banned. CRS keeps this list if it is already set.
+      crs-allow-http3.yaml: |
+        name: homelab/crs-allow-http3
+        description: "Add HTTP/3 to the CRS allowed HTTP versions"
+        seclang_rules:
+          - SecAction "id:9003,phase:1,pass,nolog,noauditlog,setvar:'tx.allowed_http_versions=HTTP/1.0 HTTP/1.1 HTTP/2 HTTP/2.0 HTTP/3 HTTP/3.0'"
       # CRS spends ~9ms of CPU per KB scanning a body it can't parse (e.g. a
       # 1 MiB application/octet-stream upload took 9s, vs 6ms as JSON), and
       # a busy routine delays every request queued behind it. Such bodies
