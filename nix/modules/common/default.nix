@@ -9,5 +9,6 @@
     ./nix.nix
     ./io-tuning.nix
     ./textfile-collector.nix
+    ./watchdog.nix
   ];
 }
