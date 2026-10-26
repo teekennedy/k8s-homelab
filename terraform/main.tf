@@ -51,6 +51,29 @@ module "backup" {
   }
 }
 
+# Lets k8s/platform/restic read the host repositories for metrics and run
+# their forget/prune/check. The passwords are owned by the NixOS sops files the
+# hosts back up with.
+data "sops_file" "restic_shared" {
+  source_file = "../nix/modules/restic/secrets.enc.yaml"
+}
+
+data "sops_file" "restic_borg_2" {
+  source_file = "../nix/hosts/borg-2/secrets.yaml"
+}
+
+module "restic_secret" {
+  source    = "./k8s-secret"
+  name      = "restic-repositories"
+  namespace = "restic"
+  data = {
+    AWS_ACCESS_KEY_ID     = module.backup.access_keys["restic-backup-user"].AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY = module.backup.access_keys["restic-backup-user"].AWS_SECRET_ACCESS_KEY
+    hosts                 = data.sops_file.restic_shared.data["restic_hosts_password"]
+    nas-backups           = data.sops_file.restic_borg_2.data["restic_repo_password"]
+  }
+}
+
 module "extra_secrets" {
   # for_each values _must_ be nonsensitive
   for_each  = nonsensitive(local.extra_secrets)

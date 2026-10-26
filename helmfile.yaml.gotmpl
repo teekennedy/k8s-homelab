@@ -227,6 +227,10 @@ releases:
     needs:
       - forgejo/forgejo
 
+  - name: restic
+    inherit:
+      - template: platform
+
   - name: woodpecker
     inherit:
       - template: platform

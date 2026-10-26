@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+#
+# restic_backup_timestamp is read from the repository by the exporters, so it
+# only advances once a snapshot has actually landed. A failed host backup is
+# already caught by NodeSystemdServiceFailed and a failed maintenance Job by
+# KubeJobFailed; these catch the ones that stop happening at all.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: restic-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "restic.labels" . | nindent 4 }}
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: restic
+      interval: 5m
+      rules:
+        {{- range $repo, $cfg := .Values.repositories }}
+        # Per host: a host's newest snapshot in the repository is too old.
+        # A host that has never backed up here has no series to alert on.
+        - alert: ResticBackupStale
+          expr: |
+            time() - max by (repository, client_hostname) (restic_backup_timestamp{repository="{{ $repo }}"})
+              > {{ $cfg.maxBackupAgeHours }} * 3600
+          for: 1h
+          labels:
+            severity: warning
+            component: backup
+          annotations:
+            summary: {{ "The newest {{ $labels.repository }} restic snapshot from {{ $labels.client_hostname }} is {{ $value | humanizeDuration }} old" | quote }}
+            description: {{ "No restic snapshot from {{ $labels.client_hostname }} has reached the {{ $labels.repository }} repository in {{ $value | humanizeDuration }}. Check the host's restic-backups-* timer and unit, and the exporter's logs in case it has stopped refreshing." | quote }}
+
+        # The exporter has never managed to read the repository: it exports
+        # nothing at all until its first refresh succeeds.
+        - alert: ResticRepositoryUnreadable
+          expr: absent(restic_scrape_duration_seconds{repository="{{ $repo }}"})
+          for: 2h
+          labels:
+            severity: warning
+            component: backup
+          annotations:
+            summary: {{ printf "The %s restic repository has reported no metrics for 2h" $repo | quote }}
+            description: {{ printf "restic-exporter-%s in the restic namespace is not exporting snapshot metrics. Check its logs for S3 or password errors." $repo | quote }}
+
+        - alert: ResticMaintenanceStale
+          expr: |
+            time() - kube_cronjob_status_last_successful_time{namespace="{{ $.Release.Namespace }}", cronjob="restic-maintenance-{{ $repo }}"}
+              > {{ $cfg.maxMaintenanceAgeHours }} * 3600
+          for: 1h
+          labels:
+            severity: warning
+            component: backup
+          annotations:
+            summary: {{ "restic forget/prune/check for {{ $labels.cronjob }} last succeeded {{ $value | humanizeDuration }} ago" | quote }}
+            description: {{ "The {{ $labels.cronjob }} CronJob has not completed successfully in {{ $value | humanizeDuration }}, so old snapshots are not being pruned or checked. Check whether it is suspended and the logs of its last Job." | quote }}
+        {{- end }}

@@ -45,6 +45,7 @@ _productionApps: {
 			"monitoring-system": true
 			"oauth2-proxy":      true
 			"renovate":          true
+			"restic":            true
 			"victoria-metrics":  true
 			"woodpecker":        true
 		}

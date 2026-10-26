@@ -1,0 +1,60 @@
+# Repository passwords (keyed by repository name) and the S3 credentials.
+# Created by terraform/main.tf from the NixOS sops files.
+secretName: restic-repositories
+
+# The hosts' timezone (nix/hosts/common/hardware.nix). restic-exporter turns
+# snapshot times into timestamps with the container's local zone and drops
+# the offset restic recorded, so this must match the zone the hosts back up in.
+timeZone: America/Denver
+
+exporter:
+  image:
+    repository: docker.io/ngosang/restic-exporter
+    tag: 2.1.2@sha256:a8f9cfa3016237c7008aefa4d9c6639bc9b34d2582eed07ac58dcf56632e4170
+  port: 8001
+  # Each refresh lists snapshots and locks. Snapshot files are cached, so only
+  # new ones are downloaded from S3.
+  refreshInterval: 3600
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+maintenance:
+  image:
+    repository: docker.io/restic/restic
+    tag: 0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# One exporter and one maintenance CronJob per repository.
+repositories:
+  # /persistent of every host (nix/modules/restic).
+  hosts:
+    url: s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/hosts
+    # Hosts back up daily, up to 2h late.
+    maxBackupAgeHours: 36
+    forget:
+      - --keep-daily 7
+      - --keep-weekly 4
+      - --keep-monthly 12
+    # After the hosts' midnight backups.
+    schedule: "0 6 * * *"
+    maxMaintenanceAgeHours: 72
+  # borg-2's NAS backup directory (nix/hosts/borg-2/nas-backups.nix).
+  nas-backups:
+    url: s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/nas-backups
+    # Weekly, up to 2h late.
+    maxBackupAgeHours: 192
+    forget:
+      - --keep-weekly 4
+      - --keep-monthly 12
+    # After the Monday-midnight backup.
+    schedule: "0 6 * * 1"
+    maxMaintenanceAgeHours: 360

@@ -18,18 +18,23 @@ in {
     "d ${nasBackupDir}/postgres 0750 s3proxy s3proxy -"
   ];
 
+  sops.secrets.restic_repo_password = {
+    owner = config.users.users.root.name;
+    group = config.users.users.root.group;
+    mode = "0400";
+  };
+
   # Offsite backup of all NAS backup data (longhorn snapshots, postgres base backups,
-  # victoriametrics) to S3.
+  # victoriametrics) to S3. Retention (forget/prune) and check run in-cluster,
+  # see k8s/platform/restic.
   services.restic.backups.nas-backups-weekly = {
     initialize = true;
     passwordFile = config.sops.secrets.restic_repo_password.path;
     environmentFile = config.sops.secrets.restic_env_file.path;
     repository = "s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/nas-backups";
     paths = [nasBackupDir];
-    pruneOpts = [
-      "--keep-weekly 4"
-      "--keep-monthly 12"
-    ];
+    # Wait out the in-cluster prune/check rather than failing.
+    extraBackupArgs = ["--retry-lock 2h"];
     timerConfig = {
       OnCalendar = "weekly";
       RandomizedDelaySec = "2h";

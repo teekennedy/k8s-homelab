@@ -1,0 +1,11 @@
+exemptions:
+  # RESTIC_PASSWORD_FILE is the path of a mounted Secret file, and the AWS keys
+  # come from a secretKeyRef rather than a literal value. The check matches on
+  # the variable name alone.
+  - controllerNames:
+      - restic-exporter-hosts
+      - restic-exporter-nas-backups
+      - restic-maintenance-hosts
+      - restic-maintenance-nas-backups
+    rules:
+      - sensitiveContainerEnvVar

@@ -1,0 +1,70 @@
+{{- /*
+Retention and integrity checks. The hosts only run `restic backup`, which
+takes a shared lock; forget, prune and check take an exclusive one, so they
+run here once per repository instead of on every host.
+*/ -}}
+{{- range $repo, $cfg := .Values.repositories }}
+{{- $sel := dict "root" $ "component" "maintenance" "repo" $repo }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: restic-maintenance-{{ $repo }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "restic.labels" $ | nindent 4 }}
+    {{- include "restic.componentLabels" $sel | nindent 4 }}
+spec:
+  schedule: {{ $cfg.schedule | quote }}
+  timeZone: {{ $.Values.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      # Up to 2h waiting for a host's backup lock, then the prune itself.
+      activeDeadlineSeconds: 14400
+      template:
+        metadata:
+          labels:
+            {{- include "restic.labels" $ | nindent 12 }}
+            {{- include "restic.componentLabels" $sel | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          serviceAccountName: restic
+          automountServiceAccountToken: false
+          securityContext:
+            {{- include "restic.podSecurityContext" $ | nindent 12 }}
+          containers:
+            - name: maintenance
+              image: "{{ $.Values.maintenance.image.repository }}:{{ $.Values.maintenance.image.tag }}"
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                {{- include "restic.containerSecurityContext" $ | nindent 16 }}
+              env:
+                {{- include "restic.repoEnv" (dict "root" $ "repo" $repo "url" $cfg.url) | nindent 16 }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  # A new pod's first connections can be refused until the
+                  # NetworkPolicy admits it.
+                  n=0
+                  until restic cat config --no-lock > /dev/null; do
+                    n=$((n + 1))
+                    [ "$n" -lt 6 ] || exit 1
+                    sleep 5
+                  done
+                  # Only removes stale locks, e.g. from a host that crashed
+                  # mid-backup.
+                  restic unlock
+                  restic forget --prune --retry-lock 2h {{ join " " $cfg.forget }}
+                  restic check --retry-lock 2h
+              resources:
+                {{- toYaml $.Values.maintenance.resources | nindent 16 }}
+              volumeMounts:
+                {{- include "restic.repoVolumeMounts" $ | nindent 16 }}
+          volumes:
+            {{- include "restic.repoVolumes" (dict "root" $ "repo" $repo) | nindent 12 }}
+{{- end }}

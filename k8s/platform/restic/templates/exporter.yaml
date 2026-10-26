@@ -1,0 +1,116 @@
+{{- range $repo, $cfg := .Values.repositories }}
+{{- $sel := dict "root" $ "component" "exporter" "repo" $repo }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: restic-exporter-{{ $repo }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "restic.labels" $ | nindent 4 }}
+    {{- include "restic.componentLabels" $sel | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "restic.selectorLabels" $sel | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "restic.labels" $ | nindent 8 }}
+        {{- include "restic.componentLabels" $sel | nindent 8 }}
+    spec:
+      serviceAccountName: restic
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "restic.podSecurityContext" $ | nindent 8 }}
+      containers:
+        - name: exporter
+          image: "{{ $.Values.exporter.image.repository }}:{{ $.Values.exporter.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            {{- include "restic.containerSecurityContext" $ | nindent 12 }}
+          env:
+            {{- include "restic.repoEnv" (dict "root" $ "repo" $repo "url" $cfg.url) | nindent 12 }}
+            - name: TZ
+              value: {{ $.Values.timeZone | quote }}
+            - name: LISTEN_PORT
+              value: {{ $.Values.exporter.port | quote }}
+            - name: REFRESH_INTERVAL
+              value: {{ $.Values.exporter.refreshInterval | quote }}
+            # `restic check` belongs to the maintenance CronJob, and global
+            # stats read the whole repository index on every refresh.
+            - name: NO_CHECK
+              value: "true"
+            - name: NO_GLOBAL_STATS
+              value: "true"
+            # Only the first refresh honours this. A failed start (bad
+            # credentials, or the NetworkPolicy not yet admitting the pod)
+            # restarts the pod instead of serving no metrics for an hour.
+            # A later failed refresh keeps the last values, so their
+            # timestamps keep aging and ResticBackupStale still fires.
+            - name: EXIT_ON_ERROR
+              value: "true"
+          ports:
+            - name: metrics
+              containerPort: {{ $.Values.exporter.port }}
+              protocol: TCP
+          # The first refresh runs before the HTTP server starts.
+          startupProbe:
+            tcpSocket:
+              port: metrics
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: metrics
+            periodSeconds: 30
+          livenessProbe:
+            tcpSocket:
+              port: metrics
+            periodSeconds: 60
+            failureThreshold: 3
+          resources:
+            {{- toYaml $.Values.exporter.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "restic.repoVolumeMounts" $ | nindent 12 }}
+      volumes:
+        {{- include "restic.repoVolumes" (dict "root" $ "repo" $repo) | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: restic-exporter-{{ $repo }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "restic.labels" $ | nindent 4 }}
+    {{- include "restic.componentLabels" $sel | nindent 4 }}
+spec:
+  selector:
+    {{- include "restic.selectorLabels" $sel | nindent 4 }}
+  ports:
+    - name: metrics
+      port: {{ $.Values.exporter.port }}
+      targetPort: metrics
+      protocol: TCP
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/servicemonitor_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: restic-exporter-{{ $repo }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "restic.labels" $ | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "restic.selectorLabels" $sel | nindent 6 }}
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 5m
+      relabelings:
+        - targetLabel: repository
+          replacement: {{ $repo }}
+{{- end }}

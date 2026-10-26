@@ -96,3 +96,5 @@ TF_VAR_state_passphrase="$(bash -c 'sops decrypt $DEVENV_ROOT/terraform/tfvars.s
 ```
 
 Save these values to nix/modules/restic/secrets.enc.yaml as environment variables under the `restic_env_file` yaml key.
+
+The same keys also go to the cluster as the `restic-repositories` Secret, see `k8s/platform/restic`.
