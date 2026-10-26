@@ -17,7 +17,7 @@ import (
 // Container image constants with renovate annotations for automated updates.
 const (
 	// renovate: datasource=docker depName=ghcr.io/cachix/devenv/devenv
-	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.4.0"
+	devenvImage = "ghcr.io/cachix/devenv/devenv:v2.4.0@sha256:d45385cfc144d2277949462ef0219ae334b55df5805762b59e66a9a44cefdd2e"
 )
 
 const imageSource = "https://github.com/teekennedy/k8s-homelab"

@@ -246,6 +246,12 @@
   },
   "packageRules": [
     {
+      "description": "dagger/lib is the shared Go code under .dagger/lib, pulled into each Dagger module by a local replace directive. It is not a published module, so there is nothing to look up.",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["dagger/lib"],
+      "enabled": false
+    },
+    {
       "description": "Update homelab packages immediately after publication",
       "matchPackageNames": [
         "ghcr.io/teekennedy/k8s-homelab",
