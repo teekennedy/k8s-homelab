@@ -17,7 +17,7 @@
     RuntimeMaxFileSize = "100M";
     RuntimeKeepFree = "200M";
 
-    # Collection is via promtail reading the journal directly, not syslog.
+    # Collection is via Alloy reading the journal directly, not syslog.
     ForwardToSyslog = false;
     # Max retention time (older logs are rotated out)
     MaxRetentionSec = "1week";

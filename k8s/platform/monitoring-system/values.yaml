@@ -747,81 +747,256 @@ loki:
       limits:
         memory: 128Mi
 
-promtail:
+# Log collector DaemonSet: pod logs from /var/log/pods and the systemd journal.
+alloy:
   enabled: true
-  livenessProbe:
-    tcpSocket:
-      port: http-metrics
-    periodSeconds: 30
-    failureThreshold: 5
-  config:
-    clients:
-      - url: http://monitoring-system-loki:3100/loki/api/v1/push
-    # The chart default positions filename is /run/promtail/positions.yaml,
-    # which is tmpfs and so is destroyed on reboot. Promtail seeks to `now -
-    # max_age` when it has no saved cursor, resulting in logs getting
-    # re-processed after reboot. Nix-impermanence is configured to persist the
-    # /var/lib/promtail folder.
-    positions:
-      filename: /var/lib/promtail/positions.yaml
-    snippets:
-      extraScrapeConfigs: |
-        - job_name: systemd-journal
-          journal:
+  # The PodLogs CRD is unused.
+  crds:
+    create: false
+  controller:
+    type: daemonset
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+    # These paths are coupled to services.journald.storage in
+    # nix/modules/common/journald.nix: journald writes to /var/log/journal only
+    # while storage is "persistent". If that ever goes back to "volatile" the
+    # journal moves to /run/log/journal and Alloy collects nothing at all,
+    # silently — there is no error for an empty journal directory.
+    volumes:
+      extra:
+        - name: pods
+          hostPath:
+            path: /var/log/pods
+        - name: journal
+          hostPath:
             path: /var/log/journal
-            max_age: 24h
-            labels:
-              job: systemd-journal
-          relabel_configs:
-            - source_labels: ['__journal__systemd_unit']
-              target_label: 'systemd_unit'
-            - source_labels: ['__journal__hostname']
-              target_label: 'host'
-        - job_name: dmesg
-          journal:
-            path: /var/log/journal
-            max_age: 24h
-            matches: _TRANSPORT=kernel
-            labels:
-              job: dmesg
-          relabel_configs:
-            - source_labels: ['__journal__hostname']
-              target_label: 'host'
-  # These paths are coupled to services.journald.storage in
-  # nix/modules/common/journald.nix: journald writes to /var/log/journal only
-  # while storage is "persistent". If that ever goes back to "volatile" the
-  # journal moves to /run/log/journal and promtail collects nothing at all,
-  # silently — there is no error for an empty journal directory.
-  extraVolumes:
-    - name: journal
-      hostPath:
-        path: /var/log/journal
-        type: DirectoryOrCreate
-    - name: machine-id
-      hostPath:
-        path: /etc/machine-id
-        type: File
-    - name: positions
-      hostPath:
-        path: /var/lib/promtail
-        type: DirectoryOrCreate
-  extraVolumeMounts:
-    - name: journal
-      mountPath: /var/log/journal
-      readOnly: true
-    - name: machine-id
-      mountPath: /etc/machine-id
-      readOnly: true
-    # Writable: this is the one thing promtail persists. The container has
-    # readOnlyRootFilesystem, so the positions file has to live on a mount.
-    - name: positions
-      mountPath: /var/lib/promtail
-  resources:
-    requests:
-      cpu: 110m
-      memory: 384Mi
-    limits:
-      memory: 512Mi
+            type: DirectoryOrCreate
+        - name: machine-id
+          hostPath:
+            path: /etc/machine-id
+            type: File
+        # Positions and journal cursors. Nix-impermanence persists /var/lib/alloy,
+        # so a reboot doesn't make Alloy re-read up to max_age of logs.
+        - name: storage
+          hostPath:
+            path: /var/lib/alloy
+            type: DirectoryOrCreate
+        # Promtail's positions, imported by the legacy_positions_file and
+        # legacy_position settings below on Alloy's first start.
+        - name: promtail-positions
+          hostPath:
+            path: /var/lib/promtail
+            type: DirectoryOrCreate
+  configReloader:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 64Mi
+  alloy:
+    storagePath: /var/lib/alloy
+    # Root to read /var/log/pods (root:root 750) and /var/log/journal across
+    # nodes with varying systemd-journal GIDs.
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    livenessProbe:
+      tcpSocket:
+        port: http-metrics
+      periodSeconds: 30
+      failureThreshold: 5
+    mounts:
+      extra:
+        - name: pods
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: journal
+          mountPath: /var/log/journal
+          readOnly: true
+        - name: machine-id
+          mountPath: /etc/machine-id
+          readOnly: true
+        # Writable: the container has readOnlyRootFilesystem.
+        - name: storage
+          mountPath: /var/lib/alloy
+        - name: promtail-positions
+          mountPath: /var/lib/promtail
+          readOnly: true
+    resources:
+      requests:
+        cpu: 110m
+        memory: 384Mi
+      limits:
+        memory: 512Mi
+    # Converted from the Promtail chart's config with
+    # `alloy convert --source-format=promtail`.
+    configMap:
+      content: |
+        loki.write "default" {
+          endpoint {
+            url = "http://monitoring-system-loki:3100/loki/api/v1/push"
+          }
+        }
+
+        // Pods on this node. The chart sets HOSTNAME to the node name.
+        discovery.kubernetes "pods" {
+          role = "pod"
+
+          selectors {
+            role  = "pod"
+            field = "spec.nodeName=" + coalesce(sys.env("HOSTNAME"), constants.hostname)
+          }
+        }
+
+        discovery.relabel "pods" {
+          targets = discovery.kubernetes.pods.targets
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_controller_name"]
+            regex         = "([0-9a-z-.]+?)(-[0-9a-f]{8,10})?"
+            target_label  = "__tmp_controller_name"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name", "__meta_kubernetes_pod_label_app", "__tmp_controller_name", "__meta_kubernetes_pod_name"]
+            regex         = "^;*([^;]+)(;.*)?$"
+            target_label  = "app"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_instance", "__meta_kubernetes_pod_label_instance"]
+            regex         = "^;*([^;]+)(;.*)?$"
+            target_label  = "instance"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component", "__meta_kubernetes_pod_label_component"]
+            regex         = "^;*([^;]+)(;.*)?$"
+            target_label  = "component"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_node_name"]
+            target_label  = "node_name"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_namespace"]
+            target_label  = "namespace"
+          }
+
+          rule {
+            source_labels = ["namespace", "app"]
+            separator     = "/"
+            target_label  = "job"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_name"]
+            target_label  = "pod"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_container_name"]
+            target_label  = "container"
+          }
+
+          rule {
+            source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+            separator     = "/"
+            target_label  = "__path__"
+            replacement   = "/var/log/pods/*$1/*.log"
+          }
+
+          // Static pods are logged under their config hash, not their UID.
+          rule {
+            source_labels = ["__meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash", "__meta_kubernetes_pod_annotation_kubernetes_io_config_hash", "__meta_kubernetes_pod_container_name"]
+            separator     = "/"
+            regex         = "true/(.*)"
+            target_label  = "__path__"
+            replacement   = "/var/log/pods/*$1/*.log"
+          }
+        }
+
+        loki.source.file "pods" {
+          targets               = discovery.relabel.pods.output
+          forward_to            = [loki.process.pods.receiver]
+          legacy_positions_file = "/var/lib/promtail/positions.yaml"
+
+          // __path__ is a glob.
+          file_match {
+            enabled = true
+          }
+        }
+
+        loki.process "pods" {
+          forward_to = [loki.write.default.receiver]
+
+          stage.cri { }
+        }
+
+        discovery.relabel "systemd_journal" {
+          targets = []
+
+          rule {
+            source_labels = ["__journal__systemd_unit"]
+            target_label  = "systemd_unit"
+          }
+
+          rule {
+            source_labels = ["__journal__hostname"]
+            target_label  = "host"
+          }
+        }
+
+        loki.source.journal "systemd_journal" {
+          path          = "/var/log/journal"
+          max_age       = "24h"
+          relabel_rules = discovery.relabel.systemd_journal.rules
+          forward_to    = [loki.write.default.receiver]
+          labels        = {
+            job = "systemd-journal",
+          }
+
+          legacy_position {
+            file = "/var/lib/promtail/positions.yaml"
+            name = "systemd-journal"
+          }
+        }
+
+        discovery.relabel "dmesg" {
+          targets = []
+
+          rule {
+            source_labels = ["__journal__hostname"]
+            target_label  = "host"
+          }
+        }
+
+        // Kernel messages only; read by the {job="dmesg"} hardware alerts.
+        loki.source.journal "dmesg" {
+          path          = "/var/log/journal"
+          max_age       = "24h"
+          matches       = "_TRANSPORT=kernel"
+          relabel_rules = discovery.relabel.dmesg.rules
+          forward_to    = [loki.write.default.receiver]
+          labels        = {
+            job = "dmesg",
+          }
+
+          legacy_position {
+            file = "/var/lib/promtail/positions.yaml"
+            name = "dmesg"
+          }
+        }
 
 # Trace store. Monolithic Tempo 3: no ingester or compactor, the live-store
 # serves recent spans and everything runs in one process. Fed only by

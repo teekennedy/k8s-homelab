@@ -8,9 +8,9 @@ exemptions:
       - hostNetworkSet
       - hostPIDSet
   - controllerNames:
-      - monitoring-system-promtail
+      - monitoring-system-alloy
     rules:
-      # promtail must run as root to read host log paths like /var/log/pods
+      # alloy must run as root to read host log paths like /var/log/pods
       # (mode 750, owned by root:root) and /var/log/journal across nodes
       # with varying systemd-journal GIDs. Verified on-cluster 2026-07-01.
       - runAsRootAllowed
@@ -19,9 +19,9 @@ exemptions:
       - monitoring-system-prometheus-node-exporter
     rules:
       - hostPathSet
-  # promtail tails the host's pod and journal logs.
+  # alloy tails the host's pod and journal logs.
   - controllerNames:
-      - monitoring-system-promtail
+      - monitoring-system-alloy
     rules:
       - hostPathSet
   # Helm test pods run once and exit.
@@ -34,6 +34,14 @@ exemptions:
   - controllerNames:
       - monitoring-system-grafana
       - monitoring-system-loki
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing
+  # The alloy chart has no probe settings for its config-reloader sidecar.
+  - controllerNames:
+      - monitoring-system-alloy
+    containerNames:
+      - config-reloader
     rules:
       - readinessProbeMissing
       - livenessProbeMissing

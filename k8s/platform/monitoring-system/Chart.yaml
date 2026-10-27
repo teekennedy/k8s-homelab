@@ -9,10 +9,10 @@ dependencies:
     version: 7.5.0
     repository: oci://ghcr.io/grafana/helm-charts
     condition: loki.enabled
-  - name: promtail
-    version: 6.17.1
-    repository: oci://ghcr.io/grafana/helm-charts
-    condition: promtail.enabled
+  - name: alloy
+    version: 1.14.3
+    repository: https://grafana.github.io/helm-charts
+    condition: alloy.enabled
   - name: prometheus-blackbox-exporter
     version: 11.20.2
     repository: oci://ghcr.io/prometheus-community/charts
