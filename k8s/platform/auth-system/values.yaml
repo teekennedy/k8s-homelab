@@ -73,6 +73,7 @@ oidcClientSecrets:
   clients:
     openhands: openhands/openhands-oauth2-proxy-secrets
     jellyfin: jellyfin/jellyfin-oidc-authelia
+    longhorn: longhorn-system/longhorn-oauth2-proxy-secrets
     grafana: monitoring-system/grafana-oidc-authelia
     forgejo: forgejo/forgejo-oidc-authelia
     homepage: homepage/homepage-oauth2-proxy-secrets
@@ -387,6 +388,15 @@ authelia:
                 subject: "group:full-admin"
               - policy: one_factor
                 subject: "group:freshrss-users"
+          # Longhorn UI (k8s/foundation/longhorn-system). Can delete volumes,
+          # replicas and backups, so admins only, always two_factor.
+          longhorn:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:longhorn-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
           jellyfin:
             default_policy: deny
             rules:
@@ -536,6 +546,29 @@ authelia:
             pkce_challenge_method: S256
             redirect_uris:
               - https://jellyfin.msng.to/sso/OID/redirect/authelia
+          # Longhorn's dedicated oauth2-proxy (k8s/foundation/longhorn-system),
+          # reverse-proxying the UI on the internal gateway. oauth2-proxy's
+          # allowed_groups repeats the authorization_policy's group check.
+          - client_id: longhorn
+            client_name: Longhorn
+            consent_mode: implicit
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/longhorn
+            token_endpoint_auth_method: client_secret_post
+            authorization_policy: longhorn
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+              - groups
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://longhorn.msng.to/oauth2/callback
           # Internal oauth2-proxy (k8s/apps/syncthing) fronting
           # the syncthing GUI with no internal-network bypass.
           - client_id: oauth2-proxy-internal
@@ -694,6 +727,8 @@ authelia:
             path: jellyfin
           - key: homepage
             path: homepage
+          - key: longhorn
+            path: longhorn
           - key: openhands
             path: openhands
           - key: oauth2-proxy-internal

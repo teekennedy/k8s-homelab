@@ -27,12 +27,27 @@ spec:
       kind: Secret
       name: cifs-secret
       namespace: longhorn-system
+    # cookie-secret / client-secret are filled in-cluster by mittwald
+    # secret-generator; don't fight it.
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: longhorn-oauth2-proxy-secrets
+      namespace: longhorn-system
   project: default
   source:
     path: k8s/foundation/longhorn-system
     repoURL: https://git.msng.to/ops/k8s-homelab
     targetRevision: main
+    # Render with `helmfile template` instead of ArgoCD's native Helm support.
+    plugin:
+      name: helmfile
   syncPolicy:
+    # Label the namespace so the internal traefik-gateway's HTTPRoute
+    # namespacePolicy (from: Selector) permits the oauth2-proxy HTTPRoute.
+    managedNamespaceMetadata:
+      labels:
+        internal-gateway-access: "true"
     automated:
       prune: true
       # selfHeal: false

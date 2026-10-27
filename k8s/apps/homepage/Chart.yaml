@@ -2,7 +2,7 @@ apiVersion: v2
 name: homepage
 description: Homepage dashboard
 type: application
-version: 0.3.10
+version: 0.3.11
 appVersion: "v2.0.0"
 dependencies:
   - name: homepage

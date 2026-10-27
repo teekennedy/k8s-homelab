@@ -1,10 +1,5 @@
 exemptions:
   - controllerNames:
-      - longhorn-basic-auth-setup
-    rules:
-      - privilegeEscalationAllowed
-      - runAsRootAllowed
-  - controllerNames:
       - longhorn-driver-deployer
     rules:
       - privilegeEscalationAllowed

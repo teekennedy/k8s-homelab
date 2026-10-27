@@ -50,7 +50,7 @@ locked down than it is (even if the current state technically matches intent).
 | Homepage | homepage/msng.to | public | built-in OIDC (Authelia) | must stay locked |
 | Authelia | authelia | public | self | must stay locked |
 | Spoolman | spoolman.msng.to | internal only | **none** | fine — losing spool inventory is acceptable |
-| Longhorn UI | longhorn.msng.to | internal only | **basic auth** | destructive if breached — must stay locked |
+| Longhorn UI | longhorn.msng.to | internal only | **SSO (Authelia, longhorn-admins)** | destructive if breached — must stay locked |
 | Prometheus | prometheus.msng.to | internal only | **none** | *believed* fine — challenge this; should he worry? |
 | Grafana | (monitoring) | ? | ? | verify |
 | Forgejo | git.msng.to | internal only | login | see 3b |

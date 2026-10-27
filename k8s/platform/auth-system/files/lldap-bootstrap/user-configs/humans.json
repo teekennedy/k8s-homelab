@@ -6,6 +6,7 @@
     "full-admin",
     "forgejo-admins",
     "freshrss-admins",
-    "jellyfin-admins"
+    "jellyfin-admins",
+    "longhorn-admins"
   ]
 }

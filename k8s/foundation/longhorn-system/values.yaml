@@ -1,8 +1,3 @@
-basicAuthPresync:
-  # Deliberately in values.yaml (not templates/basic-auth-presync-job.yaml)
-  # so that renovate can pick it up.
-  kubectlImage: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
-
 # https://github.com/longhorn/charts/blob/v1.8.x/charts/longhorn/values.yaml
 longhorn:
   defaultSettings:
@@ -31,15 +26,10 @@ longhorn:
     # This setting affects Disaster Recovery volumes which are incrementally restored from backup on an ongoing basis.
     # See https://longhorn.io/docs/archives/1.7.1/concepts/#34-backupstore-update-intervals-rto-and-rpo
     pollInterval: ~
+  # The UI has no auth of its own, so it is not exposed directly: the
+  # oauth2-proxy instance below owns longhorn.msng.to and reverse-proxies it.
   ingress:
-    enabled: true
-    annotations:
-      traefik.ingress.kubernetes.io/router.middlewares: longhorn-system-longhorn-basic-auth@kubernetescrd
-    host: longhorn.msng.to
-    path: /
-    pathType: Prefix
-    tls: true
-    tlsSecret: ""
+    enabled: false
   metrics:
     serviceMonitor:
       enabled: true
@@ -64,3 +54,110 @@ longhorn:
         memory: 64Mi
       limits:
         memory: 192Mi
+
+# --- SSO front door ---------------------------------------------------------
+# A dedicated oauth2-proxy instance reverse-proxying the Longhorn UI. No
+# trusted_ips bypass: every client, LAN included, must authenticate, and only
+# longhorn-admins (or full-admin) are admitted. templates/network-policy.yaml
+# limits the UI pods to this proxy so nothing in-cluster can skip the gate.
+#
+# Authelia's own storage is on Longhorn, so a Longhorn outage can take SSO down
+# with it. Break-glass access that needs no SSO:
+#   kubectl -n longhorn-system port-forward svc/longhorn-frontend 8080:80
+
+# The repo-specific glue, from the oauth2-proxy-instance library chart
+# (templates/oauth2-proxy-instance.yaml).
+oauth2ProxyInstance:
+  # Must equal the Authelia client_id and the oidcClientSecrets.clients key in
+  # k8s/platform/auth-system/values.yaml.
+  clientId: longhorn
+  # Must equal oauth2-proxy.config.existingSecret below, and
+  # oidcClientSecrets.clients.longhorn must point at longhorn-system/<this name>.
+  secretName: longhorn-oauth2-proxy-secrets
+  middleware:
+    # Reverse proxy, not a Traefik forwardAuth target.
+    enabled: false
+
+# https://github.com/oauth2-proxy/manifests/blob/main/helm/oauth2-proxy/values.yaml
+oauth2-proxy:
+  # Pin the Service name so the HTTPRoute backendRef is stable.
+  fullnameOverride: longhorn-auth
+  config:
+    existingSecret: longhorn-oauth2-proxy-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://longhorn.msng.to/oauth2/callback"
+      # Host-scoped cookie with a distinct name so it never collides with the
+      # public instance's Domain=msng.to cookie on this subdomain.
+      cookie_domains = ["longhorn.msng.to"]
+      cookie_name = "_oauth2_proxy_longhorn"
+      cookie_expire = "168h"
+      cookie_refresh = "1h"
+      cookie_secure = true
+      cookie_httponly = true
+      cookie_samesite = "lax"
+      # A cookie of its own per sign-in attempt. An expired session sends
+      # every request of a page load to sign in at once, and with one shared
+      # cookie the callback is checked against the last attempt's PKCE
+      # verifier rather than its own: a 500.
+      cookie_csrf_per_request = true
+      cookie_csrf_expire = "5m"
+      whitelist_domains = ["longhorn.msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      code_challenge_method = "S256"
+      # groups scope so allowed_groups can be enforced.
+      scope = "openid profile email groups"
+      # NO trusted_ips: internal clients must authenticate.
+      real_client_ip_header = "X-Real-Ip"
+      skip_provider_button = true
+      allowed_groups = ["longhorn-admins", "full-admin"]
+      upstreams = ["http://longhorn-frontend.longhorn-system.svc.cluster.local/"]
+      trusted_proxy_ips = ["10.42.0.0/16"]
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  # Exposed via the subchart's own HTTPRoute on the internal traefik-gateway's
+  # websecure listener. No entrypoint annotation, so external-dns-internal
+  # resolves the hostname to the gateway VIP. The namespace must carry the
+  # internal-gateway-access label for the gateway to admit the route; see
+  # syncPolicy.managedNamespaceMetadata in application.yaml.
+  #
+  # group, kind and weight are what the API server defaults them to. Spelled
+  # out, rules included, because server-side apply otherwise reports the
+  # defaulted fields as drift.
+  ingress:
+    enabled: false
+  gatewayApi:
+    enabled: true
+    gatewayRef:
+      group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecure
+    hostnames:
+      - longhorn.msng.to
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - group: ""
+            kind: Service
+            # oauth2-proxy.fullnameOverride and service.portNumber.
+            name: longhorn-auth
+            port: 80
+            weight: 1

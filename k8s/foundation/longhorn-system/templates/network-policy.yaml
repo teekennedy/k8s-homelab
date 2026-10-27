@@ -28,3 +28,28 @@ spec:
       ports:
         - protocol: TCP
           port: 9500
+---
+# The UI has no auth of its own; the oauth2-proxy instance reverse-proxies it.
+# This keeps the UI reachable ONLY from that proxy's pods, so nothing in-cluster
+# can bypass SSO by hitting the longhorn-frontend Service directly.
+# kubectl port-forward is unaffected and remains the break-glass path.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: longhorn-ui-sso-only
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: longhorn-ui
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: oauth2-proxy
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - port: http
+          protocol: TCP
