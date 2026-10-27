@@ -78,7 +78,7 @@
           "subdir": "grafana-builder"
         }
       },
-      "version": "620b8b415f64286bf6ff8fe28590c81549155044",
+      "version": "d56b806998cd52cb39f758529b680ef186987806",
       "sum": "FqEJAICz9T90PMJLW8i4HXazyWQPNzi68A8UauXa7GQ="
     },
     {
@@ -88,7 +88,7 @@
           "subdir": "mixin-utils"
         }
       },
-      "version": "620b8b415f64286bf6ff8fe28590c81549155044",
+      "version": "d56b806998cd52cb39f758529b680ef186987806",
       "sum": "pdZBifAdc1FjwhKRZIpSF/Hi2C9P9nsExGJxgxNHGRk="
     },
     {
@@ -159,7 +159,7 @@
           "subdir": "jsonnet"
         }
       },
-      "version": "b7dfcdf77cf88e1b74f2795d3a63d5662b80ceff",
+      "version": "e4647145065dfd8f6a3b63d65d6460cd19521240",
       "sum": "vCibXqT99tZld9IcWwEizlNry6VDTYJ4QGFvUAIFdVo=",
       "name": "perses-operator"
     },
