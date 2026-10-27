@@ -1,6 +1,7 @@
 {
   pkgs,
   config,
+  lib,
   inputs,
   devenv-zsh,
   ...
@@ -151,6 +152,39 @@ in {
         # Nothing about this hook is per-file: it always runs the whole suite.
         pass_filenames = false;
         always_run = true;
+      };
+
+      # The hook config above is a gitignored symlink that only exists where a
+      # devenv shell has been entered, so `git worktree add` creates checkouts
+      # whose pre-commit hook fails with "config file not found". This
+      # post-checkout hook links a worktree's missing config to the main
+      # checkout's. A symlink, unlike a copy, is something devenv will update in
+      # place if a shell is later entered in that worktree.
+      tasks."homelab:git-hooks:post-checkout" = let
+        marker = "managed by devenv task homelab:git-hooks:post-checkout";
+        hook = pkgs.writeText "post-checkout" ''
+          #!/bin/sh
+          # ${marker}
+          config=.pre-commit-config.yaml
+          [ -e "$config" ] && exit 0
+          common_dir="$(git rev-parse --path-format=absolute --git-common-dir)" || exit 0
+          main_config="''${common_dir%/.git}/$config"
+          [ -e "$main_config" ] && ln -sfn "$main_config" "$config"
+          exit 0
+        '';
+      in {
+        exec = ''
+          set -eu
+          hooks_dir="$(${pkgs.git}/bin/git -C "$DEVENV_ROOT" rev-parse --path-format=absolute --git-path hooks)"
+          target="$hooks_dir/post-checkout"
+          if [ -e "$target" ] && ! grep -qF ${lib.escapeShellArg marker} "$target"; then
+            echo "Not replacing existing $target" >&2
+            exit 0
+          fi
+          cmp -s ${hook} "$target" || install -D -m 0755 ${hook} "$target"
+        '';
+        after = ["devenv:git-hooks:install"];
+        before = ["devenv:enterShell"];
       };
     };
   };
