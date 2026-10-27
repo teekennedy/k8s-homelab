@@ -754,7 +754,6 @@ alloy:
   crds:
     create: false
   controller:
-    type: daemonset
     tolerations:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists
@@ -782,12 +781,6 @@ alloy:
         - name: storage
           hostPath:
             path: /var/lib/alloy
-            type: DirectoryOrCreate
-        # Promtail's positions, imported by the legacy_positions_file and
-        # legacy_position settings below on Alloy's first start.
-        - name: promtail-positions
-          hostPath:
-            path: /var/lib/promtail
             type: DirectoryOrCreate
   configReloader:
     resources:
@@ -827,9 +820,6 @@ alloy:
         # Writable: the container has readOnlyRootFilesystem.
         - name: storage
           mountPath: /var/lib/alloy
-        - name: promtail-positions
-          mountPath: /var/lib/promtail
-          readOnly: true
     resources:
       requests:
         cpu: 110m
@@ -927,9 +917,8 @@ alloy:
         }
 
         loki.source.file "pods" {
-          targets               = discovery.relabel.pods.output
-          forward_to            = [loki.process.pods.receiver]
-          legacy_positions_file = "/var/lib/promtail/positions.yaml"
+          targets    = discovery.relabel.pods.output
+          forward_to = [loki.process.pods.receiver]
 
           // __path__ is a glob.
           file_match {
@@ -965,11 +954,6 @@ alloy:
           labels        = {
             job = "systemd-journal",
           }
-
-          legacy_position {
-            file = "/var/lib/promtail/positions.yaml"
-            name = "systemd-journal"
-          }
         }
 
         discovery.relabel "dmesg" {
@@ -990,11 +974,6 @@ alloy:
           forward_to    = [loki.write.default.receiver]
           labels        = {
             job = "dmesg",
-          }
-
-          legacy_position {
-            file = "/var/lib/promtail/positions.yaml"
-            name = "dmesg"
           }
         }
 

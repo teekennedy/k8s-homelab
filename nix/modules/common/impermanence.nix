@@ -95,9 +95,6 @@ in {
         # alloy DaemonSet. Persisting them across reboots prevents Alloy from
         # re-processing existing logs.
         "/var/lib/alloy"
-        # Promtail's positions, imported once by Alloy on first start.
-        # Remove after Alloy has run on every host.
-        "/var/lib/promtail"
         # core dumps
         "/var/lib/systemd/coredump"
         # Crash records the firmware kept across a reset. systemd-pstore drains
