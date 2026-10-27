@@ -48,7 +48,7 @@
           "subdir": "gen/grafonnet-latest"
         }
       },
-      "version": "41e6bfcbe4ef1054298ffff8664f1354c897dd2d",
+      "version": "8de2f3c83a38f68085c239df979f57d8dfdb7588",
       "sum": "djejYCGNdtWsAd39+cHU1QNBIUKePhUyY4QNZt7XO4o="
     },
     {
@@ -58,7 +58,7 @@
           "subdir": "gen/grafonnet-v10.0.0"
         }
       },
-      "version": "41e6bfcbe4ef1054298ffff8664f1354c897dd2d",
+      "version": "8de2f3c83a38f68085c239df979f57d8dfdb7588",
       "sum": "xdcrJPJlpkq4+5LpGwN4tPAuheNNLXZjE6tDcyvFjr0="
     },
     {
@@ -68,7 +68,7 @@
           "subdir": "gen/grafonnet-v13.0.0"
         }
       },
-      "version": "41e6bfcbe4ef1054298ffff8664f1354c897dd2d",
+      "version": "8de2f3c83a38f68085c239df979f57d8dfdb7588",
       "sum": "hZfIVja9O6czp3Pg8fzqmN891FLz8nPvy2IJND5qlGw="
     },
     {
@@ -78,7 +78,7 @@
           "subdir": "grafana-builder"
         }
       },
-      "version": "74c55e5f503a1f84eb939f7c421e366d04f25961",
+      "version": "620b8b415f64286bf6ff8fe28590c81549155044",
       "sum": "FqEJAICz9T90PMJLW8i4HXazyWQPNzi68A8UauXa7GQ="
     },
     {
@@ -88,7 +88,7 @@
           "subdir": "mixin-utils"
         }
       },
-      "version": "74c55e5f503a1f84eb939f7c421e366d04f25961",
+      "version": "620b8b415f64286bf6ff8fe28590c81549155044",
       "sum": "pdZBifAdc1FjwhKRZIpSF/Hi2C9P9nsExGJxgxNHGRk="
     },
     {
@@ -118,8 +118,8 @@
           "subdir": ""
         }
       },
-      "version": "476483e46dab3ec02616cd94dc574c73b456ed6f",
-      "sum": "4mGNOFe5g2G/mknJ6xhV7K1k3+gpdIHOEWp2ROtFjO0="
+      "version": "ea8e318e706c0c14fe857e9b0182f6b7e0564e88",
+      "sum": "AXxs+GkEMTDptfGUv3lmmdlWB8QV4Z3y68T5XrQDHnw="
     },
     {
       "source": {
@@ -159,7 +159,7 @@
           "subdir": "jsonnet"
         }
       },
-      "version": "a4631c4695830782f323a0bf050d80dc08f06834",
+      "version": "d4db70b6cae4532a558ad8a38a1a0ac9675e8918",
       "sum": "vCibXqT99tZld9IcWwEizlNry6VDTYJ4QGFvUAIFdVo=",
       "name": "perses-operator"
     },
@@ -180,8 +180,8 @@
           "subdir": "jsonnet/kube-prometheus"
         }
       },
-      "version": "f81c076ab8f542c457840cd4c62656b8d6b4f43a",
-      "sum": "Yq0aVcSu8o9i0hJneabSTs6b28S1tDvfbtvQP6x7pW8="
+      "version": "f71fb6c77d108ad2b4cbf4d9771b56cbe92611fb",
+      "sum": "6qUzLvCg6ybFBtPPZeYfTtG34kkD6KhlU2tr6zsYRN8="
     },
     {
       "source": {
