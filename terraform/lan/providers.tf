@@ -4,7 +4,7 @@ terraform {
   required_providers {
     sops = {
       source  = "carlpett/sops"
-      version = "~> 1.4.0"
+      version = "~> 1.4"
     }
     unifi = {
       source  = "ubiquiti-community/unifi"

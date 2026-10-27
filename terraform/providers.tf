@@ -12,15 +12,23 @@ terraform {
     }
     http = {
       source  = "hashicorp/http"
-      version = "~> 3.6.0"
+      version = "~> 3.6"
     }
     sops = {
       source  = "carlpett/sops"
-      version = "~> 1.4.0"
+      version = "~> 1.4"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 3.0"
+    }
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.3"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.9"
     }
   }
 }

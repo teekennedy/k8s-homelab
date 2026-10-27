@@ -314,6 +314,25 @@
       "groupName": "terraform"
     },
     {
+      "description": "Renovate updates the nearest .terraform.lock.hcl once per package file. A lock file updated twice is listed twice in the branch's artifacts, and the post-upgrade task's output replaces only the first copy, so the stale second copy is committed. Each lock file must therefore get exactly one update. Lock file maintenance runs on every .tf file with a dependency, local `module` blocks included, so main.tf and providers.tf would both refresh the same lock: only run it from providers.tf.",
+      "matchManagers": ["terraform"],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "matchFileNames": ["!terraform/**/providers.tf"],
+      "enabled": false
+    },
+    {
+      "description": "Child modules have no lock file of their own, so they would update their parent's lock file a second time (see above). The root module declares and tracks every provider they use, so they are left alone. Their major-level constraints only need a manual bump alongside a major provider upgrade.",
+      "matchManagers": ["terraform"],
+      "matchFileNames": [
+        "terraform/backup/**",
+        "terraform/cloudflare/**",
+        "terraform/k8s-configmap/**",
+        "terraform/k8s-secret/**",
+        "terraform/smtp/**"
+      ],
+      "enabled": false
+    },
+    {
       "description": "One PR for all Dagger module updates: its Go dependencies and the images pinned in its Go source, which the .dagger post-upgrade task below regenerates and lints together anyway.",
       "matchFileNames": [
         ".dagger/**"
