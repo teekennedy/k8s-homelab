@@ -91,9 +91,12 @@ in {
         "/var/lib/kubelet"
         # logs, including systemd journal logs.
         "/var/log"
-        # promtail's journal cursor, hostPath-mounted by the promtail
-        # DaemonSet. Persisting the cursor across reboots prevents promtail
-        # from re-processing existing logs.
+        # Alloy's file positions and journal cursors, hostPath-mounted by the
+        # alloy DaemonSet. Persisting them across reboots prevents Alloy from
+        # re-processing existing logs.
+        "/var/lib/alloy"
+        # Promtail's positions, imported once by Alloy on first start.
+        # Remove after Alloy has run on every host.
         "/var/lib/promtail"
         # core dumps
         "/var/lib/systemd/coredump"
