@@ -11,6 +11,9 @@ spec:
   {{- if .Values.acmeServer }}
   acme:
     server: {{ .Values.acmeServer }}
+    {{- with .Values.acmeProfile }}
+    profile: {{ . }}
+    {{- end }}
     privateKeySecretRef:
       name: letsencrypt-prod
     solvers:

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
 #
-# Certificates here range from 24h (lldap, renewed 8h before expiry) to 90d
-# (Let's Encrypt) to 10y (internal CA), so a fixed "expires within N days"
+# Certificates here range from 24h (lldap, renewed 8h before expiry) to 160h
+# (Let's Encrypt shortlived) to 10y (internal CA), so a fixed "expires within N days"
 # threshold is wrong for all of them. These alerts key off cert-manager's own
 # renewal time instead.
 ---

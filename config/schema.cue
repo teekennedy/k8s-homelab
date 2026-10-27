@@ -32,6 +32,9 @@ package homelab
 	// certificates from. Leave it unset where nothing can answer an ACME
 	// challenge; the public issuer then signs with the internal CA instead.
 	acme_server?: string
+	// acme_profile is the certificate profile requested from acme_server,
+	// such as Let's Encrypt's "shortlived". Unset takes the server's default.
+	acme_profile?: string
 }
 
 // K3sHost represents k3s-specific host configuration

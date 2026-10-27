@@ -1,4 +1,4 @@
-# The three values below describe the environment, not the chart, so they have
+# The values below describe the environment, not the chart, so they have
 # no default here: values.yaml.gotmpl fills them in from the environment's
 # config.
 
@@ -7,6 +7,9 @@ publicDomain: ""
 # ACME directory URL for the letsencrypt-prod issuer. Empty makes that issuer
 # sign with the internal CA instead.
 acmeServer: ""
+# ACME certificate profile for the letsencrypt-prod issuer. Empty takes the
+# server's default.
+acmeProfile: ""
 # Hosts that get an NFS mTLS certificate and a CoreDNS entry, as {name, ip}.
 hosts: []
 

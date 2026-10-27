@@ -26,10 +26,10 @@ spec:
             summary: {{ "{{ $labels.instance }} is unreachable" | quote }}
             description: {{ "The HTTPS probe for {{ $labels.instance }} has failed for 5 minutes." | quote }}
 
-        # Let's Encrypt certificates renew 30 days before expiry, so 14 days
-        # left means renewal has been failing for two weeks.
+        # Let's Encrypt shortlived certificates last 160h and renew ~53h before
+        # expiry, so 24h left means renewal has been failing for over a day.
         - alert: EndpointCertificateExpiring
-          expr: (probe_ssl_earliest_cert_expiry{job="blackbox-https"} - time()) < 14 * 86400
+          expr: (probe_ssl_earliest_cert_expiry{job="blackbox-https"} - time()) < 86400
           for: 1h
           labels:
             severity: warning

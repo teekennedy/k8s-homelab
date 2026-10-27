@@ -10,7 +10,11 @@ production: #Environment & _clusterDefaults & _productionApps & {
 		networks: host_cidr: "10.69.80.0/25"
 	}
 
-	certificates: acme_server: "https://acme-v02.api.letsencrypt.org/directory"
+	certificates: {
+		acme_server: "https://acme-v02.api.letsencrypt.org/directory"
+		// 160-hour certificates, renewed by cert-manager ~53h before expiry.
+		acme_profile: "shortlived"
+	}
 
 	hosts: [
 		{
