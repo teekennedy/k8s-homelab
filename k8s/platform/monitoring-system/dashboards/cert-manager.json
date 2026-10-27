@@ -104,9 +104,8 @@
           "decimals": 2,
           "pattern": "Value",
           "thresholds": [
-            "86400",
-            "172800",
-            "259200"
+            "14400",
+            "28800"
           ],
           "type": "number",
           "unit": "dtdurations"
@@ -308,7 +307,7 @@
           "format": "s",
           "label": null,
           "logBase": 1,
-          "max": "7776000",
+          "max": "576000",
           "min": "0",
           "show": true
         },

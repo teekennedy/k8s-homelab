@@ -40,6 +40,21 @@ def test_cluster_issuer_is_ready(
 
 
 @pytest.mark.kubernetes
+def test_public_issuer_requests_shortlived_profile(
+    custom_objects: client.CustomObjectsApi,
+) -> None:
+    issuer = custom_objects.get_cluster_custom_object(
+        CERT_MANAGER_GROUP, CERT_MANAGER_VERSION, "clusterissuers", PUBLIC_ISSUER
+    )
+    acme = issuer["spec"].get("acme")
+    if acme is None:
+        pytest.skip(f"{PUBLIC_ISSUER} is backed by the internal CA, not ACME")
+
+    # The expiry alerts and dashboard are tuned for 160h certificates.
+    assert acme.get("profile") == "shortlived"
+
+
+@pytest.mark.kubernetes
 def test_internal_issuer_issues_a_certificate(
     core_v1: client.CoreV1Api,
     custom_objects: client.CustomObjectsApi,
