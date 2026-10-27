@@ -1,6 +1,6 @@
 {
-  "tag": "devenv-ci-1.2.9",
-  "image": "ghcr.io/teekennedy/k8s-homelab:devenv-ci-1.2.9@sha256:6de510739a8589eb8f013aa371c9c17e493d2a472b80348e3eae8035a6d12d9c",
+  "tag": "devenv-ci-1.2.10",
+  "image": "ghcr.io/teekennedy/k8s-homelab:devenv-ci-1.2.10@sha256:8a34d9611b9148d0b3029285be6943d7b5aa43ec870e3abca07ddec81d7d96bf",
   "platform": "linux/amd64",
   "files": {
     "cmd/lab/devenv.nix": "sha256:3b70bd87ba9cd7f9a9c10cd22a6dd83bbac1a60ac3cd82700d1a7d031476f62c",
