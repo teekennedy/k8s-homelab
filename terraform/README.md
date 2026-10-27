@@ -8,12 +8,9 @@ OpenTofu only reads the lock file of the root module being applied, so only the 
 
 Version constraints pin the major version only, e.g. `~> 3.6` (any 3.x from 3.6 up). The root module declares every provider its child modules use, so its constraints are the ones Renovate bumps.
 
-Renovate updates a lock file once for each `.tf` file that maps to it: the file's own directory's `.terraform.lock.hcl`, or the nearest parent's. When a lock file is updated twice, Renovate lists it twice in the branch. Its post-upgrade step (`dagger generate terraform --generator lock`) only replaces the first copy, so the stale second copy is committed and fails the `terraform/modules/lock/stale` check. Two rules in `renovate.json` prevent this:
+Renovate updates the lock file once for each `.tf` file that maps to it: the file's own directory's `.terraform.lock.hcl`, or the nearest parent's. Each update starts from the base branch's lock file, and only the last one is kept. A child module's update would therefore drop the root module's provider bumps. A rule in `renovate.json` makes Renovate ignore the child modules. A child module's constraint needs a manual bump alongside a major provider upgrade.
 
-- Lock file maintenance only runs from `providers.tf`. It would otherwise also run from any other file with a dependency, such as a `main.tf` with only local `module` blocks.
-- Renovate ignores the child modules. A child module's constraint needs a manual bump alongside a major provider upgrade.
-
-Keep each module's `terraform` block in `providers.tf`. Add a new child module to the second rule, and declare its providers in the root module.
+Add a new child module to that rule, and declare its providers in the root module.
 
 `dagger generate terraform --generator lock -y` treats every directory with a lock file as a module. To add a lock file to a new module, create an empty `.terraform.lock.hcl` there and run that command.
 

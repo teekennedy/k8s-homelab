@@ -4,17 +4,10 @@ gpgBootstrap:
   image: alpine/kubectl:1.37.0@sha256:954b65dea0eb140219b440413ede17c2eca205866df350d3c1fbc84d28af14ae
 
 renovate:
-  # Pinned below the chart's default (44.161.0). From 44.161.0, the image's
-  # rebuilt libcurl makes git drop a token-only URL username
-  # (https://TOKEN@host, the form Renovate uses for Forgejo) after the first
-  # 401 auth retry. Every run then fails in init with "could not read Username"
-  # while the job still reports Complete. The allowedVersions rule in
-  # renovate.json keeps Renovate from bumping this back; remove both once an
-  # image passes `git ls-remote https://$TOKEN@git.msng.to/ops/k8s-homelab.git`.
   image:
     registry: ghcr.io
     repository: renovatebot/renovate
-    tag: 44.160.1@sha256:6db9b39ad1b8256adf85d2e02b6d63c0a0e865b4e6188d3de45241ccbdb4c44f
+    tag: 44.190.0@sha256:dd348d05edcfba67e30826fb471d5bdee4868c68798abf3719a53915629503f1
   cronjob:
     # Hourly, at a static random offset (22m). A run takes a few minutes; a
     # ticked Dependency Dashboard box or a new release waits at most an hour.

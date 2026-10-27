@@ -314,14 +314,7 @@
       "groupName": "terraform"
     },
     {
-      "description": "Renovate updates the nearest .terraform.lock.hcl once per package file. A lock file updated twice is listed twice in the branch's artifacts, and the post-upgrade task's output replaces only the first copy, so the stale second copy is committed. Each lock file must therefore get exactly one update. Lock file maintenance runs on every .tf file with a dependency, local `module` blocks included, so main.tf and providers.tf would both refresh the same lock: only run it from providers.tf.",
-      "matchManagers": ["terraform"],
-      "matchUpdateTypes": ["lockFileMaintenance"],
-      "matchFileNames": ["!terraform/**/providers.tf"],
-      "enabled": false
-    },
-    {
-      "description": "Child modules have no lock file of their own, so they would update their parent's lock file a second time (see above). The root module declares and tracks every provider they use, so they are left alone. Their major-level constraints only need a manual bump alongside a major provider upgrade.",
+      "description": "Child modules have no lock file of their own, so Renovate would update their parent's lock file for them. Each update starts from the base branch's lock file and only the last is kept, so a child module's update would drop the root module's provider bumps. The root module declares and tracks every provider they use, so they are left alone. Their major-level constraints only need a manual bump alongside a major provider upgrade.",
       "matchManagers": ["terraform"],
       "matchFileNames": [
         "terraform/backup/**",
@@ -402,17 +395,6 @@
         ],
         "executionMode": "branch"
       }
-    },
-    {
-      "description": "Hold the self-hosted Renovate image at 44.160.1. From 44.161.0 the image's libcurl breaks git auth with a token-only URL, so Renovate can no longer clone Forgejo repos (see the image pin in k8s/platform/renovate/values.yaml). Remove once a newer image works.",
-      "matchDatasources": [
-        "docker"
-      ],
-      "matchPackageNames": [
-        "ghcr.io/renovatebot/renovate",
-        "renovatebot/renovate"
-      ],
-      "allowedVersions": "<=44.160.1"
     },
     {
       "description": "Don't apply minimumReleaseAge to jellyfin image+appVersion so they stay grouped",
