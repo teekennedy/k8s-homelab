@@ -221,6 +221,7 @@
                     ./nix/modules/common
                     ./nix/modules/restic
                     ./nix/modules/k3s
+                    ./nix/modules/memory-testing
                     ./nix/modules/nfs-mtls
                     ./nix/modules/selfupdate
                     ./nix/modules/ups
