@@ -223,7 +223,7 @@ appServer:
   # the locked dependencies in files/app-server/uv.lock. Its Python must match
   # files/app-server/.python-version: uv never downloads one.
   # renovate: datasource=docker depName=ghcr.io/astral-sh/uv
-  image: ghcr.io/astral-sh/uv:python3.13-alpine@sha256:1fd17509ae6051e6cad9dc1b83705483c0b24a15740b3c4d230b6b6f2e2a0241
+  image: ghcr.io/astral-sh/uv:python3.13-alpine@sha256:63b8fa4be2338728034164eb6c067a363fdbb3234fa79b64c83545317b7feec1
   port: 8080
   # Sandbox webhooks only. A port of its own so the NetworkPolicy can admit
   # sandbox pods to it and to nothing else on this server.
