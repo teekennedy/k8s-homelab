@@ -1,0 +1,49 @@
+{{- /*
+Static PV for the arr apps' own backups, backed by /storage/nas/backups/arr-stack
+on the NAS via mTLS-protected NFS. Each app mounts its own subdirectory (subPath)
+at /config/Backups. The directories (owned 1200:1200) are pre-created by the
+nfs-mtls module's tmpfiles rules.
+*/}}
+{{- with .Values.arrStackBackups }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $.Release.Name }}-arr-stack-backups
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+spec:
+  capacity:
+    storage: {{ .storage }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.2
+    - xprtsec=mtls
+  nfs:
+    server: {{ .server }}
+    path: {{ .path }}
+  claimRef:
+    name: {{ $.Release.Name }}-arr-stack-backups
+    namespace: {{ $.Release.Namespace }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $.Release.Name }}-arr-stack-backups
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: {{ $.Release.Name }}-arr-stack-backups
+  resources:
+    requests:
+      storage: {{ .storage }}
+{{- end }}

@@ -7,6 +7,15 @@ qbittorrentPasswordHash:
   pythonImage: python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211
   kubectlImage: bitnami/kubectl:latest@sha256:8f59408f9e896fc8992a0660a56687545bd06751f26531b4a26fca6d5dc7562d
 
+# Static NFS volume for the arr apps' own backups (templates/arr-stack-backups.yaml).
+# Each app keeps only its latest backup here; restic snapshots
+# /storage/nas/backups to S3 for history (k8s/platform/restic).
+arrStackBackups:
+  server: borg-2.msng.to
+  # NFSv4 path relative to the fsid=0 root, i.e. /storage/nas/backups/arr-stack.
+  path: /backups/arr-stack
+  storage: 10Gi
+
 # Prometheus resources this chart owns. They live here rather than in
 # monitoring-system so that a jellyfin deployment carries its own scrape
 # targets and alerts.
@@ -261,12 +270,19 @@ app-template:
             repository: lscr.io/linuxserver/prowlarr
             tag: 2.4.0.5397-ls152@sha256:3e9bd62ca90c97c5df75b7012e10a29f6926e62807deeddc1dc89e6e2fd141e1
           env:
+            # https://wiki.servarr.com/en/prowlarr/environment-variables
             TZ: America/Denver
             PROWLARR__AUTH__APIKEY:
               valueFrom:
                 secretKeyRef:
                   name: api-keys
                   key: PROWLARR_API_KEY
+            PROWLARR__LOG__ANALYTICSENABLED: "false"
+            # Log files are only written at level info or below; logs are
+            # collected from stdout, so turn them off.
+            PROWLARR__LOG__LEVEL: "off"
+            PROWLARR__LOG__CONSOLELEVEL: "info"
+            PROWLARR__LOG__DBENABLED: "false"
           probes:
             startup:
               enabled: true
@@ -316,6 +332,9 @@ app-template:
                   name: api-keys
                   key: RADARR_API_KEY
             RADARR__LOG__ANALYTICSENABLED: "false"
+            # Log files are only written at level info or below; logs are
+            # collected from stdout, so turn them off.
+            RADARR__LOG__LEVEL: "off"
             RADARR__LOG__CONSOLELEVEL: "info"
             RADARR__LOG__DBENABLED: "false"
             RADARR__UPDATE__AUTOMATICALLY: "false"
@@ -369,6 +388,9 @@ app-template:
                   key: SONARR_API_KEY
             # Disable analytics
             SONARR__LOG__ANALYTICSENABLED: "false"
+            # Log files are only written at level info or below; logs are
+            # collected from stdout, so turn them off.
+            SONARR__LOG__LEVEL: "off"
             # Stdout log level
             SONARR__LOG__CONSOLELEVEL: "info"
             # Disable sonarr log database
@@ -696,6 +718,22 @@ app-template:
               memory: 96Mi
             limits:
               memory: 192Mi
+        # Backup interval/retention live in each app's database, which
+        # configarr doesn't manage. See files/configMaps/arr-backup-settings.
+        arr-backup-settings:
+          image:
+            repository: python
+            tag: 3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72
+          command: ["python", "/scripts/reconcile.py"]
+          envFrom:
+            - secretRef:
+                name: api-keys
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
   service:
     main:
       controller: main
@@ -977,6 +1015,14 @@ app-template:
             - path: /app/config/secrets.yml
               readOnly: true
               subPath: secrets.yml
+    arr-backup-settings:
+      type: configMap
+      name: arr-backup-settings
+      advancedMounts:
+        configarr:
+          arr-backup-settings:
+            - path: /scripts
+              readOnly: true
     seerr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -1007,8 +1053,9 @@ app-template:
     prowlarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
-      # As of 2025-07-22 this was using 105MB
-      # As of 2026-03-17 this was using 886MB
+      # As of 2026-10-28 the filesystem held 76MB (most of it logs, since
+      # disabled). Longhorn's "actual size" was 1.8GB of deleted blocks pinned
+      # by the backup snapshot, which trim can't reclaim.
       size: 2Gi
       storageClass: longhorn
       labels:
@@ -1031,11 +1078,6 @@ app-template:
         arrs:
           radarr:
             - path: /config
-    # Mounts
-    # /config longhorn secondary
-    # /config/Backups smb
-    # /config/MediaCover longhorn cache
-    # /config/logs emptydir
     sonarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -1049,14 +1091,19 @@ app-template:
         arrs:
           sonarr:
             - path: /config
-    arr-backups:
-      accessMode: ReadWriteMany
+    # The apps' own backups (default folder /config/Backups) go to the NAS,
+    # one subdir per app. See arrStackBackups above.
+    arr-stack-backups:
       type: persistentVolumeClaim
-      size: 10Gi
-      storageClass: smb-backups
-      retain: true
+      existingClaim: jellyfin-arr-stack-backups
       advancedMounts:
         arrs:
+          prowlarr:
+            - path: /config/Backups
+              subPath: prowlarr
+          radarr:
+            - path: /config/Backups
+              subPath: radarr
           sonarr:
             - path: /config/Backups
               subPath: sonarr
@@ -1072,12 +1119,6 @@ app-template:
         arrs:
           sonarr:
             - path: /config/MediaCover
-    sonarr-logs:
-      type: emptyDir
-      advancedMounts:
-        arrs:
-          sonarr:
-            - path: /config/logs
     qbittorrent-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim

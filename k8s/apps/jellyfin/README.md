@@ -20,6 +20,26 @@ After deploying the helm chart, you'll need to do some manual steps to setup use
 - Set `InactiveSessionThreshold` to `60` minutes in Jellyfin's `/data/config/config.xml` (the setting cannot be edited via the UI). It defaults to `0`,
   which disables paused-session cleanup. This could lead to 'stuck' sessions that block reboot indefinitely.
 
+## Backups
+
+Prowlarr, Radarr and Sonarr back up through their own scheduled backup task
+(config + database zip). Each app's default backup folder, `/config/Backups`,
+is a subdirectory of the static NFS volume `jellyfin-arr-stack-backups`
+(`/storage/nas/backups/arr-stack/<app>` on the NAS, pre-created by
+`nix/modules/nfs-mtls`).
+
+Each app keeps only its latest backup. Backup interval and retention are both
+one day, set through each app's API by the `arr-backup-settings` container in
+the configarr CronJob (`files/configMaps/arr-backup-settings/reconcile.py`),
+because those settings live in the app database. History comes from restic,
+which snapshots `/storage/nas/backups` to S3 weekly (`k8s/platform/restic`).
+
+To restore, copy the zip from `/config/Backups/scheduled` into the app's
+System → Backup → Restore page.
+
+The apps don't write log files (`<APP>__LOG__LEVEL=off`). Logs go to stdout
+only, where Alloy collects them.
+
 ## Observability
 
 The `jellyfin-exporter` deployment exports metrics to Prometheus. Its
