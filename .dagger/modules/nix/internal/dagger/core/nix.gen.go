@@ -312,8 +312,9 @@ type NixDevenv struct { // nix (../../../../../../:0:0)
 	// field again.
 	refetchID bool
 
-	id           *ID
-	imageOutPath *string
+	id            *ID
+	imageOutPath  *string
+	releaseChange *string
 }
 
 func (r *NixDevenv) WithGraphQLQuery(q *querybuilder.Selection) *NixDevenv {
@@ -328,7 +329,7 @@ func (r *NixDevenv) WithGraphQLQuery(q *querybuilder.Selection) *NixDevenv {
 // CiRelease records the published devenv-ci image for tag and the toolchain
 // files it was built from, as .dagger/modules/nix/devenv-ci.json, which
 // CiToolchain reads. Run it from a checkout of tag, or of a later commit whose
-// ci image is the same (`release plan` says unchanged), so that the image
+// ci image is the same (ReleaseChange says unchanged), so that the image
 // keeps standing in for a build after edits that do not change it.
 func (r *NixDevenv) CiRelease(tag string) *File {
 	q := r.query.Select("ciRelease")
@@ -539,6 +540,25 @@ func (r *NixDevenv) Projects(ctx context.Context, opts ...NixDevenvProjectsOpts)
 	}
 
 	return convert(response), nil
+}
+
+// ReleaseChange reports whether the image Container builds for profiles
+// differs from the one published as tag, as JSON {"changed", "reason"} for
+// scripts/release-plan.sh. It compares the published image's
+// io.github.teekennedy.homelab.nix-image label with ImageOutPath, so nothing
+// is built; an image without the label has changed.
+func (r *NixDevenv) ReleaseChange(ctx context.Context, tag string, profiles []string) (string, error) {
+	if r.releaseChange != nil {
+		return *r.releaseChange, nil
+	}
+	q := r.query.Select("releaseChange")
+	q = q.Arg("tag", tag)
+	q = q.Arg("profiles", profiles)
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
 }
 
 // NixDevenvToolchainOpts contains options for NixDevenv.Toolchain

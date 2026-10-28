@@ -39,17 +39,17 @@ for project in $(jq -r 'keys[]' "$manifest"); do
   directory=$(jq -r --arg project "$project" '.[$project].directory' "$manifest")
   config=$(jq -r --arg project "$project" '.[$project].config' "$manifest")
   prefixes=$(jq -r --arg project "$project" '.[$project].artifacts[].prefix' "$manifest")
+  # Tags that mark an earlier release: any artifact's, as a release can tag only
+  # some of them, and those of prefixes the project has since replaced.
+  released=$(jq -r --arg project "$project" '.[$project] | .artifacts[].prefix, .legacyPrefixes[]?' "$manifest")
   canonical=$(printf '%s\n' "$prefixes" | head -n 1)
   # Use the same repository and project-specific config from its working directory.
   cliff() {
     git cliff --workdir "$root/$directory" --repository "$root" --config "$root/$directory/$config" "$@"
   }
-  # A project's artifacts share one version stream, but a release can tag only
-  # some of them, so any of their tags marks a release.
-  current=""
-  for prefix in $prefixes; do
-    current=${current:-$(git tag --points-at "$CI_COMMIT_SHA" --list "$prefix-[0-9]*" | head -n 1)}
-  done
+  current=$(for prefix in $prefixes; do
+    git tag --points-at "$CI_COMMIT_SHA" --list "$prefix-[0-9]*"
+  done | head -n 1)
   if [ -n "$current" ]; then
     version=${current##*-}
     metadata=$("$root/scripts/release-metadata.sh" "$current")
@@ -58,12 +58,9 @@ for project in $(jq -r 'keys[]' "$manifest"); do
     # Path filtering can drop a tagged release with no project changes. Git
     # supplies the baseline; cliff supplies only the commits after that tag.
     set -- git describe --tags --abbrev=0
-    for prefix in $prefixes; do
+    for prefix in $released; do
       set -- "$@" --match "$prefix-[0-9]*"
     done
-    if [ "$project" = devenv ]; then
-      set -- "$@" --match 'devenv-[0-9]*'
-    fi
     previous=$("$@" "$CI_COMMIT_SHA" 2>/dev/null || true)
     range=$CI_COMMIT_SHA
     if [ -n "$previous" ]; then
@@ -80,15 +77,16 @@ for project in $(jq -r 'keys[]' "$manifest"); do
       continue
     fi
     bumped=$(cliff --from-context "$context" --bumped-version)
-    # Both historical devenv-* and current devenv-ci-* share a version stream.
+    # Every prefix in $released shares the version stream.
     version=${bumped##*-}
     jq --arg tag "$canonical-$version" '.[0].version = $tag' "$context" > "$response"
     notes=$(cliff --from-context "$response" --strip all)
   fi
   for prefix in $prefixes; do
-    if [ -n "${RELEASE_PLAN:-}" ] &&
-      [ "$(jq --arg prefix "$prefix" '.[$prefix].changed' "$RELEASE_PLAN")" = false ]; then
-      echo "Skipping $prefix-$version: $(jq -r --arg prefix "$prefix" '.[$prefix].reason' "$RELEASE_PLAN")"
+    unchanged=$(jq -r --arg prefix "$prefix" \
+      '.[$prefix] | select(.changed == false) | .reason' "${RELEASE_PLAN:-/dev/null}")
+    if [ -n "$unchanged" ]; then
+      echo "Skipping $prefix-$version: $unchanged"
       continue
     fi
     create_release "$prefix-$version"

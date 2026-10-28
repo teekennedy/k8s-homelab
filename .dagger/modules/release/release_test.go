@@ -6,8 +6,6 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"dagger/release/internal/dagger"
-
 	// Sets DAGGER_SESSION_PORT/TOKEN before internal/dagger's init() reads
 	// them. Without it this test binary panics at startup.
 	_ "dagger/lib/cacheprobe"
@@ -141,29 +139,6 @@ func TestReleaseDescriptionByteLimit(t *testing.T) {
 			}
 			if !utf8.ValidString(got) || len(got) > 512 {
 				t.Errorf("invalid UTF-8 or oversized description: %q (%d bytes)", got, len(got))
-			}
-		})
-	}
-}
-
-func TestCompareImage(t *testing.T) {
-	const amd64 = dagger.Platform("linux/amd64")
-	for _, tc := range []struct {
-		name              string
-		current, recorded string
-		platform, engine  dagger.Platform
-		changed           bool
-	}{
-		{"same image", "/nix/store/a-image", "/nix/store/a-image", amd64, amd64, false},
-		{"different image", "/nix/store/b-image", "/nix/store/a-image", amd64, amd64, true},
-		{"no label", "/nix/store/a-image", "", amd64, amd64, true},
-		{"other platform", "/nix/store/a-image", "/nix/store/a-image", "linux/arm64", amd64, true},
-		{"variant ignored", "/nix/store/a-image", "/nix/store/a-image", "linux/arm64", "linux/arm64/v8", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got := compareImage("devenv-ci-1.2.3", tc.current, tc.recorded, tc.platform, tc.engine)
-			if got.Changed != tc.changed {
-				t.Errorf("changed = %v, want %v (%s)", got.Changed, tc.changed, got.Reason)
 			}
 		})
 	}

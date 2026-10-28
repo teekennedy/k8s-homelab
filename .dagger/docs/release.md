@@ -6,7 +6,6 @@ release scripts that tag them.
 | Function | What it does |
 | --- | --- |
 | `publish` | Build the image a release tag names and push it to GHCR |
-| `plan` | Say which Nix-built artifacts would publish a different image than their latest release |
 | `image` | The same image, labelled, without publishing it |
 | `build` | Check: build every `Dockerfile` in the repo |
 | `test` | Check: run `scripts/tests` against the release scripts (including `record-devenv-ci.sh`), `releases.json` and the cliff configs |
@@ -22,8 +21,9 @@ config, and artifact prefixes. Only each project's include paths in its cliff.to
 trigger releases; changes to shared release tooling do not bump projects. A
 project's artifacts share one version stream: a single bump tags every artifact
 whose image changed at the same commit, and the next bump counts from whichever
-of them was tagged last. Root `cliff.toml` includes historical `devenv-*` tags to
-preserve existing versions.
+of them was tagged last. A project's `legacyPrefixes` (devenv's historical
+`devenv-*` tags) count as earlier releases too, and root `cliff.toml` matches
+them, to preserve existing versions.
 Devenv publishes `devenv-ci-<version>` with `ci` and
 `devenv-shell-<version>` with `ci` plus `interactive`. Forgejo resources starts
 at `forgejo-resources-1.0.0` and uses its own cliff.toml. The OpenHands sandbox
@@ -46,10 +46,12 @@ retrying an older tag's pipeline is safe.
 A commit can touch a devenv file without changing an image: a comment, or a
 package only the `interactive` profile installs, which leaves `devenv-ci` as it
 is. Before tagging, the tag pipeline runs `scripts/release-plan.sh`, which calls
-`dagger api call release plan` with each Nix-built artifact's latest tag. For
-each, it evaluates the Nix store path of the image this commit would build
-(`nix devenv image-out-path`, nothing is built) and compares it with the
-`io.github.teekennedy.homelab.nix-image` label the published image carries.
+`dagger api call nix devenv release-change` for each Nix-built artifact's
+latest tag, in parallel. It reads the
+`io.github.teekennedy.homelab.nix-image` label the published image carries
+and, when there is one, compares it with the Nix store path of the image this
+commit would build (`nix devenv image-out-path`; nothing is built). The step
+only runs when a devenv file changed.
 `release.sh` then skips every artifact whose path matches, so an unchanged image
 gets no tag, release or push. Images published before the label existed, and
 Dockerfile builds, always count as changed.
@@ -85,7 +87,7 @@ contains the exact tagged commit, its committer timestamp (for reproducible
 `org.opencontainers.image.created` values), and git-cliff notes for that release.
 Both devenv artifacts use the same notes as their Forgejo release. Metadata
 generation uses an explicit commit range from the project's previous release of
-any artifact, including legacy `devenv-*` tags, to the requested commit. It also
+any artifact or legacy prefix, as `release.sh` finds it, to the requested commit. It also
 supports existing tags with no relevant commits (an empty changelog). The script
 rejects a checkout that does not match the requested tag.
 

@@ -157,7 +157,7 @@ func (r *Nix) Lab() *NixLab { // nix (../../../../../../.dagger/modules/nix/main
 
 // NixTestOpts contains options for Nix.Test
 type NixTestOpts struct {
-	Source *Directory // nix (../../../../../../.dagger/modules/nix/nix.go:153:2)
+	Source *Directory // nix (../../../../../../.dagger/modules/nix/nix.go:136:2)
 }
 
 // Tests the build-metrics parser on a real Nix build.
@@ -165,7 +165,7 @@ type NixTestOpts struct {
 // The selfupdate module's parser reads Nix's internal-json event stream, so a
 // Nix upgrade that changes it (NixOS/nix#13935) is caught here instead of only
 // on a host.
-func (r *Nix) Test(opts ...NixTestOpts) *Check { // nix (../../../../../../.dagger/modules/nix/nix.go:150:1)
+func (r *Nix) Test(opts ...NixTestOpts) *Check { // nix (../../../../../../.dagger/modules/nix/nix.go:133:1)
 	q := r.query.Select("test")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
@@ -321,15 +321,16 @@ func (r *NixBuilders) AsNode() Node {
 }
 
 // Devenv builds containers from the repo's devenv definition.
-type NixDevenv struct { // nix (../../../../../../.dagger/modules/nix/devenv.go:28:6)
+type NixDevenv struct { // nix (../../../../../../.dagger/modules/nix/devenv.go:30:6)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
 	// field again.
 	refetchID bool
 
-	id           *ID
-	imageOutPath *string
+	id            *ID
+	imageOutPath  *string
+	releaseChange *string
 }
 
 func (r *NixDevenv) WithGraphQLQuery(q *querybuilder.Selection) *NixDevenv {
@@ -344,7 +345,7 @@ func (r *NixDevenv) WithGraphQLQuery(q *querybuilder.Selection) *NixDevenv {
 // CiRelease records the published devenv-ci image for tag and the toolchain
 // files it was built from, as .dagger/modules/nix/devenv-ci.json, which
 // CiToolchain reads. Run it from a checkout of tag, or of a later commit whose
-// ci image is the same (`release plan` says unchanged), so that the image
+// ci image is the same (ReleaseChange says unchanged), so that the image
 // keeps standing in for a build after edits that do not change it.
 func (r *NixDevenv) CiRelease(tag string) *File { // nix (../../../../../../.dagger/modules/nix/devenv_prebuilt.go:63:1)
 	q := r.query.Select("ciRelease")
@@ -360,7 +361,7 @@ func (r *NixDevenv) CiRelease(tag string) *File { // nix (../../../../../../.dag
 // runs in, taken from the published devenv-ci image when that image is what a
 // build would produce: see publishedCiShell. Otherwise it is built, as
 // Toolchain builds it.
-func (r *NixDevenv) CiToolchain() *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:75:1)
+func (r *NixDevenv) CiToolchain() *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:77:1)
 	q := r.query.Select("ciToolchain")
 
 	return &Container{
@@ -379,7 +380,7 @@ type NixDevenvContainerOpts struct {
 	// (e.g. Linux-to-Linux). Does not work with macOS host daemons due to
 	// cross-platform path handling differences.
 	//
-	NixDaemon *Socket // nix (../../../../../../.dagger/modules/nix/devenv.go:109:2)
+	NixDaemon *Socket // nix (../../../../../../.dagger/modules/nix/devenv.go:111:2)
 	//
 	// devenv profiles to activate (https://devenv.sh/profiles/). Defaults to
 	// the "ci" profile, which holds exactly the toolchain the checks need. The
@@ -389,7 +390,7 @@ type NixDevenvContainerOpts struct {
 	//
 	//
 	// Default: ["ci"]
-	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:117:2)
+	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:119:2)
 }
 
 // Container builds the devenv nix environment as a minimal "from scratch"
@@ -397,7 +398,7 @@ type NixDevenvContainerOpts struct {
 // produce a minimal nix2container image containing only the runtime closure
 // (no build dependencies). The nix store is cached across runs so packages are
 // only built once.
-func (r *NixDevenv) Container(opts ...NixDevenvContainerOpts) *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:100:1)
+func (r *NixDevenv) Container(opts ...NixDevenvContainerOpts) *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:102:1)
 	q := r.query.Select("container")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `nixDaemon` optional argument
@@ -478,14 +479,14 @@ type NixDevenvImageOutPathOpts struct {
 	//
 	//
 	// Default: ["ci"]
-	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:275:2)
+	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:280:2)
 }
 
 // ImageOutPath evaluates the Nix store path of the image Container builds for
 // profiles, on the engine's platform, without building anything. Two
 // checkouts with the same path build the same image, so a release whose path
 // matches the published image's has nothing new to publish.
-func (r *NixDevenv) ImageOutPath(ctx context.Context, opts ...NixDevenvImageOutPathOpts) (string, error) { // nix (../../../../../../.dagger/modules/nix/devenv.go:270:1)
+func (r *NixDevenv) ImageOutPath(ctx context.Context, opts ...NixDevenvImageOutPathOpts) (string, error) { // nix (../../../../../../.dagger/modules/nix/devenv.go:275:1)
 	if r.imageOutPath != nil {
 		return *r.imageOutPath, nil
 	}
@@ -506,7 +507,7 @@ func (r *NixDevenv) ImageOutPath(ctx context.Context, opts ...NixDevenvImageOutP
 // IntegrationToolchain is Toolchain for the "ci" and "integration" profiles:
 // the container the Kubernetes integration workflow runs in. No release
 // publishes it, so it is always built.
-func (r *NixDevenv) IntegrationToolchain() *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:91:1)
+func (r *NixDevenv) IntegrationToolchain() *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:93:1)
 	q := r.query.Select("integrationToolchain")
 
 	return &Container{
@@ -563,6 +564,25 @@ func (r *NixDevenv) Projects(ctx context.Context, opts ...NixDevenvProjectsOpts)
 	return convert(response), nil
 }
 
+// ReleaseChange reports whether the image Container builds for profiles
+// differs from the one published as tag, as JSON {"changed", "reason"} for
+// scripts/release-plan.sh. It compares the published image's
+// io.github.teekennedy.homelab.nix-image label with ImageOutPath, so nothing
+// is built; an image without the label has changed.
+func (r *NixDevenv) ReleaseChange(ctx context.Context, tag string, profiles []string) (string, error) { // nix (../../../../../../.dagger/modules/nix/devenv_release.go:27:1)
+	if r.releaseChange != nil {
+		return *r.releaseChange, nil
+	}
+	q := r.query.Select("releaseChange")
+	q = q.Arg("tag", tag)
+	q = q.Arg("profiles", profiles)
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
 // NixDevenvToolchainOpts contains options for NixDevenv.Toolchain
 type NixDevenvToolchainOpts struct {
 	//
@@ -570,7 +590,7 @@ type NixDevenvToolchainOpts struct {
 	//
 	//
 	// Default: ["ci"]
-	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:62:2)
+	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:64:2)
 }
 
 // Toolchain returns the devenv shell for profiles with the language toolchain
@@ -583,7 +603,7 @@ type NixDevenvToolchainOpts struct {
 //
 // It is built without the lab CLI's source, so it cannot build the
 // "interactive" profile, which installs the CLI; use Container for that.
-func (r *NixDevenv) Toolchain(opts ...NixDevenvToolchainOpts) *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:57:1)
+func (r *NixDevenv) Toolchain(opts ...NixDevenvToolchainOpts) *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:59:1)
 	q := r.query.Select("toolchain")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `profiles` optional argument

@@ -32,6 +32,14 @@ steps:
   # Finds the Nix-built artifacts whose image this commit leaves unchanged, so
   # they are not tagged and published again.
   - name: plan-release
+    # Only devenv's images are Nix-built; see cliff.toml's include_paths.
+    when:
+      - path:
+          include:
+            - devenv.nix
+            - devenv.yaml
+            - devenv.lock
+            - "cmd/lab/**"
     image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     environment:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"
@@ -43,15 +51,13 @@ steps:
     # did before plans existed.
     failure: ignore
     commands:
-      - apk add --no-cache curl kubectl jq git openssh-client
+      - apk add --no-cache curl kubectl jq git
       # The CLI must match the in-cluster engine, so take its version from there.
       - export DAGGER_VERSION="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:v||p' k8s/platform/dagger-engine/values.yaml)"
       - test -n "$DAGGER_VERSION"
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       # Export the run's traces, logs and metrics to Grafana (Tempo/Loki/Prometheus).
       - . scripts/dagger-otel-env.sh
-      # Remote Nix builds on the borg hosts: dagger.toml's ci env.
-      - . scripts/nix-ci-ssh-agent.sh
       - git config --global --add safe.directory "$CI_WORKSPACE"
       - scripts/release-plan.sh "$CI_WORKSPACE/release-plan.json"
 
@@ -72,5 +78,8 @@ steps:
           echo "No release plan; releasing every artifact with changes"
         fi
         scripts/release.sh
-      # plan-release refreshed the record when devenv-ci's image is unchanged.
-      - git diff --quiet -- .dagger/modules/nix/devenv-ci.json || scripts/record-devenv-ci.sh
+      # plan-release refreshes the record when devenv-ci's image is unchanged.
+      - |
+        if jq -e '.["devenv-ci"].changed == false' "$CI_WORKSPACE/release-plan.json" >/dev/null 2>&1; then
+          scripts/record-devenv-ci.sh
+        fi

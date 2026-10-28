@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"dagger/nix/internal/dagger"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // Container image constants with renovate annotations for automated updates.
@@ -122,22 +124,25 @@ func (m *Devenv) Container(
 	} else if len(profiles) == 0 {
 		description = "Devenv shell"
 	}
-	shell, err := m.shell(ctx, m.Source, nixDaemon, profiles)
-	if err != nil {
-		return nil, err
-	}
-	outPath, err := m.ImageOutPath(ctx, profiles)
-	if err != nil {
-		return nil, err
+	// The evaluation shares nothing with the build, so they run side by side.
+	var shell *dagger.Container
+	var outPath string
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() (err error) {
+		shell, err = m.shell(gctx, m.Source, nixDaemon, profiles)
+		return err
+	})
+	g.Go(func() (err error) {
+		outPath, err = m.ImageOutPath(gctx, profiles)
+		return err
+	})
+	if err := g.Wait(); err != nil {
+		return nil, fmt.Errorf("building the devenv image: %w", err)
 	}
 	labels := imageLabels("Devenv shell", description, imageSource)
 	labels[nixImageLabel] = outPath
 	return withImageLabels(shell, labels), nil
 }
-
-// nixImageLabel is the image label holding the store path ImageOutPath
-// evaluates, which a later release compares its own against.
-const nixImageLabel = "io.github.teekennedy.homelab.nix-image"
 
 // imageLabels are the OCI labels every published image carries.
 func imageLabels(title, description, documentation string) map[string]string {

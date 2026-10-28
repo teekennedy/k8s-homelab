@@ -407,6 +407,27 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Devenv).Projects(&parent, ctx, source), nil
+		case "ReleaseChange":
+			var parent Devenv
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var tag string
+			if inputArgs["tag"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["tag"]), &tag)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg tag", err))
+				}
+			}
+			var profiles []string
+			if inputArgs["profiles"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["profiles"]), &profiles)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg profiles", err))
+				}
+			}
+			return (*Devenv).ReleaseChange(&parent, ctx, tag, profiles)
 		case "Toolchain":
 			var parent Devenv
 			err = json.Unmarshal(parentJSON, &parent)
@@ -693,9 +714,9 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Test",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Tests the build-metrics parser on a real Nix build.\n\nThe selfupdate module's parser reads Nix's internal-json event stream, so a\nNix upgrade that changes it (NixOS/nix#13935) is caught here instead of only\non a host.").
-							WithSourceMap(dag.SourceMap("nix.go", 150, 1)).
+							WithSourceMap(dag.SourceMap("nix.go", 133, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 153, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.lock", "!nix/modules/selfupdate/build-metrics/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 136, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.lock", "!nix/modules/selfupdate/build-metrics/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
 					WithFunction(
 						dag.Function("Validate",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
@@ -723,36 +744,36 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithDescription("Status probes every configured builder and reports which ones a build\nwould use. It always probes afresh, unlike a build, which reuses a probe\nfor a few minutes.").
 							WithSourceMap(dag.SourceMap("nix_builders.go", 94, 1)))).
 			WithObject(
-				dag.TypeDef().WithObject("Devenv", dagger.TypeDefWithObjectOpts{Description: "Devenv builds containers from the repo's devenv definition.", SourceMap: dag.SourceMap("devenv.go", 28, 6)}).
+				dag.TypeDef().WithObject("Devenv", dagger.TypeDefWithObjectOpts{Description: "Devenv builds containers from the repo's devenv definition.", SourceMap: dag.SourceMap("devenv.go", 30, 6)}).
 					WithFunction(
 						dag.Function("CiRelease",
 							dag.TypeDef().WithObject("File")).
-							WithDescription("CiRelease records the published devenv-ci image for tag and the toolchain\nfiles it was built from, as .dagger/modules/nix/devenv-ci.json, which\nCiToolchain reads. Run it from a checkout of tag, or of a later commit whose\nci image is the same (`release plan` says unchanged), so that the image\nkeeps standing in for a build after edits that do not change it.").
+							WithDescription("CiRelease records the published devenv-ci image for tag and the toolchain\nfiles it was built from, as .dagger/modules/nix/devenv-ci.json, which\nCiToolchain reads. Run it from a checkout of tag, or of a later commit whose\nci image is the same (ReleaseChange says unchanged), so that the image\nkeeps standing in for a build after edits that do not change it.").
 							WithSourceMap(dag.SourceMap("devenv_prebuilt.go", 63, 1)).
 							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("devenv_prebuilt.go", 63, 49)})).
 					WithFunction(
 						dag.Function("CiToolchain",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("CiToolchain is Toolchain for the \"ci\" profile, the container every check\nruns in, taken from the published devenv-ci image when that image is what a\nbuild would produce: see publishedCiShell. Otherwise it is built, as\nToolchain builds it.").
-							WithSourceMap(dag.SourceMap("devenv.go", 75, 1))).
+							WithSourceMap(dag.SourceMap("devenv.go", 77, 1))).
 					WithFunction(
 						dag.Function("Container",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("Container builds the devenv nix environment as a minimal \"from scratch\"\ncontainer, labelled for publishing. Uses `devenv container copy shell` to\nproduce a minimal nix2container image containing only the runtime closure\n(no build dependencies). The nix store is cached across runs so packages are\nonly built once.").
-							WithSourceMap(dag.SourceMap("devenv.go", 100, 1)).
-							WithArg("nixDaemon", dag.TypeDef().WithObject("Socket").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Optional host nix daemon socket for faster builds on NixOS CI hosts.\nWhen provided, the host daemon's store is used as a substituter so\npre-built packages are fetched rather than rebuilt from source.\nNote: only works when the host and container share the same platform\n(e.g. Linux-to-Linux). Does not work with macOS host daemons due to\ncross-platform path handling differences.", SourceMap: dag.SourceMap("devenv.go", 109, 2)}).
-							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/). Defaults to\nthe \"ci\" profile, which holds exactly the toolchain the checks need. The\n\"interactive\" profile — cluster tooling, the kubeconfig enterShell, the\ndagger CLI, the git hook — is deliberately not built here; pass it\nexplicitly if you want a full shell to poke at.", SourceMap: dag.SourceMap("devenv.go", 117, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
+							WithSourceMap(dag.SourceMap("devenv.go", 102, 1)).
+							WithArg("nixDaemon", dag.TypeDef().WithObject("Socket").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Optional host nix daemon socket for faster builds on NixOS CI hosts.\nWhen provided, the host daemon's store is used as a substituter so\npre-built packages are fetched rather than rebuilt from source.\nNote: only works when the host and container share the same platform\n(e.g. Linux-to-Linux). Does not work with macOS host daemons due to\ncross-platform path handling differences.", SourceMap: dag.SourceMap("devenv.go", 111, 2)}).
+							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/). Defaults to\nthe \"ci\" profile, which holds exactly the toolchain the checks need. The\n\"interactive\" profile — cluster tooling, the kubeconfig enterShell, the\ndagger CLI, the git hook — is deliberately not built here; pass it\nexplicitly if you want a full shell to poke at.", SourceMap: dag.SourceMap("devenv.go", 119, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
 					WithFunction(
 						dag.Function("ImageOutPath",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
 							WithDescription("ImageOutPath evaluates the Nix store path of the image Container builds for\nprofiles, on the engine's platform, without building anything. Two\ncheckouts with the same path build the same image, so a release whose path\nmatches the published image's has nothing new to publish.").
-							WithSourceMap(dag.SourceMap("devenv.go", 270, 1)).
-							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/).", SourceMap: dag.SourceMap("devenv.go", 275, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
+							WithSourceMap(dag.SourceMap("devenv.go", 275, 1)).
+							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/).", SourceMap: dag.SourceMap("devenv.go", 280, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
 					WithFunction(
 						dag.Function("IntegrationToolchain",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("IntegrationToolchain is Toolchain for the \"ci\" and \"integration\" profiles:\nthe container the Kubernetes integration workflow runs in. No release\npublishes it, so it is always built.").
-							WithSourceMap(dag.SourceMap("devenv.go", 91, 1))).
+							WithSourceMap(dag.SourceMap("devenv.go", 93, 1))).
 					WithFunction(
 						dag.Function("Projects",
 							dag.TypeDef().WithListOf(dag.TypeDef().WithObject("DevenvProject"))).
@@ -760,11 +781,18 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithSourceMap(dag.SourceMap("devenv_projects.go", 61, 1)).
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("devenv_projects.go", 65, 2), DefaultPath: "/", Ignore: []string{"*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"}})).
 					WithFunction(
+						dag.Function("ReleaseChange",
+							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
+							WithDescription("ReleaseChange reports whether the image Container builds for profiles\ndiffers from the one published as tag, as JSON {\"changed\", \"reason\"} for\nscripts/release-plan.sh. It compares the published image's\nio.github.teekennedy.homelab.nix-image label with ImageOutPath, so nothing\nis built; an image without the label has changed.").
+							WithSourceMap(dag.SourceMap("devenv_release.go", 27, 1)).
+							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{Description: "A published release tag, such as devenv-ci-1.2.3.", SourceMap: dag.SourceMap("devenv_release.go", 30, 2)}).
+							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.FunctionWithArgOpts{Description: "The devenv profiles that release was built with.", SourceMap: dag.SourceMap("devenv_release.go", 32, 2)})).
+					WithFunction(
 						dag.Function("Toolchain",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("Toolchain returns the devenv shell for profiles with the language toolchain\ncaches attached: the container the checks run in.\n\nThe \"ci\" profile holds exactly what `dagger check` needs. The Kubernetes\nintegration workflow adds \"integration\", which brings kubectl and curl; no\ncheck runs with it, so `dagger check` keeps running in a container that\ncannot reach a cluster even if something tried.\n\nIt is built without the lab CLI's source, so it cannot build the\n\"interactive\" profile, which installs the CLI; use Container for that.").
-							WithSourceMap(dag.SourceMap("devenv.go", 57, 1)).
-							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/).", SourceMap: dag.SourceMap("devenv.go", 62, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
+							WithSourceMap(dag.SourceMap("devenv.go", 59, 1)).
+							WithArg("profiles", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).WithOptional(true), dagger.FunctionWithArgOpts{Description: "devenv profiles to activate (https://devenv.sh/profiles/).", SourceMap: dag.SourceMap("devenv.go", 64, 2), DefaultValue: dagger.JSON("[\"ci\"]")})).
 					WithFunction(
 						dag.Function("Update",
 							dag.TypeDef().WithObject("Changeset")).

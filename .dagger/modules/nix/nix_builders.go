@@ -141,6 +141,10 @@ type nixStore func(signedOnly bool) *dagger.Container
 type nixEnv struct {
 	Container *dagger.Container
 	Remote    bool
+	// StoreOptions run a whole build in one builder's store instead of
+	// through the build hook, for a build too large for the container's
+	// store; see storeOptions. Set when Remote is.
+	StoreOptions []string
 }
 
 // Exec returns args as an exec that can reach the builders.
@@ -173,7 +177,11 @@ func (b *Builders) build(ctx context.Context, store nixStore, steps func(nixEnv)
 		return local(), nil
 	}
 
-	built, err := steps(nixEnv{Container: remote.configure(store(!remote.trusted)), Remote: true}).Sync(ctx)
+	built, err := steps(nixEnv{
+		Container:    remote.configure(store(!remote.trusted)),
+		Remote:       true,
+		StoreOptions: storeOptions(remote.storeMachine()),
+	}).Sync(ctx)
 	if err == nil {
 		return built, nil
 	}
@@ -435,12 +443,13 @@ func nixMachineField(machine string, i int) int {
 	return n
 }
 
-// storeOptions are the Nix options that run a whole build in machine's store:
+// storeOptions are the Nix options that run a whole build in machine's store,
+// which override the build hook settings configure sets:
 // `--store` makes the builder build everything, and the container only
 // evaluates, writing derivations to its own store (`--eval-store auto`) and
 // copying them over. Unlike a build hook, nothing built comes back to the
 // container, whose store would otherwise need every input and output of the
-// build. Run them in a container from withSSH.
+// build.
 //
 // An untrusted builder takes these uploads, as derivations and sources are
 // content-addressed. The client's job and core counts apply on the builder

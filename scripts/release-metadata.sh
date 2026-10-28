@@ -16,17 +16,13 @@ canonical_tag="$canonical-$version"
 revision=$(git rev-parse "$tag^{commit}")
 # Verify that the requested tag refers to this checkout.
 [ "$revision" = "$(git rev-parse HEAD)" ]
-# Select the previous release of any of the project's artifacts, as release.sh
-# does, so the notes match the release's: a release can tag only some of them.
-# Git selects it itself; --current can select another project's tag when
-# several releases share a commit.
+# Select the previous release from the same tags as release.sh, so the notes
+# match the release's. Git selects it itself; --current can select another
+# project's tag when several releases share a commit.
 set -- git describe --tags --abbrev=0
-for prefix in $(printf '%s' "$project" | jq -r '.artifacts[].prefix'); do
+for prefix in $(printf '%s' "$project" | jq -r '.artifacts[].prefix, .legacyPrefixes[]?'); do
   set -- "$@" --match "$prefix-[0-9]*"
 done
-if [ "$canonical" = devenv-ci ]; then
-  set -- "$@" --match 'devenv-[0-9]*'
-fi
 previous=$("$@" "$revision^" 2>/dev/null || true)
 range=$revision
 if [ -n "$previous" ]; then
