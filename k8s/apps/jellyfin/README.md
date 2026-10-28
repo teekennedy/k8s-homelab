@@ -17,28 +17,45 @@ After deploying the helm chart, you'll need to do some manual steps to setup use
 - Create an API key named `jellyfin-exporter` on the same dashboard page and store it for the metrics exporter:
 
   `kubectl -n jellyfin create secret generic jellyfin-exporter-api-key --from-literal=JELLYFIN_API_KEY="$(pbpaste)"`
+- Create an API key named `jellyfin-backup` for the nightly backup job:
+
+  `kubectl -n jellyfin create secret generic jellyfin-backup-api-key --from-literal=JELLYFIN_API_KEY="$(pbpaste)"`
 - Set `InactiveSessionThreshold` to `60` minutes in Jellyfin's `/data/config/config.xml` (the setting cannot be edited via the UI). It defaults to `0`,
   which disables paused-session cleanup. This could lead to 'stuck' sessions that block reboot indefinitely.
 
 ## Backups
 
-Prowlarr, Radarr and Sonarr back up through their own scheduled backup task
-(config + database zip). Each app's default backup folder, `/config/Backups`,
-is a subdirectory of the static NFS volume `jellyfin-arr-stack-backups`
-(`/storage/nas/backups/arr-stack/<app>` on the NAS, pre-created by
-`nix/modules/nfs-mtls`).
+Apps that can back themselves up write their backups to the NAS, one static
+NFS volume per directory under `/storage/nas/backups` (`templates/nas-backups.yaml`,
+directories pre-created by `nix/modules/nfs-mtls`). Each app keeps only its
+latest backup. History comes from restic, which snapshots `/storage/nas/backups`
+to S3 weekly (`k8s/platform/restic`).
 
-Each app keeps only its latest backup. Backup interval and retention are both
-one day, set through each app's API by the `arr-backup-settings` container in
-the configarr CronJob (`files/configMaps/arr-backup-settings/reconcile.py`),
-because those settings live in the app database. History comes from restic,
-which snapshots `/storage/nas/backups` to S3 weekly (`k8s/platform/restic`).
+- **Prowlarr, Radarr, Sonarr**: their own scheduled backup task (config +
+  database zip). Each app's default backup folder, `/config/Backups`, is its
+  subdirectory of `/storage/nas/backups/arr-stack`. Backup interval and
+  retention are both one day, set through each app's API by the
+  `arr-backup-settings` container in the configarr CronJob
+  (`files/configMaps/arr-backup-settings/reconcile.py`), because those settings
+  live in the app database. To restore, upload the zip from
+  `/config/Backups/scheduled` on the app's System → Backup page.
+- **Jellyfin**: Jellyfin can only back up on request, so the `jellyfin-backup`
+  CronJob calls its backup API nightly and deletes the older archives
+  (`files/configMaps/jellyfin-backup/backup.py`). The archive holds the
+  database, config, users, libraries, collections, playlists and subtitles,
+  but not metadata, trickplay or plugin configuration. Its backup folder,
+  `/data/data/backups`, is `/storage/nas/backups/jellyfin`; restore from
+  Dashboard → Backups.
+- **Seerr, qBittorrent, Cleanuparr**: no built-in backups; their volumes stay
+  in Longhorn's backup group.
 
-To restore, copy the zip from `/config/Backups/scheduled` into the app's
-System → Backup → Restore page.
+### Logging
 
-The apps don't write log files (`<APP>__LOG__LEVEL=off`). Logs go to stdout
-only, where Alloy collects them.
+Logs go to stdout, where Alloy collects them. File logging is turned off where
+the app allows it (`<APP>__LOG__LEVEL=off` for the arr apps, `FileLogger` in
+qBittorrent's config, a console-only `logging.json` for Jellyfin). Seerr,
+Cleanuparr and Jellyfin's FFmpeg and plugin logs can't be turned off, so their
+log directories are emptyDirs.
 
 ## Observability
 

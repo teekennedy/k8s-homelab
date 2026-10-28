@@ -1,21 +1,21 @@
 {{- /*
-Static PV for the arr apps' own backups, backed by /storage/nas/backups/arr-stack
-on the NAS via mTLS-protected NFS. Each app mounts its own subdirectory (subPath)
-at /config/Backups. The directories (owned 1200:1200) are pre-created by the
-nfs-mtls module's tmpfiles rules.
+One static PV/PVC per directory under /storage/nas/backups on the NAS, mounted
+via mTLS-protected NFS. Apps write their own backups here and keep only the
+latest one. The directories (owned 1200:1200) are pre-created by the nfs-mtls
+module's tmpfiles rules.
 */}}
-{{- with .Values.arrStackBackups }}
+{{- range $name, $volume := .Values.nasBackups.volumes }}
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: {{ $.Release.Name }}-arr-stack-backups
+  name: {{ $.Release.Name }}-{{ $name }}-backups
   labels:
     app.kubernetes.io/instance: {{ $.Release.Name }}
     app.kubernetes.io/name: {{ $.Chart.Name }}
 spec:
   capacity:
-    storage: {{ .storage }}
+    storage: {{ $volume.storage }}
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
@@ -24,16 +24,16 @@ spec:
     - nfsvers=4.2
     - xprtsec=mtls
   nfs:
-    server: {{ .server }}
-    path: {{ .path }}
+    server: {{ $.Values.nasBackups.server }}
+    path: {{ $volume.path }}
   claimRef:
-    name: {{ $.Release.Name }}-arr-stack-backups
+    name: {{ $.Release.Name }}-{{ $name }}-backups
     namespace: {{ $.Release.Namespace }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ $.Release.Name }}-arr-stack-backups
+  name: {{ $.Release.Name }}-{{ $name }}-backups
   namespace: {{ $.Release.Namespace }}
   labels:
     app.kubernetes.io/instance: {{ $.Release.Name }}
@@ -42,8 +42,8 @@ spec:
   accessModes:
     - ReadWriteMany
   storageClassName: ""
-  volumeName: {{ $.Release.Name }}-arr-stack-backups
+  volumeName: {{ $.Release.Name }}-{{ $name }}-backups
   resources:
     requests:
-      storage: {{ .storage }}
+      storage: {{ $volume.storage }}
 {{- end }}

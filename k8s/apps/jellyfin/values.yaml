@@ -7,14 +7,20 @@ qbittorrentPasswordHash:
   pythonImage: python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211
   kubectlImage: bitnami/kubectl:latest@sha256:8f59408f9e896fc8992a0660a56687545bd06751f26531b4a26fca6d5dc7562d
 
-# Static NFS volume for the arr apps' own backups (templates/arr-stack-backups.yaml).
-# Each app keeps only its latest backup here; restic snapshots
-# /storage/nas/backups to S3 for history (k8s/platform/restic).
-arrStackBackups:
+# Static NFS volumes for the apps' own backups (templates/nas-backups.yaml),
+# each claimed as jellyfin-<name>-backups. Each app keeps only its latest
+# backup here; restic snapshots /storage/nas/backups to S3 for history
+# (k8s/platform/restic).
+nasBackups:
   server: borg-2.msng.to
-  # NFSv4 path relative to the fsid=0 root, i.e. /storage/nas/backups/arr-stack.
-  path: /backups/arr-stack
-  storage: 10Gi
+  volumes:
+    # Paths are NFSv4 paths relative to the fsid=0 root (/storage/nas).
+    arr-stack:
+      path: /backups/arr-stack
+      storage: 10Gi
+    jellyfin:
+      path: /backups/jellyfin
+      storage: 10Gi
 
 # Prometheus resources this chart owns. They live here rather than in
 # monitoring-system so that a jellyfin deployment carries its own scrape
@@ -734,6 +740,47 @@ app-template:
               memory: 32Mi
             limits:
               memory: 64Mi
+    # Jellyfin only backs up on request, so this calls its backup API nightly
+    # and then deletes the older archives. See files/configMaps/jellyfin-backup.
+    jellyfin-backup:
+      type: cronjob
+      cronjob:
+        schedule: "0 4 * * *"
+        concurrencyPolicy: Forbid
+        successfulJobsHistory: 1
+        failedJobsHistory: 1
+      pod:
+        restartPolicy: Never
+        securityContext:
+          fsGroup: *gid
+          runAsUser: 1200
+          runAsGroup: *gid
+      containers:
+        jellyfin-backup:
+          image:
+            repository: python
+            tag: 3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72
+          command: ["python", "/scripts/backup.py"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            JELLYFIN_URL: http://jellyfin-main:8096
+            BACKUP_DIR: /backups
+          envFrom:
+            # Manual: create an API key named `jellyfin-backup` in the Jellyfin
+            # dashboard, then
+            # kubectl -n jellyfin create secret generic jellyfin-backup-api-key --from-literal=JELLYFIN_API_KEY="$(pbpaste)"
+            - secretRef:
+                name: jellyfin-backup-api-key
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
   service:
     main:
       controller: main
@@ -975,9 +1022,42 @@ app-template:
       advancedMounts:
         main:
           jellyfin:
+            # logging.json is merged over logging.default.json, and its WriteTo
+            # list only replaces the defaults by index, so the default File
+            # sink survives. Replace both to log to the console only. Jellyfin
+            # only writes logging.default.json when it is missing.
+            - path: /data/config/logging.default.json
+              readOnly: true
+              subPath: logging.json
             - path: /data/config/logging.json
               readOnly: true
               subPath: logging.json
+    # FFmpeg and plugin logs can't be turned off; keep them off the PVC.
+    jellyfin-logs:
+      type: emptyDir
+      advancedMounts:
+        main:
+          jellyfin:
+            - path: /data/log
+    # Jellyfin's own backup folder ({DataPath}/backups) on the NAS.
+    jellyfin-backups:
+      type: persistentVolumeClaim
+      existingClaim: jellyfin-jellyfin-backups
+      advancedMounts:
+        main:
+          jellyfin:
+            - path: /data/data/backups
+        jellyfin-backup:
+          jellyfin-backup:
+            - path: /backups
+    jellyfin-backup-script:
+      type: configMap
+      name: jellyfin-backup
+      advancedMounts:
+        jellyfin-backup:
+          jellyfin-backup:
+            - path: /scripts
+              readOnly: true
     cleanuparr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -990,6 +1070,13 @@ app-template:
         cleanuparr:
           cleanuparr:
             - path: /config
+    # Cleanuparr's file log can't be turned off; keep it off the PVC.
+    cleanuparr-logs:
+      type: emptyDir
+      advancedMounts:
+        cleanuparr:
+          cleanuparr:
+            - path: /config/logs
     configarr-repos:
       type: emptyDir
       advancedMounts:
@@ -1036,6 +1123,14 @@ app-template:
         seerr:
           seerr:
             - path: /app/config
+    # Seerr's file logs can't be turned off; keep them off the PVC. Its
+    # in-app log viewer reads these, so it only shows the current pod's logs.
+    seerr-logs:
+      type: emptyDir
+      advancedMounts:
+        seerr:
+          seerr:
+            - path: /app/config/logs
     seerr-cache:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -1092,7 +1187,7 @@ app-template:
           sonarr:
             - path: /config
     # The apps' own backups (default folder /config/Backups) go to the NAS,
-    # one subdir per app. See arrStackBackups above.
+    # one subdir per app. See nasBackups above.
     arr-stack-backups:
       type: persistentVolumeClaim
       existingClaim: jellyfin-arr-stack-backups
