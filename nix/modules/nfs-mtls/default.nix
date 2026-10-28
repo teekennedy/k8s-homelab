@@ -104,13 +104,22 @@ in {
     #   syncthing       8384:8384   synced folder trees
     #   copyparty       3923:3923   the private root volume
     #   victoriametrics 65534:65534 vmbackup destination
-    systemd.tmpfiles.rules = lib.mkIf cfg.serverMode [
-      "d /storage/nas/k8s 0755 root root -"
-      "d /storage/nas/backups/syncthing 0755 8384 8384 -"
-      "d /storage/nas/backups/syncthing/data 0755 8384 8384 -"
-      "d /storage/nas/backups/copyparty 0755 3923 3923 -"
-      "d /storage/nas/backups/copyparty/data 0755 3923 3923 -"
-      "d /storage/nas/backups/victoriametrics 0750 65534 65534 -"
-    ];
+    #   arr-stack       1200:1200   prowlarr/radarr/sonarr app backups, one
+    #                               subdir per app (mounted via subPath, which
+    #                               kubelet would otherwise create root-owned)
+    systemd.tmpfiles.rules = lib.mkIf cfg.serverMode ([
+        "d /storage/nas/k8s 0755 root root -"
+        "d /storage/nas/backups/syncthing 0755 8384 8384 -"
+        "d /storage/nas/backups/syncthing/data 0755 8384 8384 -"
+        "d /storage/nas/backups/copyparty 0755 3923 3923 -"
+        "d /storage/nas/backups/copyparty/data 0755 3923 3923 -"
+        "d /storage/nas/backups/victoriametrics 0750 65534 65534 -"
+        "d /storage/nas/backups/arr-stack 0750 1200 1200 -"
+      ]
+      ++ map (app: "d /storage/nas/backups/arr-stack/${app} 0750 1200 1200 -") [
+        "prowlarr"
+        "radarr"
+        "sonarr"
+      ]);
   };
 }
