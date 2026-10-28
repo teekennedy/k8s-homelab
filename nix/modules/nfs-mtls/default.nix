@@ -107,6 +107,7 @@ in {
     #   arr-stack       1200:1200   prowlarr/radarr/sonarr app backups, one
     #                               subdir per app (mounted via subPath, which
     #                               kubelet would otherwise create root-owned)
+    #   jellyfin        1200:1200   jellyfin server backups
     systemd.tmpfiles.rules = lib.mkIf cfg.serverMode ([
         "d /storage/nas/k8s 0755 root root -"
         "d /storage/nas/backups/syncthing 0755 8384 8384 -"
@@ -115,6 +116,7 @@ in {
         "d /storage/nas/backups/copyparty/data 0755 3923 3923 -"
         "d /storage/nas/backups/victoriametrics 0750 65534 65534 -"
         "d /storage/nas/backups/arr-stack 0750 1200 1200 -"
+        "d /storage/nas/backups/jellyfin 0750 1200 1200 -"
       ]
       ++ map (app: "d /storage/nas/backups/arr-stack/${app} 0750 1200 1200 -") [
         "prowlarr"
