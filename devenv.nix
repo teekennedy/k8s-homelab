@@ -190,6 +190,10 @@ in {
   };
 
   containers.shell.maxLayers = 100;
+  # The default copies the project directory into the image, so any edit to it
+  # (a comment, the lab CLI's Go code) would make a different image. Releases
+  # compare image store paths to skip publishing an unchanged image.
+  containers.shell.copyToRoot = [];
 
   # See full reference at https://devenv.sh/reference/options/
 }

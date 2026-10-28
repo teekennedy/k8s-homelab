@@ -32,6 +32,9 @@ type NixDevenv = core.NixDevenv
 // NixDevenvContainerOpts contains options for NixDevenv.Container
 type NixDevenvContainerOpts = core.NixDevenvContainerOpts
 
+// NixDevenvImageOutPathOpts contains options for NixDevenv.ImageOutPath
+type NixDevenvImageOutPathOpts = core.NixDevenvImageOutPathOpts
+
 // NixDevenvProjectsOpts contains options for NixDevenv.Projects
 type NixDevenvProjectsOpts = core.NixDevenvProjectsOpts
 

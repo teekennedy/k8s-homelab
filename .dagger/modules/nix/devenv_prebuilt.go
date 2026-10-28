@@ -57,7 +57,9 @@ type ciRelease struct {
 
 // CiRelease records the published devenv-ci image for tag and the toolchain
 // files it was built from, as .dagger/modules/nix/devenv-ci.json, which
-// CiToolchain reads. Run it from a checkout of tag.
+// CiToolchain reads. Run it from a checkout of tag, or of a later commit whose
+// ci image is the same (`release plan` says unchanged), so that the image
+// keeps standing in for a build after edits that do not change it.
 func (m *Devenv) CiRelease(ctx context.Context, tag string) (*dagger.File, error) {
 	if version, ok := strings.CutPrefix(tag, ciReleasePrefix+"-"); !ok || !releaseVersionPattern.MatchString(version) {
 		return nil, fmt.Errorf("not a %s release tag: %q", ciReleasePrefix, tag)

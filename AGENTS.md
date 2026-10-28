@@ -26,7 +26,7 @@ In-cluster secrets, such OIDC client secrets or an admin password for an in-clus
 
 ## Release Automation
 - Container releases share `.dagger/modules/release/releases.json`, `scripts/release.sh`, and `.woodpecker/release-{tag,}.yaml`. Each project defines a working directory, git-cliff config, and artifact tag prefixes. `dagger api call release publish` selects the build from that manifest.
-- Devenv uses root `cliff.toml`. One semver bump creates `devenv-ci-<version>` (ci) and `devenv-shell-<version>` (ci + interactive). Only `devenv.nix`, `devenv.yaml`, `devenv.lock`, and `cmd/lab/**` trigger devenv releases.
+- Devenv uses root `cliff.toml`. One semver bump creates `devenv-ci-<version>` (ci) and `devenv-shell-<version>` (ci + interactive), skipping either whose image Nix store path matches its latest release (`scripts/release-plan.sh`). Only `devenv.nix`, `devenv.yaml`, `devenv.lock`, and `cmd/lab/**` trigger devenv releases.
 - Forgejo resources uses `k8s/platform/forgejo/files/forgejo-resources/cliff.toml` and publishes `forgejo-resources-<version>`, starting at 1.0.0. The first release includes source history from before the directory rename.
 - The OpenHands sandbox uses `k8s/apps/openhands/files/sandbox/cliff.toml` and publishes `openhands-sandbox-<version>`, starting at 0.2.0.
 - The `release-bot` Forgejo user (in the Bots team) and its Woodpecker secret `release_bot_token` (push and tag pipelines only) are declarative in the Forgejo and Woodpecker chart values. The secret is restricted to the `alpine/git` image so no other step can use it; don't reuse that image elsewhere. Deploy Forgejo resources before Woodpecker resources.

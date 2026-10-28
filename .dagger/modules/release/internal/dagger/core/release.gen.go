@@ -183,6 +183,23 @@ func (r *Release) Image(ws *Workspace, tag string, opts ...ReleaseImageOpts) *Co
 	}
 }
 
+// Plan reports which artifacts a release of this checkout would publish a
+// different image for, as JSON keyed by artifact prefix, for release.sh.
+//
+// Only Nix-built artifacts can be unchanged: their image is the store path
+// devenv evaluates, without building anything, and the published image
+// records its own in a label. Any other artifact, and one whose published
+// image has no such label, is changed.
+func (r *Release) Plan(published []string) *File {
+	q := r.query.Select("plan")
+	q = q.Arg("published", published)
+
+	return &File{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
 // ReleasePublishOpts contains options for Release.Publish
 type ReleasePublishOpts struct {
 	// JSON emitted by scripts/release-metadata.sh.

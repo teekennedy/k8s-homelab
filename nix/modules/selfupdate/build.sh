@@ -71,7 +71,7 @@ resolve_rev() {
 }
 
 main() {
-  local rev="" target last flake_ref started status follower
+  local rev="" target last flake_ref paths drv out staged started status follower
 
   if [ -f "$TARGET_REV_FILE" ]; then
     rev=$(cat "$TARGET_REV_FILE")
@@ -116,12 +116,31 @@ main() {
     return 0
   fi
 
-  echo "building $ATTRIBUTE at $target"
-
-  # A git+file ref rather than a plain path, so that self.rev and
-  # self.lastModifiedDate resolve and system.nixos.label carries the real short
-  # rev instead of falling through to "dirty".
+  # A git+file ref rather than a plain path, so that the flake is fetched from
+  # exactly this commit of the mirror, untracked files and all left out.
   flake_ref="git+file://$REPO_DIR?ref=refs/heads/$BRANCH&rev=$target"
+
+  # Evaluate before building. A commit that does not change this host's system
+  # (it touched another host, or only comments) evaluates to the system that is
+  # already staged, so there is nothing to build, stage or reboot for. The
+  # commit is kept out of the system for exactly this reason; see
+  # nix/hosts/common/default.nix.
+  echo "evaluating $ATTRIBUTE at $target"
+  paths=$(nix eval --raw "$flake_ref#nixosConfigurations.$ATTRIBUTE.config.system.build.toplevel" \
+    --apply 't: t.drvPath + " " + t.outPath')
+  drv=${paths% *}
+  out=${paths#* }
+  staged=$(readlink -f /nix/var/nix/profiles/system)
+  if [ "$out" = "$staged" ]; then
+    # Rooted and recorded like a build, so stage.sh and the fallback timer
+    # treat it as one; the path is valid, so this builds nothing.
+    nix build "$out" --out-link "$BUILT_SYSTEM_LINK"
+    printf '%s\n' "$target" >"$BUILT_REV_FILE"
+    echo "unchanged: $target leaves this host's system as staged, $out"
+    return 0
+  fi
+
+  echo "building $out"
 
   # json-log-path tees Nix's internal-json event stream to a file while leaving
   # the human-readable output on stderr untouched (applyJSONLogger in
@@ -151,9 +170,9 @@ main() {
   status=0
   # -o (rather than the default ./result) roots the build directly at its
   # final resting place: a GC root that survives this process exiting, at a
-  # fixed path stage.sh knows to look for.
-  nix build "$flake_ref#nixosConfigurations.$ATTRIBUTE.config.system.build.toplevel" \
-    --out-link "$BUILT_SYSTEM_LINK" || status=$?
+  # fixed path stage.sh knows to look for. The derivation evaluated above is
+  # built as it is, rather than evaluating the flake a second time.
+  nix build "$drv^*" --out-link "$BUILT_SYSTEM_LINK" || status=$?
 
   unset NIX_CONFIG
 

@@ -49,13 +49,24 @@ main() {
 
   local system_path
   system_path=$(readlink -f "$BUILT_SYSTEM_LINK")
-  echo "staging $system_path (rev $target)"
 
-  # This is what `nixos-rebuild boot` itself does once it has a built toplevel:
-  # point the system profile at it and run its own activation script with
-  # `boot`, which wires it up for the next boot without switching now.
-  nix-env --profile /nix/var/nix/profiles/system --set "$system_path"
-  "$system_path/bin/switch-to-configuration" boot
+  # The commit left this host's system as it is (see build.sh): no new
+  # generation and no bootloader update. Its rev is still recorded below, since
+  # this host is now current as of it.
+  if [ "$system_path" = "$(readlink -f /nix/var/nix/profiles/system)" ] &&
+    [ "$system_path" = "$(cat "$STAGED_SYSTEM_FILE" 2>/dev/null || true)" ]; then
+    echo "unchanged: $system_path is already staged; recording rev $target"
+  else
+    echo "staging $system_path (rev $target)"
+
+    # This is what `nixos-rebuild boot` itself does once it has a built
+    # toplevel: point the system profile at it and run its own activation
+    # script with `boot`, which wires it up for the next boot without
+    # switching now.
+    nix-env --profile /nix/var/nix/profiles/system --set "$system_path"
+    "$system_path/bin/switch-to-configuration" boot
+    printf '%s\n' "$system_path" >"$STAGED_SYSTEM_FILE"
+  fi
 
   printf '%s\n' "$target" >"$LAST_REV_FILE"
   touch "$STAMP_FILE"

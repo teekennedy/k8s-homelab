@@ -8,7 +8,7 @@ be used, builds run in the Dagger engine's container as they always have.
 | --- | --- |
 | `status` | Probe every configured builder and say which ones a build would use |
 
-Builds that use the builders: `nix/validate`, `nix/lab/build`,
+Builds that use the builders: `nix/validate` (see below), `nix/lab/build`,
 `nix lab binary-nix`, `nix/lab/vendor-hash`, and every devenv shell built from
 source (the ci toolchain when no published image applies, `nix devenv
 toolchain`, `nix devenv container`, and so the devenv releases). `nix/test`
@@ -139,6 +139,24 @@ root, whose ssh reads `/etc/ssh/ssh_config` (on nix-darwin,
 your `~/.ssh/config`. Put the connection-sharing options in the `Host borg-*`
 block there, with a ControlPath root can write, such as
 `/var/run/nix-ssh-%C`.
+
+### Whole builds in one builder's store
+
+`nix/validate` builds the flake's checks, which build every host's whole NixOS
+system. It does not hand them over through the build hook, since the container
+would then need every input and output in its own store, gigabytes for each
+nixpkgs bump. It runs the build in the store of one builder, the fastest
+(`--store ssh-ng://... --eval-store auto`): the container evaluates and copies
+the derivations over, the builder substitutes or builds everything, and nothing
+comes back. That suits an untrusted login too, as derivations and sources are
+content-addressed. Because the hosts substitute from each other, a deploy of
+the same configuration then finds its system built.
+
+`nix flake check --store` itself builds nothing (it asks the build store which
+checks are missing before copying their derivations there), so the check runs
+`nix flake check --no-build` and then `nix build`s the checks
+(`scripts/nix-flake-check-remote.sh`). Without a usable builder it only
+evaluates them.
 
 ### Why the builders aren't substituters too
 

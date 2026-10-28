@@ -1,12 +1,14 @@
 #!/bin/sh
-# Commit the devenv-ci release record to main. Run from the release tag's
-# checkout, after `dagger api call nix devenv ci-release` wrote the record there.
-# Needs git, CI_COMMIT_TAG, and FORGEJO_TOKEN with Woodpecker's CI_FORGE_URL
-# and CI_REPO, or RELEASE_REMOTE to push somewhere else.
+# Commit the devenv-ci release record to main. Run from a checkout after
+# `dagger api call nix devenv ci-release` wrote the record there: the release
+# tag's, or a later commit's whose ci image is unchanged, which refreshes the
+# record's file hashes for the same release.
+# Needs git, and FORGEJO_TOKEN with Woodpecker's CI_FORGE_URL and CI_REPO, or
+# RELEASE_REMOTE to push somewhere else. The release is CI_COMMIT_TAG, or else
+# the one the record names.
 set -eu
 
 record=.dagger/modules/nix/devenv-ci.json
-tag=${CI_COMMIT_TAG:?release tag required}
 remote=${RELEASE_REMOTE:-"https://release-bot:$FORGEJO_TOKEN@${CI_FORGE_URL#*://}/$CI_REPO.git"}
 saved=$(mktemp)
 trap 'rm -f "$saved"' EXIT
@@ -25,6 +27,9 @@ recorded_version() {
     esac
   done <"$record"
 }
+
+tag=${CI_COMMIT_TAG:-devenv-ci-$(recorded_version)}
+[ "$tag" != devenv-ci- ] || { echo "No devenv-ci release named" >&2; exit 1; }
 
 # Succeeds when version $1 is newer than $2, both x.y.z.
 newer() {
@@ -56,8 +61,12 @@ for attempt in 1 2 3; do
     echo "main already records $tag"
     exit 0
   fi
+  message="chore(release): Record $tag image"
+  if [ "$recorded" = "${tag#devenv-ci-}" ]; then
+    message="chore(release): Refresh $tag toolchain files"
+  fi
   git add "$record"
-  git commit --quiet -m "chore(release): Record $tag image"
+  git commit --quiet -m "$message"
   if git push --quiet "$remote" HEAD:main; then
     echo "Recorded $tag on main"
     exit 0

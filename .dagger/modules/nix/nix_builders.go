@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,9 @@ var nixBuildersProbeScript string
 
 //go:embed scripts/nix-builders-exec.sh
 var nixBuildersExecScript string
+
+//go:embed scripts/nix-flake-check-remote.sh
+var nixFlakeCheckRemoteScript string
 
 const (
 	// nixBuildersDir holds everything a remote build reads: the machines file,
@@ -401,6 +405,53 @@ func (r *remoteNix) configure(c *dagger.Container) *dagger.Container {
 		WithMountedDirectory(nixBuildersDir+"/ssh-client", sshClientCache()).
 		WithNewFile(nixBuildersExec, nixBuildersExecScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
 		WithEnvVariable("NIX_CONFIG", strings.Join(config, "\n"))
+}
+
+// storeMachine is the machine to build on when a whole build runs in one
+// builder's store: the fastest, then the one taking the most jobs, then the
+// first listed.
+func (r *remoteNix) storeMachine() string {
+	best, bestSpeed, bestJobs := "", -1, -1
+	for _, machine := range r.machines {
+		speed, jobs := nixMachineField(machine, 4), nixMachineField(machine, 3)
+		if speed > bestSpeed || (speed == bestSpeed && jobs > bestJobs) {
+			best, bestSpeed, bestJobs = machine, speed, jobs
+		}
+	}
+	return best
+}
+
+// nixMachineField is a machine line's numeric field i (3 is its job count, 4
+// its speed factor), or 1, Nix's default, when the line leaves it out.
+func nixMachineField(machine string, i int) int {
+	fields := strings.Fields(machine)
+	if len(fields) <= i {
+		return 1
+	}
+	n, err := strconv.Atoi(fields[i])
+	if err != nil {
+		return 1
+	}
+	return n
+}
+
+// storeOptions are the Nix options that run a whole build in machine's store:
+// `--store` makes the builder build everything, and the container only
+// evaluates, writing derivations to its own store (`--eval-store auto`) and
+// copying them over. Unlike a build hook, nothing built comes back to the
+// container, whose store would otherwise need every input and output of the
+// build. Run them in a container from withSSH.
+//
+// An untrusted builder takes these uploads, as derivations and sources are
+// content-addressed. The client's job and core counts apply on the builder
+// for this connection, so they are set from the machine line.
+func storeOptions(machine string) []string {
+	return []string{
+		"--store", nixMachineURI(machine),
+		"--eval-store", "auto",
+		"--max-jobs", strconv.Itoa(nixMachineField(machine, 3)),
+		"--option", "cores", "0",
+	}
 }
 
 // sshClientCache is a binary cache holding the Nix image's ssh client, which

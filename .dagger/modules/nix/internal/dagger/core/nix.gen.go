@@ -187,7 +187,12 @@ type NixValidateOpts struct {
 	Source *Directory
 }
 
-// Evaluates the flake with `nix flake check`.
+// Checks the flake with `nix flake check` and builds its checks.
+//
+// The checks build every host's whole NixOS system, so they are built in a
+// remote builder's store: the builder already holds most of it, and the hosts
+// substitute from each other, so a deploy of the same configuration finds it
+// built. Without a usable builder, the checks are evaluated but not built.
 func (r *Nix) Validate(ctx context.Context, opts ...NixValidateOpts) error {
 	if r.validate != nil {
 		return nil
@@ -307,7 +312,8 @@ type NixDevenv struct { // nix (../../../../../../:0:0)
 	// field again.
 	refetchID bool
 
-	id *ID
+	id           *ID
+	imageOutPath *string
 }
 
 func (r *NixDevenv) WithGraphQLQuery(q *querybuilder.Selection) *NixDevenv {
@@ -321,7 +327,9 @@ func (r *NixDevenv) WithGraphQLQuery(q *querybuilder.Selection) *NixDevenv {
 
 // CiRelease records the published devenv-ci image for tag and the toolchain
 // files it was built from, as .dagger/modules/nix/devenv-ci.json, which
-// CiToolchain reads. Run it from a checkout of tag.
+// CiToolchain reads. Run it from a checkout of tag, or of a later commit whose
+// ci image is the same (`release plan` says unchanged), so that the image
+// keeps standing in for a build after edits that do not change it.
 func (r *NixDevenv) CiRelease(tag string) *File {
 	q := r.query.Select("ciRelease")
 	q = q.Arg("tag", tag)
@@ -441,6 +449,36 @@ func (r *NixDevenv) UnmarshalJSON(bs []byte) error {
 	}
 	*r = NixDevenv{query: selectNode(dag.QueryBuilder(), id, "NixDevenv")}
 	return nil
+}
+
+// NixDevenvImageOutPathOpts contains options for NixDevenv.ImageOutPath
+type NixDevenvImageOutPathOpts struct {
+	// devenv profiles to activate (https://devenv.sh/profiles/).
+	//
+	// Default: ["ci"]
+	Profiles []string
+}
+
+// ImageOutPath evaluates the Nix store path of the image Container builds for
+// profiles, on the engine's platform, without building anything. Two
+// checkouts with the same path build the same image, so a release whose path
+// matches the published image's has nothing new to publish.
+func (r *NixDevenv) ImageOutPath(ctx context.Context, opts ...NixDevenvImageOutPathOpts) (string, error) {
+	if r.imageOutPath != nil {
+		return *r.imageOutPath, nil
+	}
+	q := r.query.Select("imageOutPath")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `profiles` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Profiles) {
+			q = q.Arg("profiles", opts[i].Profiles)
+		}
+	}
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
 }
 
 // IntegrationToolchain is Toolchain for the "ci" and "integration" profiles:

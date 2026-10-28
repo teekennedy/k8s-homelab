@@ -3,9 +3,11 @@
 # NixOS continuous deployment.
 #
 # This builds and stages a new NixOS generation on every borg host and then
-# kicks off a job to perform the rollout. It deliberately does not wait for any
-# reboot: while this pipeline runs, the WoodpeckerPipelineRunning gate
-# (k8s/foundation/kured) blocks kured, so waiting here would deadlock.
+# kicks off a job to perform the rollout. A host whose system the commit does
+# not change skips its build and stage, and is not rebooted. It deliberately
+# does not wait for any reboot: while this pipeline runs, the
+# WoodpeckerPipelineRunning gate (k8s/foundation/kured) blocks kured, so
+# waiting here would deadlock.
 when:
   - event: push
     branch: main
@@ -113,6 +115,20 @@ steps:
           fi
           cat "/tmp/build.$name.log"
         done </tmp/build.pids
+
+        # A host whose system this commit leaves as it is builds nothing, and
+        # its stage and reboot are no-ops (see build.sh).
+        changed=""
+        unchanged=""
+        for entry in $HOST_ORDER; do
+          name=$${entry%%=*}
+          if grep -q '^unchanged:' "/tmp/build.$name.log"; then
+            unchanged="$unchanged $name"
+          else
+            changed="$changed $name"
+          fi
+        done
+        echo "=== system changed:$${changed:- none}; unchanged:$${unchanged:- none}"
         exit $rc
 
   - name: stage

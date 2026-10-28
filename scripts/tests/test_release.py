@@ -58,7 +58,8 @@ class ReleaseTests(unittest.TestCase):
         self.git("add", "devenv.nix", str(RESOURCES), ".dagger")
         self.git("commit", "-qm", message)
 
-    def release(self):
+    def release(self, unchanged=()):
+        """Runs release.sh, with a plan listing the unchanged prefixes."""
         env = dict(
             os.environ,
             PATH=f"{self.bin}:{os.environ['PATH']}",
@@ -67,6 +68,17 @@ class ReleaseTests(unittest.TestCase):
             CI_REPO="test/repo",
             FORGEJO_TOKEN="test",
         )
+        if unchanged:
+            plan = Path(self.temp.name) / "release-plan.json"
+            plan.write_text(
+                json.dumps(
+                    {
+                        prefix: {"changed": False, "reason": "image unchanged"}
+                        for prefix in unchanged
+                    }
+                )
+            )
+            env["RELEASE_PLAN"] = str(plan)
         subprocess.run(
             [str(ROOT / "scripts/release.sh")], cwd=self.repo, env=env, check=True
         )
@@ -203,6 +215,49 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(releases[0]["tag_name"], "devenv-shell-1.1.2")
         self.assertIn("Repair tooling", releases[0]["body"])
 
+    def test_retry_completes_artifact_pair_from_second_artifact(self):
+        (self.repo / "devenv.nix").write_text("{ fixed = true; }\n")
+        self.commit("fix(devenv): repair tooling")
+        self.git("tag", "devenv-shell-1.1.2")
+        releases = self.release()
+        self.assertEqual(releases[0]["tag_name"], "devenv-ci-1.1.2")
+
+    def test_plan_skips_unchanged_artifacts(self):
+        (self.repo / "devenv.nix").write_text("{ interactive = true; }\n")
+        self.commit("feat(devenv): add interactive tooling")
+        releases = self.release(unchanged=["devenv-ci"])
+        self.assertEqual(
+            [r["tag_name"] for r in releases],
+            ["devenv-shell-1.2.0", "forgejo-resources-1.0.0"],
+        )
+        shell = self.metadata("devenv-shell-1.2.0")
+        self.assertEqual(shell["changelog"], releases[0]["body"])
+        self.assertIn("Add interactive tooling", shell["changelog"])
+        # The skipped version is not reused: the shell's tag is the baseline.
+        (self.repo / "devenv.nix").write_text("{ ci = true; }\n")
+        self.commit("fix(devenv): repair ci tooling")
+        releases = self.release()
+        self.assertEqual(
+            [r["tag_name"] for r in releases[-2:]],
+            ["devenv-ci-1.2.1", "devenv-shell-1.2.1"],
+        )
+        self.assertNotIn("Add interactive tooling", releases[-1]["body"])
+        self.assertEqual(
+            self.metadata("devenv-ci-1.2.1")["changelog"], releases[-1]["body"]
+        )
+
+    def test_plan_with_every_artifact_unchanged(self):
+        (self.repo / "devenv.nix").write_text("{ commented = true; }\n")
+        self.commit("chore(devenv): explain tooling")
+        releases = self.release(unchanged=["devenv-ci", "devenv-shell"])
+        self.assertEqual([r["tag_name"] for r in releases], ["forgejo-resources-1.0.0"])
+        # Its commits go into the next release that does tag something.
+        (self.repo / "devenv.nix").write_text("{ changed = true; }\n")
+        self.commit("fix(devenv): change tooling")
+        releases = self.release(unchanged=["devenv-ci"])
+        self.assertEqual(releases[-1]["tag_name"], "devenv-shell-1.1.2")
+        self.assertIn("Explain tooling", releases[-1]["body"])
+
 
 class RecordDevenvCiTests(unittest.TestCase):
     """scripts/record-devenv-ci.sh against a local bare repository."""
@@ -230,14 +285,23 @@ class RecordDevenvCiTests(unittest.TestCase):
         self.git(path, "config", "user.name", "Release test")
         self.git(path, "config", "user.email", "test@example.com")
 
-    def record(self, tag):
-        """Runs the script from a detached checkout of main with tag's record."""
+    def record(self, tag, files="a", tag_event=True):
+        """Runs the script from a detached checkout of main with tag's record.
+
+        Without a tag event the script takes the release from the record, as
+        when release-plan.sh refreshes it on a push.
+        """
         work = Path(tempfile.mkdtemp(dir=self.temp.name)) / "work"
         self.clone(work)
         self.git(work, "checkout", "-q", "--detach", "origin/main")
         (work / self.RECORD).parent.mkdir(parents=True, exist_ok=True)
-        (work / self.RECORD).write_text(json.dumps({"tag": tag}, indent=2) + "\n")
-        env = dict(os.environ, CI_COMMIT_TAG=tag, RELEASE_REMOTE=str(self.remote))
+        (work / self.RECORD).write_text(
+            json.dumps({"tag": tag, "files": files}, indent=2) + "\n"
+        )
+        env = dict(os.environ, RELEASE_REMOTE=str(self.remote))
+        env.pop("CI_COMMIT_TAG", None)
+        if tag_event:
+            env["CI_COMMIT_TAG"] = tag
         result = subprocess.run(
             [str(ROOT / "scripts/record-devenv-ci.sh")],
             cwd=work,
@@ -265,6 +329,23 @@ class RecordDevenvCiTests(unittest.TestCase):
         self.record("devenv-ci-1.2.3")
         self.assertIn("already records", self.record("devenv-ci-1.2.3"))
         self.assertEqual(self.commits(), 2)
+
+    def test_refreshes_files_of_the_same_release(self):
+        self.record("devenv-ci-1.2.9")
+        self.record("devenv-ci-1.2.9", files="b", tag_event=False)
+        self.assertEqual(self.commits(), 3)
+        self.assertEqual(
+            self.git(self.remote, "log", "-1", "--format=%s", "main"),
+            "chore(release): Refresh devenv-ci-1.2.9 toolchain files",
+        )
+        self.assertIn(
+            "already records", self.record("devenv-ci-1.2.9", "b", tag_event=False)
+        )
+
+    def test_refresh_does_not_replace_newer_release(self):
+        self.record("devenv-ci-1.3.0")
+        self.assertIn("newer", self.record("devenv-ci-1.2.9", "b", tag_event=False))
+        self.assertEqual(self.main_record(), "devenv-ci-1.3.0")
 
     def test_older_release_does_not_replace_newer(self):
         self.record("devenv-ci-1.3.0")

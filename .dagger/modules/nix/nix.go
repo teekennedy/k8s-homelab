@@ -92,26 +92,52 @@ func nixFormat(toolchain *dagger.Container, source *dagger.Directory, paths []st
 		Directory("/src")
 }
 
-// Evaluates the flake with `nix flake check`.
+// Checks the flake with `nix flake check` and builds its checks.
+//
+// The checks build every host's whole NixOS system, so they are built in a
+// remote builder's store: the builder already holds most of it, and the hosts
+// substitute from each other, so a deploy of the same configuration finds it
+// built. Without a usable builder, the checks are evaluated but not built.
 // +check
 func (m *Nix) Validate(ctx context.Context,
 	// +defaultPath="/"
 	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"]
 	source *dagger.Directory,
 ) error {
-	checked, err := m.Remote.build(ctx, nixImageStore, func(env nixEnv) *dagger.Container {
-		return env.Container.
-			WithMountedDirectory("/src", source).
-			WithWorkdir("/src").
-			WithExec(env.Exec(nixCommand("flake", "check", "--no-build")))
-	})
-	if err == nil {
-		_, err = checked.Sync(ctx)
+	check := func(c *dagger.Container) *dagger.Container {
+		return c.WithMountedDirectory("/src", source).WithWorkdir("/src")
 	}
+
+	var remote *remoteNix
+	if m.Remote.configured() {
+		var err error
+		if remote, err = m.Remote.remote(ctx); err != nil {
+			warnf("not building the flake's checks: %v", err)
+		}
+	}
+	if remote != nil {
+		machine := remote.storeMachine()
+		infof("building the flake's checks in the store of %s", nixMachineURI(machine))
+		_, err := remote.builders.withSSH(check(nixImageStore(!remote.trusted))).
+			WithNewFile("/flake-check.sh", nixFlakeCheckRemoteScript, dagger.ContainerWithNewFileOpts{Permissions: 0o755}).
+			WithExec(append([]string{"/flake-check.sh"}, storeOptions(machine)...)).
+			Sync(ctx)
+		if err == nil {
+			return nil
+		}
+		reason := remoteNixFailure(err)
+		if reason == "" {
+			return fmt.Errorf("nix flake check failed: %w", withExecOutput(err))
+		}
+		warnf("building the flake's checks on %s failed (%s); evaluating them without building", nixMachineURI(machine), reason)
+	} else {
+		infof("evaluating the flake's checks without building them: they build whole NixOS systems, which need a remote builder")
+	}
+
+	_, err := check(nixImageStore(false)).WithExec(nixCommand("flake", "check", "--no-build")).Sync(ctx)
 	if err != nil {
 		return fmt.Errorf("nix flake check failed: %w", withExecOutput(err))
 	}
-
 	return nil
 }
 

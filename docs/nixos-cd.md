@@ -118,10 +118,18 @@ the other servers (borg-0, borg-1), then the agent (borg-3) — the order k3s wa
 for a minor-version upgrade. It is fixed rather than derived, so nothing has to
 work out whether a given change actually crosses a k3s minor.
 
-**Nothing reboots unless something changed.** The `reboot` verb compares
-`/run/booted-system` against `/nix/var/nix/profiles/system` and answers
-`UP_TO_DATE` when they match. A flake.lock bump producing an identical toplevel
-costs no reboots.
+**A host only changes when its system does.** `build.sh` evaluates the host's
+toplevel before building it. When that is the system already staged, as for a
+commit that only touches another host or only comments, it builds nothing,
+`stage.sh` records the commit without making a new generation, and the
+pipeline's build step lists the host as unchanged. The `reboot` verb then
+compares `/run/booted-system` against `/nix/var/nix/profiles/system` and answers
+`UP_TO_DATE` when they match, so the host is not rebooted either.
+
+This only works because the commit is not part of the system: no rev in
+`system.nixos.label` or `system.configurationRevision`. With one, every commit
+gave every host a new system and a reboot. The commit a host is on is in
+`nixos_selfupdate_info{rev}` and the `status` verb instead.
 
 ## Credentials
 

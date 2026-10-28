@@ -62,6 +62,10 @@
   # these two agree on.
   builtRevFile = "${stateDir}/built-rev";
   builtSystemLink = "${stateDir}/built-system";
+  # The system the last successful stage activated for the next boot. A stage
+  # of that same system has nothing left to do; the profile alone cannot say
+  # so, since a stage can point it at a system and then fail to activate it.
+  stagedSystemFile = "${stateDir}/staged-system";
   repoDir = "${stateDir}/repo.git";
   # Consumed on read, same pattern for both stages: the caller writes the rev
   # it wants acted on, then starts the corresponding unit.
@@ -139,6 +143,7 @@
       BUILT_REV_FILE = builtRevFile;
       BUILT_SYSTEM_LINK = builtSystemLink;
       LAST_REV_FILE = lastRevFile;
+      STAGED_SYSTEM_FILE = stagedSystemFile;
       STAMP_FILE = stampFile;
       TARGET_REV_FILE = stageTargetFile;
       RUN_LOG = stageLog;

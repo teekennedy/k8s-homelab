@@ -6,6 +6,7 @@ release scripts that tag them.
 | Function | What it does |
 | --- | --- |
 | `publish` | Build the image a release tag names and push it to GHCR |
+| `plan` | Say which Nix-built artifacts would publish a different image than their latest release |
 | `image` | The same image, labelled, without publishing it |
 | `build` | Check: build every `Dockerfile` in the repo |
 | `test` | Check: run `scripts/tests` against the release scripts (including `record-devenv-ci.sh`), `releases.json` and the cliff configs |
@@ -18,9 +19,11 @@ what `dagger check` runs in.
 
 `releases.json` maps each project to its working directory, git-cliff
 config, and artifact prefixes. Only each project's include paths in its cliff.toml
-trigger releases; changes to shared release tooling do not bump projects. The first artifact is the canonical version
-stream; a single bump creates every artifact tag at the same commit. Root
-`cliff.toml` includes historical `devenv-*` tags to preserve existing versions.
+trigger releases; changes to shared release tooling do not bump projects. A
+project's artifacts share one version stream: a single bump tags every artifact
+whose image changed at the same commit, and the next bump counts from whichever
+of them was tagged last. Root `cliff.toml` includes historical `devenv-*` tags to
+preserve existing versions.
 Devenv publishes `devenv-ci-<version>` with `ci` and
 `devenv-shell-<version>` with `ci` plus `interactive`. Forgejo resources starts
 at `forgejo-resources-1.0.0` and uses its own cliff.toml. The OpenHands sandbox
@@ -37,6 +40,30 @@ After publishing a `devenv-ci` tag, the pipeline records the image with
 `dagger check` pulls the image instead of building the toolchain (see the
 module README). The script never replaces a newer release's record, so
 retrying an older tag's pipeline is safe.
+
+### Skipping unchanged images
+
+A commit can touch a devenv file without changing an image: a comment, or a
+package only the `interactive` profile installs, which leaves `devenv-ci` as it
+is. Before tagging, the tag pipeline runs `scripts/release-plan.sh`, which calls
+`dagger api call release plan` with each Nix-built artifact's latest tag. For
+each, it evaluates the Nix store path of the image this commit would build
+(`nix devenv image-out-path`, nothing is built) and compares it with the
+`io.github.teekennedy.homelab.nix-image` label the published image carries.
+`release.sh` then skips every artifact whose path matches, so an unchanged image
+gets no tag, release or push. Images published before the label existed, and
+Dockerfile builds, always count as changed.
+
+When `devenv-ci` is unchanged, the plan step also rewrites
+`devenv-ci.json` for its latest release with this commit's file hashes, and
+`record-devenv-ci.sh` commits it ("Refresh ... toolchain files"), so
+`dagger check` keeps pulling that image rather than building an identical one.
+
+Paths only compare equal because devenv's default `copyToRoot`, which copies
+the project directory into the image, is turned off in `devenv.nix`. If the
+plan step fails, tagging carries on without it and releases every artifact, as
+before.
+
 When adding projects, also extend the push path and tag ref filters in
 `.woodpecker/release-tag.yaml` and `.woodpecker/release.yaml`.
 
@@ -56,11 +83,11 @@ The tag publishing pipeline runs `scripts/release-metadata.sh <tag>` in a full
 clone, then supplies the JSON to `release publish --metadata=<file>`. Metadata
 contains the exact tagged commit, its committer timestamp (for reproducible
 `org.opencontainers.image.created` values), and git-cliff notes for that release.
-Both devenv artifacts use the canonical CI tag's notes. Metadata generation uses
-an explicit commit range from the previous project tag, including legacy prefixes
-listed in the manifest, to the requested commit. It also supports existing tags
-with no relevant commits (an empty changelog). The script rejects a
-checkout that does not match the requested tag and its canonical sibling.
+Both devenv artifacts use the same notes as their Forgejo release. Metadata
+generation uses an explicit commit range from the project's previous release of
+any artifact, including legacy `devenv-*` tags, to the requested commit. It also
+supports existing tags with no relevant commits (an empty changelog). The script
+rejects a checkout that does not match the requested tag.
 
 Publishing preserves existing title, source, URL, documentation, and license
 labels, using defaults only for missing labels. An existing description supplies

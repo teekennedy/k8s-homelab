@@ -8,6 +8,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -124,8 +126,18 @@ func (m *Devenv) Container(
 	if err != nil {
 		return nil, err
 	}
-	return withImageLabels(shell, imageLabels("Devenv shell", description, imageSource)), nil
+	outPath, err := m.ImageOutPath(ctx, profiles)
+	if err != nil {
+		return nil, err
+	}
+	labels := imageLabels("Devenv shell", description, imageSource)
+	labels[nixImageLabel] = outPath
+	return withImageLabels(shell, labels), nil
 }
+
+// nixImageLabel is the image label holding the store path ImageOutPath
+// evaluates, which a later release compares its own against.
+const nixImageLabel = "io.github.teekennedy.homelab.nix-image"
 
 // imageLabels are the OCI labels every published image carries.
 func imageLabels(title, description, documentation string) map[string]string {
@@ -197,10 +209,7 @@ func (m *Devenv) shell(
 	nixDaemon *dagger.Socket,
 	profiles []string,
 ) (*dagger.Container, error) {
-	devenvOpts := []string{"--no-tui", "--option", "devenv.warnOnNewVersion:bool", "false"}
-	for _, p := range profiles {
-		devenvOpts = append(devenvOpts, "--profile", p)
-	}
+	devenvOpts := devenvOptions(profiles)
 	if nixDaemon != nil {
 		// Use the host daemon as a substituter. The "daemon" keyword connects
 		// to the socket at the default path (/nix/var/nix/daemon-socket/socket).
@@ -242,6 +251,50 @@ func (m *Devenv) shell(
 	return dag.Container().Import(built.File("/tmp/shell")).
 		WithEnvVariable("PATH", "$DEVENV_PROFILE/bin:/bin", dagger.ContainerWithEnvVariableOpts{Expand: true}).
 		WithWorkdir("/src"), nil
+}
+
+// devenvOptions are the devenv flags every build and evaluation of the shell
+// runs with.
+func devenvOptions(profiles []string) []string {
+	opts := []string{"--no-tui", "--option", "devenv.warnOnNewVersion:bool", "false"}
+	for _, p := range profiles {
+		opts = append(opts, "--profile", p)
+	}
+	return opts
+}
+
+// ImageOutPath evaluates the Nix store path of the image Container builds for
+// profiles, on the engine's platform, without building anything. Two
+// checkouts with the same path build the same image, so a release whose path
+// matches the published image's has nothing new to publish.
+func (m *Devenv) ImageOutPath(
+	ctx context.Context,
+	// devenv profiles to activate (https://devenv.sh/profiles/).
+	// +optional
+	// +default=["ci"]
+	profiles []string,
+) (string, error) {
+	const attr = "containers.shell.derivation.outPath"
+	// The source is at the same path as in shell, in case anything the image
+	// holds names it.
+	out, err := devenvContainer().
+		WithDirectory("/devenv", m.Source).
+		WithWorkdir("/devenv").
+		WithExec(append([]string{"devenv", "eval", attr}, devenvOptions(profiles)...)).
+		Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("evaluating the devenv image for profiles %v: %w", profiles, withExecOutput(err))
+	}
+	// devenv eval prints a JSON object keyed by attribute.
+	var values map[string]string
+	if err := json.Unmarshal([]byte(out), &values); err != nil {
+		return "", fmt.Errorf("reading devenv eval's output %q: %w", out, err)
+	}
+	path := values[attr]
+	if !strings.HasPrefix(path, "/nix/store/") {
+		return "", fmt.Errorf("devenv eval gave no store path for %s: %q", attr, out)
+	}
+	return path, nil
 }
 
 // withToolchainCaches attaches the caches every language toolchain in the ci

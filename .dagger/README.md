@@ -196,8 +196,11 @@ The release pipeline (`.woodpecker/release.yaml`) writes the record with
 `dagger api call nix devenv ci-release --tag=<tag>` after publishing, and
 `scripts/record-devenv-ci.sh` commits it to main as release-bot. Between a
 toolchain change landing and its release being recorded, checks build the
-toolchain. To record a release by hand, run the same call from a checkout of
-its tag and export the file over `modules/nix/devenv-ci.json`.
+toolchain. A devenv change that leaves the `ci` image as it is publishes no new
+`devenv-ci` release; the tag pipeline refreshes the record's file hashes for
+the latest one instead (see [release](docs/release.md)). To record a release by
+hand, run the same call from a checkout of its tag and export the file over
+`modules/nix/devenv-ci.json`.
 
 What the image does not track is the devenv CLI image `devenvShell` builds
 with: a Renovate bump of it does not change the four files, so the toolchain

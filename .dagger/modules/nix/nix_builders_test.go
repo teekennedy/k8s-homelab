@@ -134,3 +134,45 @@ func TestNixMachineBuilds(t *testing.T) {
 		}
 	}
 }
+
+func TestStoreMachine(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		machines []string
+		want     string
+	}{
+		{"fastest", []string{
+			"ssh-ng://a x86_64-linux - 8 1",
+			"ssh-ng://b x86_64-linux - 1 2",
+		}, "ssh-ng://b x86_64-linux - 1 2"},
+		{"most jobs among the fastest", []string{
+			"ssh-ng://a x86_64-linux - 2 4",
+			"ssh-ng://b x86_64-linux - 4 4",
+			"ssh-ng://c x86_64-linux - 4 4",
+		}, "ssh-ng://b x86_64-linux - 4 4"},
+		{"defaults for missing fields", []string{
+			"ssh-ng://a",
+			"ssh-ng://b x86_64-linux - 2",
+		}, "ssh-ng://b x86_64-linux - 2"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := (&remoteNix{machines: tc.machines}).storeMachine()
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestStoreOptions(t *testing.T) {
+	got := storeOptions("ssh-ng://nix-ci@10.69.80.11 x86_64-linux - 4 4 big-parallel")
+	want := []string{
+		"--store", "ssh-ng://nix-ci@10.69.80.11",
+		"--eval-store", "auto",
+		"--max-jobs", "4",
+		"--option", "cores", "0",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

@@ -1,6 +1,8 @@
 #!/bin/sh
 # Create releases for every project in the shared container manifest.
 # Needs git-cliff, curl, jq, git, FORGEJO_TOKEN and Woodpecker CI_* variables.
+# RELEASE_PLAN optionally names scripts/release-plan.sh's output: an artifact
+# it lists as unchanged is not tagged.
 set -eu
 
 root=$(git rev-parse --show-toplevel)
@@ -42,15 +44,23 @@ for project in $(jq -r 'keys[]' "$manifest"); do
   cliff() {
     git cliff --workdir "$root/$directory" --repository "$root" --config "$root/$directory/$config" "$@"
   }
-  current=$(git tag --points-at "$CI_COMMIT_SHA" --list "$canonical-*")
+  # A project's artifacts share one version stream, but a release can tag only
+  # some of them, so any of their tags marks a release.
+  current=""
+  for prefix in $prefixes; do
+    current=${current:-$(git tag --points-at "$CI_COMMIT_SHA" --list "$prefix-[0-9]*" | head -n 1)}
+  done
   if [ -n "$current" ]; then
-    version=${current#"$canonical-"}
+    version=${current##*-}
     metadata=$("$root/scripts/release-metadata.sh" "$current")
     notes=$(printf '%s' "$metadata" | jq -r .changelog)
   else
     # Path filtering can drop a tagged release with no project changes. Git
     # supplies the baseline; cliff supplies only the commits after that tag.
-    set -- git describe --tags --abbrev=0 --match "$canonical-[0-9]*"
+    set -- git describe --tags --abbrev=0
+    for prefix in $prefixes; do
+      set -- "$@" --match "$prefix-[0-9]*"
+    done
     if [ "$project" = devenv ]; then
       set -- "$@" --match 'devenv-[0-9]*'
     fi
@@ -76,6 +86,11 @@ for project in $(jq -r 'keys[]' "$manifest"); do
     notes=$(cliff --from-context "$response" --strip all)
   fi
   for prefix in $prefixes; do
+    if [ -n "${RELEASE_PLAN:-}" ] &&
+      [ "$(jq --arg prefix "$prefix" '.[$prefix].changed' "$RELEASE_PLAN")" = false ]; then
+      echo "Skipping $prefix-$version: $(jq -r --arg prefix "$prefix" '.[$prefix].reason' "$RELEASE_PLAN")"
+      continue
+    fi
     create_release "$prefix-$version"
   done
 done

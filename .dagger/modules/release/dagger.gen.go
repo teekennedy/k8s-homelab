@@ -260,6 +260,20 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Release).Image(&parent, ctx, ws, tag, metadata)
+		case "Plan":
+			var parent Release
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var published []string
+			if inputArgs["published"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["published"]), &published)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg published", err))
+				}
+			}
+			return (*Release).Plan(&parent, ctx, published)
 		case "Publish":
 			var parent Release
 			err = json.Unmarshal(parentJSON, &parent)
@@ -388,6 +402,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 163, 2)}).
 							WithArg("tag", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("release.go", 164, 2)}).
 							WithArg("metadata", dag.TypeDef().WithObject("File").WithOptional(true), dagger.FunctionWithArgOpts{Description: "JSON emitted by scripts/release-metadata.sh, including the tag's git-cliff notes.", SourceMap: dag.SourceMap("release.go", 167, 2)})).
+					WithFunction(
+						dag.Function("Plan",
+							dag.TypeDef().WithObject("File")).
+							WithDescription("Plan reports which artifacts a release of this checkout would publish a\ndifferent image for, as JSON keyed by artifact prefix, for release.sh.\n\nOnly Nix-built artifacts can be unchanged: their image is the store path\ndevenv evaluates, without building anything, and the published image\nrecords its own in a label. Any other artifact, and one whose published\nimage has no such label, is changed.").
+							WithSourceMap(dag.SourceMap("plan.go", 37, 1)).
+							WithArg("published", dag.TypeDef().WithListOf(dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)), dagger.FunctionWithArgOpts{Description: "The latest release tag of each artifact to compare, such as\ndevenv-ci-1.2.3. An artifact with none is changed.", SourceMap: dag.SourceMap("plan.go", 41, 2)})).
 					WithFunction(
 						dag.Function("Publish",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
