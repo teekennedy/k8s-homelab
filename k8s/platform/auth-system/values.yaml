@@ -13,7 +13,7 @@ valkeyInstance:
   # Must match authelia.configMap.session.redis.high_availability.sentinel_name.
   masterName: mymaster
   image: valkey/valkey:9-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
-  exporterImage: oliver006/redis_exporter:v1.94.0@sha256:0842ef7110e62b40bbde2d5c11f38c6fbd99f7100c75e3866637c1b335a1eff7
+  exporterImage: oliver006/redis_exporter:v1.95.0@sha256:afb21407aba3df1b4010899f155fc6b1ba2026c97b725d72aca4019d772e7b6b
   auth:
     # Authelia reads both passwords from its own Secret (templates/authelia-secret.yaml),
     # under the key names its chart expects.
