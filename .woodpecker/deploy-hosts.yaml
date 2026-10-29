@@ -106,11 +106,13 @@ steps:
         done
 
         rc=0
+        failed=""
         while read -r pid name; do
           if wait "$pid"; then
             echo "=== $name: built $CI_COMMIT_SHA"
           else
             echo "=== $name: FAILED to build $CI_COMMIT_SHA"
+            failed="$failed $name"
             rc=1
           fi
           cat "/tmp/build.$name.log"
@@ -122,13 +124,16 @@ steps:
         unchanged=""
         for entry in $HOST_ORDER; do
           name=$${entry%%=*}
+          case " $failed " in
+            *" $name "*) continue ;;
+          esac
           if grep -q '^unchanged:' "/tmp/build.$name.log"; then
             unchanged="$unchanged $name"
           else
             changed="$changed $name"
           fi
         done
-        echo "=== system changed:$${changed:- none}; unchanged:$${unchanged:- none}"
+        echo "=== system changed:$${changed:- none}; unchanged:$${unchanged:- none}; failed:$${failed:- none}"
         exit $rc
 
   - name: stage

@@ -37,7 +37,8 @@ class ReleaseTests(unittest.TestCase):
         self.git("config", "user.name", "Release test")
         self.git("config", "user.email", "test@example.com")
         self.commit("chore: baseline")
-        self.git("tag", "devenv-1.1.1")
+        self.git("tag", "devenv-ci-1.1.1")
+        self.git("tag", "devenv-shell-1.1.1")
         self.bin = self.repo / "bin"
         self.bin.mkdir()
         curl = self.bin / "curl"
@@ -96,7 +97,7 @@ class ReleaseTests(unittest.TestCase):
             )
         )
 
-    def test_migration_and_independent_versions(self):
+    def test_independent_versions(self):
         (self.repo / "devenv.nix").write_text("{ changed = true; }\n")
         self.commit("feat(devenv): add tooling")
         releases = self.release()
@@ -132,7 +133,6 @@ class ReleaseTests(unittest.TestCase):
         )
 
     def test_metadata_rejects_wrong_checkout(self):
-        self.git("tag", "devenv-ci-1.1.1")
         (self.repo / "devenv.nix").write_text("{ changed = true; }\n")
         self.commit("fix(devenv): change tooling")
         with self.assertRaises(subprocess.CalledProcessError):
@@ -285,15 +285,15 @@ class RecordDevenvCiTests(unittest.TestCase):
         self.git(path, "config", "user.name", "Release test")
         self.git(path, "config", "user.email", "test@example.com")
 
-    def record(self, tag, files="a", tag_event=True):
-        """Runs the script from a detached checkout of main with tag's record.
+    def record(self, tag, files="a", tag_event=True, at="origin/main"):
+        """Runs the script from a detached checkout of at with tag's record.
 
         Without a tag event the script takes the release from the record, as
         when release-plan.sh refreshes it on a push.
         """
         work = Path(tempfile.mkdtemp(dir=self.temp.name)) / "work"
         self.clone(work)
-        self.git(work, "checkout", "-q", "--detach", "origin/main")
+        self.git(work, "checkout", "-q", "--detach", at)
         (work / self.RECORD).parent.mkdir(parents=True, exist_ok=True)
         (work / self.RECORD).write_text(
             json.dumps({"tag": tag, "files": files}, indent=2) + "\n"
@@ -346,6 +346,17 @@ class RecordDevenvCiTests(unittest.TestCase):
         self.record("devenv-ci-1.3.0")
         self.assertIn("newer", self.record("devenv-ci-1.2.9", "b", tag_event=False))
         self.assertEqual(self.main_record(), "devenv-ci-1.3.0")
+
+    def test_refresh_does_not_replace_newer_files(self):
+        self.record("devenv-ci-1.2.9")
+        stale = self.git(self.remote, "rev-parse", "main")
+        self.git(self.seed, "pull", "-q", str(self.remote), "main")
+        (self.seed / "devenv.nix").write_text("{ changed = true; }\n")
+        self.git(self.seed, "commit", "-qam", "chore(devenv): change tooling")
+        self.git(self.seed, "push", "-q", str(self.remote), "HEAD:main")
+        output = self.record("devenv-ci-1.2.9", "b", tag_event=False, at=stale)
+        self.assertIn("have changed", output)
+        self.assertEqual(self.commits(), 3)
 
     def test_older_release_does_not_replace_newer(self):
         self.record("devenv-ci-1.3.0")

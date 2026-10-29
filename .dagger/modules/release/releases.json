@@ -2,9 +2,6 @@
   "devenv": {
     "directory": ".",
     "config": "cliff.toml",
-    "legacyPrefixes": [
-      "devenv"
-    ],
     "artifacts": [
       {
         "prefix": "devenv-ci",

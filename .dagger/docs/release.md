@@ -21,9 +21,7 @@ config, and artifact prefixes. Only each project's include paths in its cliff.to
 trigger releases; changes to shared release tooling do not bump projects. A
 project's artifacts share one version stream: a single bump tags every artifact
 whose image changed at the same commit, and the next bump counts from whichever
-of them was tagged last. A project's `legacyPrefixes` (devenv's historical
-`devenv-*` tags) count as earlier releases too, and root `cliff.toml` matches
-them, to preserve existing versions.
+of them was tagged last.
 Devenv publishes `devenv-ci-<version>` with `ci` and
 `devenv-shell-<version>` with `ci` plus `interactive`. Forgejo resources starts
 at `forgejo-resources-1.0.0` and uses its own cliff.toml. The OpenHands sandbox
@@ -87,7 +85,7 @@ contains the exact tagged commit, its committer timestamp (for reproducible
 `org.opencontainers.image.created` values), and git-cliff notes for that release.
 Both devenv artifacts use the same notes as their Forgejo release. Metadata
 generation uses an explicit commit range from the project's previous release of
-any artifact or legacy prefix, as `release.sh` finds it, to the requested commit. It also
+any artifact, as `release.sh` finds it, to the requested commit. It also
 supports existing tags with no relevant commits (an empty changelog). The script
 rejects a checkout that does not match the requested tag.
 

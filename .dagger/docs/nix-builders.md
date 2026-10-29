@@ -150,7 +150,8 @@ nixpkgs bump. It runs the build in the store of one builder, the fastest
 the derivations over, the builder substitutes or builds everything, and nothing
 comes back. That suits an untrusted login too, as derivations and sources are
 content-addressed. Because the hosts substitute from each other, a deploy of
-the same configuration then finds its system built.
+the same configuration then finds its system built, all but the few small
+derivations that carry the commit label (`/etc` and the system itself).
 
 `nix flake check --store` itself builds nothing (it asks the build store which
 checks are missing before copying their derivations there), so the check runs

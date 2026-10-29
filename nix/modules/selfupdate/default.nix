@@ -62,6 +62,12 @@
   # these two agree on.
   builtRevFile = "${stateDir}/built-rev";
   builtSystemLink = "${stateDir}/built-system";
+  # The out path that build has with its label fixed, which build.sh compares
+  # a commit's against to skip building a system that only the label changes.
+  builtUnlabeledFile = "${stateDir}/built-unlabeled";
+  # The rev build.sh last found to change nothing, so that a retried build of
+  # it reports it unchanged again rather than as built.
+  builtUnchangedFile = "${stateDir}/built-unchanged";
   # The system the last successful stage activated for the next boot. A stage
   # of that same system has nothing left to do; the profile alone cannot say
   # so, since a stage can point it at a system and then fail to activate it.
@@ -114,6 +120,8 @@
         LAST_REV_FILE = lastRevFile;
         BUILT_REV_FILE = builtRevFile;
         BUILT_SYSTEM_LINK = builtSystemLink;
+        BUILT_UNLABELED_FILE = builtUnlabeledFile;
+        BUILT_UNCHANGED_FILE = builtUnchangedFile;
         TARGET_REV_FILE = buildTargetFile;
         RUN_LOG = buildLog;
         BRANCH = branch;

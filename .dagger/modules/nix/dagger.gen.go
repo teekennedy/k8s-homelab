@@ -720,7 +720,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithFunction(
 						dag.Function("Validate",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
-							WithDescription("Checks the flake with `nix flake check` and builds its checks.\n\nThe checks build every host's whole NixOS system, so they are built in a\nremote builder's store: the builder already holds most of it, and the hosts\nsubstitute from each other, so a deploy of the same configuration finds it\nbuilt. Without a usable builder, the checks are evaluated but not built.").
+							WithDescription("Checks the flake with `nix flake check` and builds its checks.\n\nThe checks build every host's whole NixOS system, so they are built in a\nremote builder's store: the builder already holds most of it, and the hosts\nsubstitute from each other, so a deploy of the same configuration finds it\nbuilt but for its commit label. Without a usable builder, the checks are evaluated but not built.").
 							WithSourceMap(dag.SourceMap("nix.go", 102, 1)).
 							WithCheck().
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 105, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!cmd/lab/flake.nix", "!cmd/lab/flake.lock", "!cmd/lab/default.nix", "!cmd/lab/gomod.json"}})).

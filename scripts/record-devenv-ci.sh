@@ -9,6 +9,10 @@
 set -eu
 
 record=.dagger/modules/nix/devenv-ci.json
+# The ci toolchain's files, whose hashes the record holds; see toolchainFiles in
+# .dagger/modules/nix/devenv_prebuilt.go.
+toolchain="devenv.nix devenv.yaml devenv.lock cmd/lab/devenv.nix"
+source=$(git rev-parse HEAD)
 remote=${RELEASE_REMOTE:-"https://release-bot:$FORGEJO_TOKEN@${CI_FORGE_URL#*://}/$CI_REPO.git"}
 saved=$(mktemp)
 trap 'rm -f "$saved"' EXIT
@@ -51,6 +55,13 @@ for attempt in 1 2 3; do
   git fetch --quiet "$remote" main
   git checkout --quiet --force -B main FETCH_HEAD
   recorded=$(recorded_version)
+  # A refresh records this checkout's files, which a later push may already
+  # have changed on main; its own refresh records those.
+  # shellcheck disable=SC2086 # one path per word
+  if [ -z "${CI_COMMIT_TAG:-}" ] && ! git diff --quiet "$source" FETCH_HEAD -- $toolchain; then
+    echo "main's toolchain files have changed since $source; leaving its record"
+    exit 0
+  fi
   # A retried pipeline for an older release must not replace a newer one.
   if [ -n "$recorded" ] && newer "$recorded" "${tag#devenv-ci-}"; then
     echo "main already records the newer devenv-ci-$recorded"

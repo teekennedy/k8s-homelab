@@ -39,9 +39,6 @@ for project in $(jq -r 'keys[]' "$manifest"); do
   directory=$(jq -r --arg project "$project" '.[$project].directory' "$manifest")
   config=$(jq -r --arg project "$project" '.[$project].config' "$manifest")
   prefixes=$(jq -r --arg project "$project" '.[$project].artifacts[].prefix' "$manifest")
-  # Tags that mark an earlier release: any artifact's, as a release can tag only
-  # some of them, and those of prefixes the project has since replaced.
-  released=$(jq -r --arg project "$project" '.[$project] | .artifacts[].prefix, .legacyPrefixes[]?' "$manifest")
   canonical=$(printf '%s\n' "$prefixes" | head -n 1)
   # Use the same repository and project-specific config from its working directory.
   cliff() {
@@ -57,8 +54,10 @@ for project in $(jq -r 'keys[]' "$manifest"); do
   else
     # Path filtering can drop a tagged release with no project changes. Git
     # supplies the baseline; cliff supplies only the commits after that tag.
+    # Any artifact's tag marks an earlier release, as a release can tag only
+    # some of them.
     set -- git describe --tags --abbrev=0
-    for prefix in $released; do
+    for prefix in $prefixes; do
       set -- "$@" --match "$prefix-[0-9]*"
     done
     previous=$("$@" "$CI_COMMIT_SHA" 2>/dev/null || true)
@@ -77,7 +76,7 @@ for project in $(jq -r 'keys[]' "$manifest"); do
       continue
     fi
     bumped=$(cliff --from-context "$context" --bumped-version)
-    # Every prefix in $released shares the version stream.
+    # Every artifact of the project shares the version stream.
     version=${bumped##*-}
     jq --arg tag "$canonical-$version" '.[0].version = $tag' "$context" > "$response"
     notes=$(cliff --from-context "$response" --strip all)

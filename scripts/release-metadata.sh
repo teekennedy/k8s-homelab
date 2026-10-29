@@ -20,7 +20,7 @@ revision=$(git rev-parse "$tag^{commit}")
 # match the release's. Git selects it itself; --current can select another
 # project's tag when several releases share a commit.
 set -- git describe --tags --abbrev=0
-for prefix in $(printf '%s' "$project" | jq -r '.artifacts[].prefix, .legacyPrefixes[]?'); do
+for prefix in $(printf '%s' "$project" | jq -r '.artifacts[].prefix'); do
   set -- "$@" --match "$prefix-[0-9]*"
 done
 previous=$("$@" "$revision^" 2>/dev/null || true)

@@ -118,18 +118,24 @@ the other servers (borg-0, borg-1), then the agent (borg-3) — the order k3s wa
 for a minor-version upgrade. It is fixed rather than derived, so nothing has to
 work out whether a given change actually crosses a k3s minor.
 
-**A host only changes when its system does.** `build.sh` evaluates the host's
-toplevel before building it. When that is the system already staged, as for a
-commit that only touches another host or only comments, it builds nothing,
-`stage.sh` records the commit without making a new generation, and the
-pipeline's build step lists the host as unchanged. The `reboot` verb then
-compares `/run/booted-system` against `/nix/var/nix/profiles/system` and answers
-`UP_TO_DATE` when they match, so the host is not rebooted either.
+**A host only changes when its system does.** Every system is labelled with
+the commit it was built from (`system.nixos.label`, set in
+`nix/hosts/common`), so the boot menu says which commit each generation came
+from. That label alone makes every commit's system different, so `build.sh`
+first evaluates the host's system with the label fixed to a constant, which
+builds nothing. When that path matches the one recorded for the host's last
+build (`built-unlabeled` in the state directory), as for a commit that only
+touches another host or only comments, the commit changes nothing but the
+label: `build.sh` builds nothing, `stage.sh` records the commit without making
+a new generation, and the pipeline's build step lists the host as unchanged.
+Otherwise the host builds its system, label and all, and records the new path.
+The `reboot` verb compares `/run/booted-system` against
+`/nix/var/nix/profiles/system` and answers `UP_TO_DATE` when they match, so an
+unchanged host is not rebooted either.
 
-This only works because the commit is not part of the system: no rev in
-`system.nixos.label` or `system.configurationRevision`. With one, every commit
-gave every host a new system and a reboot. The commit a host is on is in
-`nixos_selfupdate_info{rev}` and the `status` verb instead.
+A generation's label is therefore the commit that last changed that host's
+system, not necessarily the latest commit it was deployed at. That one is in
+`nixos_selfupdate_info{rev}` and the `status` verb.
 
 ## Credentials
 

@@ -71,7 +71,7 @@ resolve_rev() {
 }
 
 main() {
-  local rev="" target last flake_ref paths drv out staged started status follower
+  local rev="" target last flake_ref unlabeled started status follower
 
   if [ -f "$TARGET_REV_FILE" ]; then
     rev=$(cat "$TARGET_REV_FILE")
@@ -112,35 +112,45 @@ main() {
   # handled -- a retried pipeline, or a stage that lags behind a second build
   # -- cheap rather than a wasted rebuild.
   if [ "$target" = "$(cat "$BUILT_REV_FILE" 2>/dev/null || true)" ] && [ -e "$BUILT_SYSTEM_LINK" ]; then
-    echo "$target is already built at $(readlink -f "$BUILT_SYSTEM_LINK")"
+    # Reported as the first run did, since the pipeline reads it from the log.
+    if [ "$target" = "$(cat "$BUILT_UNCHANGED_FILE" 2>/dev/null || true)" ]; then
+      echo "unchanged: $target leaves this host's system as built, $(readlink -f "$BUILT_SYSTEM_LINK")"
+    else
+      echo "$target is already built at $(readlink -f "$BUILT_SYSTEM_LINK")"
+    fi
     return 0
   fi
 
-  # A git+file ref rather than a plain path, so that the flake is fetched from
-  # exactly this commit of the mirror, untracked files and all left out.
+  # A git+file ref rather than a plain path, so that self.rev and
+  # self.lastModifiedDate resolve and system.nixos.label carries the real short
+  # rev instead of falling through to "dirty".
   flake_ref="git+file://$REPO_DIR?ref=refs/heads/$BRANCH&rev=$target"
 
-  # Evaluate before building. A commit that does not change this host's system
-  # (it touched another host, or only comments) evaluates to the system that is
-  # already staged, so there is nothing to build, stage or reboot for. The
-  # commit is kept out of the system for exactly this reason; see
-  # nix/hosts/common/default.nix.
+  # Evaluate before building. system.nixos.label names the commit, so every
+  # commit makes a different system. With the label fixed instead, a commit
+  # that leaves this host's configuration as it is (it touched another host, or
+  # only comments) evaluates to the same path as the last build did. That build
+  # then stands for this commit too, keeping the label of the commit it was
+  # built from, and there is nothing to build, stage or reboot for. The
+  # fixed-label system is only evaluated, never built.
   echo "evaluating $ATTRIBUTE at $target"
-  paths=$(nix eval --raw "$flake_ref#nixosConfigurations.$ATTRIBUTE.config.system.build.toplevel" \
-    --apply 't: t.drvPath + " " + t.outPath')
-  drv=${paths% *}
-  out=${paths#* }
-  staged=$(readlink -f /nix/var/nix/profiles/system)
-  if [ "$out" = "$staged" ]; then
-    # Rooted and recorded like a build, so stage.sh and the fallback timer
-    # treat it as one; the path is valid, so this builds nothing.
-    nix build "$out" --out-link "$BUILT_SYSTEM_LINK"
+  unlabeled=$(nix eval --raw "$flake_ref#nixosConfigurations.$ATTRIBUTE" --apply '
+    c: (c.extendModules {
+      modules = [({lib, ...}: {system.nixos.label = lib.mkForce "unlabeled";})];
+    }).config.system.build.toplevel.outPath')
+  if [ -e "$BUILT_SYSTEM_LINK" ] &&
+    [ "$unlabeled" = "$(cat "$BUILT_UNLABELED_FILE" 2>/dev/null || true)" ]; then
+    printf '%s\n' "$target" >"$BUILT_UNCHANGED_FILE"
     printf '%s\n' "$target" >"$BUILT_REV_FILE"
-    echo "unchanged: $target leaves this host's system as staged, $out"
+    echo "unchanged: $target leaves this host's system as built, $(readlink -f "$BUILT_SYSTEM_LINK")"
     return 0
   fi
 
-  echo "building $out"
+  echo "building $ATTRIBUTE at $target"
+  # The build replaces BUILT_SYSTEM_LINK, so the record of what it held goes
+  # first: interrupted between the two, a later commit must not take the new
+  # system for the old one.
+  rm -f "$BUILT_UNLABELED_FILE" "$BUILT_UNCHANGED_FILE"
 
   # json-log-path tees Nix's internal-json event stream to a file while leaving
   # the human-readable output on stderr untouched (applyJSONLogger in
@@ -170,9 +180,9 @@ main() {
   status=0
   # -o (rather than the default ./result) roots the build directly at its
   # final resting place: a GC root that survives this process exiting, at a
-  # fixed path stage.sh knows to look for. The derivation evaluated above is
-  # built as it is, rather than evaluating the flake a second time.
-  nix build "$drv^*" --out-link "$BUILT_SYSTEM_LINK" || status=$?
+  # fixed path stage.sh knows to look for.
+  nix build "$flake_ref#nixosConfigurations.$ATTRIBUTE.config.system.build.toplevel" \
+    --out-link "$BUILT_SYSTEM_LINK" || status=$?
 
   unset NIX_CONFIG
 
@@ -205,6 +215,7 @@ main() {
   fi
 
   printf '%s\n' "$target" >"$BUILT_REV_FILE"
+  printf '%s\n' "$unlabeled" >"$BUILT_UNLABELED_FILE"
   echo "built $(readlink -f "$BUILT_SYSTEM_LINK")"
 }
 

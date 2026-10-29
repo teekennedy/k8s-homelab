@@ -190,7 +190,7 @@ type NixValidateOpts struct {
 // The checks build every host's whole NixOS system, so they are built in a
 // remote builder's store: the builder already holds most of it, and the hosts
 // substitute from each other, so a deploy of the same configuration finds it
-// built. Without a usable builder, the checks are evaluated but not built.
+// built but for its commit label. Without a usable builder, the checks are evaluated but not built.
 func (r *Nix) Validate(opts ...NixValidateOpts) *Check { // nix (../../../../../../.dagger/modules/nix/nix.go:102:1)
 	q := r.query.Select("validate")
 	for i := len(opts) - 1; i >= 0; i-- {

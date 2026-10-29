@@ -192,7 +192,7 @@ type NixValidateOpts struct {
 // The checks build every host's whole NixOS system, so they are built in a
 // remote builder's store: the builder already holds most of it, and the hosts
 // substitute from each other, so a deploy of the same configuration finds it
-// built. Without a usable builder, the checks are evaluated but not built.
+// built but for its commit label. Without a usable builder, the checks are evaluated but not built.
 func (r *Nix) Validate(ctx context.Context, opts ...NixValidateOpts) error {
 	if r.validate != nil {
 		return nil
