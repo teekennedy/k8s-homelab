@@ -1,6 +1,6 @@
 apiVersion: v2
 name: kube-prometheus-stack
-version: 0.1.68
+version: 0.1.69
 dependencies:
   - name: kube-prometheus-stack
     version: 92.16.0
@@ -21,6 +21,6 @@ dependencies:
     repository: oci://ghcr.io/grafana-community/helm-charts
     condition: tempo.enabled
   - name: opentelemetry-collector
-    version: 0.178.0
+    version: 0.178.1
     repository: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
     condition: opentelemetry-collector.enabled
