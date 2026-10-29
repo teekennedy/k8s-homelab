@@ -269,6 +269,16 @@ func (r *HelmfileRelease) Name(ctx context.Context) (string, error) {
 	return response, q.Execute(ctx)
 }
 
+// Returns rendered template output from `helmfile template`.
+func (r *HelmfileRelease) Output() *File {
+	q := r.query.Select("output")
+
+	return &File{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
 // Path is the chart's directory relative to the repo root.
 func (r *HelmfileRelease) Path(ctx context.Context) (string, error) {
 	if r.path != nil {

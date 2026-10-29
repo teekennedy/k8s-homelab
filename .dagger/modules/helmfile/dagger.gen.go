@@ -346,6 +346,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
 			return nil, (*Release).Lint(&parent, ctx)
+		case "Output":
+			var parent Release
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return (*Release).Output(&parent, ctx)
 		case "Render":
 			var parent Release
 			err = json.Unmarshal(parentJSON, &parent)
@@ -431,8 +438,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Lint",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Lints the release's chart with `helmfile lint`.\n\nhelmfile lint runs helm lint with the release's merged values. It reuses the\ndependencies the render built.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 231, 1)).
+							WithSourceMap(dag.SourceMap("helmfile.go", 240, 1)).
 							WithCheck()).
+					WithFunction(
+						dag.Function("Output",
+							dag.TypeDef().WithObject("File")).
+							WithDescription("Returns rendered template output from `helmfile template`.").
+							WithSourceMap(dag.SourceMap("helmfile.go", 227, 1))).
 					WithFunction(
 						dag.Function("Render",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).

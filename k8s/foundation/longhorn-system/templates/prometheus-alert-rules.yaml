@@ -1,6 +1,12 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
 # Based on https://longhorn.io/docs/1.10.0/monitoring/alert-rules-example/
 ---
+{{- /* External hostname: oauth2-proxy gatewayApi if enabled, else the longhorn ingress if enabled. */}}
+{{- $op := dig "oauth2-proxy" dict .Values.AsMap }}
+{{- $gw := dig "gatewayApi" dict $op }}
+{{- $opIngress := dig "ingress" dict $op }}
+{{- $lhIngress := .Values.longhorn.ingress }}
+{{- $externalHostname := coalesce (and $gw.enabled (first ($gw.hostnames | default list))) (and $opIngress.enabled (first ($opIngress.hosts | default list))) (and $lhIngress.enabled $lhIngress.host) }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -19,7 +25,7 @@ spec:
           more than 5 minutes.
         summary: The actual used space of Longhorn volume is over 90% of the capacity.
         custom_link_text: volume
-        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/volume/{{`{{$labels.volume}}`}}
+        custom_link_url: https://{{ $externalHostname }}/#/volume/{{`{{$labels.volume}}`}}
       expr: (longhorn_volume_actual_size_bytes / longhorn_volume_capacity_bytes) * 100 > 90
       for: 5m
       labels:
@@ -33,7 +39,7 @@ spec:
           more than 2 minutes.
         summary: Longhorn volume {{`{{$labels.volume}}`}} is Fault
         custom_link_text: volume
-        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/volume/{{`{{$labels.volume}}`}}
+        custom_link_url: https://{{ $externalHostname }}/#/volume/{{`{{$labels.volume}}`}}
       expr: longhorn_volume_robustness{state="faulted"} == 1
       for: 5m
       labels:
@@ -45,7 +51,7 @@ spec:
           more than 5 minutes.
         summary: Longhorn volumes are Degraded
         custom_link_text: volumes
-        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/volume?field=status&stateValue=detached
+        custom_link_url: https://{{ $externalHostname }}/#/volume?field=status&stateValue=detached
       expr: count(longhorn_volume_robustness{state="degraded"} == 1) > 0
       for: 5m
       labels:
@@ -60,7 +66,7 @@ spec:
           unschedulable replica ({{`{{$labels.reason}}`}}) for more than 15 minutes. Delete the stopped replica that has no node before the volume next detaches.
         summary: Longhorn strict-local volume {{`{{$labels.volume}}`}} has an unschedulable replica
         custom_link_text: volume
-        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/volume/{{`{{$labels.volume}}`}}
+        custom_link_url: https://{{ $externalHostname }}/#/volume/{{`{{$labels.volume}}`}}
       expr: kube_longhorn_volume_status_condition{type="Scheduled", data_locality="strict-local"} == 0
       for: 15m
       labels:
@@ -77,14 +83,14 @@ spec:
         issue: The used storage of node {{`{{$labels.node}}`}} is high.
         severity: warning
         custom_link_text: node
-        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/node?field=name&value={{`{{$labels.node}}`}}
+        custom_link_url: https://{{ $externalHostname }}/#/node?field=name&value={{`{{$labels.node}}`}}
     - alert: LonghornDiskStorageWarning
       annotations:
         description: The used storage of disk {{`{{$labels.disk}}`}} on node {{`{{$labels.node}}`}} is at {{`{{$value}}`}}% capacity for
           more than 5 minutes.
         summary:  The used storage of disk is over 70% of the capacity.
         custom_link_text: node
-        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/node?field=name&value={{`{{$labels.node}}`}}
+        custom_link_url: https://{{ $externalHostname }}/#/node?field=name&value={{`{{$labels.node}}`}}
       expr: (longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes) * 100 > 70
       for: 5m
       labels:
@@ -119,7 +125,7 @@ spec:
         description: Longhorn backup {{`{{$labels.backup}}`}} of volume {{`{{$labels.volume}}`}} is in the Error state.
         summary: Longhorn backup {{`{{$labels.backup}}`}} failed
         custom_link_text: backups
-        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/backup
+        custom_link_url: https://{{ $externalHostname }}/#/backup
       expr: longhorn_backup_state == 4 and on (volume) group by (volume) (longhorn_volume_robustness)
       for: 5m
       labels:
@@ -132,7 +138,7 @@ spec:
         description: The newest backup of the PVC {{`{{$labels.pvc}}`}} in the {{`{{$labels.pvc_namespace}}`}} namespace is {{`{{$value | humanizeDuration}}`}} old.
         summary: Longhorn volume {{`{{$labels.pvc_namespace}}`}}/{{`{{$labels.pvc}}`}} has not been backed up recently
         custom_link_text: volume
-        custom_link_url: https://{{ .Values.longhorn.ingress.host }}/#/volume/{{`{{$labels.volume}}`}}
+        custom_link_url: https://{{ $externalHostname }}/#/volume/{{`{{$labels.volume}}`}}
       expr: (time() - longhorn_volume_last_backup_at) > 36 * 3600 and longhorn_volume_last_backup_at > 0
       for: 1h
       labels:

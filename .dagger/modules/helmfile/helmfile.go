@@ -223,6 +223,15 @@ func (r *Release) Render(ctx context.Context) error {
 	return nil
 }
 
+// Returns rendered template output from `helmfile template`.
+func (r *Release) Output(ctx context.Context) (*dagger.File, error) {
+	ctr, err := r.rendered().Sync(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("helmfile template failed for %s (%s): %w", r.Path, r.Environment, withExecOutput(err))
+	}
+	return ctr.File("/rendered.yaml"), nil
+}
+
 // Lints the release's chart with `helmfile lint`.
 //
 // helmfile lint runs helm lint with the release's merged values. It reuses the

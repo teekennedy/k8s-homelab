@@ -331,7 +331,8 @@ func helmfileScenarios() []cachetest.Scenario {
 // audit reads to the shared table: editing it re-runs that chart's audit and
 // no other.
 func polarisScenarios() []cachetest.Scenario {
-	return append(helmfileScenarios(),
+	return append(
+		helmfileScenarios(),
 		chartConfigScenario("k8s/apps/alpha/polaris.yaml", "exemptions: []\n"),
 		cachetest.Scenario{
 			// Expected: the repo-wide config is part of every release's audit.
