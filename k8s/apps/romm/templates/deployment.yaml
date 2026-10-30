@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "romm.fullname" . }}
+  labels:
+    {{- include "romm.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  # Single writer: the /romm PVC is RWO and the embedded valkey is per-pod.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "romm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "romm.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: romm
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: ROMM_BASE_URL
+              value: {{ .Values.baseUrl | quote }}
+            - name: ROMM_SESSION_SECURE_COOKIE
+              value: "true"
+            - name: ROMM_AUTH_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "romm.fullname" . }}-auth
+                  key: ROMM_AUTH_SECRET_KEY
+            - name: ROMM_DB_DRIVER
+              value: postgresql
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.psql.clusterName }}-app
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.psql.clusterName }}-app
+                  key: port
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.psql.clusterName }}-app
+                  key: dbname
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.psql.clusterName }}-app
+                  key: user
+            - name: DB_PASSWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.psql.clusterName }}-app
+                  key: password
+            {{- range $name, $value := .Values.extraEnv }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- with .Values.metadataSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+                optional: true
+          {{- end }}
+          startupProbe:
+            httpGet:
+              path: /api/heartbeat
+              port: http
+            # First boot runs database migrations.
+            failureThreshold: 60
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/heartbeat
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /api/heartbeat
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /romm
+            - name: redis-data
+              mountPath: /redis-data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "romm.fullname" . }}-data
+        # The embedded valkey only holds the task queue and metadata caches,
+        # which RomM rebuilds.
+        - name: redis-data
+          emptyDir: {}

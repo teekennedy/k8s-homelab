@@ -1,0 +1,57 @@
+---
+# Bracket on one host: /api goes to the backend with the prefix stripped (this
+# backend version has no API prefix setting), everything else to the frontend.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: bracket
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gauntlet.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.name }}
+      namespace: {{ .Values.gateway.namespace }}
+      sectionName: {{ .Values.gateway.sectionName }}
+  hostnames:
+    - {{ .Values.bracket.host | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: bracket-backend
+          port: {{ .Values.bracket.backend.port }}
+    - backendRefs:
+        - name: bracket-frontend
+          port: {{ .Values.bracket.frontend.port }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: roll-page
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gauntlet.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.name }}
+      namespace: {{ .Values.gateway.namespace }}
+      sectionName: {{ .Values.gateway.sectionName }}
+  hostnames:
+    - {{ .Values.rollPage.host | quote }}
+  rules:
+    - backendRefs:
+        - name: roll-page
+          port: {{ .Values.rollPage.port }}

@@ -1,0 +1,73 @@
+# Default values for gauntlet.
+
+# Every route is on the internal gateway: the event runs on the LAN.
+gateway:
+  name: traefik-gateway
+  namespace: kube-system
+  sectionName: websecure
+
+# --- Bracket ------------------------------------------------------------------
+# The split backend/frontend images, not the combined `ghcr.io/evroon/bracket`
+# one: that image builds its API URL (http://localhost:8400/api) into the
+# frontend, while the frontend image here takes it at startup.
+bracket:
+  host: bracket.msng.to
+  backend:
+    image:
+      repository: ghcr.io/evroon/bracket-backend
+      tag: "v2.2.5@sha256:23f80cb6f7422e2cb248d7aff0467484ca9c92334e59d4975064811e7ea960ad"
+    port: 8400
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+  frontend:
+    image:
+      repository: ghcr.io/evroon/bracket-frontend
+      tag: "v2.2.5@sha256:c194f4af762549d7f64faaa2c57d61d255b3c19130217d79af1ff9afbdbb8b41"
+    port: 3000
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+  # Login for the referee. The password is generated into the bracket-secrets
+  # Secret (key ADMIN_PASSWORD). Bracket only creates this user when it
+  # initialises an empty database.
+  adminEmail: admin@msng.to
+
+psql:
+  clusterName: bracket-psql
+  image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie@sha256:39add80f5b1e573e2f6b641c66fd1a2f8dede67ca0330e870285bc1078551390
+
+# --- Roll page ------------------------------------------------------------------
+rollPage:
+  host: gauntlet.msng.to
+  image:
+    # Python with no third-party packages: server.py only uses the standard
+    # library. Its Python must match files/roll-page/.python-version.
+    repository: ghcr.io/astral-sh/uv
+    tag: python3.14-alpine@sha256:a069b57ec30ef94da43700a7332b162a13adb0b8a1cfba4e0b62c1a9727153c4
+  port: 8080
+  romm:
+    # In-cluster API address, used by the server.
+    url: http://romm.romm.svc.cluster.local:8080
+    # Address the TV's browser opens to play.
+    publicUrl: https://romm.msng.to
+    # EmulatorJS player route; {id} is the ROM id.
+    playPath: /rom/{id}/ejs
+    collection: Gauntlet
+    # Created out of band, not by this chart: a RomM client API token
+    # (Administration → Client API Tokens) with roms.read and collections.read.
+    tokenSecret:
+      name: romm-api-token
+      key: ROMM_API_TOKEN
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

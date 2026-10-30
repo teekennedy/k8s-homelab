@@ -1,0 +1,7 @@
+exemptions:
+  # The image's init script must start as root: it templates the nginx config
+  # and starts nginx, gunicorn and valkey, dropping nginx to the `romm` user.
+  - controllerNames:
+      - romm
+    rules:
+      - runAsRootAllowed

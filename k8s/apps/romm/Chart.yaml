@@ -1,0 +1,8 @@
+apiVersion: v2
+name: romm
+description: RomM game library with in-browser play through EmulatorJS.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the rommapp/romm image tag deployed by this chart.
+appVersion: "5.4.1"

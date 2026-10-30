@@ -1,0 +1,15 @@
+[project]
+name = "gauntlet-roll-page"
+version = "0.1.0"
+description = "Roll page for The Gauntlet: picks a random game from a RomM collection"
+requires-python = ">=3.14"
+# server.py is standard library only; the pod runs it with a bare interpreter.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -1,0 +1,199 @@
+{{- $backend := dict "ctx" . "component" "bracket-backend" }}
+{{- $frontend := dict "ctx" . "component" "bracket-frontend" }}
+{{- $baseUrl := printf "https://%s" .Values.bracket.host }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bracket-backend
+  labels:
+    {{- include "gauntlet.componentLabels" $backend | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "gauntlet.componentSelectorLabels" $backend | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gauntlet.componentLabels" $backend | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        # The image's `bracket` user, pinned by number so runAsNonRoot can be
+        # verified (confirmed with `id` in v2.2.5).
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend
+          image: "{{ .Values.bracket.backend.image.repository }}:{{ .Values.bracket.backend.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.bracket.backend.port }}
+              protocol: TCP
+          env:
+            - name: ENVIRONMENT
+              value: PRODUCTION
+            - name: PG_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.psql.clusterName }}-app
+                  key: uri
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bracket-secrets
+                  key: JWT_SECRET
+            - name: ADMIN_EMAIL
+              value: {{ .Values.bracket.adminEmail | quote }}
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bracket-secrets
+                  key: ADMIN_PASSWORD
+            - name: CORS_ORIGINS
+              value: {{ $baseUrl | quote }}
+            # Used for SSO callbacks; the route serves the API under /api.
+            - name: BASE_URL
+              value: {{ printf "%s/api" $baseUrl | quote }}
+            - name: ALLOW_USER_REGISTRATION
+              value: "false"
+            - name: ALLOW_DEMO_USER_REGISTRATION
+              value: "false"
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: http
+            # Runs database migrations on start.
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.bracket.backend.resources | nindent 12 }}
+          volumeMounts:
+            # Uploaded tournament and team logos. Lost on restart; nothing
+            # else lives here.
+            - name: static
+              mountPath: /app/static
+      volumes:
+        - name: static
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bracket-backend
+  labels:
+    {{- include "gauntlet.componentLabels" $backend | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.bracket.backend.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "gauntlet.componentSelectorLabels" $backend | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bracket-frontend
+  labels:
+    {{- include "gauntlet.componentLabels" $frontend | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "gauntlet.componentSelectorLabels" $frontend | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gauntlet.componentLabels" $frontend | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          image: "{{ .Values.bracket.frontend.image.repository }}:{{ .Values.bracket.frontend.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          # The entrypoint rewrites the built files in place to inject the
+          # API URL, so the root filesystem stays writable.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.bracket.frontend.port }}
+              protocol: TCP
+          env:
+            - name: NEXT_PUBLIC_API_BASE_URL
+              value: {{ printf "%s/api" $baseUrl | quote }}
+            # Captcha only guards sign-up, which is disabled.
+            - name: NEXT_PUBLIC_HCAPTCHA_SITE_KEY
+              value: ""
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.bracket.frontend.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bracket-frontend
+  labels:
+    {{- include "gauntlet.componentLabels" $frontend | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.bracket.frontend.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "gauntlet.componentSelectorLabels" $frontend | nindent 4 }}

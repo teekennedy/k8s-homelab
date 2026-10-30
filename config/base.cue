@@ -52,11 +52,13 @@ _productionApps: {
 		apps: {
 			"copyparty": true
 			"freshrss":  true
+			"gauntlet":  true
 			"homepage":  true
 			"jellyfin":  true
 			"joplin":    true
 			"openhands": true
 			"redteam":   true
+			"romm":      true
 			"spoolman":  true
 			"syncthing": true
 			"terraria":  true

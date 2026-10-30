@@ -1,0 +1,61 @@
+# Default values for romm.
+
+image:
+  repository: rommapp/romm
+  pullPolicy: IfNotPresent
+  tag: "5.4.1@sha256:8677fb7b81b1d3db20b849e989a1dadc2a11159e51eb34a2acdcb01102274edf"
+
+route:
+  host: romm.msng.to
+  # Internal gateway only: ROMs and saves stay on the LAN.
+  gateway:
+    name: traefik-gateway
+    namespace: kube-system
+    sectionName: websecure
+
+service:
+  port: 8080
+
+# --- Postgres (CNPG) --------------------------------------------------------
+psql:
+  clusterName: romm-psql
+  image: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie@sha256:39add80f5b1e573e2f6b641c66fd1a2f8dede67ca0330e870285bc1078551390
+
+# --- App config --------------------------------------------------------------
+baseUrl: https://romm.msng.to
+
+# Optional metadata provider credentials (SCREENSCRAPER_USER,
+# SCREENSCRAPER_PASSWORD, RETROACHIEVEMENTS_API_KEY, STEAMGRIDDB_API_KEY, ...).
+# Created out of band, not by this chart; RomM starts without it.
+metadataSecret: romm-metadata
+
+extraEnv:
+  # Hash-based matching that needs no account.
+  HASHEOUS_API_ENABLED: "true"
+
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+
+# The image starts as root: its init script templates the nginx config and
+# starts nginx, gunicorn and valkey, dropping nginx to the `romm` user itself.
+securityContext:
+  allowPrivilegeEscalation: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 2Gi
+
+persistence:
+  # Mounted at /romm as one volume. RomM hardlinks across library/, resources/
+  # and assets/, which fails across mounts. Holds ROMs, saves, states and
+  # cached artwork.
+  data:
+    size: 20Gi
+    storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/backup: "enabled"

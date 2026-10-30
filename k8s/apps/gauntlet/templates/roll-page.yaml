@@ -1,0 +1,136 @@
+{{- $c := dict "ctx" . "component" "roll-page" }}
+{{- $v := .Values.rollPage }}
+{{- $static := .Files.Glob "files/roll-page/static/*" }}
+{{- /*
+server.py and its static/ files, mounted at /app. Tests, pyproject.toml and
+uv.lock stay in files/roll-page/ and are not shipped.
+*/}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: roll-page
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gauntlet.componentLabels" $c | nindent 4 }}
+data:
+  server.py: |-
+    {{- .Files.Get "files/roll-page/server.py" | nindent 4 }}
+  {{- range $path, $_ := $static }}
+  {{ base $path }}: |-
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: roll-page
+  labels:
+    {{- include "gauntlet.componentLabels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "gauntlet.componentSelectorLabels" $c | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # The server reads server.py once at startup; restart it when the
+        # ConfigMap changes.
+        checksum/config: {{ printf "%s%s" (.Files.Get "files/roll-page/server.py") ($static.AsConfig) | sha256sum }}
+      labels:
+        {{- include "gauntlet.componentLabels" $c | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: roll-page
+          image: "{{ $v.image.repository }}:{{ $v.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          command: ["python", "/app/server.py"]
+          env:
+            - name: PORT
+              value: {{ $v.port | quote }}
+            - name: STATIC_DIR
+              value: /app/static
+            - name: ROMM_URL
+              value: {{ $v.romm.url | quote }}
+            - name: ROMM_PUBLIC_URL
+              value: {{ $v.romm.publicUrl | quote }}
+            - name: ROMM_PLAY_PATH
+              value: {{ $v.romm.playPath | quote }}
+            - name: ROMM_COLLECTION
+              value: {{ $v.romm.collection | quote }}
+            # Optional so the page still comes up, and says what's missing,
+            # before the token exists.
+            - name: ROMM_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $v.romm.tokenSecret.name }}
+                  key: {{ $v.romm.tokenSecret.key }}
+                  optional: true
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          ports:
+            - name: http
+              containerPort: {{ $v.port }}
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          volumeMounts:
+            - name: app
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: app
+          configMap:
+            name: roll-page
+            items:
+              - key: server.py
+                path: server.py
+              {{- range $path, $_ := $static }}
+              - key: {{ base $path }}
+                path: static/{{ base $path }}
+              {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: roll-page
+  labels:
+    {{- include "gauntlet.componentLabels" $c | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ $v.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "gauntlet.componentSelectorLabels" $c | nindent 4 }}

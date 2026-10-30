@@ -1,0 +1,262 @@
+:root {
+  --bg: #0d0b14;
+  --bg-glow: #24123a;
+  --surface: #171324;
+  --line: #2e2645;
+  --text: #f4f1ff;
+  --muted: #a39cbd;
+  --p1: #ff4d6d;
+  --p2: #3ec9ff;
+  --gold: #ffd23f;
+  --font: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Arial Black", "Avenir Next Heavy", Impact, var(--font);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: radial-gradient(ellipse at 50% 120%, var(--bg-glow), var(--bg) 70%) fixed, var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow: hidden;
+}
+
+/* Matchup ------------------------------------------------------------- */
+
+.matchup {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 2vw;
+  padding: 3vh 4vw 1vh;
+}
+
+.player {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: var(--text);
+  font: 900 clamp(28px, 5vw, 84px) / 1.1 var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.player:focus {
+  border-bottom-color: var(--line);
+}
+
+.player::placeholder {
+  color: var(--line);
+}
+
+.p1 {
+  text-align: right;
+  color: var(--p1);
+}
+
+.p2 {
+  color: var(--p2);
+}
+
+.vs {
+  font: 900 clamp(18px, 2.4vw, 40px) / 1 var(--font-display);
+  color: var(--gold);
+  font-style: italic;
+}
+
+/* Stage --------------------------------------------------------------- */
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 4vw;
+  padding: 0 5vw;
+  min-height: 0;
+}
+
+.wheel-wrap {
+  position: relative;
+  height: min(70vh, 45vw);
+  aspect-ratio: 1;
+  justify-self: center;
+}
+
+.wheel {
+  width: 100%;
+  height: 100%;
+}
+
+.pointer {
+  position: absolute;
+  top: -1.5vh;
+  left: 50%;
+  translate: -50% 0;
+  width: 0;
+  height: 0;
+  border-left: 2.2vh solid transparent;
+  border-right: 2.2vh solid transparent;
+  border-top: 4.4vh solid var(--gold);
+  filter: drop-shadow(0 0.4vh 0.6vh rgb(0 0 0 / 0.6));
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 3vh;
+}
+
+.status {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(18px, 2vw, 32px);
+}
+
+body[data-state="error"] .status {
+  color: var(--p1);
+}
+
+.result-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(14px, 1.4vw, 22px);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.game-name {
+  margin: 0.5vh 0 0;
+  color: var(--gold);
+  font: 900 clamp(32px, 4.4vw, 80px) / 1.05 var(--font-display);
+  text-wrap: balance;
+}
+
+.game-platform {
+  margin: 1vh 0 0;
+  font-size: clamp(18px, 1.8vw, 30px);
+}
+
+.countdown {
+  margin: 2vh 0 0;
+  min-height: 1.2em;
+  color: var(--muted);
+  font-size: clamp(16px, 1.6vw, 26px);
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-state="landed"] .result {
+  animation: reveal 400ms ease-out;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(1vh) scale(0.98);
+  }
+}
+
+/* Buttons ------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  gap: 1.5vw;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 1vw;
+  padding: 1.6vh 2.4vw;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: 800 clamp(18px, 2vw, 34px) / 1 var(--font);
+  cursor: pointer;
+}
+
+.btn.primary {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: var(--bg);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--p2);
+  outline-offset: 3px;
+}
+
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6em;
+  height: 1.6em;
+  padding: 0 0.3em;
+  border-radius: 0.8em;
+  background: rgb(0 0 0 / 0.25);
+  font: 800 0.7em / 1 var(--font);
+}
+
+.btn:not(.primary) kbd {
+  background: var(--line);
+}
+
+/* Footer -------------------------------------------------------------- */
+
+.hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1vh 3vw;
+  padding: 2vh 5vw 3vh;
+  color: var(--muted);
+  font-size: clamp(12px, 1.1vw, 18px);
+}
+
+.hint kbd {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.pool-size {
+  margin-left: auto;
+}
+
+/* Portrait / small screens, so the page still works on a phone. */
+@media (max-aspect-ratio: 1/1) {
+  body {
+    overflow: auto;
+  }
+
+  .stage {
+    grid-template-columns: 1fr;
+    padding: 2vh 16px;
+  }
+
+  .wheel-wrap {
+    height: auto;
+    width: min(90vw, 60vh);
+  }
+
+  .matchup,
+  .hint {
+    padding-inline: 16px;
+  }
+}

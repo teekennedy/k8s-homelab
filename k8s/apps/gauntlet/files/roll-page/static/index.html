@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Gauntlet</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script type="module" src="/static/app.js"></script>
+  </head>
+  <body data-state="loading">
+    <header class="matchup" aria-label="Current matchup">
+      <input id="p1" class="player p1" maxlength="24" placeholder="Player 1" autocomplete="off" spellcheck="false" />
+      <span class="vs">vs</span>
+      <input id="p2" class="player p2" maxlength="24" placeholder="Player 2" autocomplete="off" spellcheck="false" />
+    </header>
+
+    <main class="stage">
+      <div class="wheel-wrap">
+        <div id="wheel" class="wheel"></div>
+        <div class="pointer" aria-hidden="true"></div>
+      </div>
+
+      <section class="panel" aria-live="polite">
+        <p id="status" class="status">Loading the game pool…</p>
+        <div id="result" class="result" hidden>
+          <p class="result-label">Tonight's battleground</p>
+          <h1 id="game-name" class="game-name"></h1>
+          <p id="game-platform" class="game-platform"></p>
+          <p id="countdown" class="countdown"></p>
+        </div>
+        <div class="actions">
+          <button id="roll" class="btn primary" type="button" disabled>
+            <kbd>A</kbd><span id="roll-label">Roll</span>
+          </button>
+          <button id="reroll" class="btn" type="button" hidden>
+            <kbd>B</kbd><span>Reroll</span>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="hint">
+      <span><kbd>Enter</kbd>/<kbd>A</kbd> roll · play</span>
+      <span><kbd>R</kbd>/<kbd>B</kbd> reroll</span>
+      <span><kbd>Esc</kbd> stop countdown</span>
+      <span id="pool-size" class="pool-size"></span>
+    </footer>
+  </body>
+</html>
