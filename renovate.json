@@ -397,14 +397,6 @@
       }
     },
     {
-      "description": "Don't apply minimumReleaseAge to jellyfin image+appVersion so they stay grouped",
-      "minimumReleaseAge": "0 days",
-      "matchPackageNames": [
-        "ghcr.io/jellyfin/jellyfin",
-        "jellyfin/jellyfin"
-      ]
-    },
-    {
       "matchDatasources": [
         "docker"
       ],
@@ -676,6 +668,17 @@
       "matchPackageNames": [
         "*"
       ]
+    },
+    {
+      "description": "Jellyfin group settings",
+      "groupName": "jellyfin",
+      "minimumReleaseAge": "0 days",
+      "matchPackageNames": [
+        "ghcr.io/jellyfin/jellyfin",
+        "jellyfin/jellyfin"
+      ],
+      "schedule": ["* 2-9 * * *"],
+      "automergeSchedule": ["* 2-9 * * *"]
     }
   ]
 }
