@@ -185,6 +185,7 @@ crowdsec:
         outofband_rules:
           - homelab/crs-allow-http3
           - homelab/crs-skip-unparsed-body
+          - homelab/crs-skip-hosts
           - crowdsecurity/crs
     rules:
       # The bundled CRS only allows HTTP/1.x and HTTP/2, so every HTTP/3
@@ -207,6 +208,16 @@ crowdsec:
         seclang_rules:
           - SecRule REQUEST_HEADERS:Content-Type "!@rx ^(?:application/(?:x-www-form-urlencoded|(?:[a-z0-9.+-]+\+)?json|(?:[a-z0-9.+-]+\+)?xml)|multipart/form-data|text/)" "id:9001,phase:1,pass,nolog,noauditlog,ctl:requestBodyAccess=Off"
           - SecRule &REQUEST_HEADERS:Content-Type "@eq 0" "id:9002,phase:1,pass,nolog,noauditlog,ctl:requestBodyAccess=Off"
+      # Jellyfin's normal traffic (playback progress reports every 10s, web
+      # UI bundles) repeatedly matches CRS and gets streaming clients banned.
+      # Removing the CRS ID range takes effect on the next rule, unlike
+      # ctl:ruleEngine=Off, which waits for the next phase. In-band rules
+      # still apply to these hosts.
+      crs-skip-hosts.yaml: |
+        name: homelab/crs-skip-hosts
+        description: "Skip CRS for hosts whose normal traffic it misflags"
+        seclang_rules:
+          - SecRule REQUEST_HEADERS:Host "@rx ^jellyfin\.msng\.to(?::[0-9]+)?$" "id:9004,phase:1,pass,nolog,noauditlog,ctl:requestBodyAccess=Off,ctl:ruleRemoveById=900000-999999"
     resources:
       limits:
         # Unsets the chart's default CPU limit.

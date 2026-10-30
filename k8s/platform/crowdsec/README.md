@@ -238,6 +238,10 @@ on_load:
 
 The rule ID or name is in `cscli alerts inspect -d <alert-id>`.
 
+If CRS misflags an app's normal traffic across many rules, skip CRS for that
+host in `homelab/crs-skip-hosts` instead. Jellyfin is skipped this way: its
+playback progress reports and web UI bundles got streaming clients banned.
+
 ## Optional: CrowdSec Console Enrollment
 
 The [CrowdSec Console](https://app.crowdsec.net) provides centralized management and community blocklists. It's **free** but requires signup.
