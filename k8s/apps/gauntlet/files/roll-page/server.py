@@ -1,8 +1,12 @@
 """Roll page server for The Gauntlet.
 
-Serves the TV page and picks a random game from a RomM collection. The pick
-happens here, before the page spins its wheel; the wheel only animates
-towards it. Nothing is stored: results live in Bracket.
+Serves the TV and referee pages, picks a random game from a RomM collection,
+and keeps the tournament record. The pick happens here, before the TV spins
+its wheel; the wheel only animates towards it.
+
+The tournament record is opaque to this server beyond a shape check: the pages
+build the bracket from it. Writes carry the version they were based on, and a
+stale one is refused, so the TV and the referee can't overwrite each other.
 
 Standard library only, so the pod runs it with a bare interpreter.
 """
@@ -14,6 +18,7 @@ import logging
 import mimetypes
 import os
 import secrets
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,6 +33,14 @@ log = logging.getLogger("roll-page")
 # smaller.
 MAX_GAMES = 10000
 
+# Longest a GET /api/tournament?since= waits for a change before answering
+# with the unchanged record.
+LONG_POLL_SECONDS = 25
+
+MAX_BODY_BYTES = 256 * 1024
+MAX_PLAYERS = 64
+FORMATS = {"single", "double"}
+
 
 class RommError(Exception):
     """RomM could not supply the game pool. The message is shown on the TV."""
@@ -41,6 +54,8 @@ class Config:
     collection: str
     play_path: str
     static_dir: Path
+    # Where the tournament record is kept. Empty keeps it in memory only.
+    data_dir: Path | None
     port: int
 
     @classmethod
@@ -51,10 +66,11 @@ class Config:
             romm_public_url=env.get("ROMM_PUBLIC_URL", "").rstrip("/"),
             romm_token=env.get("ROMM_API_TOKEN", ""),
             collection=env.get("ROMM_COLLECTION", "Gauntlet"),
-            play_path=env.get("ROMM_PLAY_PATH", "/rom/{id}/ejs"),
+            play_path=env.get("ROMM_PLAY_PATH", "/console/rom/{id}/play"),
             static_dir=Path(
                 env.get("STATIC_DIR", Path(__file__).resolve().parent / "static")
             ),
+            data_dir=Path(env["DATA_DIR"]) if env.get("DATA_DIR") else None,
             port=int(env.get("PORT", "8080")),
         )
 
@@ -132,7 +148,81 @@ def pick(games: list[dict[str, object]], exclude: set[int]) -> dict[str, object]
     return secrets.choice(candidates)
 
 
-def make_handler(config: Config, romm: Romm) -> type[BaseHTTPRequestHandler]:
+class Conflict(Exception):
+    """A write was based on an older version of the tournament."""
+
+
+def check_tournament(t: object) -> None:
+    """Raises ValueError unless t is null or a well-formed tournament record."""
+    if t is None:
+        return
+    if not isinstance(t, dict):
+        raise ValueError("tournament must be an object")
+    players = t.get("players")
+    if (
+        not isinstance(players, list)
+        or not 2 <= len(players) <= MAX_PLAYERS
+        or not all(isinstance(p, str) and 0 < len(p) <= 40 for p in players)
+    ):
+        raise ValueError(f"players must be 2-{MAX_PLAYERS} names")
+    if t.get("format") not in FORMATS:
+        raise ValueError(f"format must be one of {sorted(FORMATS)}")
+    results = t.get("results")
+    if not isinstance(results, list) or not all(
+        isinstance(r, dict)
+        and isinstance(r.get("match"), int)
+        and isinstance(r.get("winner"), int)
+        and isinstance(r.get("loser"), int)
+        for r in results
+    ):
+        raise ValueError("results must be a list of {match, winner, loser}")
+    vetoes = t.get("vetoes")
+    if not isinstance(vetoes, list) or not all(isinstance(v, int) for v in vetoes):
+        raise ValueError("vetoes must be a list of player indexes")
+    if t.get("tv") is not None and not isinstance(t.get("tv"), int):
+        raise ValueError("tv must be a match id or null")
+
+
+class TournamentStore:
+    """The tournament record, its version, and waiting readers."""
+
+    def __init__(self, data_dir: Path | None) -> None:
+        self.path = data_dir / "tournament.json" if data_dir else None
+        self.changed = threading.Condition()
+        self.version = 0
+        self.tournament: dict | None = None
+        if self.path and self.path.exists():
+            saved = json.loads(self.path.read_text())
+            self.version = saved["version"]
+            self.tournament = saved["tournament"]
+
+    def snapshot(self) -> dict[str, object]:
+        return {"version": self.version, "tournament": self.tournament}
+
+    def get(self, since: int | None, timeout: float) -> dict[str, object]:
+        """Returns the record, first waiting up to timeout for one newer than since."""
+        with self.changed:
+            if since is not None:
+                self.changed.wait_for(lambda: self.version != since, timeout)
+            return self.snapshot()
+
+    def put(self, version: int, tournament: dict | None) -> dict[str, object]:
+        with self.changed:
+            if version != self.version:
+                raise Conflict
+            self.version += 1
+            self.tournament = tournament
+            if self.path:
+                tmp = self.path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(self.snapshot()))
+                os.replace(tmp, self.path)
+            self.changed.notify_all()
+            return self.snapshot()
+
+
+def make_handler(
+    config: Config, romm: Romm, store: TournamentStore
+) -> type[BaseHTTPRequestHandler]:
     static_files = {p.name: p for p in config.static_dir.iterdir() if p.is_file()}
 
     class Handler(BaseHTTPRequestHandler):
@@ -152,6 +242,12 @@ def make_handler(config: Config, romm: Romm) -> type[BaseHTTPRequestHandler]:
         def _json(self, status: int, payload: object) -> None:
             self._send(status, json.dumps(payload).encode(), "application/json")
 
+        def _body(self) -> object:
+            length = int(self.headers.get("Content-Length") or 0)
+            if length > MAX_BODY_BYTES:
+                raise ValueError("body too large")
+            return json.loads(self.rfile.read(length) or b"{}")
+
         def _pool(self) -> list[dict[str, object]] | None:
             try:
                 return romm.pool()
@@ -165,6 +261,15 @@ def make_handler(config: Config, romm: Romm) -> type[BaseHTTPRequestHandler]:
             if path == "/healthz":
                 self._send(HTTPStatus.OK, b"ok\n", "text/plain")
                 return
+            if path == "/api/tournament":
+                query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                try:
+                    since = int(query["since"][0]) if "since" in query else None
+                except ValueError:
+                    self._json(HTTPStatus.BAD_REQUEST, {"error": "bad since"})
+                    return
+                self._json(HTTPStatus.OK, store.get(since, LONG_POLL_SECONDS))
+                return
             if path == "/api/pool":
                 games = self._pool()
                 if games is not None:
@@ -173,9 +278,10 @@ def make_handler(config: Config, romm: Romm) -> type[BaseHTTPRequestHandler]:
                         {"collection": config.collection, "games": games},
                     )
                 return
-            name = "index.html" if path == "/" else path.removeprefix("/static/")
+            pages = {"/": "index.html", "/ref": "ref.html"}
+            name = pages.get(path) or path.removeprefix("/static/")
             file = static_files.get(name)
-            if file is None or (path != "/" and not path.startswith("/static/")):
+            if file is None or (path not in pages and not path.startswith("/static/")):
                 self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
                 return
             content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
@@ -188,9 +294,7 @@ def make_handler(config: Config, romm: Romm) -> type[BaseHTTPRequestHandler]:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
                 return
             try:
-                length = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(length) or b"{}")
-                exclude = {int(i) for i in body.get("exclude", [])}
+                exclude = {int(i) for i in self._body().get("exclude", [])}
             except (ValueError, TypeError, AttributeError):
                 self._json(HTTPStatus.BAD_REQUEST, {"error": "bad request body"})
                 return
@@ -205,11 +309,34 @@ def make_handler(config: Config, romm: Romm) -> type[BaseHTTPRequestHandler]:
             log.info("rolled %s (%s)", game["name"], game["id"])
             self._json(HTTPStatus.OK, {"game": game, "games": games})
 
+        def do_PUT(self) -> None:
+            if urllib.parse.urlsplit(self.path).path != "/api/tournament":
+                self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                return
+            try:
+                body = self._body()
+                version = body["version"]
+                if not isinstance(version, int):
+                    raise ValueError("version must be an integer")
+                tournament = body["tournament"]
+                check_tournament(tournament)
+            except (ValueError, TypeError, KeyError, AttributeError) as e:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": f"bad request: {e}"})
+                return
+            try:
+                self._json(HTTPStatus.OK, store.put(version, tournament))
+            except Conflict:
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {"error": "tournament changed", **store.snapshot()},
+                )
+
     return Handler
 
 
 def serve(config: Config) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer(("", config.port), make_handler(config, Romm(config)))
+    handler = make_handler(config, Romm(config), TournamentStore(config.data_dir))
+    return ThreadingHTTPServer(("", config.port), handler)
 
 
 def main() -> None:

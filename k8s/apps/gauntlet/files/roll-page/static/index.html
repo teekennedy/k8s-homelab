@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>The Gauntlet</title>
     <link rel="stylesheet" href="/static/style.css" />
+    <!-- Defines window.bracketsManager, used to rebuild the bracket. -->
+    <script src="/static/brackets-viewer.min.js"></script>
     <script type="module" src="/static/app.js"></script>
   </head>
   <body data-state="loading">
@@ -12,6 +14,7 @@
       <input id="p1" class="player p1" maxlength="24" placeholder="Player 1" autocomplete="off" spellcheck="false" />
       <span class="vs">vs</span>
       <input id="p2" class="player p2" maxlength="24" placeholder="Player 2" autocomplete="off" spellcheck="false" />
+      <p id="stage" class="stage-label" hidden></p>
     </header>
 
     <main class="stage">
@@ -26,7 +29,6 @@
           <p class="result-label">Tonight's battleground</p>
           <h1 id="game-name" class="game-name"></h1>
           <p id="game-platform" class="game-platform"></p>
-          <p id="countdown" class="countdown"></p>
         </div>
         <div class="actions">
           <button id="roll" class="btn primary" type="button" disabled>
@@ -36,13 +38,21 @@
             <kbd>B</kbd><span>Reroll</span>
           </button>
         </div>
+        <div id="vetoes" class="actions vetoes" hidden>
+          <button id="veto1" class="btn veto p1" type="button">
+            <kbd>X</kbd><span>Veto · <span id="veto1-name"></span></span>
+          </button>
+          <button id="veto2" class="btn veto p2" type="button">
+            <kbd>Y</kbd><span>Veto · <span id="veto2-name"></span></span>
+          </button>
+        </div>
       </section>
     </main>
 
     <footer class="hint">
-      <span><kbd>Enter</kbd>/<kbd>A</kbd> roll · play</span>
+      <span><kbd>Enter</kbd>/<kbd>A</kbd> roll · start</span>
       <span><kbd>R</kbd>/<kbd>B</kbd> reroll</span>
-      <span><kbd>Esc</kbd> stop countdown</span>
+      <span id="veto-hint" hidden><kbd>1</kbd>/<kbd>X</kbd> <kbd>2</kbd>/<kbd>Y</kbd> veto (one per player)</span>
       <span id="pool-size" class="pool-size"></span>
     </footer>
   </body>

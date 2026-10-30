@@ -1,0 +1,337 @@
+:root {
+  --bg: #0d0b14;
+  --surface: #171324;
+  --surface-2: #211b33;
+  --line: #2e2645;
+  --text: #f4f1ff;
+  --muted: #a39cbd;
+  --p1: #ff4d6d;
+  --p2: #3ec9ff;
+  --gold: #ffd23f;
+  --danger: #ff4d6d;
+  --font: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Arial Black", "Avenir Next Heavy", Impact, var(--font);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Component display rules would otherwise override the attribute. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 960px;
+  padding: 16px 16px 48px;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 var(--font);
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h1 {
+  font: 900 24px/1.1 var(--font-display);
+  text-transform: uppercase;
+}
+
+h1 span {
+  color: var(--gold);
+}
+
+h2 {
+  font-size: 18px;
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.link {
+  color: var(--p2);
+}
+
+.card {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hint {
+  margin: 6px 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.error {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface));
+  color: var(--text);
+}
+
+.champion {
+  border-color: var(--gold);
+  color: var(--gold);
+  font: 900 22px/1.2 var(--font-display);
+  text-align: center;
+}
+
+/* Form ---------------------------------------------------------------- */
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.field.inline {
+  margin-bottom: 0;
+}
+
+textarea,
+select,
+.names input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented legend {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.segmented label {
+  flex: 1 1 160px;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+}
+
+.segmented span {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.segmented input:checked + span {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.segmented input:focus-visible + span {
+  outline: 2px solid var(--p2);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.names {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Buttons ------------------------------------------------------------- */
+
+.btn {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 700 16px/1.2 var(--font);
+  cursor: pointer;
+}
+
+.btn.primary {
+  width: 100%;
+  border-color: var(--gold);
+  background: var(--gold);
+  color: var(--bg);
+}
+
+.btn.small {
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn.danger {
+  width: 100%;
+  border-color: var(--danger);
+  background: transparent;
+  color: var(--danger);
+}
+
+.winners {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.btn.win {
+  min-height: 72px;
+  border-radius: 14px;
+  font: 900 18px/1.15 var(--font-display);
+  overflow-wrap: anywhere;
+}
+
+.btn.win.p1 {
+  border-color: var(--p1);
+  color: var(--p1);
+}
+
+.btn.win.p2 {
+  border-color: var(--p2);
+  color: var(--p2);
+}
+
+.btn.win.chosen.p1 {
+  background: var(--p1);
+  color: var(--bg);
+}
+
+.btn.win.chosen.p2 {
+  background: var(--p2);
+  color: var(--bg);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 8px 12px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gold);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.chip.used {
+  border-color: var(--line);
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* Match sheet ---------------------------------------------------------- */
+
+.sheet {
+  width: min(520px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.sheet::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}
+
+.sheet .hint {
+  margin-bottom: 12px;
+}
+
+/* Bracket (brackets-viewer), recoloured for the dark page ---------------- */
+
+.bracket-scroll {
+  margin: 0 -16px;
+  padding: 0 16px;
+  overflow-x: auto;
+}
+
+.brackets-viewer {
+  --primary-background: var(--surface);
+  --secondary-background: var(--surface-2);
+  --match-background: var(--surface-2);
+  --font-color: var(--text);
+  --win-color: var(--gold);
+  --loss-color: var(--muted);
+  --label-color: var(--muted);
+  --hint-color: var(--muted);
+  --connector-color: var(--line);
+  --border-color: var(--line);
+  --border-hover-color: var(--gold);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.brackets-viewer .match {
+  cursor: pointer;
+}
+
+.brackets-viewer h1 {
+  display: none;
+}

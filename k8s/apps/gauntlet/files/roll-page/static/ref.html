@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gauntlet Referee</title>
+    <link rel="stylesheet" href="/static/brackets-viewer.min.css" />
+    <link rel="stylesheet" href="/static/ref.css" />
+    <script src="/static/brackets-viewer.min.js"></script>
+    <script type="module" src="/static/ref.js"></script>
+  </head>
+  <body>
+    <header class="top">
+      <h1>Gauntlet <span>referee</span></h1>
+      <a href="/" class="link">TV page</a>
+    </header>
+
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <!-- No tournament yet -->
+    <section id="setup" class="card" hidden>
+      <h2>New tournament</h2>
+      <label class="field">
+        <span>Players, one per line, in seed order</span>
+        <textarea id="players" rows="8" spellcheck="false" placeholder="Terrance&#10;Alex&#10;Sam&#10;Jo"></textarea>
+      </label>
+      <fieldset class="segmented">
+        <legend>Format</legend>
+        <label><input type="radio" name="format" value="double" checked /><span>Double elimination</span></label>
+        <label><input type="radio" name="format" value="single" /><span>Single elimination</span></label>
+      </fieldset>
+      <label class="check"><input id="shuffle" type="checkbox" checked /> Shuffle seeding</label>
+      <button id="create" class="btn primary" type="button">Start tournament</button>
+    </section>
+
+    <!-- Tournament running -->
+    <section id="running" hidden>
+      <div id="champion" class="card champion" hidden></div>
+
+      <div id="on-tv" class="card" hidden>
+        <p class="eyebrow">On the TV · <span id="tv-label"></span></p>
+        <p class="hint">Tap the winner.</p>
+        <div class="winners">
+          <button id="win1" class="btn win p1" type="button"></button>
+          <button id="win2" class="btn win p2" type="button"></button>
+        </div>
+        <label class="field inline">
+          <span>Show on TV</span>
+          <select id="tv-select"></select>
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <h2>Bracket</h2>
+          <button id="undo" class="btn small" type="button">Undo last result</button>
+        </div>
+        <p class="hint">Tap any match to change or clear its result. Later results that no longer fit are dropped.</p>
+        <div class="bracket-scroll"><div id="bracket" class="brackets-viewer"></div></div>
+      </div>
+
+      <div class="card">
+        <h2>Vetoes</h2>
+        <p class="hint">One per player for the whole tournament. Tap to fix a mistake.</p>
+        <div id="veto-list" class="chips"></div>
+      </div>
+
+      <div class="card">
+        <h2>Players</h2>
+        <p class="hint">Fix a name here. To change who's in the bracket, end the tournament and start a new one.</p>
+        <div id="names" class="names"></div>
+        <button id="save-names" class="btn small" type="button">Save names</button>
+      </div>
+
+      <div class="card danger-zone">
+        <button id="end" class="btn danger" type="button">End tournament</button>
+      </div>
+    </section>
+
+    <dialog id="match-dialog" class="sheet">
+      <form method="dialog">
+        <p class="eyebrow" id="dialog-label"></p>
+        <p class="hint" id="dialog-hint"></p>
+        <div class="winners">
+          <button id="dialog-win1" class="btn win p1" type="button"></button>
+          <button id="dialog-win2" class="btn win p2" type="button"></button>
+        </div>
+        <div class="row">
+          <button id="dialog-clear" class="btn small" type="button">Clear result</button>
+          <button id="dialog-tv" class="btn small" type="button">Show on TV</button>
+          <button class="btn small" value="close">Close</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

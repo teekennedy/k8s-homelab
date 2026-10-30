@@ -1,12 +1,16 @@
-// The Gauntlet roll page. The server picks the game; the wheel only spins to
-// that pick. Controls: keyboard, mouse, or either gamepad (A = roll/play,
-// B = reroll).
+// The Gauntlet TV page. The server picks the game; the wheel only spins to
+// that pick. With a tournament running, the matchup comes from the bracket the
+// referee manages at /ref; without one, the names are typed in.
+//
+// Controls: keyboard, mouse, or any gamepad. A = roll / start, B = reroll,
+// X / Y = veto for the left / right player.
 import { Wheel } from "/static/spin-wheel-esm.js";
+import { rebuild } from "/static/bracket.js";
+import { createManager, mutate, subscribe, tournament, watch } from "/static/store.js";
 
 const WHEEL_SLOTS = 16;
 const SPIN_MS = 6500;
 const SPIN_TURNS = 6;
-const AUTO_LAUNCH_SECONDS = 6;
 const MATCHUP_KEY = "gauntlet.matchup";
 const COLORS = ["#ff4d6d", "#3ec9ff", "#ffd23f", "#9b5de5", "#00f5a0", "#ff8c42"];
 const LABEL_COLORS = ["#0d0b14", "#0d0b14", "#0d0b14", "#f4f1ff", "#0d0b14", "#0d0b14"];
@@ -15,21 +19,28 @@ const $ = (id) => document.getElementById(id);
 const el = {
   p1: $("p1"),
   p2: $("p2"),
+  stage: $("stage"),
   status: $("status"),
   result: $("result"),
   name: $("game-name"),
   platform: $("game-platform"),
-  countdown: $("countdown"),
   roll: $("roll"),
   rollLabel: $("roll-label"),
   reroll: $("reroll"),
+  vetoes: $("vetoes"),
+  veto: [$("veto1"), $("veto2")],
+  vetoName: [$("veto1-name"), $("veto2-name")],
+  vetoHint: $("veto-hint"),
   poolSize: $("pool-size"),
 };
 
 let state = "loading"; // loading | idle | spinning | landed | launching | error
 let current = null; // the game the wheel is spinning to, or landed on
-let rolled = []; // ids rolled for this matchup, skipped by rerolls
-let countdownTimer = null;
+let rolled = []; // ids rolled for this matchup, skipped by later rolls
+// The bracket match on the TV: { id, players: [index, index] }, or null when
+// there's no tournament (manual names) or nothing to play.
+let match = null;
+let rebuildSeq = 0;
 
 const wheel = new Wheel($("wheel"), {
   items: [{ label: "" }],
@@ -45,14 +56,16 @@ const wheel = new Wheel($("wheel"), {
   borderColor: "#0d0b14",
   borderWidth: 6,
   rotationResistance: 0,
-  onRest: (event) => {
-    if (event.method === "spintoitem" && state === "spinning") land();
+  // Only the spin to the pick ever rests: the idle spin has no resistance,
+  // and stop() raises no event.
+  onRest: () => {
+    if (state === "spinning") land();
   },
 });
 
 // --- Matchup ----------------------------------------------------------------
 
-function loadMatchup() {
+function loadManualMatchup() {
   try {
     const saved = JSON.parse(localStorage.getItem(MATCHUP_KEY) || "{}");
     el.p1.value = saved.p1 || "";
@@ -62,7 +75,7 @@ function loadMatchup() {
   }
 }
 
-function saveMatchup() {
+function saveManualMatchup() {
   rolled = [];
   try {
     localStorage.setItem(MATCHUP_KEY, JSON.stringify({ p1: el.p1.value, p2: el.p2.value }));
@@ -72,11 +85,71 @@ function saveMatchup() {
 }
 
 for (const input of [el.p1, el.p2]) {
-  input.addEventListener("change", saveMatchup);
+  input.addEventListener("change", saveManualMatchup);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === "Escape") input.blur();
     e.stopPropagation();
   });
+}
+
+function showMatchup(names, label, editable, solo = false) {
+  document.body.classList.toggle("solo", solo);
+  el.p1.value = names[0];
+  el.p2.value = names[1];
+  el.p1.readOnly = el.p2.readOnly = !editable;
+  el.stage.textContent = label;
+  el.stage.hidden = !label;
+}
+
+// Follows the tournament record: fills in the names, and resets the roll when
+// the referee moves the TV on to another match.
+async function onTournament(t) {
+  const seq = ++rebuildSeq;
+  if (!t) {
+    if (match !== null || state === "loading") loadManualMatchup();
+    match = null;
+    showMatchup([el.p1.value, el.p2.value], "", true);
+    renderVetoes();
+    return;
+  }
+
+  let bracket;
+  try {
+    bracket = await rebuild(t, createManager);
+  } catch (e) {
+    showMatchup(["", ""], `Bracket error: ${e.message}`, false);
+    return;
+  }
+  if (seq !== rebuildSeq) return;
+
+  if (bracket.champion != null) {
+    setMatch(null);
+    showMatchup([t.players[bracket.champion], ""], "Champion of the Gauntlet", false, true);
+  } else if (bracket.tv) {
+    const players = [bracket.tv.opponent1.id, bracket.tv.opponent2.id];
+    setMatch({ id: bracket.tv.id, players });
+    showMatchup(
+      players.map((p) => t.players[p]),
+      bracket.labels.get(bracket.tv.id),
+      false,
+    );
+  } else {
+    setMatch(null);
+    showMatchup(["", ""], "Waiting for the referee", false);
+  }
+  renderVetoes();
+}
+
+function setMatch(next) {
+  const changed = match?.id !== next?.id;
+  match = next;
+  if (!changed) return;
+  rolled = [];
+  if (["landed", "spinning"].includes(state)) {
+    // The referee moved on; drop the game rolled for the previous match.
+    wheel.stop();
+    showReady();
+  }
 }
 
 // --- Wheel ------------------------------------------------------------------
@@ -123,8 +196,30 @@ function setState(next) {
   state = next;
   document.body.dataset.state = next;
   el.roll.disabled = !["idle", "landed"].includes(next);
-  el.rollLabel.textContent = next === "landed" ? "Play now" : "Roll";
+  el.rollLabel.textContent = next === "landed" ? "Start" : "Roll";
   el.reroll.hidden = next !== "landed";
+  renderVetoes();
+}
+
+function renderVetoes() {
+  const t = tournament();
+  const show = Boolean(t && match);
+  el.vetoHint.hidden = !show;
+  el.vetoes.hidden = !show || state !== "landed";
+  if (!show) return;
+  match.players.forEach((player, side) => {
+    const used = t.vetoes.includes(player);
+    el.vetoName[side].textContent = used ? `${t.players[player]} (used)` : t.players[player];
+    el.veto[side].disabled = used || state !== "landed";
+  });
+}
+
+function showReady() {
+  el.result.hidden = true;
+  el.status.hidden = false;
+  el.status.textContent = "Ready when you are.";
+  setState("idle");
+  idleSpin();
 }
 
 function showError(message) {
@@ -148,21 +243,19 @@ async function loadPool() {
   try {
     const { collection, games } = await api("/api/pool");
     setWheel(games);
-    idleSpin();
     el.poolSize.textContent = `${games.length} games in ${collection}`;
-    el.status.textContent = games.length ? "Ready when you are." : `Add games to ${collection} in RomM.`;
-    setState(games.length ? "idle" : "error");
+    if (!games.length) return showError(`Add games to ${collection} in RomM.`);
+    showReady();
   } catch (e) {
     showError(e.message);
   }
 }
 
-async function roll() {
-  stopCountdown();
+async function roll(message = "Spinning…") {
   setState("spinning");
   el.result.hidden = true;
   el.status.hidden = false;
-  el.status.textContent = "Spinning…";
+  el.status.textContent = message;
   try {
     const { game, games } = await api("/api/roll", {
       method: "POST",
@@ -186,44 +279,49 @@ function land() {
   el.status.hidden = true;
   el.result.hidden = false;
   setState("landed");
-  startCountdown();
 }
 
-function startCountdown() {
-  let left = AUTO_LAUNCH_SECONDS;
-  const tick = () => {
-    if (left <= 0) return launch();
-    el.countdown.textContent = `Launching in ${left}…`;
-    left--;
-  };
-  tick();
-  countdownTimer = setInterval(tick, 1000);
-}
-
-function stopCountdown(message = "") {
-  clearInterval(countdownTimer);
-  countdownTimer = null;
-  el.countdown.textContent = message;
-}
-
-function launch() {
+function start() {
   if (!current) return;
-  stopCountdown("Loading game…");
   setState("launching");
+  el.status.hidden = false;
+  el.status.textContent = "Loading game…";
   window.location.assign(current.playUrl);
 }
 
 function primary() {
   if (state === "idle") roll();
-  else if (state === "landed") launch();
+  else if (state === "landed") start();
 }
 
 function reroll() {
   if (state === "landed") roll();
 }
 
+let vetoing = false;
+
+async function veto(side) {
+  const t = tournament();
+  if (state !== "landed" || !t || !match || vetoing) return;
+  const player = match.players[side];
+  if (t.vetoes.includes(player)) return;
+  vetoing = true;
+  try {
+    await mutate((latest) =>
+      latest.vetoes.includes(player) ? latest : { ...latest, vetoes: [...latest.vetoes, player] },
+    );
+    roll(`${t.players[player]} vetoed it. Spinning again…`);
+  } catch (e) {
+    el.status.hidden = false;
+    el.status.textContent = e.message;
+  } finally {
+    vetoing = false;
+  }
+}
+
 el.roll.addEventListener("click", primary);
-el.reroll.addEventListener("click", reroll);
+el.reroll.addEventListener("click", () => reroll());
+el.veto.forEach((button, side) => button.addEventListener("click", () => veto(side)));
 
 document.addEventListener("keydown", (e) => {
   if (e.repeat) return;
@@ -232,26 +330,29 @@ document.addEventListener("keydown", (e) => {
     primary();
   } else if (e.key === "r" || e.key === "R") {
     reroll();
-  } else if (e.key === "Escape" && state === "landed") {
-    stopCountdown("Countdown stopped.");
+  } else if (e.key === "1" || e.key === "2") {
+    veto(Number(e.key) - 1);
   }
 });
 
 // --- Gamepads ---------------------------------------------------------------
 
-const GAMEPAD_A = 0;
-const GAMEPAD_B = 1;
-const GAMEPAD_START = 9;
+// Standard-mapping button indexes. Every pad does everything: which pad is
+// "player 1" isn't reliable (the Steam Deck's own controls count as one), so
+// the veto buttons are per side instead.
+const BUTTONS = [
+  [0, primary], // A
+  [9, primary], // Start
+  [1, reroll], // B
+  [2, () => veto(0)], // X
+  [3, () => veto(1)], // Y
+];
 const held = new Map();
 
 function pollGamepads() {
   for (const pad of navigator.getGamepads?.() ?? []) {
     if (!pad) continue;
-    for (const [button, action] of [
-      [GAMEPAD_A, primary],
-      [GAMEPAD_START, primary],
-      [GAMEPAD_B, reroll],
-    ]) {
+    for (const [button, action] of BUTTONS) {
       const key = `${pad.index}:${button}`;
       const pressed = Boolean(pad.buttons[button]?.pressed);
       if (pressed && !held.get(key) && document.activeElement?.tagName !== "INPUT") action();
@@ -264,16 +365,10 @@ function pollGamepads() {
 // Coming back from RomM with the browser's back button restores this page
 // from the bfcache mid-"launching"; start fresh instead.
 window.addEventListener("pageshow", (e) => {
-  if (e.persisted && state === "launching") {
-    stopCountdown();
-    el.result.hidden = true;
-    el.status.hidden = false;
-    el.status.textContent = "Ready when you are.";
-    setState("idle");
-    idleSpin();
-  }
+  if (e.persisted && state === "launching") showReady();
 });
 
-loadMatchup();
+subscribe(onTournament);
+watch();
 requestAnimationFrame(pollGamepads);
 loadPool();

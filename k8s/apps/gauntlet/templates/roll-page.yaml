@@ -30,6 +30,9 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: 3
+  # Single writer: the tournament record lives on an RWO volume.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "gauntlet.componentSelectorLabels" $c | nindent 6 }}
@@ -48,6 +51,8 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -60,6 +65,8 @@ spec:
               value: {{ $v.port | quote }}
             - name: STATIC_DIR
               value: /app/static
+            - name: DATA_DIR
+              value: /data
             - name: ROMM_URL
               value: {{ $v.romm.url | quote }}
             - name: ROMM_PUBLIC_URL
@@ -107,7 +114,12 @@ spec:
             - name: app
               mountPath: /app
               readOnly: true
+            - name: data
+              mountPath: /data
       volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: roll-page-data
         - name: app
           configMap:
             name: roll-page

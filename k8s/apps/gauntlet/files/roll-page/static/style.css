@@ -16,6 +16,11 @@
   box-sizing: border-box;
 }
 
+/* Component display rules would otherwise override the attribute. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -69,6 +74,34 @@ body {
 
 .p2 {
   color: var(--p2);
+}
+
+/* One name only: the champion. */
+.solo .matchup {
+  grid-template-columns: 1fr;
+}
+
+.solo .p1 {
+  text-align: center;
+}
+
+.solo .vs,
+.solo .p2 {
+  display: none;
+}
+
+.stage-label {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(14px, 1.4vw, 22px);
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.player[readonly] {
+  cursor: default;
 }
 
 .vs {
@@ -192,6 +225,23 @@ body[data-state="landed"] .result {
   border-color: var(--gold);
   background: var(--gold);
   color: var(--bg);
+}
+
+.vetoes {
+  flex-wrap: wrap;
+}
+
+.btn.veto {
+  font-size: clamp(14px, 1.4vw, 24px);
+  padding: 1.2vh 1.8vw;
+}
+
+.btn.veto.p1 {
+  border-color: var(--p1);
+}
+
+.btn.veto.p2 {
+  border-color: var(--p2);
 }
 
 .btn:disabled {

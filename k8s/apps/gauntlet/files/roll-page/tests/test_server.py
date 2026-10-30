@@ -96,6 +96,7 @@ def static_dir(tmp_path, monkeypatch) -> None:
     # CI only uploads Python sources, so the real static/ isn't available.
     (tmp_path / "index.html").write_text("<title>The Gauntlet</title>")
     (tmp_path / "app.js").write_text("wheel.spinToItem(0);")
+    (tmp_path / "ref.html").write_text("<title>Referee</title>")
     monkeypatch.setenv("TEST_STATIC_DIR", str(tmp_path))
 
 
@@ -119,9 +120,12 @@ def app(romm_url: str) -> Iterator[str]:
     yield from make_app(romm_url)
 
 
-def call(url: str, body: object | None = None) -> tuple[int, object]:
+def call(
+    url: str, body: object | None = None, method: str | None = None
+) -> tuple[int, object]:
     data = None if body is None else json.dumps(body).encode()
-    request = urllib.request.Request(url, data=data, method="POST" if data else "GET")
+    method = method or ("POST" if data else "GET")
+    request = urllib.request.Request(url, data=data, method=method)
     try:
         with urllib.request.urlopen(request) as response:
             raw = response.read()
@@ -144,13 +148,13 @@ def test_pool_lists_collection_games(app: str) -> None:
             "id": 12,
             "name": "Bomberman",
             "platform": "SNES",
-            "playUrl": "https://romm.example/rom/12/ejs",
+            "playUrl": "https://romm.example/console/rom/12/play",
         },
         {
             "id": 11,
             "name": "Sonic the Hedgehog 2",
             "platform": "Genesis",
-            "playUrl": "https://romm.example/rom/11/ejs",
+            "playUrl": "https://romm.example/console/rom/11/play",
         },
     ]
 
@@ -219,11 +223,11 @@ def test_unreachable_romm() -> None:
 
 
 def test_custom_play_path(romm_url: str) -> None:
-    app = make_app(romm_url, ROMM_PLAY_PATH="/console/rom/{id}/play")
+    app = make_app(romm_url, ROMM_PLAY_PATH="/rom/{id}/ejs")
     url = next(app)
     _, body = call(f"{url}/api/pool")
 
-    assert body["games"][0]["playUrl"] == "https://romm.example/console/rom/12/play"
+    assert body["games"][0]["playUrl"] == "https://romm.example/rom/12/ejs"
 
 
 def test_serves_page_and_static_files(app: str) -> None:
@@ -251,3 +255,99 @@ def test_healthz(app: str) -> None:
 
     assert status == 200
     assert body == "ok\n"
+
+
+TOURNAMENT = {
+    "format": "double",
+    "players": ["Terrance", "Alex", "Sam"],
+    "results": [],
+    "vetoes": [],
+    "tv": None,
+}
+
+
+def put(app: str, version: int, tournament: object) -> tuple[int, object]:
+    return call(
+        f"{app}/api/tournament",
+        {"version": version, "tournament": tournament},
+        method="PUT",
+    )
+
+
+def test_tournament_starts_empty(app: str) -> None:
+    assert call(f"{app}/api/tournament") == (200, {"version": 0, "tournament": None})
+
+
+def test_tournament_put_and_get(app: str) -> None:
+    status, body = put(app, 0, TOURNAMENT)
+
+    assert status == 200
+    assert body == {"version": 1, "tournament": TOURNAMENT}
+    assert call(f"{app}/api/tournament")[1] == body
+
+
+def test_tournament_rejects_stale_version(app: str) -> None:
+    put(app, 0, TOURNAMENT)
+    status, body = put(app, 0, {**TOURNAMENT, "vetoes": [0]})
+
+    assert status == 409
+    assert body["version"] == 1
+    assert body["tournament"]["vetoes"] == []
+
+
+def test_tournament_can_be_cleared(app: str) -> None:
+    put(app, 0, TOURNAMENT)
+
+    assert put(app, 1, None) == (200, {"version": 2, "tournament": None})
+
+
+@pytest.mark.parametrize(
+    "tournament",
+    [
+        {**TOURNAMENT, "players": ["Solo"]},
+        {**TOURNAMENT, "players": ["A", ""]},
+        {**TOURNAMENT, "format": "swiss"},
+        {**TOURNAMENT, "results": [{"match": "1", "winner": 0, "loser": 1}]},
+        {**TOURNAMENT, "results": [{"match": 1, "winner": 0}]},
+        {**TOURNAMENT, "vetoes": ["Alex"]},
+        {**TOURNAMENT, "tv": "now"},
+        ["not", "an", "object"],
+    ],
+)
+def test_tournament_rejects_bad_records(app: str, tournament: object) -> None:
+    status, _ = put(app, 0, tournament)
+
+    assert status == 400
+    assert call(f"{app}/api/tournament")[1]["version"] == 0
+
+
+def test_tournament_long_poll_wakes_on_change(app: str) -> None:
+    result: list[object] = []
+    waiter = threading.Thread(
+        target=lambda: result.append(call(f"{app}/api/tournament?since=0"))
+    )
+    waiter.start()
+    put(app, 0, TOURNAMENT)
+    waiter.join(timeout=5)
+
+    assert result == [(200, {"version": 1, "tournament": TOURNAMENT})]
+
+
+def test_tournament_survives_restart(romm_url: str, tmp_path) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    first = make_app(romm_url, DATA_DIR=str(data))
+    put(next(first), 0, TOURNAMENT)
+    next(first, None)
+
+    second = make_app(romm_url, DATA_DIR=str(data))
+    status, body = call(f"{next(second)}/api/tournament")
+
+    assert body == {"version": 1, "tournament": TOURNAMENT}
+
+
+def test_serves_referee_page(app: str) -> None:
+    status, body = call(f"{app}/ref")
+
+    assert status == 200
+    assert "Referee" in body

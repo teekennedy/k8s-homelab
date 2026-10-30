@@ -1,8 +1,8 @@
 apiVersion: v2
 name: gauntlet
-description: The Gauntlet tournament night — Bracket for the referee and a roll page that picks games from RomM.
+description: The Gauntlet tournament night — a roll page that picks games from RomM, and a simple elimination bracket.
 type: application
 # Bump on any change to the chart templates/values.
-version: 0.1.0
-# Tracks the Bracket image tags deployed by this chart.
-appVersion: "v2.2.5"
+version: 0.2.0
+# The roll page's own version; it has no upstream image.
+appVersion: "0.2.0"
