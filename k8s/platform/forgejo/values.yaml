@@ -6,7 +6,7 @@ forgejoResources:
   # Deliberately in values.yaml (not templates/forgejo-resources.yaml) so
   # that renovate can pick it up.
   image: ghcr.io/teekennedy/k8s-homelab:forgejo-resources-1.0.3@sha256:155ff945de77d438e6a86aaa4e439539a98f74f313bf248b7c49d3b40818785d
-  waitImage: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  waitImage: alpine:3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 
 # Valkey replication set + Sentinel, from the valkey-instance library chart
 # (k8s/charts/valkey-instance). Deliberately a *separate* instance from
