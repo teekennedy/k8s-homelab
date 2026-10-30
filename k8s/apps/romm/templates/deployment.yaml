@@ -69,6 +69,33 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.psql.clusterName }}-app
                   key: password
+            {{- with .Values.oidc }}
+            {{- if .enabled }}
+            - name: OIDC_ENABLED
+              value: "true"
+            - name: OIDC_PROVIDER
+              value: authelia
+            - name: OIDC_CLIENT_ID
+              value: {{ .clientId | quote }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: romm-oidc-authelia
+                  key: client-secret
+            - name: OIDC_REDIRECT_URI
+              value: {{ printf "%s/api/oauth/openid" $.Values.baseUrl | quote }}
+            - name: OIDC_SERVER_APPLICATION_URL
+              value: {{ .serverUrl | quote }}
+            - name: OIDC_CLAIM_ROLES
+              value: groups
+            - name: OIDC_ROLE_ADMIN
+              value: {{ .adminGroups | quote }}
+            - name: OIDC_ROLE_VIEWER
+              value: {{ .userGroups | quote }}
+            - name: DISABLE_USERPASS_LOGIN
+              value: {{ .disableUserpassLogin | quote }}
+            {{- end }}
+            {{- end }}
             {{- range $name, $value := .Values.extraEnv }}
             - name: {{ $name }}
               value: {{ $value | quote }}

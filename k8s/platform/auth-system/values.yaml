@@ -80,6 +80,7 @@ oidcClientSecrets:
     oauth2-proxy-internal: syncthing/syncthing-oauth2-proxy-secrets
     copyparty: copyparty/copyparty-oauth2-proxy-secrets
     freshrss: freshrss/freshrss-oidc-authelia
+    romm: romm/romm-oidc-authelia
   # The python-flavoured tag ships an interpreter, which must match
   # files/oidc-client-secrets/.python-version: uv never downloads one.
   image:
@@ -388,6 +389,17 @@ authelia:
                 subject: "group:full-admin"
               - policy: one_factor
                 subject: "group:freshrss-users"
+          # RomM (k8s/apps/romm). Players only browse and play, so one_factor
+          # is enough for them; admins can delete ROMs and saves.
+          romm:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:romm-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
+              - policy: one_factor
+                subject: "group:romm-users"
           # Longhorn UI (k8s/foundation/longhorn-system). Can delete volumes,
           # replicas and backups, so admins only, always two_factor.
           longhorn:
@@ -649,6 +661,30 @@ authelia:
               - code
             redirect_uris:
               - https://rss.msng.to/i/oidc/
+          # RomM (k8s/apps/romm), via its built-in OIDC (Authlib). It sends
+          # PKCE (S256) and requests `groups` for role mapping. Claims missing
+          # from the ID token are fetched from userinfo, so no claims policy.
+          - client_id: romm
+            client_name: RomM
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/romm
+            token_endpoint_auth_method: client_secret_basic
+            authorization_policy: romm
+            consent_mode: pre-configured
+            pre_configured_consent_duration: 100y
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+              - groups
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://romm.msng.to/api/oauth/openid
         jwks:
           - key_id: RS256
             algorithm: RS256
@@ -733,6 +769,8 @@ authelia:
             path: openhands
           - key: oauth2-proxy-internal
             path: oauth2-proxy-internal
+          - key: romm
+            path: romm
       smtp-creds:
         items:
           - key: password

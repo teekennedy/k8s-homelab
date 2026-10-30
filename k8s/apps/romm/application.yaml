@@ -30,6 +30,11 @@ spec:
       kind: Secret
       name: romm-auth
       namespace: romm
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: romm-oidc-authelia
+      namespace: romm
   project: default
   source:
     path: k8s/apps/romm

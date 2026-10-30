@@ -33,6 +33,18 @@ extraEnv:
   # Hash-based matching that needs no account.
   HASHEOUS_API_ENABLED: "true"
 
+# Login through Authelia (client `romm` in k8s/platform/auth-system). The
+# first OIDC login links to the existing RomM user with the same email.
+oidc:
+  enabled: true
+  clientId: romm
+  serverUrl: https://authelia.msng.to
+  # LLDAP groups. A user in neither list is refused.
+  adminGroups: romm-admins,full-admin
+  userGroups: romm-users
+  # Keep username/password login, e.g. as a fallback while Authelia is down.
+  disableUserpassLogin: false
+
 podSecurityContext:
   seccompProfile:
     type: RuntimeDefault
