@@ -178,7 +178,7 @@ ddnsUpdater:
   enabled: true
   image:
     repository: alpine/curl
-    tag: "8.21.0@sha256:a1c44bab54d88e18ea9a6a4ecefab7f2d230b968567b78960fcaff8d51b7f067"
+    tag: "8.22.0@sha256:f05779b04a6f3c6f228c67118786f5c80d4c4922dd79b0b24c92dc10a74f594f"
   period: "300" # seconds
   publicIpProvider: https://checkip.amazonaws.com
   resources:
