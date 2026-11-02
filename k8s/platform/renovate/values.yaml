@@ -7,7 +7,7 @@ renovate:
   image:
     registry: ghcr.io
     repository: renovatebot/renovate
-    tag: 44.200.1@sha256:d2c9fe4124062e44b64b568f038fedf661ff86dcd6bc6f8d56c57a6d1889c3be
+    tag: 44.200.2@sha256:165e8e95bc337faede7558d7c7c30f2a0d57f52a444d6ddf92d83b6024e88447
   cronjob:
     # Hourly, at a static random offset (22m). A run takes a few minutes; a
     # ticked Dependency Dashboard box or a new release waits at most an hour.
