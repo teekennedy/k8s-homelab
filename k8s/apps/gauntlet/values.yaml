@@ -50,7 +50,7 @@ rollPage:
     # Python with no third-party packages: server.py only uses the standard
     # library. Its Python must match files/roll-page/.python-version.
     repository: ghcr.io/astral-sh/uv
-    tag: python3.14-alpine@sha256:a069b57ec30ef94da43700a7332b162a13adb0b8a1cfba4e0b62c1a9727153c4
+    tag: python3.14-alpine@sha256:df6ea28f3caf5eb77ebae34d38e9b177b41a4e58ee963b1cbc5c8c1c92710238
   port: 8080
   romm:
     # In-cluster API address, used by the server.
