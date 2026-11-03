@@ -16,7 +16,7 @@ import (
 // production cluster's.
 //
 // renovate: datasource=docker depName=rancher/k3s
-const k3sImage = "rancher/k3s:v1.37.1-k3s1@sha256:ca7f37d993d82ef0dcdcfecb2e0e2618ea541dbaffc620c8cedebe01a82acd0d"
+const k3sImage = "rancher/k3s:v1.37.2-k3s1@sha256:21ea6e0fac4e3930c2ce8aa40ddd41a8b18cb3e9a0222c030dc005e7e88c4332"
 
 // One k3s cluster: starting it, reaching it from a Dagger container, proving a
 // kubeconfig still points at it, and stopping it. A cluster is either created
