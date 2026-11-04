@@ -5,7 +5,7 @@ psql:
 forgejoResources:
   # Deliberately in values.yaml (not templates/forgejo-resources.yaml) so
   # that renovate can pick it up.
-  image: ghcr.io/teekennedy/k8s-homelab:forgejo-resources-1.0.5@sha256:cc5b39bef1b22c1b363d3efba54622229681c158f1965b13fb1a9608ef2a2419
+  image: ghcr.io/teekennedy/k8s-homelab:forgejo-resources-1.0.6@sha256:95cf08c0e24f812f51f207a0d84d1bd8ece2e23c0588c1ecf800a2813f4e59c9
   waitImage: alpine:3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 
 # Valkey replication set + Sentinel, from the valkey-instance library chart
