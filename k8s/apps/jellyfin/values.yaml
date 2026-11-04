@@ -5,7 +5,7 @@ qbittorrentPasswordHash:
   # Deliberately in values.yaml (not templates/qbittorrent-password-hash-job.yaml)
   # so that renovate can pick them up.
   pythonImage: python:3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72
-  kubectlImage: bitnami/kubectl:latest@sha256:bedd34c910e2a5ce9836813d16444af449d7fe07a29136d59f34e861e8e660c5
+  kubectlImage: bitnami/kubectl:latest@sha256:8f59408f9e896fc8992a0660a56687545bd06751f26531b4a26fca6d5dc7562d
 
 # Prometheus resources this chart owns. They live here rather than in
 # monitoring-system so that a jellyfin deployment carries its own scrape
