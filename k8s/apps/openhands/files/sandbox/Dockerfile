@@ -11,7 +11,7 @@ FROM ghcr.io/openhands/agent-server:1.60.1-python@sha256:b43ee580c2177280c81cb80
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 ARG KUBECTL_VERSION=v1.37.2
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
-ARG CLAUDE_ADAPTER_VERSION=0.99.0
+ARG CLAUDE_ADAPTER_VERSION=0.99.1
 # Must match the engine (k8s/platform/dagger-engine/values.yaml), so Renovate
 # does not track it on its own.
 ARG DAGGER_VERSION=1.0.0-beta.20
