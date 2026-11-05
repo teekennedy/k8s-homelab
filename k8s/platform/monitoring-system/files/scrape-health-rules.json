@@ -19,7 +19,7 @@
         },
         {
           "alert": "PrometheusScrapeGroupDisappeared",
-          "expr": "group by (job, namespace, service, node, endpoint, metrics_path) (present_over_time(up[24h]))\nunless\ngroup by (job, namespace, service, node, endpoint, metrics_path) (up)",
+          "expr": "(\n  group by (job, namespace, service, node, endpoint, metrics_path) (present_over_time(up[24h]))\n  unless\n  group by (job, namespace, service, node, endpoint, metrics_path) (up)\n)\nunless on (namespace, service)\n(\n  (\n    group by (namespace, service) (present_over_time(kube_service_info[24h]))\n    unless\n    group by (namespace, service) (kube_service_info)\n  )\n  and on () (count(kube_service_info) > 0)\n)\nunless on (job)\n(\n  (\n    group by (job) (label_replace(present_over_time(prometheus_target_scrape_pool_targets{scrape_job=~\"podMonitor/.+\"}[24h]), \"job\", \"$1\", \"scrape_job\", \"podMonitor/(.+)/[0-9]+\"))\n    unless\n    group by (job) (label_replace(prometheus_target_scrape_pool_targets{scrape_job=~\"podMonitor/.+\"}, \"job\", \"$1\", \"scrape_job\", \"podMonitor/(.+)/[0-9]+\"))\n  )\n  and on () (count(prometheus_target_scrape_pool_targets) > 0)\n)\n",
           "for": "30m",
           "labels": {
             "severity": "warning",
@@ -27,7 +27,7 @@
           },
           "annotations": {
             "summary": "Scrape group {{ $labels.job }} disappeared",
-            "description": "A scrape group seen in the last 24 hours has been absent for 30 minutes. Check ServiceMonitor/PodMonitor/ScrapeConfig discovery and endpoints. This can also indicate intentional removal; it expires after the 24-hour history window. Pod/instance labels are ignored to tolerate replacements. Stable node labels are retained where the scraper supplies them."
+            "description": "A scrape group seen in the last 24 hours has been absent for 30 minutes. Check ServiceMonitor/PodMonitor/ScrapeConfig discovery and endpoints. Groups are excluded once their removal is observed: the backing Service was deleted (kube_service_info), or the PodMonitor was deleted (its scrape pool left Prometheus). Each exclusion turns off if its source metric is missing entirely, so a broken kube-state-metrics or self-scrape fails closed. Other removals (ScrapeConfigs, Probes, Services still present) expire after the 24-hour history window. Pod/instance labels are ignored to tolerate replacements. Stable node labels are retained where the scraper supplies them."
           }
         },
         {

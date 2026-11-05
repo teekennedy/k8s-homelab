@@ -518,7 +518,6 @@ kube-prometheus-stack:
       - mutatingwebhookconfigurations
       - networkpolicies
       - secrets
-      - services
       - storageclasses
       - validatingwebhookconfigurations
       - volumeattachments
@@ -528,6 +527,10 @@ kube-prometheus-stack:
       - kube_replicaset_(created|metadata_generation|spec_replicas|status_[a-z_]+|annotations|labels)
       - kube_pod_(tolerations|status_qos_class|status_scheduled|status_scheduled_time|status_initialized_time|status_ready_time|status_container_ready_time|service_account|scheduler|restart_policy|ips|created|spec_volumes_[a-z_]+|init_container_state_started|container_state_started)
       - kube_[a-z_]+_(created|annotations)
+      # Services are collected only for kube_service_info, which
+      # PrometheusScrapeGroupDisappeared uses to tell a deleted Service apart
+      # from a broken monitor.
+      - kube_service_(labels|spec_[a-z_]+|status_[a-z_]+)
       - kube_(pod|deployment|statefulset|daemonset|node|namespace|cronjob|persistentvolume|poddisruptionbudget)_labels
     rbac:
       extraRules:
