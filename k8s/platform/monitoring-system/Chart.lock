@@ -7,7 +7,7 @@ dependencies:
   version: 7.5.0
 - name: alloy
   repository: https://grafana.github.io/helm-charts
-  version: 1.14.4
+  version: 1.15.0
 - name: prometheus-blackbox-exporter
   repository: oci://ghcr.io/prometheus-community/charts
   version: 11.21.1
@@ -17,5 +17,5 @@ dependencies:
 - name: opentelemetry-collector
   repository: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
   version: 0.178.2
-digest: sha256:7ec5ee472a0a6f03bd0eff01f5396ad8581ccef0139ee7a37cfda781280d4397
-generated: "2026-11-05T20:25:25.097861426Z"
+digest: sha256:4f10f85a9d67448ae668ce35abfaaeffeb7b92571852e034fa11e7b87a2d8e69
+generated: "2026-11-05T22:27:25.948385133Z"
