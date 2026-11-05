@@ -43,9 +43,13 @@ spec:
         # server or agent StatefulSet pods (woodpecker-server-0, woodpecker-agent-0)
         # or the rollout job (nixos-rollout-*), which must not gate reboots since
         # waiting for reboots is its entire job.
+        #
+        # `== 1` is required: kube-state-metrics emits a series for every phase
+        # of every pod, valued 0 when the pod is not in that phase, so a leftover
+        # Succeeded step pod would otherwise count as running forever.
         - alert: WoodpeckerPipelineRunning
           expr: |
-            count(kube_pod_status_phase{namespace="{{ .Values.woodpeckerGate.namespace }}", pod=~"{{ .Values.woodpeckerGate.podPattern }}", phase="Running"}) > 0
+            count(kube_pod_status_phase{namespace="{{ .Values.woodpeckerGate.namespace }}", pod=~"{{ .Values.woodpeckerGate.podPattern }}", phase="Running"} == 1) > 0
           labels:
             severity: info
             component: ci
