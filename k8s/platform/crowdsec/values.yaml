@@ -10,7 +10,7 @@ crowdsec:
   container_runtime: containerd
   image:
     repository: crowdsecurity/crowdsec
-    tag: v1.8.1-slim@sha256:07e51c9526b6e8f43180f053a69966782d1be0d54a5445f691868bbba4a40d31
+    tag: v1.8.2-slim@sha256:aa9f6343424bd76f042e9c347fc13b37c2db86dcc763465c2e47744b2442a4c7
 
   config:
     config.yaml.local: |
