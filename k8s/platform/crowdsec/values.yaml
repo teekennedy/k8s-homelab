@@ -95,6 +95,14 @@ crowdsec:
           secretKeyRef:
             name: crowdsec-psql-app
             key: password
+      # Registers the Traefik bouncer as "traefik" at startup. LAPI only adds
+      # a bouncer whose name is new, so a changed key needs
+      # `cscli bouncers delete traefik` and a LAPI restart.
+      - name: BOUNCER_KEY_traefik
+        valueFrom:
+          secretKeyRef:
+            name: crowdsec-bouncer-key
+            key: apiKey
 
     # Dashboard metrics
     metrics:
@@ -254,36 +262,3 @@ traefikBouncer:
     # add ~2ms at this size, ~5ms at 256 KiB and ~20ms at 1 MiB; attack
     # payloads are small.
     bodyLimit: 65536
-
-# Bootstrap middleware job configuration
-bootstrapMiddleware:
-  # Enable the bootstrap job
-  enabled: true
-
-  # Container image for running the bootstrap script. The python-flavoured tag
-  # ships an interpreter, which must match
-  # files/bootstrap-middleware/.python-version: uv never downloads one.
-  image:
-    repository: ghcr.io/astral-sh/uv
-    tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
-    pullPolicy: IfNotPresent
-
-  # Resource limits for the bootstrap job
-  resources:
-    limits:
-      memory: 256Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
-
-  # Security context for the bootstrap job
-  securityContext:
-    allowPrivilegeEscalation: false
-    runAsNonRoot: true
-    runAsUser: 65534
-
-  # Node selector for the bootstrap job
-  nodeSelector: {}
-
-  # Tolerations for the bootstrap job
-  tolerations: []

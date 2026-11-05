@@ -18,26 +18,18 @@ spec:
         # and attempt a patch that Kubernetes rejects as reducing the storage request.
         - /spec/resources/requests/storage
       kind: PersistentVolumeClaim
-    # Bouncer key is managed manually after initial deploy
+    # Generated secrets
     - jsonPointers:
         - /data
         - /stringData
       kind: Secret
       name: crowdsec-bouncer-key
       namespace: crowdsec
-    # crowdsec-secrets is a generated secret
     - jsonPointers:
         - /data
         - /stringData
       kind: Secret
       name: crowdsec-secrets
-      namespace: crowdsec
-    # Middleware changes made by bootstrap job
-    - group: traefik.io
-      jqPathExpressions:
-        - .spec.plugin."crowdsec-bouncer".CrowdsecLapiKey
-      kind: Middleware
-      name: crowdsec-bouncer
       namespace: crowdsec
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition

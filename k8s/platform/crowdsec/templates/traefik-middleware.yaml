@@ -17,6 +17,10 @@ metadata:
   labels:
     app.kubernetes.io/name: crowdsec
     app.kubernetes.io/component: traefik-bouncer
+  annotations:
+    # Apply after LAPI is healthy, so the bouncer key is registered before
+    # Traefik starts using it.
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   plugin:
     # Plugin name must match the key in traefik's experimental.plugins config
@@ -37,10 +41,8 @@ spec:
       crowdsecLapiScheme: http
       crowdsecLapiHost: crowdsec-service.{{ .Release.Namespace }}.svc.cluster.local:8080
 
-      # API key for bouncer authentication
-      # NOTE: You must replace this with a real key generated from CrowdSec LAPI:
-      #   kubectl -n crowdsec exec -it deployment/crowdsec-lapi -- cscli bouncers add traefik-bouncer -o raw
-      CrowdsecLapiKey: "REPLACE_WITH_REAL_KEY"
+      # Traefik replaces the URN with the value of the Secret key.
+      CrowdsecLapiKey: "urn:k8s:secret:crowdsec-bouncer-key:apiKey"
 
       # Update interval for stream mode (in seconds)
       updateIntervalSeconds: {{ .Values.traefikBouncer.updateInterval }}

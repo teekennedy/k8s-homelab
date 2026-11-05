@@ -31,54 +31,25 @@ contributes to bans.
 - **CrowdSec Agent**: DaemonSet that monitors Traefik pod logs
 - **CrowdSec AppSec**: 2-replica Deployment serving the WAF on port 7422
 - **Traefik Bouncer Plugin**: Runs inside Traefik, blocks bad IPs
-- **Bootstrap Job**: Post-install job that configures the bouncer automatically
 
-## Post-Deployment Setup
+## Bouncer API Key
 
-### Automated Bootstrap
+The bouncer key needs no setup:
 
-The bouncer setup is **fully automated** via a Kubernetes Job that runs after deployment. The job:
+1. kubernetes-secret-generator fills the `crowdsec-bouncer-key` Secret (`apiKey`).
+2. LAPI registers a bouncer named `traefik` with that key at startup, from the
+   `BOUNCER_KEY_traefik` env var.
+3. The Middleware sets `CrowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:apiKey`,
+   and Traefik substitutes the Secret's value when it builds the middleware.
 
-1. ✅ Generates a bouncer API key from CrowdSec LAPI
-2. ✅ Updates the Traefik middleware with the key
-3. ✅ Restarts Traefik to apply changes
-4. ✅ Is idempotent (safe to re-run)
-
-**Monitor the bootstrap job:**
+LAPI only registers a bouncer whose name doesn't exist yet. If the Secret is
+regenerated while the LAPI database survives, delete the stale bouncer and
+restart LAPI:
 
 ```bash
-# Watch the job
-kubectl -n crowdsec get jobs -w
-
-# View job logs
-kubectl -n crowdsec logs -f job/crowdsec-bootstrap-middleware
+kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli bouncers delete traefik
+kubectl -n crowdsec rollout restart deployment crowdsec-lapi
 ```
-
-**Expected output (first run):**
-```
-CrowdSec Bouncer Middleware Bootstrap Starting...
-Loaded in-cluster Kubernetes configuration
-Middleware has placeholder key, needs configuration
-Found LAPI pod: crowdsec-lapi-xxx
-Generating bouncer key in pod crowdsec-lapi-xxx...
-Successfully generated bouncer key
-Updating middleware crowdsec-bouncer...
-Successfully updated middleware
-Restarting Traefik deployment...
-Triggered Traefik restart, waiting for rollout...
-Traefik rollout completed successfully
-Bootstrap completed successfully
-```
-
-**Expected output (subsequent runs):**
-```
-CrowdSec Bouncer Middleware Bootstrap Starting...
-Loaded in-cluster Kubernetes configuration
-Middleware already configured with a valid bouncer key
-Bootstrap completed (already configured)
-```
-
-The job is **idempotent** - it detects if the middleware already has a valid key and skips generation to avoid creating duplicate bouncers.
 
 ### Verify Bouncer Connection
 
@@ -91,7 +62,7 @@ kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli bouncers list
 Expected output:
 ```
 Name              IP Address      Valid  Last API pull         Type                       Version  Auth Type
-traefik-bouncer   10.42.x.x       ✔️      2026-01-23T14:30:00Z  crowdsec-bouncer-traefik          api-key
+traefik           10.42.x.x       ✔️      2026-01-23T14:30:00Z  crowdsec-bouncer-traefik          api-key
 ```
 
 ### Apply Middleware to Ingresses
@@ -275,15 +246,6 @@ crowdsec:
 
 ## Configuration
 
-### Disable Bootstrap Job
-
-If you want to configure the bouncer manually, disable the bootstrap job in `values.yaml`:
-
-```yaml
-bootstrapMiddleware:
-  enabled: false
-```
-
 ### Adjust Stream Mode Update Interval
 
 Edit `values.yaml`:
@@ -330,37 +292,14 @@ Browse available collections: https://hub.crowdsec.net/browse/#collections
 
 ### Bouncer Shows as Invalid
 
-If `cscli bouncers list` shows "Invalid" or bouncer isn't listed:
+If `cscli bouncers list` shows "Invalid" or the `traefik` bouncer isn't listed:
 
-**Option 1: Re-run the bootstrap job (recommended)**
-
-Delete the job to trigger a re-run on next sync:
-
-```bash
-kubectl -n crowdsec delete job crowdsec-bootstrap-middleware
-argocd app sync crowdsec
-```
-
-**Option 2: Manual setup**
-
-If the bootstrap job fails, you can set up the bouncer manually:
-
-1. Generate a bouncer API key:
-   ```bash
-   kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli bouncers add traefik-bouncer -o raw
-   ```
-
-2. Update the middleware with the key:
-   ```bash
-   kubectl -n crowdsec edit middleware crowdsec-bouncer
-   ```
-
-   Find `CrowdsecLapiKey: "REPLACE_WITH_REAL_KEY"` and replace with the generated key.
-
-3. Restart Traefik:
-   ```bash
-   kubectl -n kube-system rollout restart deployment traefik
-   ```
+- Check that the `crowdsec-bouncer-key` Secret has an `apiKey`.
+- Check the LAPI startup logs for `Registered bouncer for traefik`.
+- If the key changed, follow [Bouncer API Key](#bouncer-api-key) to
+  re-register it.
+- Check the Traefik logs for errors resolving the `urn:k8s:secret:` reference.
+  Traefik drops a middleware whose Secret it can't read.
 
 ### Agent Not Detecting Attacks
 
@@ -385,21 +324,6 @@ kubectl -n kube-system logs deployment/traefik | grep -i plugin
 ```
 
 The CrowdSec plugin is configured in `nix/modules/k3s/k3s.nix` as part of the Traefik HelmChartConfig. If you see "plugin not found", verify the plugin configuration is present in the Nix config and rebuild the system.
-
-### Bootstrap Job Fails
-
-Check the job logs for errors:
-
-```bash
-kubectl -n crowdsec logs job/crowdsec-bootstrap-middleware
-```
-
-Common issues:
-- **LAPI pod not ready**: Wait for LAPI to start, then delete the job to retry
-- **Middleware not found**: Ensure the middleware resource was created
-- **Permission errors**: Check RBAC resources (ServiceAccount, Role, ClusterRole)
-
-The bootstrap script source is in `files/bootstrap-middleware/` if you need to debug or modify it.
 
 ### High False Positive Rate
 
