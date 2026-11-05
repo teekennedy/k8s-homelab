@@ -8,7 +8,7 @@
     nixos-facter-modules.url = "github:nix-community/nixos-facter-modules?ref=main";
     # TODO: revert to github:NixOS/nixpkgs/nixos-unstable once k3s embeds the
     # gateway-api-crd chart upstream.
-    nixpkgs.url = "github:teekennedy/nixpkgs/k3s-embed-all-charts";
+    nixpkgs.url = "github:teekennedy/nixpkgs/k3s-embed-all-charts-rebased";
     disko.url = "github:nix-community/disko?ref=master";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence?ref=master";
