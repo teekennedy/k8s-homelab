@@ -1,0 +1,14 @@
+[project]
+name = "qbittorrent-password-hash"
+version = "1.0.0"
+description = "Generates the qBittorrent WebUI password hash for the jellyfin chart"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

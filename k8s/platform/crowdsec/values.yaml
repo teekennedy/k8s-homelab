@@ -265,7 +265,7 @@ bootstrapMiddleware:
   # files/bootstrap-middleware/.python-version: uv never downloads one.
   image:
     repository: ghcr.io/astral-sh/uv
-    tag: python3.14-alpine@sha256:df6ea28f3caf5eb77ebae34d38e9b177b41a4e58ee963b1cbc5c8c1c92710238
+    tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
     pullPolicy: IfNotPresent
 
   # Resource limits for the bootstrap job

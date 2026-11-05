@@ -69,10 +69,9 @@ unavailable, which is also when Jellyfin has nothing to stream.
 
 ## How it runs
 
-`exporter.py` is shipped as a ConfigMap and run with `uv run --script` on
-`ghcr.io/astral-sh/uv:python3.14-alpine`. Its dependencies live in the PEP 723
-header at the top of the file; keep that pin and `pyproject.toml` in step, since
-the tests resolve against the latter.
+`exporter.py` is shipped as a ConfigMap and run with `uv run --script`. Its
+dependencies live in the PEP 723 header at the top of the file; keep that pin
+and `pyproject.toml` in step, since the tests resolve against the latter.
 
 Because `uv` reads the script once at startup, a ConfigMap change on its own
 would leave the running interpreter on the old code. The Deployment therefore

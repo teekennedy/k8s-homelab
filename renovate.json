@@ -333,6 +333,20 @@
       "groupName": "dagger modules"
     },
     {
+      "description": "Matcher for uv image tags.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/astral-sh/uv"],
+      "versioning": "regex:^python(?<major>\\d+)\\.(?<minor>\\d+)-(?<compatibility>.+)$"
+    },
+    {
+      "description": "One PR for every Python interpreter bump, ensuring .python-version matches the version in the uv base image.",
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["python", "ghcr.io/astral-sh/uv"],
+      "matchUpdateTypes": ["major", "minor"],
+      "groupName": "python interpreter",
+      "groupSlug": "python-interpreter"
+    },
+    {
       "description": "Give lock file maintenance PRs a title that identifies the lock file type and directory, instead of the generic default 'chore(deps): lock file maintenance' that's identical across every PR.",
       "matchManagers": [
         "nix"
