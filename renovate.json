@@ -538,6 +538,18 @@
       "sourceUrl": "https://github.com/grafana/logs-drilldown"
     },
     {
+      "description": "The oauth2-proxy chart version (10.x) is not the app version (7.x), so the chart's sourceUrl metadata (the app repo, which has no GitHub Releases and only vX.Y.Z tags) never matches. The chart is published from oauth2-proxy/manifests, which tags and releases each version as oauth2-proxy-<version>.",
+      "matchDatasources": [
+        "docker",
+        "helm"
+      ],
+      "matchPackageNames": [
+        "oauth2-proxy",
+        "ghcr.io/oauth2-proxy/charts/oauth2-proxy"
+      ],
+      "sourceUrl": "https://github.com/oauth2-proxy/manifests"
+    },
+    {
       "description": "Track smallstep/step-cli changelog from GitHub releases",
       "matchDatasources": [
         "docker"
