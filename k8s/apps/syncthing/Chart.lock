@@ -1,9 +1,9 @@
 dependencies:
 - name: oauth2-proxy
   repository: oci://ghcr.io/oauth2-proxy/charts
-  version: 10.7.1
+  version: 10.7.2
 - name: oauth2-proxy-instance
   repository: file://../../charts/oauth2-proxy-instance
   version: 0.1.0
-digest: sha256:731a93478a1222f88b9625c94b9efb05de437c8dfcc92c03667682a5d9448df7
-generated: "2026-10-21T12:22:39.872973-06:00"
+digest: sha256:bef706681c8b7e5f326ef4f5379cca61583a2c162bf2e0e384037d83c8a04764
+generated: "2026-11-05T19:27:29.415880712Z"

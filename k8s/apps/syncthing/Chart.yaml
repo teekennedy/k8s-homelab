@@ -3,14 +3,14 @@ name: syncthing
 description: Syncthing continuous file synchronization, exposed internally via Gateway API.
 type: application
 # Bump on any change to the chart templates/values.
-version: 0.2.1
+version: 0.2.2
 # Tracks the syncthing/syncthing image tag deployed by this chart.
 appVersion: "2.1.0"
 dependencies:
   # Dedicated oauth2-proxy instance reverse-proxying the GUI, which has no auth
   # of its own. Absorbed from the former k8s/platform/oauth2-proxy-internal.
   - name: oauth2-proxy
-    version: 10.7.1
+    version: 10.7.2
     repository: oci://ghcr.io/oauth2-proxy/charts
   # Shared glue for that instance: the mittwald/reflector Secret. Library chart,
   # renders nothing itself.
