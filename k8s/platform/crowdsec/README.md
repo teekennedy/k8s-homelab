@@ -42,13 +42,32 @@ The bouncer key needs no setup:
 3. The Middleware sets `CrowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:apiKey`,
    and Traefik substitutes the Secret's value when it builds the middleware.
 
+### Changing the Key
+
 LAPI only registers a bouncer whose name doesn't exist yet. If the Secret is
-regenerated while the LAPI database survives, delete the stale bouncer and
-restart LAPI:
+regenerated while the LAPI database survives, delete the stale bouncer,
+restart LAPI, then restart Traefik:
 
 ```bash
 kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli bouncers delete traefik
 kubectl -n crowdsec rollout restart deployment crowdsec-lapi
+kubectl -n crowdsec rollout status deployment crowdsec-lapi
+kubectl -n kube-system rollout restart deployment traefik
+```
+
+Traefik needs the restart because the plugin starts its decision-stream poller
+once per Traefik process, with the key the first instance had. A Middleware
+reload hands the new key to AppSec calls but not to the poller.
+
+When one key is used from several IPs, LAPI lists it once per IP as
+`traefik@<ip>` entries (`auto_created`). `cscli bouncers delete traefik`
+removes them along with `traefik`. cscli refuses to delete these entries on
+their own, and once their parent is gone it reports `couldn't find a parent
+bouncer`. To clear orphaned ones, recreate the parent and delete it:
+
+```bash
+kubectl -n crowdsec exec deployment/crowdsec-lapi -- sh -c \
+  'cscli bouncers add <name> >/dev/null && cscli bouncers delete <name>'
 ```
 
 ### Verify Bouncer Connection
@@ -296,7 +315,7 @@ If `cscli bouncers list` shows "Invalid" or the `traefik` bouncer isn't listed:
 
 - Check that the `crowdsec-bouncer-key` Secret has an `apiKey`.
 - Check the LAPI startup logs for `Registered bouncer for traefik`.
-- If the key changed, follow [Bouncer API Key](#bouncer-api-key) to
+- If the key changed, follow [Changing the Key](#changing-the-key) to
   re-register it.
 - Check the Traefik logs for errors resolving the `urn:k8s:secret:` reference.
   Traefik drops a middleware whose Secret it can't read.

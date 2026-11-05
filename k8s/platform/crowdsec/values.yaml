@@ -97,7 +97,8 @@ crowdsec:
             key: password
       # Registers the Traefik bouncer as "traefik" at startup. LAPI only adds
       # a bouncer whose name is new, so a changed key needs
-      # `cscli bouncers delete traefik` and a LAPI restart.
+      # `cscli bouncers delete traefik` and LAPI and Traefik restarts (see
+      # README.md).
       - name: BOUNCER_KEY_traefik
         valueFrom:
           secretKeyRef:
