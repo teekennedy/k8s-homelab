@@ -43,12 +43,11 @@ def test_reconcile_keeps_other_settings(arr):
     assert body["username"] == "admin"
 
 
-def test_reconcile_never_sends_stored_password_back(arr):
+def test_reconcile_sends_stored_password_back_unchanged(arr):
     reconcile.reconcile("radarr", arr.url, API_KEY, WANTED)
 
     body = arr.requests[-1]["body"]
-    assert body["password"] == ""
-    assert body["passwordConfirmation"] == ""
+    assert body["password"] == "stored-hash"
 
 
 def test_reconcile_is_a_noop_when_up_to_date(arr, capsys):

@@ -47,9 +47,10 @@ def reconcile(app: str, url: str, api_key: str, wanted: dict) -> dict:
     if not changes:
         print(f"{app}: backup settings already up to date")
         return changes
-    # A non-empty password makes the API re-save the auth user; Prowlarr and
-    # Radarr return the stored hash here, so never send it back.
-    body = {**current, **changes, "password": "", "passwordConfirmation": ""}
+    # The API returns the stored password hash and rejects an empty password
+    # when authentication is on. Sending the hash back unchanged leaves the
+    # user as is; only a different value gets re-hashed.
+    body = {**current, **changes}
     request("PUT", f"{url}/{current['id']}", api_key, body)
     print(f"{app}: updated {changes}")
     return changes
