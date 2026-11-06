@@ -346,6 +346,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
 			return nil, (*Release).Lint(&parent, ctx)
+		case "LintPython":
+			var parent Release
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Release).LintPython(&parent, ctx)
 		case "Output":
 			var parent Release
 			err = json.Unmarshal(parentJSON, &parent)
@@ -439,6 +446,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Lints the release's chart with `helmfile lint`.\n\nhelmfile lint runs helm lint with the release's merged values. It reuses the\ndependencies the render built.").
 							WithSourceMap(dag.SourceMap("helmfile.go", 240, 1)).
+							WithCheck()).
+					WithFunction(
+						dag.Function("LintPython",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Lints that Python ConfigMaps run as uv projects on their Python.\n\nAny container that mounts a ConfigMap carrying .py files must be able to see\n.python-version, pyproject.toml and uv.lock from it, run on a\nghcr.io/astral-sh/uv:pythonX.Y image whose X.Y matches .python-version, and\nstart with `uv run --frozen --no-python-downloads`. That way the pod runs on\nthe Python and locked dependencies the python module tested.").
+							WithSourceMap(dag.SourceMap("helmfile_python.go", 37, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("Output",

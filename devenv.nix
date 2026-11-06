@@ -7,6 +7,7 @@
   ...
 }: let
   dagger = inputs.dagger.packages.${pkgs.stdenv.hostPlatform.system}.dagger;
+  python = pkgs.python315;
 in {
   cachix.enable = true;
   cachix.pull = ["pre-commit-hooks"];
@@ -23,11 +24,12 @@ in {
 
   # uv ships its own CPython by default, which means every `uv run` in CI
   # re-downloads an interpreter that the profile already provides. Point uv at
-  # the Nix one instead. Every pyproject.toml in this repo asks for >=3.11 or
-  # >=3.12, so the profile's python3 satisfies all of them; if that ever stops
-  # being true, uv fails loudly rather than silently downloading, which is the
-  # error we want.
-  env.UV_PYTHON = pkgs.python3.interpreter;
+  # the Nix one instead; if it doesn't satisfy a project, uv fails loudly
+  # rather than silently downloading, which is the error we want.
+  #
+  # The minor version must match every .python-version in the repo and the
+  # uv images that run those projects; `dagger check python` enforces it.
+  env.UV_PYTHON = python.interpreter;
   env.UV_PYTHON_DOWNLOADS = "never";
   env.UV_PYTHON_PREFERENCE = "only-system";
 
@@ -73,7 +75,7 @@ in {
         kubernetes-helm
         kubernetes-polaris
         opentofu
-        python3
+        python
         trivy # The successor to tfsec, apparently
         uv
         woodpecker-cli

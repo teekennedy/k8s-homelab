@@ -2,7 +2,7 @@
 name = "qbittorrent-password-hash"
 version = "1.0.0"
 description = "Generates the qBittorrent WebUI password hash for the jellyfin chart"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 dependencies = []
 
 [dependency-groups]

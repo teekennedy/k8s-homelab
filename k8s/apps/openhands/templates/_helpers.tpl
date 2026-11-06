@@ -112,6 +112,8 @@ templates/app-server.yaml.
   path: pyproject.toml
 - key: uv.lock
   path: uv.lock
+- key: .python-version
+  path: .python-version
 {{- range $path, $_ := .Files.Glob "files/app-server/app_server/*.py" }}
 - key: {{ printf "app_server.%s" (base $path) }}
   path: {{ printf "app_server/%s" (base $path) }}

@@ -4,7 +4,10 @@
 qbittorrentPasswordHash:
   # Deliberately in values.yaml (not templates/qbittorrent-password-hash-job.yaml)
   # so that renovate can pick them up.
-  pythonImage: python:3.15-alpine@sha256:20a82dbc2783112ddb91d1534603f802d222a3e63e593cd002eb2ac534e70211
+  image:
+    # Python must match files/qbittorrent-password-hash/.python-version.
+    repository: ghcr.io/astral-sh/uv
+    tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
   kubectlImage: bitnami/kubectl:latest@sha256:8f59408f9e896fc8992a0660a56687545bd06751f26531b4a26fca6d5dc7562d
 
 # Static NFS volumes for the apps' own backups (templates/nas-backups.yaml),
@@ -45,7 +48,7 @@ monitoring:
 #
 # Deliberately not an app-template controller: its Deployment, Service and
 # ConfigMap live in templates/ so the pod template can carry a checksum over
-# files/jellyfin-exporter/exporter.py. app-template can only checksum ConfigMaps
+# the project in files/jellyfin-exporter/. app-template can only checksum ConfigMaps
 # it generates from its own values, and a subchart cannot read the parent
 # chart's files -- see templates/jellyfin-exporter-deployment.yaml. Because
 # those are all chart-owned, `enabled` here is the single switch for the whole
@@ -725,23 +728,39 @@ app-template:
             limits:
               memory: 192Mi
         # Backup interval/retention live in each app's database, which
-        # configarr doesn't manage. See files/configMaps/arr-backup-settings.
+        # configarr doesn't manage. See files/arr-backup-settings.
         arr-backup-settings:
+          # Python must match files/arr-backup-settings/.python-version.
           image:
-            repository: python
-            tag: 3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72
-          command: ["python", "/scripts/reconcile.py"]
+            repository: ghcr.io/astral-sh/uv
+            tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
+          # uv builds the project's environment beside it, and /app is a
+          # read-only ConfigMap mount, so run from a writable copy.
+          command:
+            - sh
+            - -c
+            - |-
+              set -eu
+              cp -rL /app/. /project/
+              mkdir -p /project/tmp
+              cd /project
+              exec uv run --frozen --no-dev --no-cache --no-python-downloads --link-mode copy \
+                python reconcile.py
+          env:
+            HOME: /project
+            TMPDIR: /project/tmp
+            PYTHONUNBUFFERED: "1"
           envFrom:
             - secretRef:
                 name: api-keys
           resources:
             requests:
               cpu: 10m
-              memory: 32Mi
-            limits:
               memory: 64Mi
+            limits:
+              memory: 128Mi
     # Jellyfin only backs up on request, so this calls its backup API nightly
-    # and then deletes the older archives. See files/configMaps/jellyfin-backup.
+    # and then deletes the older archives. See files/jellyfin-backup.
     jellyfin-backup:
       type: cronjob
       cronjob:
@@ -757,10 +776,22 @@ app-template:
           runAsGroup: *gid
       containers:
         jellyfin-backup:
+          # Python must match files/jellyfin-backup/.python-version.
           image:
-            repository: python
-            tag: 3.14-alpine@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72
-          command: ["python", "/scripts/backup.py"]
+            repository: ghcr.io/astral-sh/uv
+            tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
+          # uv builds the project's environment beside it, and /app is a
+          # read-only ConfigMap mount, so run from a writable copy.
+          command:
+            - sh
+            - -c
+            - |-
+              set -eu
+              cp -rL /app/. /project/
+              mkdir -p /project/tmp
+              cd /project
+              exec uv run --frozen --no-dev --no-cache --no-python-downloads --link-mode copy \
+                python backup.py
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -769,6 +800,9 @@ app-template:
           env:
             JELLYFIN_URL: http://jellyfin-main:8096
             BACKUP_DIR: /backups
+            HOME: /project
+            TMPDIR: /project/tmp
+            PYTHONUNBUFFERED: "1"
           envFrom:
             # Manual: create an API key named `jellyfin-backup` in the Jellyfin
             # dashboard, then
@@ -778,9 +812,9 @@ app-template:
           resources:
             requests:
               cpu: 10m
-              memory: 32Mi
-            limits:
               memory: 64Mi
+            limits:
+              memory: 128Mi
   service:
     main:
       controller: main
@@ -1039,7 +1073,8 @@ app-template:
         main:
           jellyfin:
             - path: /data/log
-    # Jellyfin's own backup folder ({DataPath}/backups) on the NAS.
+    # Jellyfin's own backup folder on the NAS. Jellyfin hardcodes it as
+    # {JELLYFIN_DATA_DIR}/data/backups, so the doubled "data" can't be avoided.
     jellyfin-backups:
       type: persistentVolumeClaim
       existingClaim: jellyfin-jellyfin-backups
@@ -1050,14 +1085,20 @@ app-template:
         jellyfin-backup:
           jellyfin-backup:
             - path: /backups
-    jellyfin-backup-script:
+    jellyfin-backup-project:
       type: configMap
       name: jellyfin-backup
       advancedMounts:
         jellyfin-backup:
           jellyfin-backup:
-            - path: /scripts
+            - path: /app
               readOnly: true
+    jellyfin-backup-workdir:
+      type: emptyDir
+      advancedMounts:
+        jellyfin-backup:
+          jellyfin-backup:
+            - path: /project
     cleanuparr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -1108,8 +1149,14 @@ app-template:
       advancedMounts:
         configarr:
           arr-backup-settings:
-            - path: /scripts
+            - path: /app
               readOnly: true
+    arr-backup-settings-workdir:
+      type: emptyDir
+      advancedMounts:
+        configarr:
+          arr-backup-settings:
+            - path: /project
     seerr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim

@@ -1,4 +1,4 @@
-# Python dev artefacts from files/jellyfin-exporter/.
-files/jellyfin-exporter/.venv
-files/jellyfin-exporter/.pytest_cache
+# Python dev artefacts from the projects under files/.
+files/*/.venv
+files/*/.pytest_cache
 __pycache__

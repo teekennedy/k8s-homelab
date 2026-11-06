@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#     "bcrypt>=4.2.0",
-#     "kubernetes>=31.0.0",
-# ]
-# ///
 """
 Authelia OIDC client secret sync.
 

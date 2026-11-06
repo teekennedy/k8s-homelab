@@ -80,10 +80,10 @@ dagger.lock                 # pinned versions of remote modules and the Go SDK
 | --- | --- | --- | --- | --- |
 | `cue` | | | `export`, `fix`, `format`, `trim` | |
 | `go` | `modules` | per module: `test` | per module: `fix` | per module: `integration-test` |
-| `helmfile` | `releases` | `lint`; per release: `audit`, `lint`, `render`, `validate` | | |
+| `helmfile` | `releases` | `lint`; per release: `audit`, `lint`, `lint-python`, `render`, `validate` | | |
 | `kubernetes` | | | | `integration-test`, `integration-reports`, `dev-cluster`, `dev-cluster-delete` |
 | `nix` | | `test`, `validate`; `lab/build` | `format`; `lab/vendor-hash` | `devenv ci-toolchain`, `devenv toolchain`, `devenv integration-toolchain`, `devenv container`, `devenv ci-release`, `devenv projects`, `devenv update`, `lab binary`, `lab binary-nix`, `builders status`, `image` |
-| `python` | `projects` | per project: `test` | per project: `format`, `lock` | |
+| `python` | `projects` | per project: `lint`, `test` | per project: `format`, `lock` | |
 | `release` | | `build`, `test` | | `image`, `publish` |
 | `terraform` | `modules` | `audit`; per module: `validate` | `format`; per module: `lock` | |
 | `woodpecker` | | `lint` | | |

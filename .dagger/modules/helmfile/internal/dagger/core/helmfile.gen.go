@@ -145,6 +145,7 @@ type HelmfileRelease struct { // helmfile (../../../../../../:0:0)
 	environment *string
 	id          *ID
 	lint        *Void
+	lintPython  *Void
 	name        *string
 	path        *string
 	render      *Void
@@ -252,6 +253,22 @@ func (r *HelmfileRelease) Lint(ctx context.Context) error {
 		return nil
 	}
 	q := r.query.Select("lint")
+
+	return q.Execute(ctx)
+}
+
+// Lints that Python ConfigMaps run as uv projects on their Python.
+//
+// Any container that mounts a ConfigMap carrying .py files must be able to see
+// .python-version, pyproject.toml and uv.lock from it, run on a
+// ghcr.io/astral-sh/uv:pythonX.Y image whose X.Y matches .python-version, and
+// start with `uv run --frozen --no-python-downloads`. That way the pod runs on
+// the Python and locked dependencies the python module tested.
+func (r *HelmfileRelease) LintPython(ctx context.Context) error {
+	if r.lintPython != nil {
+		return nil
+	}
+	q := r.query.Select("lintPython")
 
 	return q.Execute(ctx)
 }

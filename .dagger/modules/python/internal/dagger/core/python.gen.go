@@ -115,6 +115,7 @@ type PythonProject struct { // python (../../../../../../:0:0)
 	refetchID bool
 
 	id   *ID
+	lint *Void
 	path *string
 	test *Void
 }
@@ -191,6 +192,21 @@ func (r *PythonProject) UnmarshalJSON(bs []byte) error {
 	}
 	*r = PythonProject{query: selectNode(dag.QueryBuilder(), id, "PythonProject")}
 	return nil
+}
+
+// Checks .python-version matches devenv's Python.
+//
+// devenv pins uv to its own interpreter (UV_PYTHON) and never downloads one, so
+// a project's tests run on that Python whatever .python-version says. This
+// makes the two agree. helmfile's release lint checks the same file against
+// the uv image that runs the project in the cluster.
+func (r *PythonProject) Lint(ctx context.Context) error {
+	if r.lint != nil {
+		return nil
+	}
+	q := r.query.Select("lint")
+
+	return q.Execute(ctx)
 }
 
 // Refreshes the project's uv.lock to match pyproject.toml.

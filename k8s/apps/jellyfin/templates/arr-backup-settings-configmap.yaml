@@ -1,0 +1,14 @@
+{{- /*
+The uv project in files/arr-backup-settings/, without its tests.
+*/}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arr-backup-settings
+  namespace: {{ .Release.Namespace }}
+data:
+  {{- range list "reconcile.py" "pyproject.toml" "uv.lock" ".python-version" }}
+  {{ . }}: |-
+    {{- $.Files.Get (printf "files/arr-backup-settings/%s" .) | nindent 4 }}
+  {{- end }}

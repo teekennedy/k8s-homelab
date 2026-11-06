@@ -1,7 +1,3 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = ["websockets==17.0.1"]
-# ///
 """Prometheus exporter for Jellyfin playback sessions.
 
 Jellyfin reports an audio-only transcode and a full video encode both as

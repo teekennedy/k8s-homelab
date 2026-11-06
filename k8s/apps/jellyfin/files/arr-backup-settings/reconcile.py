@@ -11,20 +11,23 @@ import os
 import sys
 import urllib.request
 
-BASE_URL = os.environ.get("ARRS_URL", "http://jellyfin-arrs:{port}")
+DEFAULT_BASE_URL = "http://jellyfin-arrs:{port}"
 APPS = {
     "prowlarr": (9696, "v1"),
     "radarr": (7878, "v3"),
     "sonarr": (8989, "v3"),
 }
-WANTED = {
-    "backupFolder": "Backups",
-    "backupInterval": int(os.environ.get("BACKUP_INTERVAL_DAYS", "1")),
-    "backupRetention": int(os.environ.get("BACKUP_RETENTION_DAYS", "1")),
-}
 
 
-def request(method, url, api_key, body=None):
+def wanted_settings(env) -> dict:
+    return {
+        "backupFolder": "Backups",
+        "backupInterval": int(env.get("BACKUP_INTERVAL_DAYS", "1")),
+        "backupRetention": int(env.get("BACKUP_RETENTION_DAYS", "1")),
+    }
+
+
+def request(method: str, url: str, api_key: str, body=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("X-Api-Key", api_key)
@@ -34,31 +37,37 @@ def request(method, url, api_key, body=None):
     return json.loads(payload) if payload else None
 
 
-def reconcile(app, port, version, api_key):
-    url = f"{BASE_URL.format(port=port)}/api/{version}/config/host"
+def reconcile(app: str, url: str, api_key: str, wanted: dict) -> dict:
+    """Bring the app's host config at url in line with wanted.
+
+    Returns the settings that were changed.
+    """
     current = request("GET", url, api_key)
-    changes = {k: v for k, v in WANTED.items() if current.get(k) != v}
+    changes = {k: v for k, v in wanted.items() if current.get(k) != v}
     if not changes:
         print(f"{app}: backup settings already up to date")
-        return
+        return changes
     # A non-empty password makes the API re-save the auth user; Prowlarr and
     # Radarr return the stored hash here, so never send it back.
     body = {**current, **changes, "password": "", "passwordConfirmation": ""}
     request("PUT", f"{url}/{current['id']}", api_key, body)
     print(f"{app}: updated {changes}")
+    return changes
 
 
-def main():
+def main(env=os.environ) -> int:
+    base_url = env.get("ARRS_URL", DEFAULT_BASE_URL)
+    wanted = wanted_settings(env)
     failed = False
     for app, (port, version) in APPS.items():
-        api_key = os.environ[f"{app.upper()}_API_KEY"]
+        url = f"{base_url.format(port=port)}/api/{version}/config/host"
         try:
-            reconcile(app, port, version, api_key)
+            reconcile(app, url, env[f"{app.upper()}_API_KEY"], wanted)
         except Exception as e:  # keep going so one app can't block the others
-            print(f"{app}: failed: {e}", file=sys.stderr)
+            print(f"{app}: failed: {e!r}", file=sys.stderr)
             failed = True
-    sys.exit(1 if failed else 0)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

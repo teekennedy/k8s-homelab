@@ -1,0 +1,14 @@
+{{- /*
+The uv project in files/jellyfin-backup/, without its tests.
+*/}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jellyfin-backup
+  namespace: {{ .Release.Namespace }}
+data:
+  {{- range list "backup.py" "pyproject.toml" "uv.lock" ".python-version" }}
+  {{ . }}: |-
+    {{- $.Files.Get (printf "files/jellyfin-backup/%s" .) | nindent 4 }}
+  {{- end }}

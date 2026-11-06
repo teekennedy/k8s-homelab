@@ -19,4 +19,4 @@ inputs:
   nix2container:
     url: github:nlewo/nix2container
   nixpkgs:
-    url: github:NixOS/nixpkgs/nixos-unstable
+    url: github:NixOS/nixpkgs/nixpkgs-unstable

@@ -56,7 +56,7 @@ func blackCmd() []string {
 func (m *Python) Projects(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
+	// +ignore=["*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/.python-version", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"]
 	source *dagger.Directory,
 ) (*PythonProjects, error) {
 	pyprojectFiles, err := source.Glob(ctx, "**/pyproject.toml")
@@ -164,6 +164,37 @@ func (pp *PythonProject) Test(ctx context.Context) error {
 		Sync(ctx)
 	if err != nil {
 		return fmt.Errorf("pytest failed in %s: %w", pp.Path, withExecOutput(err))
+	}
+	return nil
+}
+
+// pythonVersionScript fails when .python-version names a different
+// major.minor than the interpreter uv is pinned to. It is a no-op for a project
+// without a .python-version.
+const pythonVersionScript = `
+[ -f .python-version ] || exit 0
+want=$(tr -d '[:space:]' < .python-version)
+have=$("${UV_PYTHON:-python3}" -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+[ "$want" = "$have" ] && exit 0
+echo ".python-version is $want but devenv's Python is $have (devenv.nix)" >&2
+exit 1
+`
+
+// Checks .python-version matches devenv's Python.
+//
+// devenv pins uv to its own interpreter (UV_PYTHON) and never downloads one, so
+// a project's tests run on that Python whatever .python-version says. This
+// makes the two agree. helmfile's release lint checks the same file against
+// the uv image that runs the project in the cluster.
+// +check
+func (pp *PythonProject) Lint(ctx context.Context) error {
+	_, err := pp.Container.
+		WithMountedDirectory("/src", pp.Source).
+		WithWorkdir("/src").
+		WithExec([]string{"sh", "-c", pythonVersionScript}).
+		Sync(ctx)
+	if err != nil {
+		return fmt.Errorf("python version mismatch in %s: %w", pp.Path, withExecOutput(err))
 	}
 	return nil
 }

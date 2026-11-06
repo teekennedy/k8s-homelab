@@ -1,0 +1,14 @@
+[project]
+name = "arr-backup-settings"
+version = "1.0.0"
+description = "Reconciles the arr apps' backup schedule for the jellyfin chart"
+requires-python = ">=3.15"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

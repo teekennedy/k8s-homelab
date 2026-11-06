@@ -1,9 +1,9 @@
 {{- if .Values.exporter.enabled }}
 {{- /*
-Mounted at /app in the jellyfin-exporter pod, which copies it somewhere
-writable and runs it with `uv run --script`: exporter.py's PEP 723 header
-carries its own dependencies. Its tests, pyproject.toml and uv.lock live
-alongside it in files/jellyfin-exporter/ and are deliberately not shipped here.
+The exporter's uv project, mounted at /app in the jellyfin-exporter pod, which
+copies it somewhere writable and runs it with `uv run --frozen`, so the pod
+gets the dependencies and Python that the tests ran against. Its tests stay in
+files/jellyfin-exporter/.
 */}}
 ---
 apiVersion: v1
@@ -14,8 +14,8 @@ metadata:
   labels:
     app.kubernetes.io/name: jellyfin-exporter
 data:
-  exporter.py: |-
-    {{- .Files.Get "files/jellyfin-exporter/exporter.py" | nindent 4 }}
-  .python-version: |-
-    {{- .Files.Get "files/jellyfin-exporter/.python-version" | nindent 4 }}
+  {{- range list "exporter.py" "pyproject.toml" "uv.lock" ".python-version" }}
+  {{ . }}: |-
+    {{- $.Files.Get (printf "files/jellyfin-exporter/%s" .) | nindent 4 }}
+  {{- end }}
 {{- end }}

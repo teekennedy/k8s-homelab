@@ -69,13 +69,14 @@ unavailable, which is also when Jellyfin has nothing to stream.
 
 ## How it runs
 
-`exporter.py` is shipped as a ConfigMap and run with `uv run --script`. Its
-dependencies live in the PEP 723 header at the top of the file; keep that pin
-and `pyproject.toml` in step, since the tests resolve against the latter.
+`exporter.py`, `pyproject.toml`, `uv.lock` and `.python-version` are shipped
+as a ConfigMap and run with `uv run --frozen` on the uv image whose Python
+matches `.python-version`, so the pod installs exactly the locked dependencies
+the tests ran against. `dagger check helmfile` enforces that pairing.
 
-Because `uv` reads the script once at startup, a ConfigMap change on its own
+Because `uv` reads the project once at startup, a ConfigMap change on its own
 would leave the running interpreter on the old code. The Deployment therefore
-carries a `checksum/config` annotation over this file, which is why it lives in
+carries a `checksum/config` annotation over the ConfigMap, which is why it lives in
 `templates/jellyfin-exporter-deployment.yaml` rather than being an app-template
 controller: a subchart cannot read the parent chart's `files/`, so
 app-template's own `checksum/configMaps` can never see this script.

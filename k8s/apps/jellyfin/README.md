@@ -36,12 +36,12 @@ to S3 weekly (`k8s/platform/restic`).
   subdirectory of `/storage/nas/backups/arr-stack`. Backup interval and
   retention are both one day, set through each app's API by the
   `arr-backup-settings` container in the configarr CronJob
-  (`files/configMaps/arr-backup-settings/reconcile.py`), because those settings
+  (`files/arr-backup-settings/reconcile.py`), because those settings
   live in the app database. To restore, upload the zip from
   `/config/Backups/scheduled` on the app's System → Backup page.
 - **Jellyfin**: Jellyfin can only back up on request, so the `jellyfin-backup`
   CronJob calls its backup API nightly and deletes the older archives
-  (`files/configMaps/jellyfin-backup/backup.py`). The archive holds the
+  (`files/jellyfin-backup/backup.py`). The archive holds the
   database, config, users, libraries, collections, playlists and subtitles,
   but not metadata, trickplay or plugin configuration. Its backup folder,
   `/data/data/backups`, is `/storage/nas/backups/jellyfin`; restore from

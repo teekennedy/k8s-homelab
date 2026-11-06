@@ -116,7 +116,7 @@ spec:
       annotations:
         # uv reads the source once at startup; a ConfigMap change alone never
         # restarts the pod.
-        checksum/source: {{ printf "%s%s%s" (.Files.Get "files/app-server/pyproject.toml") (.Files.Get "files/app-server/uv.lock") (.Files.Glob "files/app-server/app_server/*.py").AsConfig | sha256sum }}
+        checksum/source: {{ printf "%s%s%s%s" (.Files.Get "files/app-server/pyproject.toml") (.Files.Get "files/app-server/uv.lock") (.Files.Get "files/app-server/.python-version") (.Files.Glob "files/app-server/app_server/*.py").AsConfig | sha256sum }}
         checksum/specs: {{ include (print $.Template.BasePath "/sandbox-specs.yaml") . | sha256sum }}
         checksum/defaults: {{ merge (dict "acp_servers" $cfg.acpServers) $cfg.defaults | toJson | sha256sum }}
     spec:

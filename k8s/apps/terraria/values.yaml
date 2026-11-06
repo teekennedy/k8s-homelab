@@ -116,6 +116,8 @@ app-template:
           command:
             - uv
             - run
+            - --frozen
+            - --no-dev
             - --no-cache
             - --no-python-downloads
             - --link-mode
@@ -293,6 +295,9 @@ app-template:
               readOnly: true
             - path: /app/pyproject.toml
               subPath: pyproject.toml
+              readOnly: true
+            - path: /app/uv.lock
+              subPath: uv.lock
               readOnly: true
             - path: /app/.python-version
               subPath: .python-version

@@ -1,9 +1,10 @@
 {{- $c := dict "ctx" . "component" "roll-page" }}
 {{- $v := .Values.rollPage }}
 {{- $static := .Files.Glob "files/roll-page/static/*" }}
+{{- $project := list "server.py" "pyproject.toml" "uv.lock" ".python-version" }}
 {{- /*
-server.py and its static/ files, mounted at /app. Tests, pyproject.toml and
-uv.lock stay in files/roll-page/ and are not shipped.
+The uv project in files/roll-page/ and its static/ files, mounted at /app. The
+tests are not shipped.
 */}}
 ---
 apiVersion: v1
@@ -14,8 +15,10 @@ metadata:
   labels:
     {{- include "gauntlet.componentLabels" $c | nindent 4 }}
 data:
-  server.py: |-
-    {{- .Files.Get "files/roll-page/server.py" | nindent 4 }}
+  {{- range $project }}
+  {{ . }}: |-
+    {{- $.Files.Get (printf "files/roll-page/%s" .) | nindent 4 }}
+  {{- end }}
   {{- range $path, $_ := $static }}
   {{ base $path }}: |-
     {{- $.Files.Get $path | nindent 4 }}
@@ -39,9 +42,9 @@ spec:
   template:
     metadata:
       annotations:
-        # The server reads server.py once at startup; restart it when the
+        # The server reads its project once at startup; restart it when the
         # ConfigMap changes.
-        checksum/config: {{ printf "%s%s" (.Files.Get "files/roll-page/server.py") ($static.AsConfig) | sha256sum }}
+        checksum/config: {{ printf "%s%s" (.Files.Glob "files/roll-page/{server.py,pyproject.toml,uv.lock,.python-version}").AsConfig ($static.AsConfig) | sha256sum }}
       labels:
         {{- include "gauntlet.componentLabels" $c | nindent 8 }}
     spec:
@@ -59,8 +62,23 @@ spec:
         - name: roll-page
           image: "{{ $v.image.repository }}:{{ $v.image.tag }}"
           imagePullPolicy: IfNotPresent
-          command: ["python", "/app/server.py"]
+          command:
+            - sh
+            - -c
+            - |-
+              set -eu
+              # uv builds the project's environment beside it, and /app is a
+              # read-only ConfigMap mount, so run from a writable copy.
+              cp -rL /app/. /project/
+              mkdir -p /project/tmp
+              cd /project
+              exec uv run --frozen --no-dev --no-cache --no-python-downloads --link-mode copy \
+                python server.py
           env:
+            - name: HOME
+              value: /project
+            - name: TMPDIR
+              value: /project/tmp
             - name: PORT
               value: {{ $v.port | quote }}
             - name: STATIC_DIR
@@ -116,7 +134,11 @@ spec:
               readOnly: true
             - name: data
               mountPath: /data
+            - name: workdir
+              mountPath: /project
       volumes:
+        - name: workdir
+          emptyDir: {}
         - name: data
           persistentVolumeClaim:
             claimName: roll-page-data
@@ -124,8 +146,10 @@ spec:
           configMap:
             name: roll-page
             items:
-              - key: server.py
-                path: server.py
+              {{- range $project }}
+              - key: {{ . }}
+                path: {{ . }}
+              {{- end }}
               {{- range $path, $_ := $static }}
               - key: {{ base $path }}
                 path: static/{{ base $path }}

@@ -1,10 +1,15 @@
 {{- if .Values.webhook.enabled }}
+{{- /*
+The uv project in files/kured-webhook/, without its tests.
+*/}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kured-webhook
   namespace: {{ .Release.Namespace }}
 data:
-  server.py: |-
-    {{- .Files.Get "files/kured-webhook/server.py" | nindent 4 }}
+  {{- range list "server.py" "pyproject.toml" "uv.lock" ".python-version" }}
+  {{ . }}: |-
+    {{- $.Files.Get (printf "files/kured-webhook/%s" .) | nindent 4 }}
+  {{- end }}
 {{- end }}

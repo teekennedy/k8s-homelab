@@ -43,9 +43,24 @@ spec:
             runAsNonRoot: true
             runAsUser: 65534
           command:
-            - python
-            - /app/server.py
+            - sh
+            - -c
+            - |-
+              set -eu
+              # uv builds the project's environment beside it, and /app is a
+              # read-only ConfigMap mount, so run from a writable copy.
+              cp -rL /app/. /project/
+              mkdir -p /project/tmp
+              cd /project
+              exec uv run --frozen --no-dev --no-cache --no-python-downloads --link-mode copy \
+                python server.py
           env:
+            - name: HOME
+              value: /project
+            - name: TMPDIR
+              value: /project/tmp
+            - name: PYTHONUNBUFFERED
+              value: "1"
             - name: ALERTMANAGER_URL
               value: {{ .Values.webhook.alertmanagerUrl | quote }}
             - name: DRAIN_SILENCE_ALERTS
@@ -78,10 +93,14 @@ spec:
             failureThreshold: 3
           volumeMounts:
             - name: webhook-config
-              mountPath: /app/server.py
-              subPath: server.py
+              mountPath: /app
+              readOnly: true
+            - name: workdir
+              mountPath: /project
       volumes:
         - name: webhook-config
           configMap:
             name: kured-webhook
+        - name: workdir
+          emptyDir: {}
 {{- end }}

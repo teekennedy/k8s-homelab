@@ -109,6 +109,6 @@ uv tool run black .    # formatting, as CI checks it
 If Python's bcrypt ever stopped verifying Authelia's output, every sync would
 silently re-hash and restart Authelia forever; that fixture is what catches it.
 
-The `pyproject.toml` here exists only for pytest and black — at runtime the job
-uses the PEP-723 header in `sync.py` via `uv run --script`, so only the script is
-mounted into the container.
+At runtime the job mounts `sync.py`, `pyproject.toml`, `uv.lock` and
+`.python-version` and runs `uv run --frozen --no-dev`, so it installs exactly the
+locked dependencies the tests ran against.

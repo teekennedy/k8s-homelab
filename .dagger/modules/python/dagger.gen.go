@@ -298,6 +298,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
 			return (*PythonProject).Format(&parent, ctx)
+		case "Lint":
+			var parent PythonProject
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*PythonProject).Lint(&parent, ctx)
 		case "Lock":
 			var parent PythonProject
 			err = json.Unmarshal(parentJSON, &parent)
@@ -344,7 +351,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							dag.TypeDef().WithObject("PythonProjects")).
 							WithDescription("Projects returns every Python project in the repo — every directory with a\npyproject.toml — keyed by path.").
 							WithSourceMap(dag.SourceMap("python.go", 56, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("python.go", 60, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("python.go", 60, 2), DefaultPath: "/", Ignore: []string{"*", "!**/*.py", "!**/pyproject.toml", "!**/uv.lock", "!**/.python-version", "!**/tests/fixtures/**", "**/.venv/**", "**/__pycache__/**", "**/.pytest_cache/**"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Python")).
@@ -369,13 +376,19 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Format",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Formats the project with black.").
-							WithSourceMap(dag.SourceMap("python.go", 173, 1)).
+							WithSourceMap(dag.SourceMap("python.go", 204, 1)).
 							WithGenerator()).
+					WithFunction(
+						dag.Function("Lint",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Checks .python-version matches devenv's Python.\n\ndevenv pins uv to its own interpreter (UV_PYTHON) and never downloads one, so\na project's tests run on that Python whatever .python-version says. This\nmakes the two agree. helmfile's release lint checks the same file against\nthe uv image that runs the project in the cluster.").
+							WithSourceMap(dag.SourceMap("python.go", 190, 1)).
+							WithCheck()).
 					WithFunction(
 						dag.Function("Lock",
 							dag.TypeDef().WithObject("Changeset")).
 							WithDescription("Refreshes the project's uv.lock to match pyproject.toml.\n\nIt runs `uv lock`. A project without a uv.lock is left alone. uv comes from\nthe toolchain, so the lock is written by the same uv version as everything\nelse.").
-							WithSourceMap(dag.SourceMap("python.go", 192, 1)).
+							WithSourceMap(dag.SourceMap("python.go", 223, 1)).
 							WithGenerator()).
 					WithFunction(
 						dag.Function("Test",

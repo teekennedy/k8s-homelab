@@ -1,0 +1,14 @@
+[project]
+name = "jellyfin-backup"
+version = "1.0.0"
+description = "Nightly Jellyfin server backup for the jellyfin chart"
+requires-python = ">=3.15"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

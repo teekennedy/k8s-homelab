@@ -37,6 +37,11 @@ exemptions:
       - jellyfin-qbittorrent-update-password
     rules:
       - sensitiveConfigmapContent
+  # The hash script's own source, which only names the password env var.
+  - controllerNames:
+      - jellyfin-qbittorrent-password-hash
+    rules:
+      - sensitiveConfigmapContent
   - controllerNames:
       - jellyfin-seerr
     rules:
