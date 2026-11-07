@@ -19,7 +19,7 @@ when:
 clone:
   git:
     # default clone image, must be explicitly specified when changing settings
-    image: woodpeckerci/plugin-git@sha256:b49127ebd592cde07fb7a08c68025b1ea2f44f21cd4bd1440dbfe042a02c1581
+    image: woodpeckerci/plugin-git@sha256:b8d2401997be68ec25d62bd753fe5d30236e029fe007a5e823177e0e485ae205
     # https://github.com/woodpecker-ci/plugin-git/blob/main/docs.md
     settings:
       tags: true
