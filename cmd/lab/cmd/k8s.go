@@ -787,6 +787,8 @@ func diffApp(ctx context.Context, tier, app string) error {
 	templateArgs := []string{
 		"template", info.ReleaseName, chartDir,
 		"--namespace", info.Namespace,
+		// Argo CD never creates Helm test hooks, so they would always diff.
+		"--skip-tests",
 	}
 
 	clusterValues := filepath.Join(getConfigDir(), "gen", "cluster-values.yaml")

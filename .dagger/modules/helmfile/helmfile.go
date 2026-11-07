@@ -206,12 +206,12 @@ func (r *Release) args(command ...string) []string {
 // a release starts from it, so a release's repositories and dependencies are
 // fetched once however many checks consume them. A chart directory with no
 // matching release fails here: helmfile exits non-zero when the selector
-// matches nothing.
+// matches nothing. Tests are skipped as Argo CD skips Helm test hooks.
 func (r *Release) rendered() *dagger.Container {
 	// Redirected in the shell rather than with RedirectStdout, which still
 	// echoes every rendered manifest into the check's log.
 	return helmfileContainer(r.Container, r.Source).
-		WithExec(withRepoConfig(" > /rendered.yaml", r.args("template", "--include-crds")))
+		WithExec(withRepoConfig(" > /rendered.yaml", r.args("template", "--include-crds", "--skip-tests")))
 }
 
 // Renders the release with `helmfile template`.

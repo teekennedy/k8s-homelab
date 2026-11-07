@@ -24,12 +24,6 @@ exemptions:
       - monitoring-system-alloy
     rules:
       - hostPathSet
-  # Helm test pods run once and exit.
-  - controllerNames:
-      - monitoring-system-grafana-test
-    rules:
-      - readinessProbeMissing
-      - livenessProbeMissing
   # The k8s-sidecar config watchers have no health endpoint at this version.
   - controllerNames:
       - monitoring-system-grafana
@@ -45,13 +39,6 @@ exemptions:
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
-  # Helm test pods come from upstream charts with no resource settings.
-  - controllerNames:
-      - monitoring-system-grafana-test
-    rules:
-      - cpuRequestsMissing
-      - memoryRequestsMissing
-      - memoryLimitsMissing
   # The Tempo chart cannot label its volumeClaimTemplate; the labelled PVC it
   # adopts is declared in templates/tempo-pvc.yaml.
   - controllerNames:

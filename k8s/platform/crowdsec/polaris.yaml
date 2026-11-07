@@ -23,34 +23,8 @@ exemptions:
       - crowdsec-appsec
     rules:
       - runAsRootAllowed
-  # Helm test pods use curl/wget without pinned tags and run as root.
-  - controllerNames:
-      - crowdsec-test-agent
-      - crowdsec-test-lapi-up
-      - crowdsec-test-appsec-up
-    rules:
-      - runAsRootAllowed
-      - privilegeEscalationAllowed
-      - tagNotSpecified
   # Reads the host's container logs from /var/log.
   - controllerNames:
       - crowdsec-agent
     rules:
       - hostPathSet
-  # Helm test pods run once and exit.
-  - controllerNames:
-      - crowdsec-test-agent
-      - crowdsec-test-lapi-up
-      - crowdsec-test-appsec-up
-    rules:
-      - readinessProbeMissing
-      - livenessProbeMissing
-  # Helm test pods come from upstream charts with no resource settings.
-  - controllerNames:
-      - crowdsec-test-agent
-      - crowdsec-test-lapi-up
-      - crowdsec-test-appsec-up
-    rules:
-      - cpuRequestsMissing
-      - memoryRequestsMissing
-      - memoryLimitsMissing

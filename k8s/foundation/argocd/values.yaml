@@ -136,10 +136,11 @@ argo-cd:
                 # included (left out, they would be pruned), and against the
                 # destination cluster's Kubernetes version and API versions
                 # rather than Helm's built-in defaults, so charts that gate
-                # resources on .Capabilities see the real cluster. ArgoCD
+                # resources on .Capabilities see the real cluster. Helm test
+                # hooks are left out: ArgoCD never creates them. ArgoCD
                 # passes both to every plugin; API versions are
                 # comma-separated, which --api-versions accepts as is.
-                set -- --include-crds
+                set -- --include-crds --skip-tests
                 if [ -n "${KUBE_VERSION:-}" ]; then
                   set -- "$@" --kube-version "$KUBE_VERSION"
                 fi
