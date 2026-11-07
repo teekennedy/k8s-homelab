@@ -13,7 +13,7 @@
     defaultUserAuthorizedKeyFiles = lib.mkOption {
       type = lib.types.listOf lib.types.path;
       description = "SSH authorizedKeyFiles for the default user login";
-      default = builtins.map (s: ./authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./authorized_keys));
+      default = map (s: ./authorized_keys + "/${s}") (builtins.attrNames (builtins.readDir ./authorized_keys));
     };
   };
   config = {
@@ -30,6 +30,8 @@
       isNormalUser = true;
       openssh.authorizedKeys.keyFiles = config.defaultUserAuthorizedKeyFiles;
       extraGroups = ["wheel"]; # Enable ‘sudo’ for the user.
+      # Keep the user manager running between logins so a cold ssh login doesn't wait for it to start.
+      linger = true;
       packages = with pkgs; [
         file
         btop
