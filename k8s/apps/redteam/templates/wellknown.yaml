@@ -41,7 +41,7 @@ spec:
       initContainers:
         # Substitute sha256(NONCE) into the served security.txt.
         - name: render-hash
-          image: "{{ .Values.wellknown.busyboxImage }}"
+          image: "{{ .Values.wellknown.alpineImage }}"
           securityContext:
             runAsUser: 65534
             allowPrivilegeEscalation: false

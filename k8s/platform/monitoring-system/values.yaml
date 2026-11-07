@@ -37,6 +37,10 @@ kube-prometheus-stack:
         recurring-job.longhorn.io/source: "enabled"
         recurring-job-group.longhorn.io/backup: "enabled"
     sidecar:
+      image:
+        registry: quay.io
+        repository: kiwigrid/k8s-sidecar
+        tag: "2.14.3@sha256:52d311dcedd587421a236c4d6c621f05614c40a51386e955e0699dca97ec0880"
       dashboards:
         enabled: true
         searchNamespace: ALL
@@ -247,9 +251,15 @@ kube-prometheus-stack:
         app.kubernetes.io/component: crds-upgrade
       image:
         busybox:
-          tag: "1.37.0"
+          registry: docker.io
+          repository: busybox
+          # renovate: datasource=docker depName=busybox
+          tag: "1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4"
         kubectl:
-          tag: "v1.34.0"
+          registry: docker.io
+          repository: alpine/kubectl
+          # renovate: datasource=docker depName=alpine/kubectl
+          tag: "1.37.1@sha256:a5d0fbecab3f7b6c2ab7398f1daa73a3e0ed6ece18556d21698233e9e3759cc7"
       resources:
         requests:
           cpu: 20m
@@ -633,6 +643,10 @@ loki:
   test:
     enabled: false
   loki:
+    image:
+      registry: docker.io
+      repository: grafana/loki
+      tag: "3.6.16@sha256:79f3fbf2a3eca97dd735e2aa0871a2fc15365a81c68dea67f639b092c301f454"
     # TCP rather than /ready, which fails while the ingester replays its WAL.
     livenessProbe:
       tcpSocket:
@@ -712,6 +726,10 @@ loki:
   backend:
     replicas: 0
   gateway:
+    image:
+      registry: docker.io
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.31.7-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e"
     livenessProbe:
       tcpSocket:
         port: http-metrics
@@ -724,6 +742,12 @@ loki:
       limits:
         memory: 128Mi
   lokiCanary:
+    # Pinned with loki.loki.image: the chart pins Loki below its appVersion,
+    # which the canary follows, and Renovate only sees images set here.
+    image:
+      registry: docker.io
+      repository: grafana/loki-canary
+      tag: "3.6.16@sha256:6d53ce040b436e558936fe05514729c230e9e04edf1fe411d02701025e515924"
     livenessProbe:
       tcpSocket:
         port: http-metrics
@@ -736,6 +760,10 @@ loki:
       limits:
         memory: 192Mi
   sidecar:
+    image:
+      registry: quay.io
+      repository: kiwigrid/k8s-sidecar
+      tag: "2.14.3@sha256:52d311dcedd587421a236c4d6c621f05614c40a51386e955e0699dca97ec0880"
     resources:
       requests:
         cpu: 20m

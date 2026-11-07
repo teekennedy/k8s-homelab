@@ -4,8 +4,8 @@ image: "ghcr.io/teekennedy/k8s-homelab-devenv:v0.1.0-claude-redteam@sha256:58015
 wellknown:
   # Deliberately in values.yaml (not templates/wellknown.yaml) so that
   # renovate can pick them up.
-  busyboxImage: busybox:stable@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
-  nginxImage: nginxinc/nginx-unprivileged:stable@sha256:ec0f7ecb1fbd84959ac114e65fb36074ffc97d4d51db0f18ee925162d889dcef
+  alpineImage: alpine:3.24.4@sha256:93b41ef40b1677fce8fcc64ff4af09daddfacf5040afde618bc46c1e2d1cc7d4
+  nginxImage: nginxinc/nginx-unprivileged:1.31.7-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e
 
 # Repo the internal session pre-clones (unauthenticated read; public via mirror).
 repoURL: "https://git.msng.to/ops/k8s-homelab"

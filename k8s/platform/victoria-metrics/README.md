@@ -160,12 +160,13 @@ kubectl -n victoria-metrics logs job/vm-backup-manual -f
    `/storage/nas/backups/victoriametrics` on borg-2.
 2. Stop the server:
    `kubectl -n victoria-metrics scale sts victoria-metrics-server --replicas=0`
-3. Run `vmrestore` against the server PVC:
+3. Run `vmrestore` against the server PVC, using the version in
+   `backup.image.tag` (without the digest) for `<version>`:
    ```sh
    kubectl -n victoria-metrics run vmrestore --rm -i --restart=Never \
-     --image=victoriametrics/vmrestore:v1.153.0 --overrides='{"spec":{
+     --image=victoriametrics/vmrestore:<version> --overrides='{"spec":{
        "securityContext":{"runAsUser":65534,"runAsGroup":65534,"fsGroup":65534},
-       "containers":[{"name":"vmrestore","image":"victoriametrics/vmrestore:v1.153.0",
+       "containers":[{"name":"vmrestore","image":"victoriametrics/vmrestore:<version>",
          "args":["-storageDataPath=/storage","-src=fs:///backup/latest"],
          "volumeMounts":[{"name":"data","mountPath":"/storage"},
                          {"name":"backup","mountPath":"/backup","readOnly":true}]}],

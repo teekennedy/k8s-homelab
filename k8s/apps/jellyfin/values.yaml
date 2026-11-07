@@ -8,7 +8,7 @@ qbittorrentPasswordHash:
     # Python must match files/qbittorrent-password-hash/.python-version.
     repository: ghcr.io/astral-sh/uv
     tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
-  kubectlImage: bitnami/kubectl:latest@sha256:8f59408f9e896fc8992a0660a56687545bd06751f26531b4a26fca6d5dc7562d
+  kubectlImage: alpine/kubectl:1.37.1@sha256:a5d0fbecab3f7b6c2ab7398f1daa73a3e0ed6ece18556d21698233e9e3759cc7
 
 # Static NFS volumes for the apps' own backups (templates/nas-backups.yaml),
 # each claimed as jellyfin-<name>-backups. Each app keeps only its latest

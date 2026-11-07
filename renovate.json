@@ -33,6 +33,16 @@
       ]
     },
     {
+      "description": "Track image tags in Helm values under a renovate comment, for charts whose image keys (e.g. name/tag) the helm-values manager doesn't recognize.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "k8s/**/values.yaml"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n\\s*tag:\\s*\"?(?<currentValue>[^\"@\\s]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\"?"
+      ]
+    },
+    {
       "description": "Track Docker images in Dagger Go module",
       "customType": "regex",
       "managerFilePatterns": [

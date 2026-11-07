@@ -4,7 +4,7 @@ This application deploys a TShock-based Terraria server using the bjw-s-labs `ap
 
 ## What gets deployed
 
-- A single `terraria` pod running `ghcr.io/pryaxis/tshock:sha256-1b6af2e9741e2ea24268a553a3699a0010344f02d6fa13d099357d72dd2edba2`
+- A single `terraria` pod running the image set in `values.yaml`
 - Persistent volumes mounted at:
   - `/tshock`
   - `/worlds`

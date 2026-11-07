@@ -81,7 +81,7 @@ valkeyInstance:
   component: valkey           # app.kubernetes.io/component; defaults to name
   replicas: 3                 # sentinel only
   masterName: mymaster        # Sentinel monitor name
-  image: valkey/valkey:9-alpine@sha256:...
+  image: valkey/valkey:<tag>@sha256:<digest>
   exporterImage: oliver006/redis_exporter:...
   labelsTemplate: ""          # optional named template for the consumer's common labels
   maxmemoryPolicy: allkeys-lru

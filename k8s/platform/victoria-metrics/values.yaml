@@ -171,9 +171,10 @@ backup:
   # After Longhorn's 2:30am recurring-job window.
   schedule: "15 3 * * *"
   activeDeadlineSeconds: 7200
+  # Keep in sync with victoria-metrics-single.server.image.tag.
   image:
-    # Keep in sync with victoria-metrics-single.server.image.tag.
-    tag: "v1.153.0"
+    image: victoriametrics/vmbackup
+    tag: "v1.155.0@sha256:26af85b273442e15e5172769979998ad98486706051acbe7826cd3a8c5d83bca"
   nfs:
     server: borg-2.msng.to
     path: /backups/victoriametrics

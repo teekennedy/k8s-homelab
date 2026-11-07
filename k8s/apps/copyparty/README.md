@@ -131,7 +131,7 @@ The fix is a one-line derived image, which needs a build + registry + renovate
 entry, so it's deferred as agreed:
 
 ```dockerfile
-FROM copyparty/iv:1.20.19
+FROM copyparty/iv:<tag>  # image.tag from values.yaml
 RUN apk add --no-cache vips-heif
 ```
 

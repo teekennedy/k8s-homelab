@@ -39,7 +39,7 @@ spec:
             fsGroup: 65534
           containers:
             - name: vmbackup
-              image: "victoriametrics/vmbackup:{{ .Values.backup.image.tag }}"
+              image: "{{ .Values.backup.image.image }}:{{ .Values.backup.image.tag }}"
               args:
                 - -storageDataPath=/storage
                 - -snapshot.createURL=http://victoria-metrics-server.{{ .Release.Namespace }}.svc:8428/snapshot/create
