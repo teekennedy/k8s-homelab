@@ -14,6 +14,8 @@
   # so the bootloader's extra-files cleanup never touches them.
   espStateDir = "memory-testing";
   bootEntry = "memory-testing-bios-setup.conf";
+  # kured drains the node and reboots when this file exists.
+  rebootSentinel = "/run/reboot-required";
 
   setupVar = pkgs.fetchurl {
     url = "https://github.com/datasone/setup_var.efi/releases/download/0.3.1/setup_var.efi";
@@ -181,11 +183,18 @@
     text = ''
       usage() {
         cat <<EOF
-      Usage: bios-setup [--dry-run] [--no-reboot] [--force] PRESET|VAR:OFFSET=VALUE...
+      Usage: bios-setup [--dry-run] [--no-reboot] [--now] [--force] PRESET|VAR:OFFSET=VALUE...
 
-      Queues BIOS setup variable writes on the ESP, then reboots once into the
-      UEFI shell entry, which applies them, records the settings and resets.
-      The next boot's memory-testing-collect saves the recorded settings.
+      Queues BIOS setup variable writes on the ESP and sets the UEFI shell entry
+      as the one-shot boot entry, which applies them, records the settings and
+      resets. The next boot's memory-testing-collect saves the recorded settings.
+
+      The reboot goes through kured, which drains the node first: it starts once
+      no other node holds the kured lock and no alerts are firing. Rebooting a
+      node that still has Longhorn volumes attached can hang the shutdown.
+
+        --no-reboot  queue only; the next reboot of any kind runs the shell entry
+        --now        reboot immediately without draining (cluster unavailable)
 
       Presets:
       ${lib.concatStrings (lib.mapAttrsToList (n: v: "  ${n}: ${
@@ -199,14 +208,15 @@
       EOF
       }
 
-      dry_run=0 reboot=1 force=0
+      dry_run=0 reboot=kured force=0
       writes=()
       [ $# -gt 0 ] || { usage; exit 2; }
       for arg in "$@"; do
         case $arg in
           -h | --help) usage; exit 0 ;;
           --dry-run) dry_run=1 ;;
-          --no-reboot) reboot=0 ;;
+          --no-reboot) reboot=none ;;
+          --now) reboot=now ;;
           --force) force=1 ;;
       ${lib.concatStrings (lib.mapAttrsToList (n: v: "    ${n}) writes+=(${lib.escapeShellArgs v}) ;;\n") presets)}
           *)
@@ -245,11 +255,15 @@
       echo "''${writes[*]:-(none)}" > "$esp/queued.txt"
       sync
 
-      if [ "$reboot" -eq 1 ]; then
-        systemctl reboot --boot-loader-entry=${bootEntry}
-      else
-        echo "queued. Reboot with: systemctl reboot --boot-loader-entry=${bootEntry}"
-      fi
+      bootctl set-oneshot ${bootEntry}
+      case $reboot in
+        kured)
+          touch ${rebootSentinel}
+          echo "queued. kured will drain and reboot this node (check: kubectl -n kured logs ds/kured)"
+          ;;
+        now) systemctl reboot ;;
+        none) echo "queued. The next reboot runs the shell entry; let kured do it with: touch ${rebootSentinel}" ;;
+      esac
     '';
   };
 in {

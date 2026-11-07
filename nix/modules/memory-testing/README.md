@@ -34,7 +34,11 @@ sudo bios-setup read                       # change nothing, record settings
 ```
 
 `bios-setup` writes the queued `setup_var.efi` call to `/boot/memory-testing/action.nsh`
-and reboots once into the shell entry (`systemctl reboot --boot-loader-entry=…`).
+and makes the shell entry the one-shot boot entry (`bootctl set-oneshot`). It
+then creates `/run/reboot-required`, so kured drains the node before rebooting.
+Draining matters: a plain reboot of a node with Longhorn volumes attached tears
+down their iSCSI devices under mounted filesystems and can hang the shutdown.
+`--now` reboots immediately anyway, for when the cluster is unavailable.
 `startup.nsh` records the settings, applies the queued writes, records them
 again and resets. The next boot then trains memory with the new settings, and
 `memory-testing-collect` moves the recordings into that boot's directory.
