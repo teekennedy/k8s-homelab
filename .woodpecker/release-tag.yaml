@@ -40,7 +40,7 @@ steps:
             - devenv.yaml
             - devenv.lock
             - "cmd/lab/**"
-    image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    image: alpine:3.24.4@sha256:93b41ef40b1677fce8fcc64ff4af09daddfacf5040afde618bc46c1e2d1cc7d4
     environment:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"
       DAGGER_NO_NAG: "1"
@@ -62,9 +62,7 @@ steps:
       - scripts/release-plan.sh "$CI_WORKSPACE/release-plan.json"
 
   - name: tag-release
-    # The only image release_bot_token is released to; see
-    # k8s/platform/woodpecker/values.yaml.
-    image: alpine/git@sha256:ac6c828f15d82775d204d3d75112e1d34af8945da80ccf922713c9891ba68e7a
+    image: alpine/git:2.54.0@sha256:ac6c828f15d82775d204d3d75112e1d34af8945da80ccf922713c9891ba68e7a
     environment:
       FORGEJO_TOKEN:
         from_secret: release_bot_token

@@ -19,7 +19,7 @@ clone:
 
 steps:
   - name: publish-release
-    image: alpine:3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+    image: alpine:3.24.4@sha256:93b41ef40b1677fce8fcc64ff4af09daddfacf5040afde618bc46c1e2d1cc7d4
     environment:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"
       DAGGER_NO_NAG: "1"
@@ -52,9 +52,7 @@ steps:
   - name: record-devenv-ci
     when:
       - evaluate: 'CI_COMMIT_TAG startsWith "devenv-ci-"'
-    # The only image release_bot_token is released to; see
-    # k8s/platform/woodpecker/values.yaml.
-    image: alpine/git@sha256:ac6c828f15d82775d204d3d75112e1d34af8945da80ccf922713c9891ba68e7a
+    image: alpine/git:2.54.0@sha256:ac6c828f15d82775d204d3d75112e1d34af8945da80ccf922713c9891ba68e7a
     environment:
       FORGEJO_TOKEN:
         from_secret: release_bot_token

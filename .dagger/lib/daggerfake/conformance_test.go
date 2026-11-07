@@ -54,7 +54,7 @@ func (t tree) with(path, contents string) tree {
 	return next
 }
 
-const image = "alpine:3.22"
+const image = "alpine:3.24.4"
 
 // ---------------------------------------------------------------------------
 // the cases
