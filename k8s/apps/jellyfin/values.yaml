@@ -765,12 +765,28 @@ app-template:
         concurrencyPolicy: Forbid
         successfulJobsHistory: 1
         failedJobsHistory: 1
+        # Fail rather than sit Pending (and block later runs) while there is
+        # no Jellyfin pod to schedule next to.
+        activeDeadlineSeconds: 7200
       pod:
         restartPolicy: Never
         securityContext:
           fsGroup: *gid
+          # The root of jellyfin-data already matches, so this skips a
+          # recursive chown of the whole volume on every run.
+          fsGroupChangePolicy: "OnRootMismatch"
           runAsUser: 1200
           runAsGroup: *gid
+        # jellyfin-data is ReadWriteOnce, so it can only be mounted on the node
+        # Jellyfin's pod is running on.
+        affinity:
+          podAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: jellyfin
+                    app.kubernetes.io/controller: main
       containers:
         jellyfin-backup:
           # Python must match files/jellyfin-backup/.python-version.
@@ -797,6 +813,7 @@ app-template:
           env:
             JELLYFIN_URL: http://jellyfin-main:8096
             BACKUP_DIR: /backups
+            DATA_DIR: /jellyfin-data
             HOME: /project
             TMPDIR: /project/tmp
             PYTHONUNBUFFERED: "1"
@@ -1003,11 +1020,15 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/backup: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
       advancedMounts:
         main:
           jellyfin:
             - path: /data
+        jellyfin-backup:
+          jellyfin-backup:
+            - path: /jellyfin-data
+              readOnly: true
     jellyfin-cache:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -1103,7 +1124,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/backup: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
       advancedMounts:
         cleanuparr:
           cleanuparr:
@@ -1194,12 +1215,13 @@ app-template:
       type: persistentVolumeClaim
       # As of 2026-10-28 the filesystem held 76MB (most of it logs, since
       # disabled). Longhorn's "actual size" was 1.8GB of deleted blocks pinned
-      # by the backup snapshot, which trim can't reclaim.
+      # by its daily Longhorn backup snapshot, which trim can't reclaim. Hence
+      # trim-only; Prowlarr's own backups go to the NAS.
       size: 2Gi
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/backup: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
       advancedMounts:
         arrs:
           prowlarr:
@@ -1212,7 +1234,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/backup: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
       advancedMounts:
         arrs:
           radarr:
@@ -1225,7 +1247,7 @@ app-template:
       storageClass: longhorn
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/backup: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
       advancedMounts:
         arrs:
           sonarr:

@@ -1,4 +1,6 @@
+import contextlib
 import json
+import sqlite3
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,7 +23,25 @@ class StubJellyfin:
 
 
 @pytest.fixture
-def jellyfin(tmp_path):
+def data_dir(tmp_path):
+    """A Jellyfin data volume holding the files the extras tar picks up."""
+    data = tmp_path / "data"
+    (data / "plugins/configurations").mkdir(parents=True)
+    (data / "plugins/configurations/LDAP-Auth.xml").write_text("<ldap/>")
+    (data / "plugins/SSO-Auth").mkdir()
+    (data / "plugins/SSO-Auth/sso-secret.key").write_text("secret")
+    (data / "data").mkdir()
+    # Already in Jellyfin's own archive, so left out of the extras tar.
+    (data / "data/jellyfin.db").write_bytes(b"core")
+    with contextlib.closing(sqlite3.connect(data / "data/playback_reporting.db")) as db:
+        db.execute("CREATE TABLE PlaybackActivity (ItemName TEXT)")
+        db.execute("INSERT INTO PlaybackActivity VALUES ('Heat')")
+        db.commit()
+    return data
+
+
+@pytest.fixture
+def jellyfin(tmp_path, data_dir):
     backup_dir = tmp_path / "backups"
     backup_dir.mkdir()
     stub = StubJellyfin(backup_dir)
@@ -61,6 +81,7 @@ def jellyfin(tmp_path):
         "JELLYFIN_URL": stub.url,
         "JELLYFIN_API_KEY": API_KEY,
         "BACKUP_DIR": str(backup_dir),
+        "DATA_DIR": str(data_dir),
     }
     yield stub
     server.shutdown()

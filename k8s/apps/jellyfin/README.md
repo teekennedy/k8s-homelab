@@ -43,11 +43,23 @@ to S3 weekly (`k8s/platform/restic`).
   CronJob calls its backup API nightly and deletes the older archives
   (`files/jellyfin-backup/backup.py`). The archive holds the
   database, config, users, libraries, collections, playlists and subtitles,
-  but not metadata, trickplay or plugin configuration. Its backup folder,
+  but not metadata, trickplay or plugins. Its backup folder,
   `/data/data/backups`, is `/storage/nas/backups/jellyfin`; restore from
   Dashboard → Backups.
-- **Seerr, qBittorrent, Cleanuparr**: no built-in backups; their volumes stay
-  in Longhorn's backup group.
+
+  The same job also writes `jellyfin-extras-<timestamp>.tar` beside each
+  archive: `/data/plugins` (installed plugins and their settings, including the
+  LDAP and SSO credentials) and every plugin database in `/data/data`. It reads
+  them from `jellyfin-data`, which is ReadWriteOnce, so the job only schedules
+  onto the node running Jellyfin. Jellyfin loads plugins at startup, so to
+  restore, extract the tar from the backup folder over `/data` and restart the
+  pod.
+
+  Metadata and trickplay are refetched or regenerated, so `jellyfin-data` is
+  trim-only in Longhorn.
+- **Seerr, qBittorrent**: no built-in backups; their volumes stay in Longhorn's
+  backup group.
+- **Cleanuparr**: not backed up; its settings are quick to recreate.
 
 ### Logging
 
