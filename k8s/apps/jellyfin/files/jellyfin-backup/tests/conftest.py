@@ -33,6 +33,8 @@ def data_dir(tmp_path):
     (data / "data").mkdir()
     # Already in Jellyfin's own archive, so left out of the extras tar.
     (data / "data/jellyfin.db").write_bytes(b"core")
+    # Skipped too. Not a valid database, so copying it would fail the run.
+    (data / "data/infuse_sync.db").write_bytes(b"infuse")
     with contextlib.closing(sqlite3.connect(data / "data/playback_reporting.db")) as db:
         db.execute("CREATE TABLE PlaybackActivity (ItemName TEXT)")
         db.execute("INSERT INTO PlaybackActivity VALUES ('Heat')")

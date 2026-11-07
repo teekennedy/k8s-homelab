@@ -21,9 +21,15 @@ from pathlib import Path
 # included. Metadata and trickplay can be refetched or regenerated.
 OPTIONS = {"Database": True, "Subtitles": True, "Metadata": False, "Trickplay": False}
 ARCHIVE_GLOB = "jellyfin-backup-*.zip"
-# Databases in DATA_DIR/data that Jellyfin's archive already holds. Every
-# other one there belongs to a plugin.
-CORE_DATABASES = {"jellyfin.db"}
+# Databases in DATA_DIR/data left out of the extras tar. Every other one there
+# belongs to a plugin and is copied.
+SKIPPED_DATABASES = {
+    # Already in Jellyfin's own archive.
+    "jellyfin.db",
+    # Infuse's sync cache, which the plugin rebuilds. It's in WAL mode, so
+    # SQLite can't open it from a read-only mount while it's closed.
+    "infuse_sync.db",
+}
 
 
 def create_backup(jellyfin_url: str, api_key: str) -> dict:
@@ -65,7 +71,7 @@ def write_extras(data_dir: Path, dest: Path) -> None:
             tar.add(data_dir / "plugins", arcname="plugins")
             # Copied through SQLite so that a write mid-copy can't tear them.
             for db in sorted((data_dir / "data").glob("*.db")):
-                if db.name not in CORE_DATABASES:
+                if db.name not in SKIPPED_DATABASES:
                     copy = Path(scratch) / db.name
                     snapshot_sqlite(db, copy)
                     tar.add(copy, arcname=f"data/{db.name}")

@@ -89,6 +89,7 @@ def test_main_writes_extras_with_plugins_and_plugin_databases(jellyfin, tmp_path
         rows = db.execute("SELECT ItemName FROM PlaybackActivity").fetchall()
     assert rows == [("Heat",)]
     assert not (out / "data/jellyfin.db").exists()
+    assert not (out / "data/infuse_sync.db").exists()
 
 
 def test_failed_extras_leave_old_extras_and_no_partial_file(jellyfin, data_dir):
