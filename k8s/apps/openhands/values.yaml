@@ -80,6 +80,15 @@ ci:
   # entry under woodpecker-resources.users there); key: token.
   secretName: openhands-woodpecker
 
+# The Grafana the sandboxes' Grafana MCP server talks to, for specs with
+# `grafanaMcp: true`. The in-cluster Service rather than grafana.msng.to, so
+# the traffic never leaves the cluster to come back through the ingress. The
+# token is a read-only (Viewer) service account's, minted into this Secret by
+# the grafana-openhands-token job in k8s/platform/monitoring-system; key: token.
+grafana:
+  url: http://monitoring-system-grafana.monitoring-system.svc
+  secretName: openhands-grafana
+
 # --- Model credentials ------------------------------------------------------
 # Read by the ACP agent the agent server spawns. Created by hand; see README.md,
 # "Prerequisites". Optional so the pod still starts before it exists — the
@@ -352,6 +361,10 @@ sandboxSpecs:
       forgeCredentials: true
       # Run Dagger checks on the shared engine; see "Sandbox specs" in README.md.
       daggerEngine: true
+      # Read-only view of the cluster through kubectl, and of its logs, metrics
+      # and dashboards through the Grafana MCP server.
+      clusterRead: true
+      grafanaMcp: true
       storage:
         size: 5Gi
         storageClass: longhorn-tmp

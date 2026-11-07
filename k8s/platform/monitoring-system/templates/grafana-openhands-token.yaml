@@ -1,0 +1,153 @@
+{{- $cfg := .Values.openhandsGrafana }}
+{{- if $cfg.enabled }}
+{{- $grafanaSvc := printf "http://%s-grafana.%s.svc" .Release.Name .Release.Namespace }}
+{{- $adminSecret := index .Values "kube-prometheus-stack" "grafana" "admin" "existingSecret" }}
+---
+# Gives the OpenHands sandboxes a read-only Grafana identity: a Viewer service
+# account and a token for it, written to a Secret in the openhands namespace.
+# The Secret is owned by the job, not templated, so a sync never overwrites it
+# with an empty one. A token is only shown once, so the job keeps the one in
+# the Secret for as long as Grafana accepts it and mints a new one otherwise.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana-openhands-token
+  namespace: {{ .Release.Namespace }}
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grafana-openhands-token
+  namespace: {{ $cfg.secretNamespace }}
+rules:
+  # The create permission is incompatible with specific resource names
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ $cfg.secretName | quote }}]
+    verbs: ["get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: grafana-openhands-token
+  namespace: {{ $cfg.secretNamespace }}
+subjects:
+  - kind: ServiceAccount
+    name: grafana-openhands-token
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: grafana-openhands-token
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grafana-openhands-token
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    helm.sh/hook: post-install,post-upgrade
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      serviceAccountName: grafana-openhands-token
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: apply
+          image: "{{ $cfg.image.repository }}:{{ $cfg.image.tag }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
+          env:
+            - name: GRAFANA_URL
+              value: {{ $grafanaSvc | quote }}
+            - name: GRAFANA_USER
+              valueFrom: { secretKeyRef: { name: {{ $adminSecret }}, key: username } }
+            - name: GRAFANA_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $adminSecret }}, key: password } }
+            - name: SA_NAME
+              value: {{ $cfg.serviceAccountName | quote }}
+            - name: TARGET_NAMESPACE
+              value: {{ $cfg.secretNamespace | quote }}
+            - name: TARGET_NAME
+              value: {{ $cfg.secretName | quote }}
+          command: ["/bin/sh", "-euc"]
+          args:
+            - |
+              # The image's curl has no jq beside it, so the few fields read
+              # back are cut out of Grafana's JSON, whose field order is fixed
+              # by its Go structs.
+              until curl -fsS "$GRAFANA_URL/api/health" >/dev/null; do
+                echo "waiting for Grafana"; sleep 5
+              done
+
+              grafana() { # grafana METHOD PATH [JSON BODY]
+                curl -sS --fail-with-body -u "$GRAFANA_USER:$GRAFANA_PASSWORD" \
+                  -X "$1" -H 'Content-Type: application/json' \
+                  ${3:+--data-binary "$3"} "$GRAFANA_URL$2"
+              }
+
+              kube_ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              kube_token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              secret_url="https://kubernetes.default.svc/api/v1/namespaces/$TARGET_NAMESPACE/secrets"
+              kube() { # kube METHOD URL [JSON BODY]
+                curl -sS --fail-with-body --cacert "$kube_ca" \
+                  -H "Authorization: Bearer $kube_token" -H 'Content-Type: application/json' \
+                  -X "$1" ${3:+--data-binary "$3"} "$2"
+              }
+
+              # Keep the current token while Grafana still accepts it.
+              current=$(kube GET "$secret_url/$TARGET_NAME" 2>/dev/null \
+                | sed -n 's/.*"token": *"\([^"]*\)".*/\1/p' | base64 -d 2>/dev/null || true)
+              if [ -n "$current" ] && curl -fsS -o /dev/null \
+                -H "Authorization: Bearer $current" "$GRAFANA_URL/api/user"; then
+                echo "token in $TARGET_NAMESPACE/$TARGET_NAME is still valid"
+                exit 0
+              fi
+
+              sa_id=$(grafana GET "/api/serviceaccounts/search?query=$SA_NAME&perpage=100" \
+                | sed -n "s/.*{\"id\":\([0-9]*\),[^}]*\"name\":\"$SA_NAME\".*/\1/p")
+              if [ -z "$sa_id" ]; then
+                sa_id=$(grafana POST /api/serviceaccounts \
+                  "{\"name\":\"$SA_NAME\",\"role\":\"Viewer\",\"isDisabled\":false}" \
+                  | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
+                echo "created service account $SA_NAME ($sa_id)"
+              fi
+              # Viewer is the whole point; put it back if someone widened it.
+              grafana PATCH "/api/serviceaccounts/$sa_id" '{"role":"Viewer","isDisabled":false}' >/dev/null
+
+              # Drop the tokens that stopped working, then mint one.
+              for id in $(grafana GET "/api/serviceaccounts/$sa_id/tokens" \
+                | grep -o '"id":[0-9]*' | cut -d: -f2); do
+                grafana DELETE "/api/serviceaccounts/$sa_id/tokens/$id" >/dev/null
+              done
+              key=$(grafana POST "/api/serviceaccounts/$sa_id/tokens" '{"name":"openhands"}' \
+                | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
+              [ -n "$key" ] || { echo "Grafana returned no token"; exit 1; }
+
+              body="{\"apiVersion\":\"v1\",\"kind\":\"Secret\",\"metadata\":{\"name\":\"$TARGET_NAME\",\"namespace\":\"$TARGET_NAMESPACE\"},\"stringData\":{\"token\":\"$key\"}}"
+              if kube GET "$secret_url/$TARGET_NAME" >/dev/null 2>&1; then
+                kube PUT "$secret_url/$TARGET_NAME" "$body" >/dev/null
+              else
+                kube POST "$secret_url" "$body" >/dev/null
+              fi
+              echo "wrote $TARGET_NAMESPACE/$TARGET_NAME"
+{{- end }}

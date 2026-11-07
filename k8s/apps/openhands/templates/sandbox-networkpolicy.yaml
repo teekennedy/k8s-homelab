@@ -40,14 +40,29 @@ spec:
     {{- if eq $cfg.egress "lan" }}
     {{- include "openhands.egressForge" $root | nindent 4 }}
     {{- end }}
-    {{- if $cfg.daggerEngine }}
-    # Dagger's kube-pod:// transport is `kubectl exec` through the apiserver,
-    # which is host-networked, so only an ipBlock on the nodes can match it.
+    {{- if or $cfg.daggerEngine $cfg.clusterRead }}
+    # The apiserver, for Dagger's kube-pod:// transport (`kubectl exec`) and for
+    # kubectl itself. It is host-networked, so only an ipBlock on the nodes can
+    # match it.
     - to:
         - ipBlock:
             cidr: {{ $root.Values.networkPolicy.nodeCidr }}
       ports:
         - port: 6443
+          protocol: TCP
+    {{- end }}
+    {{- if $cfg.grafanaMcp }}
+    # Grafana's container port: the Service's is DNAT'd away before egress
+    # policy is evaluated.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $root.Values.monitoringNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - port: 3000
           protocol: TCP
     {{- end }}
     {{- if ne $cfg.egress "none" }}

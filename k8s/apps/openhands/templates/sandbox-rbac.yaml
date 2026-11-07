@@ -12,7 +12,7 @@ metadata:
   namespace: {{ $root.Release.Namespace }}
   labels:
     {{- include "openhands.labels" $root | nindent 4 }}
-automountServiceAccountToken: {{ default false $cfg.daggerEngine }}
+automountServiceAccountToken: {{ or $cfg.daggerEngine $cfg.clusterRead | default false }}
 {{- if $cfg.daggerEngine }}
 ---
 # Reach the shared Dagger engine over `kube-pod://`, which is `kubectl exec`.
@@ -45,6 +45,59 @@ subjects:
 roleRef:
   kind: Role
   name: {{ printf "%s-runtime-%s-dagger-exec" $fullName $spec }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- if $cfg.clusterRead }}
+---
+# Read-only access to the cluster for `kubectl`, through the built-in `view`
+# role: everything namespaced but Secrets, Roles and RoleBindings. It does not
+# cover the cluster-scoped objects a debugging session asks about first, which
+# are added here.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-runtime-%s-cluster-read" $fullName $spec }}
+  labels:
+    {{- include "openhands.labels" $root | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "volumeattachments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-runtime-%s-cluster-read" $fullName $spec }}
+  labels:
+    {{- include "openhands.labels" $root | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ printf "%s-runtime-%s" $fullName $spec }}
+    namespace: {{ $root.Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ printf "%s-runtime-%s-cluster-read" $fullName $spec }}
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-runtime-%s-view" $fullName $spec }}
+  labels:
+    {{- include "openhands.labels" $root | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ printf "%s-runtime-%s" $fullName $spec }}
+    namespace: {{ $root.Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: view
   apiGroup: rbac.authorization.k8s.io
 {{- end }}
 {{- end }}

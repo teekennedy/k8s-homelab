@@ -56,7 +56,7 @@ spec:
       # An agent server that exits stays exited, and reports as ERROR.
       restartPolicy: Never
       serviceAccountName: {{ printf "%s-runtime-%s" $fullName .spec }}
-      automountServiceAccountToken: {{ default false $cfg.daggerEngine }}
+      automountServiceAccountToken: {{ or $cfg.daggerEngine $cfg.clusterRead | default false }}
       enableServiceLinks: false
       securityContext:
         {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
@@ -71,6 +71,9 @@ spec:
             - -c
             - |
               {{- include "openhands.seedSkillsScript" $root | nindent 14 }}
+              {{- if $cfg.grafanaMcp }}
+              {{- include "openhands.seedGrafanaMcpScript" $root | nindent 14 }}
+              {{- end }}
               mkdir -p /workspace/project
               # Preserve refreshed credentials until the shared seed changes.
               if [ -s /opt/openai-auth/openai_oauth.json ]; then
@@ -139,6 +142,20 @@ spec:
             {{- end }}
             {{- if $cfg.forgeCredentials }}
             {{- include "openhands.forgeEnv" $root | nindent 12 }}
+            {{- end }}
+            {{- if $cfg.grafanaMcp }}
+            # Read by the Grafana MCP server that seed-home registers with
+            # Claude Code. Optional: the job that mints the token may not have
+            # run yet, and the server then answers 401 instead of the pod
+            # failing to start.
+            - name: GRAFANA_URL
+              value: {{ $root.Values.grafana.url | quote }}
+            - name: GRAFANA_SERVICE_ACCOUNT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.grafana.secretName }}
+                  key: token
+                  optional: true
             {{- end }}
             {{- if $cfg.daggerEngine }}
             # `kube-pod://` is `kubectl exec` through the apiserver, using the

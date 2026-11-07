@@ -76,7 +76,9 @@ Three consequences worth stating plainly:
   authorization policy; there is no viewer tier, because there is nothing a
   viewer could be restricted to.
 - **A sandbox cannot reach the app server's API**, only its webhook port, and
-  cannot reach the Kubernetes API: an agent cannot start more agents.
+  can only read the Kubernetes API, never write it: an agent cannot start more
+  agents. A spec with `clusterRead` sees everything the built-in `view` role
+  does, which excludes Secrets.
 - **Only the app server talks to the Kubernetes API**, and only to manage
   sandboxes — see `templates/app-server-rbac.yaml`. Every other ServiceAccount
   in this chart has no permissions and no mounted token.
@@ -279,6 +281,7 @@ so the copy is a full refresh and a deleted skill does not linger.
 
 | Skill | What it does |
 | --- | --- |
+| `create-pr` | Publishes a branch with `scripts/create-pr.sh`: pushes it and opens or updates its pull request with the title and description the agent gives. |
 | `forgejo-iterate` | Drives a Forgejo pull request to green: polls the combined commit status, pulls failing step logs out of Woodpecker, classifies the failure, fixes or restarts, and repeats. |
 
 The ACP adapter passes `settingSources: ["user", "project", "local"]` to the
@@ -320,7 +323,7 @@ pod. They are `sandboxSpecs.specs` in `values.yaml`.
 
 | Spec | Reaches | Forge credentials |
 | --- | --- | --- |
-| `repo` (default) | the model API, `git.msng.to`, the API server and the Dagger engine | yes |
+| `repo` (default) | the model API, `git.msng.to`, the API server (read-only), Grafana and the Dagger engine | yes |
 | `isolated` | the model API only — nothing on the LAN | no |
 
 A spec with `daggerEngine: true` gets a mounted ServiceAccount token, a Role
@@ -329,6 +332,28 @@ server on 6443. That is what Dagger's `kube-pod://` runner transport needs, as
 for Woodpecker's `dagger-pipeline`. The sandbox image must supply `kubectl` and
 the `dagger` CLI, which the sandbox image provides, and sets
 `_EXPERIMENTAL_DAGGER_RUNNER_HOST` for it.
+
+A spec with `clusterRead: true` gets the same mounted ServiceAccount token,
+bound to the built-in `view` ClusterRole plus read on nodes, PersistentVolumes,
+StorageClasses, VolumeAttachments and `metrics.k8s.io` (see
+`templates/sandbox-rbac.yaml`), so `kubectl get/describe/logs/top` work with no
+kubeconfig. `view` omits Secrets, Roles and RoleBindings, so a sandbox cannot
+read credentials or widen its own access.
+
+A spec with `grafanaMcp: true` registers the official [Grafana MCP server][mcp-grafana]
+with Claude Code, for logs (Loki), metrics (Prometheus), traces and dashboards.
+The `seed-home` initContainer merges it into `~/.claude.json` at every start,
+as a stdio server run with `--disable-write`, taking `GRAFANA_URL` and
+`GRAFANA_SERVICE_ACCOUNT_TOKEN` from the container's environment by `${VAR}`
+expansion so the token is never written to disk. It talks to Grafana's
+in-cluster Service (`grafana.url`), not `grafana.msng.to`. The token belongs to a
+Viewer service account, `openhands-readonly`, which the `grafana-openhands-token`
+job in `k8s/platform/monitoring-system` creates after each sync and writes to
+the `openhands-grafana` Secret here; it reuses the token while Grafana still
+accepts it and mints a new one otherwise. Only Claude Code sessions see the MCP
+server; the native OpenHands agent of the `codex` profiles does not.
+
+[mcp-grafana]: https://github.com/grafana/mcp-grafana
 
 **The agent profile picker chooses the spec.** A conversation runs on the spec
 its agent profile is named after — `isolated`, or `isolated-<anything>` — and
@@ -354,8 +379,9 @@ kubectl -n openhands get sandbox -L openhands.msng.to/sandbox-spec
 
 ### Sandbox image
 
-`files/sandbox/Dockerfile` is the upstream agent server with `kubectl` and the
-`dagger` CLI added; the CLI version must match the engine's.
+`files/sandbox/Dockerfile` is the upstream agent server with `kubectl`, the
+`dagger` CLI and `mcp-grafana` added; the dagger CLI version must match the
+engine's.
 
 A conventional commit on `main` that touches `files/sandbox/` (a bumped `FROM`
 tag or CLI version, say) is tagged `openhands-sandbox-<version>` and published

@@ -666,6 +666,18 @@ gitSync:
     repository: alpine/curl
     tag: "8.22.0@sha256:f05779b04a6f3c6f228c67118786f5c80d4c4922dd79b0b24c92dc10a74f594f"
 
+# Read-only Grafana identity for the OpenHands sandboxes (k8s/apps/openhands),
+# minted by templates/grafana-openhands-token.yaml. The Secret it writes is
+# read by the sandboxes' Grafana MCP server.
+openhandsGrafana:
+  enabled: true
+  serviceAccountName: openhands-readonly
+  secretNamespace: openhands
+  secretName: openhands-grafana
+  image:
+    repository: alpine/curl
+    tag: "8.22.0@sha256:f05779b04a6f3c6f228c67118786f5c80d4c4922dd79b0b24c92dc10a74f594f"
+
 loki:
   enabled: true
   deploymentMode: SingleBinary

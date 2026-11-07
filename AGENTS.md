@@ -7,7 +7,7 @@
 - `nix/modules/` provides reusable Nix modules (e.g. `nix/modules/k3s`) that get imported by multiple hosts; extend here before duplicating config.
 - `k8s/foundation/`, `k8s/platform/`, and `k8s/apps/` hold Argo CD application definitions (tier app-of-apps live at `k8s/<tier>/application.yaml`).
 - `terraform/` contains infrastructure state (OpenTofu) for provisioning external resources
-- `scripts/` includes misc helper scripts such as `scripts/create-pr.sh`.
+- `scripts/` includes misc helper scripts such as `scripts/create-pr.sh`, which pushes the current branch and opens or updates its PR (`--help` lists the title/description/draft flags; auto-merge is opt-in). Agents should use it to publish changes.
 
 ## Build, Test, and Development Commands
 

@@ -239,6 +239,37 @@ done
 {{- end }}
 
 {{/*
+Registers the Grafana MCP server with Claude Code, in its user config. The
+server inherits GRAFANA_URL and the token from the agent container's
+environment through ${VAR} expansion, so the token is never written to disk.
+Merged into ~/.claude.json, which the CLI keeps its own state in, and replaced
+on every start so a change here takes effect on the next rollout.
+*/}}
+{{- define "openhands.seedGrafanaMcpScript" -}}
+python3 - <<'PY'
+import json, os
+path = os.path.join(os.environ["HOME"], ".claude.json")
+try:
+    with open(path) as f:
+        cfg = json.load(f)
+except (OSError, ValueError):
+    cfg = {}
+cfg.setdefault("mcpServers", {})["grafana"] = {
+    "type": "stdio",
+    "command": "mcp-grafana",
+    "args": ["--disable-write"],
+    "env": {
+        "GRAFANA_URL": "${GRAFANA_URL}",
+        "GRAFANA_SERVICE_ACCOUNT_TOKEN": "${GRAFANA_SERVICE_ACCOUNT_TOKEN}",
+    },
+}
+with open(path + ".tmp", "w") as f:
+    json.dump(cfg, f)
+os.replace(path + ".tmp", path)
+PY
+{{- end }}
+
+{{/*
 In-cluster URLs of the app server's two ports.
 */}}
 {{- define "openhands.appServerURL" -}}
