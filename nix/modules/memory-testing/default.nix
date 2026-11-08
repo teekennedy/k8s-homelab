@@ -16,6 +16,8 @@
   bootEntry = "memory-testing-bios-setup.conf";
   # kured drains the node and reboots when this file exists.
   rebootSentinel = "/run/reboot-required";
+  # The script kured runs to reboot the node; it lasts until the next boot.
+  rebootCommand = "/run/reboot-command";
 
   setupVar = pkgs.fetchurl {
     url = "https://github.com/datasone/setup_var.efi/releases/download/0.3.1/setup_var.efi";
@@ -183,7 +185,7 @@
     text = ''
       usage() {
         cat <<EOF
-      Usage: bios-setup [--dry-run] [--no-reboot] [--now] [--force] PRESET|VAR:OFFSET=VALUE...
+      Usage: bios-setup [--dry-run] [--no-reboot] [--now] [--poweroff] [--force] PRESET|VAR:OFFSET=VALUE...
 
       Queues BIOS setup variable writes on the ESP and sets the UEFI shell entry
       as the one-shot boot entry, which applies them, records the settings and
@@ -195,6 +197,8 @@
 
         --no-reboot  queue only; the next reboot of any kind runs the shell entry
         --now        reboot immediately without draining (cluster unavailable)
+        --poweroff   power off instead of rebooting, e.g. to swap modules. The
+                     shell entry still runs on the next power on
 
       Presets:
       ${lib.concatStrings (lib.mapAttrsToList (n: v: "  ${n}: ${
@@ -208,7 +212,7 @@
       EOF
       }
 
-      dry_run=0 reboot=kured force=0
+      dry_run=0 reboot=kured action=reboot force=0
       writes=()
       [ $# -gt 0 ] || { usage; exit 2; }
       for arg in "$@"; do
@@ -217,6 +221,7 @@
           --dry-run) dry_run=1 ;;
           --no-reboot) reboot=none ;;
           --now) reboot=now ;;
+          --poweroff) action=poweroff ;;
           --force) force=1 ;;
       ${lib.concatStrings (lib.mapAttrsToList (n: v: "    ${n}) writes+=(${lib.escapeShellArgs v}) ;;\n") presets)}
           *)
@@ -258,11 +263,17 @@
       bootctl set-oneshot ${bootEntry}
       case $reboot in
         kured)
+          if [ "$action" = poweroff ]; then
+            printf '#!/bin/sh\nexec /run/current-system/sw/bin/systemctl poweroff\n' > ${rebootCommand}
+          fi
           touch ${rebootSentinel}
-          echo "queued. kured will drain and reboot this node (check: kubectl -n kured logs ds/kured)"
+          echo "queued. kured will drain and $action this node (check: kubectl -n kured logs ds/kured)"
           ;;
-        now) systemctl reboot ;;
-        none) echo "queued. The next reboot runs the shell entry; let kured do it with: touch ${rebootSentinel}" ;;
+        now) systemctl "$action" ;;
+        none)
+          [ "$action" = reboot ] || echo "--poweroff has no effect with --no-reboot" >&2
+          echo "queued. The next reboot runs the shell entry; let kured do it with: touch ${rebootSentinel}"
+          ;;
       esac
     '';
   };

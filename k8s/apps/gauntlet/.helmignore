@@ -25,6 +25,4 @@
 files/roll-page/.venv
 files/roll-page/.pytest_cache
 files/roll-page/tests
-files/roll-page/pyproject.toml
-files/roll-page/uv.lock
 __pycache__

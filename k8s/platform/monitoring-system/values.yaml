@@ -575,6 +575,16 @@ kube-prometheus-stack:
                         type: [type]
                         reason: [reason]
                       valueFrom: [status]
+                # Volumes outside the backup group keep their last backup
+                # time, so LonghornVolumeBackupStale needs to tell them apart.
+                - name: backup_group
+                  help: 1 when the volume is in Longhorn's backup recurring-job group.
+                  each:
+                    type: StateSet
+                    stateSet:
+                      path: [metadata, labels, "recurring-job-group.longhorn.io/backup"]
+                      labelName: backup_group
+                      list: [enabled]
 
 prometheus-blackbox-exporter:
   fullnameOverride: blackbox-exporter

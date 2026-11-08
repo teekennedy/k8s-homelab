@@ -39,6 +39,9 @@ then creates `/run/reboot-required`, so kured drains the node before rebooting.
 Draining matters: a plain reboot of a node with Longhorn volumes attached tears
 down their iSCSI devices under mounted filesystems and can hang the shutdown.
 `--now` reboots immediately anyway, for when the cluster is unavailable.
+`--poweroff` powers off instead, for swapping modules: it rewrites
+`/run/reboot-command`, the script kured runs, to power off for this boot only.
+The one-shot entry is an EFI variable, so it still runs on the next power on.
 `startup.nsh` records the settings, applies the queued writes, records them
 again and resets. The next boot then trains memory with the new settings, and
 `memory-testing-collect` moves the recordings into that boot's directory.

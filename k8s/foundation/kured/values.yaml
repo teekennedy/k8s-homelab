@@ -13,7 +13,9 @@ kured:
     messageTemplateUncordon: "event=uncordon node=%s"
     # How often to check for sentinel file
     period: "3m0s"
-    rebootCommand: "/run/current-system/sw/bin/systemctl reboot"
+    # Script created on each node by nix/modules/k3s/kured.nix. Edit it on a
+    # node to make one reboot do something else, such as power off.
+    rebootCommand: "/run/reboot-command"
     # Alerts kured should ignore.
     alertFilterRegexp: "^(KubeVersionMismatch|LonghornVolumeActualSpaceUsedWarning|LonghornNodeStorageWarning|LonghornDiskStorageWarning|CPUThrottlingHigh|ZFSScrubTooOld|JellyfinExporterDown|NixosRebootPendingTooLong|PrometheusTargetScrapeFailed|ResticBackupStale|ResticMaintenanceStale|ResticRepositoryUnreadable|Watchdog)$"
     # Only firing alerts should block reboot
