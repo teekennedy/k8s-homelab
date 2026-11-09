@@ -344,7 +344,7 @@ sandboxSpecs:
   # Built from files/sandbox/Dockerfile, which pins the upstream agent-server
   # tag and adds kubectl, the dagger CLI and the Claude Code adapter. Released
   # by any conventional commit under files/sandbox; Renovate bumps this tag.
-  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.17@sha256:527fac6ad8b3ab5b6ac5573597609dcfecd7d744f7f8f054236162d5bd107079
+  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.18@sha256:1a5c257182fdc8bbff23ae8e4826dc0ef955615bf0a7ff10e24e9c902d71795a
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:
