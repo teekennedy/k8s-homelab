@@ -22,8 +22,13 @@ app-template:
             TZ: America/Denver
             PUID: &UID 1000
             PGID: &GID 1000
-            # Backups managed through k8s
-            SPOOLMAN_AUTOMATIC_BACKUP: "FALSE"
+            # Nightly backup at midnight to the NAS (see nasBackups). Spoolman
+            # hardcodes 5 rotated copies; restic keeps the history.
+            SPOOLMAN_AUTOMATIC_BACKUP: "TRUE"
+            SPOOLMAN_DIR_BACKUPS: /backups
+            # The file log can't be turned off, so keep it off the PVC; logs are
+            # collected from stdout.
+            SPOOLMAN_DIR_LOGS: /logs
           command:
             - uvicorn
             - spoolman.main:app
@@ -96,8 +101,27 @@ app-template:
       type: persistentVolumeClaim
       size: 100Mi
       storageClass: longhorn
+      # Backed up by spoolman itself to the NAS, so no Longhorn backup
+      # snapshot is pinning deleted blocks.
       labels:
         recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/backup: "enabled"
+        recurring-job-group.longhorn.io/ephemeral: "enabled"
       globalMounts:
         - path: /home/app/.local/share/spoolman
+    backups:
+      type: persistentVolumeClaim
+      existingClaim: spoolman-backups
+      globalMounts:
+        - path: /backups
+    logs:
+      type: emptyDir
+      sizeLimit: 50Mi
+      globalMounts:
+        - path: /logs
+
+# Static NFS volume for spoolman's database backups (templates/nas-backups.yaml).
+nasBackups:
+  server: borg-2.msng.to
+  # NFSv4 path relative to the fsid=0 root (/storage/nas).
+  path: /backups/spoolman
+  storage: 1Gi

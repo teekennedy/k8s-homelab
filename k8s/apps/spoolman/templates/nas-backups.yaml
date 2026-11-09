@@ -1,0 +1,47 @@
+{{- /*
+Static NFS volume (mTLS) for spoolman's own database backups, at
+/storage/nas/backups/spoolman on the NAS. The directory is pre-created owned by
+spoolman's UID/GID; restic snapshots /storage/nas/backups for history.
+*/}}
+{{- with .Values.nasBackups }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $.Release.Name }}-backups
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+spec:
+  capacity:
+    storage: {{ .storage }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.2
+    - xprtsec=mtls
+  nfs:
+    server: {{ .server }}
+    path: {{ .path }}
+  claimRef:
+    name: {{ $.Release.Name }}-backups
+    namespace: {{ $.Release.Namespace }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $.Release.Name }}-backups
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: {{ $.Release.Name }}-backups
+  resources:
+    requests:
+      storage: {{ .storage }}
+{{- end }}
