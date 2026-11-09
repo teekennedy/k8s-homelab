@@ -4,7 +4,7 @@ victoria-metrics-single:
     fullnameOverride: victoria-metrics-server
     image:
       image: victoriametrics/victoria-metrics
-      tag: "v1.155.0@sha256:f60dc268b54ecf87f6e09d740c2b732838aa9193090cc741417c9f6386a130df"
+      tag: "v1.156.0@sha256:da8a90ac0912f16589be2b96a6441a2fca4bca415c83783d972d92e3b5b66970"
     retentionPeriod: "4y"
     resources:
       requests:
@@ -174,7 +174,7 @@ backup:
   # Keep in sync with victoria-metrics-single.server.image.tag.
   image:
     image: victoriametrics/vmbackup
-    tag: "v1.155.0@sha256:26af85b273442e15e5172769979998ad98486706051acbe7826cd3a8c5d83bca"
+    tag: "v1.156.0@sha256:f2b1c03f4ca75392e9e8a67dc88d51f7eb7e950dbe0fa14e8c78b5f34f3c40ea"
   nfs:
     server: borg-2.msng.to
     path: /backups/victoriametrics
