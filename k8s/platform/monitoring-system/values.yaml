@@ -531,6 +531,12 @@ kube-prometheus-stack:
       - storageclasses
       - validatingwebhookconfigurations
       - volumeattachments
+    # kubernetes-mixin skips Jobs labeled `excluded-from-alerts: "true"` in
+    # KubeJobNotCompleted (and KubeJobFailed, via mixins/main.jsonnet). It
+    # reads that label from kube_job_labels, which only carries allowlisted
+    # labels.
+    metricLabelsAllowlist:
+      - jobs=[excluded-from-alerts]
     # Unused per-object metadata. kube_replicaset_owner is kept: the workload
     # recording rules join on it.
     metricDenylist:

@@ -54,6 +54,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: nixos-rollout
+        # A rollout can wait on kured for days. KubeJobNotCompleted and
+        # KubeJobFailed both block kured, so either one firing for this Job
+        # would hold off the reboot the Job is waiting for.
+        excluded-from-alerts: "true"
     spec:
       # Bounds the whole rollout, including waiting for kured to be unblocked.
       activeDeadlineSeconds: {{ $rollout.activeDeadlineSeconds }}
