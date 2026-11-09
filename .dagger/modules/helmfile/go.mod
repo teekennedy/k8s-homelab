@@ -10,7 +10,7 @@ require (
 	github.com/vektah/gqlparser/v2 v2.5.36
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 )
 
 require go.yaml.in/yaml/v3 v3.0.6
