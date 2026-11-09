@@ -77,3 +77,7 @@ spec:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
       - RespectIgnoreDifferences=true
+      # Client-side apply copies each object into a last-applied-configuration
+      # annotation, capped at 256 KiB. The OIDC client secret sync ConfigMap
+      # carries a uv.lock larger than that.
+      - ServerSideApply=true
