@@ -5,7 +5,7 @@
 # at start. Released as ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-<version>
 # by any conventional commit that touches this directory; see README.md,
 # "Sandbox image".
-FROM ghcr.io/openhands/agent-server:1.60.1-python@sha256:b43ee580c2177280c81cb807c9a559d7a14aa13b48dba5040132a6a637bb6d55
+FROM ghcr.io/openhands/agent-server:1.61.0-python@sha256:a402109d904d744e34d446487a1c3f9fdd3fd98535b29a0401cdd3bce8560e6c
 
 
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
