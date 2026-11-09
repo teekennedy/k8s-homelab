@@ -73,6 +73,10 @@ rules:
     resources: ["secrets"]
     resourceNames: [{{ $rollout.certSecretName | quote }}]
     verbs: ["get"]
+  # To find an older rollout still running and leave the fleet to it.
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

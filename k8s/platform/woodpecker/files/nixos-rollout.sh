@@ -112,6 +112,29 @@ wait_for_host() {
   return 1
 }
 
+# Prints the name of an unfinished rollout Job created before this one, if any.
+# concurrencyPolicy: Forbid only counts Jobs the CronJob started itself, not
+# the ones the pipeline creates with `kubectl create job --from`, so a scheduled
+# run can start beside a pipeline one. The pipeline deletes every rollout Job
+# before creating its own, so yielding to the older one never holds back a
+# newer revision.
+older_rollout() {
+  created=$(kubectl get job "$JOB_NAME" -o jsonpath='{.metadata.creationTimestamp}')
+  jobs=$(kubectl get jobs -l app.kubernetes.io/name=nixos-rollout \
+    -o jsonpath='{range .items[*]}{.metadata.creationTimestamp} {.metadata.name} {.status.conditions[*].type}{"\n"}{end}')
+  # RFC 3339 UTC timestamps sort as strings; the name breaks ties.
+  echo "$jobs" | awk -v created="$created" -v me="$JOB_NAME" '
+    NF >= 2 && $2 != me \
+      && !/ (Complete|Failed|FailureTarget|SuccessCriteriaMet)( |$)/ \
+      && ($1 < created || ($1 == created && $2 < me)) { print $2; exit }'
+}
+
+other=$(older_rollout)
+if [ -n "$other" ]; then
+  echo "rollout $other is already running; leaving the fleet to it"
+  exit 0
+fi
+
 setup_ssh
 
 # Intentionally unquoted: HOST_ORDER is a space-separated name=ip list and the

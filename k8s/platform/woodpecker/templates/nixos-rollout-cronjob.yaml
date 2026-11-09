@@ -39,7 +39,9 @@ metadata:
     app.kubernetes.io/instance: nixos-rollout
 spec:
   schedule: {{ $rollout.schedule | quote }}
-  # A scheduled run must never collide with one the pipeline just started.
+  # Only covers Jobs this CronJob started. A scheduled run that starts beside
+  # a pipeline-created rollout exits on its own; see older_rollout in
+  # files/nixos-rollout.sh.
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
@@ -100,6 +102,10 @@ spec:
               imagePullPolicy: IfNotPresent
               command: ["/scripts/nixos-rollout.sh"]
               env:
+                - name: JOB_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.labels['batch.kubernetes.io/job-name']
                 - name: SSH_USER
                   value: {{ $rollout.user | quote }}
                 # name=ip pairs; see nixosRollout.hostOrder in values.yaml.
