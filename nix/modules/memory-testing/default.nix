@@ -79,6 +79,24 @@
     "reset"
   ]);
 
+  # setup_var.efi 0.3.1 prints junk after each value it writes
+  # (SaSetup:0x1B4=0x01ptaltup:(); reads come out clean. The values are right
+  # and always 2 hex digits per byte, so cut each line there. Keeps
+  # " # Writing skipped" and passes other lines (errors) through.
+  cleanWriteOutput = pkgs.writeText "clean-setup-var-output.awk" ''
+    {
+      if (match($0, /^[A-Za-z]+(\([0-9]+\))?:0x[0-9A-Fa-f]+(\([0-9]+\))?=0x/)) {
+        head = substr($0, 1, RLENGTH)
+        size = 1
+        if (match(head, /\([0-9]+\)=0x$/)) size = substr(head, RSTART + 1, RLENGTH - 5) + 0
+        keep = length(head) + 2 * size
+        skipped = index(substr($0, keep + 1), " # Writing skipped") == 1
+        $0 = substr($0, 1, keep) (skipped ? " # Writing skipped" : "")
+      }
+      print
+    }
+  '';
+
   collect = pkgs.writeShellApplication {
     name = "memory-testing-collect";
     runtimeInputs =
@@ -88,9 +106,16 @@
       state=${stateDir}
       btime=$(awk '/^btime/ {print $2}' /proc/stat)
       boot_id=$(tr -d - < /proc/sys/kernel/random/boot_id)
-      dir=$state/boots/$(date -u -d "@$btime" +%Y-%m-%dT%H%MZ)
-      if [ -e "$dir/meta.txt" ] && ! grep -qx "boot_id=$boot_id" "$dir/meta.txt"; then
-        dir=$dir-''${boot_id:0:8}
+      # btime shifts by a few seconds when the clock syncs, which can change the
+      # minute in the name. Reuse the directory that already holds this boot.
+      existing=$(grep -lx "boot_id=$boot_id" "$state"/boots/*/meta.txt 2>/dev/null | head -1 || true)
+      if [ -n "$existing" ]; then
+        dir=$(dirname "$existing")
+      else
+        dir=$state/boots/$(date -u -d "@$btime" +%Y-%m-%dT%H%MZ)
+        if [ -e "$dir/meta.txt" ]; then
+          dir=$dir-''${boot_id:0:8}
+        fi
       fi
       mkdir -p "$dir"
       cd "$dir"
@@ -135,7 +160,10 @@
         if [ -e "$esp/after.txt" ]; then
           tr -d '\r' < "$esp/after.txt" > bios-settings.txt
           [ -e "$esp/before.txt" ] && tr -d '\r' < "$esp/before.txt" > bios-settings-before.txt
-          [ -e "$esp/action.txt" ] && tr -d '\r' < "$esp/action.txt" > bios-setup-output.txt
+          if [ -e "$esp/action.txt" ]; then
+            cp "$esp/action.txt" bios-setup-output.raw
+            tr -d '\r' < "$esp/action.txt" | awk -f ${cleanWriteOutput} > bios-setup-output.txt
+          fi
           [ -e "$esp/queued.txt" ] && cp "$esp/queued.txt" bios-setup-queued.txt
           rm -f "$esp/after.txt" "$esp/before.txt" "$esp/action.txt" "$esp/queued.txt"
           cp bios-settings.txt "$state/bios-settings-current.txt"

@@ -16,6 +16,7 @@ in `/cache`:
 | `bdat-acpi.bin`, `bdat-data.bin` | once | Intel BDAT table and the margin results it points to, if the BIOS publishes them |
 | `dmidecode-memory.txt` | once | installed modules, including serial numbers |
 | `bios-settings*.txt` | once | BIOS settings recorded by `bios-setup` before this boot, else the last recorded ones |
+| `bios-setup-output.txt`, `.raw` | once | what `setup_var.efi` printed for the writes: cleaned of the junk it prints after each value, and as printed |
 | `temps.txt` | appended | DIMM (spd5118) and CPU package temperatures |
 | `mce-this-boot.txt` | refreshed | kernel machine-check lines. The next boot finishes the previous boot's file from the journal, so a crash doesn't lose them |
 | `rasdaemon-mce.txt`, `reboots.txt` | refreshed | full MCE history and reboot history |
