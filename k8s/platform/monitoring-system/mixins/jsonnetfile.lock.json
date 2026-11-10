@@ -78,7 +78,7 @@
           "subdir": "grafana-builder"
         }
       },
-      "version": "c4ca2b36432ebb4b2067f4bcd511e5872363f489",
+      "version": "1abcc571e0882164a917e848ae2d9426188bf016",
       "sum": "FqEJAICz9T90PMJLW8i4HXazyWQPNzi68A8UauXa7GQ="
     },
     {
@@ -88,7 +88,7 @@
           "subdir": "mixin-utils"
         }
       },
-      "version": "c4ca2b36432ebb4b2067f4bcd511e5872363f489",
+      "version": "1abcc571e0882164a917e848ae2d9426188bf016",
       "sum": "pdZBifAdc1FjwhKRZIpSF/Hi2C9P9nsExGJxgxNHGRk="
     },
     {
@@ -118,8 +118,8 @@
           "subdir": ""
         }
       },
-      "version": "ea8e318e706c0c14fe857e9b0182f6b7e0564e88",
-      "sum": "AXxs+GkEMTDptfGUv3lmmdlWB8QV4Z3y68T5XrQDHnw="
+      "version": "909cdb0f39b735c8da772f41e02c1be4317418f4",
+      "sum": "JOhiNzeqhGtNSdwKUqp1/h/V1DBdJZcyF7Ui6w3cPUg="
     },
     {
       "source": {
@@ -148,7 +148,7 @@
           "subdir": "jsonnet"
         }
       },
-      "version": "f02294ab2e9ff84bebdc06b5a52377d6783dddf9",
+      "version": "3516376ee99e2ca1e6e9fedc4665f1c8795650c1",
       "sum": "ifkErE0+w5icCxKlH8CvmAcqAUTqlVaUbOlHB0t6wVk=",
       "name": "community-mixins"
     },
@@ -159,8 +159,8 @@
           "subdir": "jsonnet"
         }
       },
-      "version": "c921726a72cd3ed26460415a5b1ff179baf12b71",
-      "sum": "TwzfbIf7KdVigv3gxKR4I4OoSHwHaHIxGBdiA0iTBqc=",
+      "version": "7aee825e9a798ea28772b2179bad492da1ac3ded",
+      "sum": "VJytUvtKSJ1EMtHoZdKK4SC09FrZpw1g60/buo2qcYw=",
       "name": "perses-operator"
     },
     {
@@ -180,7 +180,7 @@
           "subdir": "jsonnet/kube-prometheus"
         }
       },
-      "version": "b6c2f62b287524652592e6e2f7ea0d3054cb8ac6",
+      "version": "d36fc1dfbbc6b9779b34cbcdd967c2b5521a2b6b",
       "sum": "fQCIMRyfrPKvjnG/ADM5wmLyNcux9hnUlpJhaie6S94="
     },
     {
