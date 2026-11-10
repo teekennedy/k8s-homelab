@@ -10,12 +10,12 @@ dependencies:
   version: 1.15.0
 - name: prometheus-blackbox-exporter
   repository: oci://ghcr.io/prometheus-community/charts
-  version: 11.21.1
+  version: 11.21.2
 - name: tempo
   repository: oci://ghcr.io/grafana-community/helm-charts
   version: 3.2.1
 - name: opentelemetry-collector
   repository: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
   version: 0.178.3
-digest: sha256:b20baaffa1b4ef5cdf51e069d58c70b0e1de4db6a2bc4c0be2d062dca7d608e1
-generated: "2026-11-10T20:26:22.660457257Z"
+digest: sha256:815287e87d76839b0b4617c4821d9c53214a73a27756026f98e901a5aae04f5d
+generated: "2026-11-10T21:26:21.938411587Z"
