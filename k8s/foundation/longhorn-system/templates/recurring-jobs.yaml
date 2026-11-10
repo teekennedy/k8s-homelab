@@ -1,4 +1,9 @@
 # yaml-language-server: $schema=https://github.com/datreeio/CRDs-catalog/raw/refs/heads/main/longhorn.io/recurringjob_v1beta2.json
+#
+# Times are America/Denver. Everything here finishes before 02:00, when the
+# restic backups start (borg-2's weekly run copies these backups off-site), and
+# well before kured's 04:00 reboot window (the backup target is on borg-2, the
+# first host it reboots).
 ---
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
@@ -7,7 +12,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   concurrency: 1
-  cron: 0 4 * * *     # 04:00 daily
+  cron: "45 1 * * *"  # 01:45 daily, after backup-daily
   groups:
   - ephemeral
   - backup
@@ -23,7 +28,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   task: system-backup
-  cron: "0 2 * * *"   # 02:00 daily
+  cron: "0 1 * * *"   # 01:00 daily
   retain: 30
   parameters:
     # Don't backup volumes as part of this job
@@ -38,7 +43,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   concurrency: 1
-  cron: "30 2 * * *"         # 02:30 daily
+  cron: "15 1 * * *"         # 01:15 daily
   groups: ["backup"]
   retain: 1
   task: backup

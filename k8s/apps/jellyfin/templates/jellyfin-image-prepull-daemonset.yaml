@@ -1,0 +1,72 @@
+{{- if .Values.imagePrepull.enabled }}
+{{- $main := index .Values "app-template" "controllers" "main" }}
+{{- $image := $main.containers.jellyfin.image }}
+{{- /*
+Keeps Jellyfin's image on every node Jellyfin can be scheduled to.
+
+The main controller uses the Recreate strategy, so on an image update the old
+pod is gone before the new one starts pulling, and the pull happens while
+Jellyfin is down. The same goes for a drain onto a node that has never run the
+current image. This DaemonSet runs the image on each of those nodes, and its
+sync wave makes Argo CD wait for it to be ready on all of them before it
+applies the Deployment.
+
+The container runs the image itself (sleeping) rather than pulling it in an
+init container, so that the image stays in use and kubelet image GC never
+removes it.
+*/}}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: jellyfin-image-prepull
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    app.kubernetes.io/controller: image-prepull
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+spec:
+  revisionHistoryLimit: 3
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Pull on every node at once. Nothing depends on these pods.
+      maxUnavailable: "100%"
+  selector:
+    matchLabels:
+      app.kubernetes.io/controller: image-prepull
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/controller: image-prepull
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ .Chart.Name }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # sleep runs as PID 1, which ignores SIGTERM.
+      terminationGracePeriodSeconds: 1
+      securityContext:
+        runAsUser: {{ $main.pod.securityContext.runAsUser }}
+        runAsGroup: {{ $main.pod.securityContext.runAsGroup }}
+        runAsNonRoot: true
+      {{- with $main.pod.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: jellyfin
+          image: "{{ $image.repository }}:{{ $image.tag }}"
+          command: ["sleep", "infinity"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.imagePrepull.resources | nindent 12 }}
+{{- end }}

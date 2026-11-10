@@ -38,23 +38,24 @@ repositories:
   # /persistent of every host (nix/modules/restic).
   hosts:
     url: s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/hosts
-    # Hosts back up daily, up to 2h late.
+    # Hosts back up daily between 02:00 and 04:00.
     maxBackupAgeHours: 36
     forget:
       - --keep-daily 7
       - --keep-weekly 4
       - --keep-monthly 12
-    # After the hosts' midnight backups.
-    schedule: "0 6 * * *"
+    # After the hosts' 02:00-04:00 backups and kured's 04:00-10:00 reboot
+    # window.
+    schedule: "30 10 * * *"
     maxMaintenanceAgeHours: 72
   # borg-2's NAS backup directory (nix/hosts/borg-2/nas-backups.nix).
   nas-backups:
     url: s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/nas-backups
-    # Weekly, up to 2h late.
+    # Weekly, Mondays between 02:00 and 03:00.
     maxBackupAgeHours: 192
     forget:
       - --keep-weekly 4
       - --keep-monthly 12
-    # After the Monday-midnight backup.
-    schedule: "0 6 * * 1"
+    # After the Monday 02:00 backup and kured's 04:00-10:00 reboot window.
+    schedule: "30 10 * * 1"
     maxMaintenanceAgeHours: 360

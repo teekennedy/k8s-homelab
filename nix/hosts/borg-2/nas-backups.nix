@@ -35,9 +35,11 @@ in {
     paths = [nasBackupDir];
     # Wait out the in-cluster prune/check rather than failing.
     extraBackupArgs = ["--retry-lock 2h"];
+    # After the cluster's 01:00-02:00 backups land on the NAS. A run takes
+    # ~40m, so starting by 03:00 keeps it clear of kured's 04:00 reboot window.
     timerConfig = {
-      OnCalendar = "weekly";
-      RandomizedDelaySec = "2h";
+      OnCalendar = "Mon *-*-* 02:00:00";
+      RandomizedDelaySec = "1h";
       Persistent = true;
     };
   };

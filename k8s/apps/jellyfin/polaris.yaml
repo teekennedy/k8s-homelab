@@ -62,3 +62,9 @@ exemptions:
     rules:
       - readinessProbeMissing
       - livenessProbeMissing
+  # Runs `sleep infinity` to keep Jellyfin's image on the node.
+  - controllerNames:
+      - jellyfin-image-prepull
+    rules:
+      - readinessProbeMissing
+      - livenessProbeMissing

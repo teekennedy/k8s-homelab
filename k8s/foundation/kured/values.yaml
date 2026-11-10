@@ -4,6 +4,12 @@ kured:
   # https://kured.dev/docs/configuration/
   configuration:
     timeZone: America/Denver
+    # Reboot window, picked from when the cluster is least used. kured only starts
+    # a reboot inside it; one already draining at endTime carries on. Nightly
+    # backups (most write to the NAS on borg-2, the first host to reboot) run
+    # 01:00-04:00, before startTime -- keep new nightly jobs out of the window.
+    startTime: "04:00"
+    endTime: "09:59"
     prometheusUrl: http://monitoring-system-kube-pro-prometheus.monitoring-system.svc.cluster.local:9090
     # kured uses the shoutrrr library for sending notifications
     # Shoutrrr docs for generic webhooks: https://containrrr.dev/shoutrrr/v0.7/services/generic/

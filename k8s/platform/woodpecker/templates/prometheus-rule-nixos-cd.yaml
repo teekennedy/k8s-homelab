@@ -47,14 +47,18 @@ spec:
         # firing alerts are keeping kured from rebooting. The rollout Job keeps
         # waiting on kured for up to nixosRollout.activeDeadlineSeconds, and
         # kured ignores this alert, so it cannot block the reboot itself.
+        #
+        # kured only reboots between 04:00 and 10:00, so a generation staged
+        # just after the window closes waits ~18h before it even starts. 24h
+        # means a whole window went by without this host rebooting.
         - alert: NixosRebootPendingTooLong
           expr: nixos_selfupdate_reboot_pending == 1
-          for: 6h
+          for: 24h
           labels:
             severity: warning
             component: nixos-cd
           annotations:
-            summary: {{ "{{ $labels.instance }} has had a NixOS generation staged for 6h without rebooting" | quote }}
+            summary: {{ "{{ $labels.instance }} has had a NixOS generation staged for 24h without rebooting" | quote }}
             description: {{ "A new system generation is staged but not booted. Either no rollout Job was created, or kured is blocked (check the firing alerts) or never got to this host. `kubectl -n woodpecker create job --from=cronjob/nixos-rollout nixos-rollout-manual` rolls it out." | quote }}
 
         # One of the build/stage/fallback units failed on the host. Distinct

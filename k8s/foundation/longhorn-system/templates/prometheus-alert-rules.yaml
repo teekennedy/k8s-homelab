@@ -131,7 +131,7 @@ spec:
       labels:
         issue: Longhorn backup {{`{{$labels.backup}}`}} of volume {{`{{$labels.volume}}`}} failed.
         severity: warning
-    # backup-daily runs at 02:30, so 36h means at least one run was missed.
+    # backup-daily runs at 01:15, so 36h means at least one run was missed.
     # Volumes that were never backed up report 0 and are skipped, as are
     # volumes moved out of the backup group (kube-state-metrics' backup_group).
     - alert: LonghornVolumeBackupStale

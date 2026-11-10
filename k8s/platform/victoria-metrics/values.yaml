@@ -168,8 +168,10 @@ victoria-metrics-single:
 
 # Daily vmbackup CronJob writing to a NAS-backed PV.
 backup:
-  # After Longhorn's 2:30am recurring-job window.
-  schedule: "15 3 * * *"
+  # After Longhorn's 01:15 backups, and before borg-2's 02:00 restic run copies
+  # the NAS off-site. Also clear of kured's 04:00 reboot window: the backup PV
+  # is on borg-2's NAS.
+  schedule: "30 1 * * *"
   activeDeadlineSeconds: 7200
   # Keep in sync with victoria-metrics-single.server.image.tag.
   image:

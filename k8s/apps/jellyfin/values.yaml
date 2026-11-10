@@ -86,6 +86,19 @@ exporter:
     limits:
       memory: 128Mi
 
+# Keeps the main controller's image on every node it can run on, so a rollout
+# or drain doesn't pull ~750MB while Jellyfin is down. Image and node affinity
+# come from app-template.controllers.main. See
+# templates/jellyfin-image-prepull-daemonset.yaml.
+imagePrepull:
+  enabled: true
+  resources:
+    requests:
+      cpu: 1m
+      memory: 8Mi
+    limits:
+      memory: 16Mi
+
 app-template:
   defaultPodOptions:
     automountServiceAccountToken: false
@@ -155,8 +168,9 @@ app-template:
             # It keeps liveness out of the migration window, and a failed
             # migration sits un-Ready and readable instead of crashlooping.
             #
-            # 180 x 10s = 30 minutes, which is the migration budget; the 10s
-            # period keeps an ordinary no-migration restart detected quickly.
+            # 900 x 2s = 30 minutes, which is the migration budget. Jellyfin is
+            # down for users until this and readiness pass, so both poll every
+            # 2s rather than leaving a ready server waiting on the next probe.
             startup:
               enabled: true
               custom: true
@@ -164,8 +178,8 @@ app-template:
                 httpGet:
                   path: /System/Ping
                   port: 8096
-                failureThreshold: 180
-                periodSeconds: 10
+                failureThreshold: 900
+                periodSeconds: 2
                 successThreshold: 1
                 timeoutSeconds: 3
             liveness:
@@ -186,8 +200,10 @@ app-template:
                 httpGet:
                   path: /health
                   port: 8096
-                failureThreshold: 3
-                periodSeconds: 10
+                # 15 x 2s keeps the 30s of failures it takes to pull a running
+                # server out of the Service.
+                failureThreshold: 15
+                periodSeconds: 2
                 successThreshold: 1
                 timeoutSeconds: 5
           resources:
@@ -761,7 +777,10 @@ app-template:
     jellyfin-backup:
       type: cronjob
       cronjob:
-        schedule: "0 4 * * *"
+        # Before borg-2's 02:00 restic run copies the NAS off-site, and clear of
+        # kured's 04:00 reboot window, which can move Jellyfin or reboot the
+        # NAS. A backup takes ~10s and runs live.
+        schedule: "30 1 * * *"
         concurrencyPolicy: Forbid
         successfulJobsHistory: 1
         failedJobsHistory: 1

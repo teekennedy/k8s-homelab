@@ -48,8 +48,10 @@ in {
         # prevent restic from crossing filesystem boundaries and subvolumes when performing a backup
         "--one-file-system"
       ];
+      # 02:00-04:00: after the cluster's nightly backups, before kured's 04:00
+      # reboot window.
       timerConfig = {
-        OnCalendar = "daily";
+        OnCalendar = "*-*-* 02:00:00";
         RandomizedDelaySec = "2h";
         Persistent = true;
       };

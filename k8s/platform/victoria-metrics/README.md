@@ -137,7 +137,7 @@ exactly what's missing when the volume is full.
 
 ## Backups
 
-`templates/backup-cronjob.yaml` runs `vmbackup` daily at 03:15. It mounts the
+`templates/backup-cronjob.yaml` runs `vmbackup` daily at 01:30. It mounts the
 server's Longhorn PVC read-only (pinned to the same node via `podAffinity`),
 takes a snapshot through `/snapshot/create`, and writes it incrementally to
 `/storage/nas/backups/victoriametrics/latest` on borg-2 over mTLS NFS.
