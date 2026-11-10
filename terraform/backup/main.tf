@@ -124,9 +124,15 @@ resource "aws_s3_bucket_public_access_block" "backup" {
 resource "aws_s3_bucket_lifecycle_configuration" "backup" {
   bucket = aws_s3_bucket.backup.id
 
-  # Rule 1: Large objects (>=128 KB): Standard -> IA (45d) -> Glacier Instant Retrieval (90d)
+  # Restic keeps snapshots for at most ~92 days, so a pack either dies within
+  # that window or lives on indefinitely (data that never changes). Packs only
+  # referenced by daily snapshots are pruned ~30-32 days after upload; 35 days
+  # moves what is left straight to Glacier IR, which is cheaper than Standard
+  # or IA for both kinds even counting its 90-day minimum. Objects under
+  # 128 KB (restic metadata) stay in Standard: IA and Glacier IR bill them as
+  # 128 KB, and S3 does not transition them by default anyway.
   rule {
-    id     = "backup-large-objects-to-ia-then-gir"
+    id     = "backup-large-objects-to-gir"
     status = "Enabled"
 
     filter {
@@ -134,32 +140,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
     }
 
     transition {
-      days          = 45
-      storage_class = "STANDARD_IA"
-    }
-
-    transition {
-      days          = 90
+      days          = 35
       storage_class = "GLACIER_IR"
     }
   }
 
-  # Rule 2: Small objects (<128 KB): Standard -> IA (45d), do NOT move to GIR
-  rule {
-    id     = "backup-small-objects-to-ia-only"
-    status = "Enabled"
-
-    filter {
-      object_size_less_than = 131072 # 128 KB
-    }
-
-    transition {
-      days          = 45
-      storage_class = "STANDARD_IA"
-    }
-  }
-
-  # Rule 3: Housekeeping — abort incomplete multipart uploads
+  # Housekeeping — abort incomplete multipart uploads
   rule {
     id     = "abort-incomplete-mpu-7d"
     status = "Enabled"

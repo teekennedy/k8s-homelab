@@ -33,11 +33,12 @@ normally already a daily, and the older backstops sit at month ends:
 
 Anything older is forgotten and pruned on the next maintenance run.
 
-The bucket's lifecycle rules (`terraform/backup/main.tf`) move packs to
-Standard-IA at 45 days and Glacier Instant Retrieval at 90. Most packs that
-only old snapshots use are pruned before they reach Glacier IR. Prune
-downloads partly-used packs to repack them, which costs retrieval fees once
-they are in IA or Glacier IR.
+The bucket's lifecycle rule (`terraform/backup/main.tf`) moves packs to
+Glacier Instant Retrieval at 35 days, just after packs used only by daily
+snapshots have been pruned. What remains is either long-lived data or data a
+monthly backstop still holds, and Glacier IR is the cheapest place for both,
+even with its 90-day minimum. Prune downloads partly-used packs to repack
+them, which costs Glacier IR retrieval fees ($0.03/GB).
 
 ## Metrics and alerts
 
