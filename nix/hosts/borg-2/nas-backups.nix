@@ -27,7 +27,7 @@ in {
   # Offsite backup of all NAS backup data (longhorn snapshots, postgres base backups,
   # victoriametrics) to S3. Retention (forget/prune) and check run in-cluster,
   # see k8s/platform/restic.
-  services.restic.backups.nas-backups-weekly = {
+  services.restic.backups.nas-backups-daily = {
     initialize = true;
     passwordFile = config.sops.secrets.restic_repo_password.path;
     environmentFile = config.sops.secrets.restic_env_file.path;
@@ -38,7 +38,7 @@ in {
     # After the cluster's 01:00-02:00 backups land on the NAS. A run takes
     # ~40m, so starting by 03:00 keeps it clear of kured's 04:00 reboot window.
     timerConfig = {
-      OnCalendar = "Mon *-*-* 02:00:00";
+      OnCalendar = "*-*-* 02:00:00";
       RandomizedDelaySec = "1h";
       Persistent = true;
     };

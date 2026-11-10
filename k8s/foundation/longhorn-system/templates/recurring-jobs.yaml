@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://github.com/datreeio/CRDs-catalog/raw/refs/heads/main/longhorn.io/recurringjob_v1beta2.json
 #
 # Times are America/Denver. Everything here finishes before 02:00, when the
-# restic backups start (borg-2's weekly run copies these backups off-site), and
+# restic backups start (borg-2's daily run copies these backups off-site), and
 # well before kured's 04:00 reboot window (the backup target is on borg-2, the
 # first host it reboots).
 ---

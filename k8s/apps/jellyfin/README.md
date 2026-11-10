@@ -29,7 +29,7 @@ Apps that can back themselves up write their backups to the NAS, one static
 NFS volume per directory under `/storage/nas/backups` (`templates/nas-backups.yaml`,
 directories pre-created by `nix/modules/nfs-mtls`). Each app keeps only its
 latest backup. History comes from restic, which snapshots `/storage/nas/backups`
-to S3 weekly (`k8s/platform/restic`).
+to S3 daily (`k8s/platform/restic`).
 
 - **Prowlarr, Radarr, Sonarr**: their own scheduled backup task (config +
   database zip). Each app's default backup folder, `/config/Backups`, is its

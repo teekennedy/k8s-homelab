@@ -141,7 +141,7 @@ exactly what's missing when the volume is full.
 server's Longhorn PVC read-only (pinned to the same node via `podAffinity`),
 takes a snapshot through `/snapshot/create`, and writes it incrementally to
 `/storage/nas/backups/victoriametrics/latest` on borg-2 over mTLS NFS.
-History comes from the `nas-backups-weekly` restic job
+History comes from the `nas-backups-daily` restic job
 (`nix/hosts/borg-2/nas-backups.nix`), which ships that directory offsite.
 
 Since vmbackup is the backup path, the server PVC is in Longhorn's

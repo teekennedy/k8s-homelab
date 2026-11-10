@@ -7,7 +7,7 @@ here.
 | Repository    | Written by                                          | Schedule |
 | ------------- | --------------------------------------------------- | -------- |
 | `hosts`  | every host's `/persistent` (`nix/modules/restic`)   | daily    |
-| `nas-backups` | borg-2's NAS backups (`nix/hosts/borg-2/nas-backups.nix`) | weekly   |
+| `nas-backups` | borg-2's NAS backups (`nix/hosts/borg-2/nas-backups.nix`) | daily    |
 
 ## Why the work is split
 
@@ -17,6 +17,27 @@ run concurrently: `forget`, `prune` and `check` take an exclusive lock and
 would block the other hosts' backups. So the hosts back up with
 `--retry-lock 2h`, and one CronJob per repository runs
 `unlock` (stale locks only), `forget --prune` and `check` after the backups.
+
+## Retention
+
+Both repositories keep `--keep-daily 30 --keep-monthly 4`: every snapshot
+from the last 30 days, plus the last snapshot of each of the last four
+calendar months. The current month is one of the four, so its snapshot is
+normally already a daily, and the older backstops sit at month ends:
+
+| Backstop             | Age          |
+| -------------------- | ------------ |
+| last month's end     | 1-31 days    |
+| 2 months ago (end)   | 29-62 days   |
+| 3 months ago (end)   | 59-92 days   |
+
+Anything older is forgotten and pruned on the next maintenance run.
+
+The bucket's lifecycle rules (`terraform/backup/main.tf`) move packs to
+Standard-IA at 45 days and Glacier Instant Retrieval at 90. Most packs that
+only old snapshots use are pruned before they reach Glacier IR. Prune
+downloads partly-used packs to repack them, which costs retrieval fees once
+they are in IA or Glacier IR.
 
 ## Metrics and alerts
 

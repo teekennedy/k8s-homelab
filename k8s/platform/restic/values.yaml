@@ -34,6 +34,10 @@ maintenance:
       memory: 1Gi
 
 # One exporter and one maintenance CronJob per repository.
+#
+# Retention: every daily snapshot for 30 days, plus the last snapshot of each
+# of the last 4 calendar months (the current one included). Monthly buckets
+# follow the calendar, so the two oldest backstops are ~30-60 and ~60-90 days old.
 repositories:
   # /persistent of every host (nix/modules/restic).
   hosts:
@@ -41,9 +45,8 @@ repositories:
     # Hosts back up daily between 02:00 and 04:00.
     maxBackupAgeHours: 36
     forget:
-      - --keep-daily 7
-      - --keep-weekly 4
-      - --keep-monthly 12
+      - --keep-daily 30
+      - --keep-monthly 4
     # After the hosts' 02:00-04:00 backups and kured's 04:00-10:00 reboot
     # window.
     schedule: "30 10 * * *"
@@ -51,11 +54,11 @@ repositories:
   # borg-2's NAS backup directory (nix/hosts/borg-2/nas-backups.nix).
   nas-backups:
     url: s3:s3.us-west-2.amazonaws.com/missingtoken-backup-us-west-2/restic/nas-backups
-    # Weekly, Mondays between 02:00 and 03:00.
-    maxBackupAgeHours: 192
+    # Daily, between 02:00 and 03:00.
+    maxBackupAgeHours: 36
     forget:
-      - --keep-weekly 4
-      - --keep-monthly 12
-    # After the Monday 02:00 backup and kured's 04:00-10:00 reboot window.
-    schedule: "30 10 * * 1"
-    maxMaintenanceAgeHours: 360
+      - --keep-daily 30
+      - --keep-monthly 4
+    # After the 02:00-03:00 backup and kured's 04:00-10:00 reboot window.
+    schedule: "30 10 * * *"
+    maxMaintenanceAgeHours: 72
