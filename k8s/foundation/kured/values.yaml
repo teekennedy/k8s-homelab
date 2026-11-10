@@ -23,7 +23,7 @@ kured:
     # node to make one reboot do something else, such as power off.
     rebootCommand: "/run/reboot-command"
     # Alerts kured should ignore.
-    alertFilterRegexp: "^(KubeVersionMismatch|LonghornVolumeActualSpaceUsedWarning|LonghornNodeStorageWarning|LonghornDiskStorageWarning|CPUThrottlingHigh|ZFSScrubTooOld|JellyfinExporterDown|NixosRebootPendingTooLong|PrometheusTargetScrapeFailed|ResticBackupStale|ResticMaintenanceStale|ResticRepositoryUnreadable|Watchdog)$"
+    alertFilterRegexp: "^(KubeVersionMismatch|LonghornBackupOrphaned|LonghornVolumeActualSpaceUsedWarning|LonghornNodeStorageWarning|LonghornDiskStorageWarning|CPUThrottlingHigh|ZFSScrubTooOld|JellyfinExporterDown|NixosRebootPendingTooLong|PrometheusTargetScrapeFailed|ResticBackupStale|ResticMaintenanceStale|ResticRepositoryUnreadable|Watchdog)$"
     # Only firing alerts should block reboot
     alertFiringOnly: true
     # Give drain operation up to 30 minutes to complete (for Longhorn replica evacuation)

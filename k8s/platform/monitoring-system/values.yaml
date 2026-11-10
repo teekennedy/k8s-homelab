@@ -551,7 +551,7 @@ kube-prometheus-stack:
     rbac:
       extraRules:
         - apiGroups: ["longhorn.io"]
-          resources: ["volumes"]
+          resources: ["volumes", "backupvolumes"]
           verbs: ["list", "watch"]
     customResourceState:
       enabled: true
@@ -591,6 +591,23 @@ kube-prometheus-stack:
                       path: [metadata, labels, "recurring-job-group.longhorn.io/backup"]
                       labelName: backup_group
                       list: [enabled]
+            # Backups of deleted volumes are kept until deleted by hand, so
+            # LonghornBackupOrphaned needs their age.
+            - groupVersionKind:
+                group: longhorn.io
+                version: v1beta2
+                kind: BackupVolume
+              metricNamePrefix: kube_longhorn_backupvolume
+              labelsFromPath:
+                backupvolume: [metadata, name]
+                volume: [spec, volumeName]
+              metrics:
+                - name: last_backup_at
+                  help: Unix time of the newest backup in the backup volume.
+                  each:
+                    type: Gauge
+                    gauge:
+                      path: [status, lastBackupAt]
 
 prometheus-blackbox-exporter:
   fullnameOverride: blackbox-exporter

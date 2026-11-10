@@ -148,3 +148,22 @@ spec:
       labels:
         issue: Longhorn volume for PVC {{`{{$labels.pvc}}`}} in the {{`{{$labels.pvc_namespace}}`}} namespace has a stale backup.
         severity: warning
+    # Longhorn keeps the backups of a deleted volume until they are deleted by
+    # hand, and restic copies them off-site every day. Both metrics come from
+    # kube-state-metrics, so the volume list is never missing on its own.
+    # status_condition has a series for every volume; backup_group only has
+    # one for volumes carrying the group label.
+    - alert: LonghornBackupOrphaned
+      annotations:
+        description: Backup volume {{`{{$labels.backupvolume}}`}} belongs to a volume that no longer exists, and its newest backup is {{`{{$value | humanizeDuration}}`}} old. If it is no longer needed, run `kubectl -n longhorn-system delete backupvolumes.longhorn.io {{`{{$labels.backupvolume}}`}}`.
+        summary: Longhorn backup volume {{`{{$labels.backupvolume}}`}} has no volume and no backup in over 30 days
+        custom_link_text: backups
+        custom_link_url: https://{{ $externalHostname }}/#/backup
+      expr: |-
+        (time() - kube_longhorn_backupvolume_last_backup_at) > 30 * 86400
+          and kube_longhorn_backupvolume_last_backup_at > 0
+          unless on (volume) kube_longhorn_volume_status_condition
+      for: 1h
+      labels:
+        issue: Longhorn backup volume {{`{{$labels.backupvolume}}`}} has no volume.
+        severity: warning
