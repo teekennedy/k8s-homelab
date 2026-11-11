@@ -1,7 +1,7 @@
 apiVersion: v2
 name: longhorn
 description: Distributed block storage
-version: 0.2.3
+version: 0.2.4
 appVersion: 1.13.0
 
 dependencies:
@@ -11,7 +11,7 @@ dependencies:
   # Dedicated oauth2-proxy instance reverse-proxying the Longhorn UI, which has
   # no auth of its own.
   - name: oauth2-proxy
-    version: 10.7.3
+    version: 10.7.4
     repository: oci://ghcr.io/oauth2-proxy/charts
   # Shared glue for that instance: the mittwald/reflector Secret. Library chart,
   # renders nothing itself.
