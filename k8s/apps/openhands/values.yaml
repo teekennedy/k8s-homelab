@@ -448,7 +448,7 @@ valkeyInstance:
   component: auth-sessions
   labelsTemplate: openhands.labels
   image: valkey/valkey:9-alpine@sha256:bf09d58e96d6b4524a15396b65b242bbe18beebbcc15a04d8ee75ddac62fae0b
-  exporterImage: oliver006/redis_exporter:v1.96.0@sha256:3d57b9eb142a62ffc600063606a41cd471cd53d81bed10be5b56b3a8918f2c26
+  exporterImage: oliver006/redis_exporter:v1.97.0@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
   auth:
     # Must match oauth2-proxy's sessionStorage existingSecret/passwordKey below.
     secretName: openhands-auth-sessions
