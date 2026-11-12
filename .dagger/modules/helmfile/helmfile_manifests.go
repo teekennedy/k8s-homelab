@@ -20,9 +20,19 @@ import (
 // catalog schema is known to be stale.
 // +check
 func (r *Release) Validate(ctx context.Context) error {
-	// Parse per-chart skip list
+	// The per-chart skip list is optional. Exists is checked first because
+	// File on a missing path logs a failed span even when the error is handled.
 	var skipKinds []string
-	if cfg, err := r.Source.File(path.Join(r.Path, "kubeconform.yaml")).Contents(ctx); err == nil && cfg != "" {
+	cfgPath := path.Join(r.Path, "kubeconform.yaml")
+	exists, err := r.Source.Exists(ctx, cfgPath, dagger.DirectoryExistsOpts{ExpectedType: dagger.ExistsTypeRegularType})
+	if err != nil {
+		return fmt.Errorf("looking for %s: %w", cfgPath, err)
+	}
+	if exists {
+		cfg, err := r.Source.File(cfgPath).Contents(ctx)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", cfgPath, err)
+		}
 		skipKinds = parseKubeconformSkipKinds(cfg)
 	}
 

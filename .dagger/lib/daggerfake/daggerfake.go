@@ -544,6 +544,24 @@ func (e *Engine) applyDirectory(d *dirVal, field string, args map[string]any) (a
 		}
 		return &fileVal{contents: c}, nil
 
+	case "exists":
+		if d.opaque != "" {
+			return nil, fmt.Errorf("exists in an opaque directory is not modelled")
+		}
+		p := clean(str(args["path"]))
+		_, isFile := d.files[p]
+		isDir := slices.ContainsFunc(sortedKeys(d.files), func(f string) bool { return strings.HasPrefix(f, p+"/") })
+		switch t := str(args["expectedType"]); t {
+		case "":
+			return isFile || isDir, nil
+		case "REGULAR_TYPE":
+			return isFile, nil
+		case "DIRECTORY_TYPE":
+			return isDir, nil
+		default:
+			return nil, fmt.Errorf("exists expectedType %q is not modelled", t)
+		}
+
 	case "entries":
 		if d.opaque != "" {
 			return nil, fmt.Errorf("entries of an opaque directory is not modelled")

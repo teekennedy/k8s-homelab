@@ -264,6 +264,30 @@ func valueCases() []valueCase {
 			want:  []any{".golangci.yaml", "a/", "b/"},
 		},
 		{
+			name:  "exists for a file",
+			setup: srcSetup(base),
+			query: `{node(id:$SRC){... on Directory{exists(path:"a/go.mod", expectedType:REGULAR_TYPE)}}}`,
+			want:  true,
+		},
+		{
+			name:  "exists for a missing file",
+			setup: srcSetup(base),
+			query: `{node(id:$SRC){... on Directory{exists(path:"a/missing.yaml", expectedType:REGULAR_TYPE)}}}`,
+			want:  false,
+		},
+		{
+			name:  "exists for a directory as a file",
+			setup: srcSetup(base),
+			query: `{node(id:$SRC){... on Directory{exists(path:"a", expectedType:REGULAR_TYPE)}}}`,
+			want:  false,
+		},
+		{
+			name:  "exists for a directory",
+			setup: srcSetup(base),
+			query: `{node(id:$SRC){... on Directory{exists(path:"a")}}}`,
+			want:  true,
+		},
+		{
 			name:  "file contents",
 			setup: srcSetup(base),
 			query: `{node(id:$SRC){... on Directory{file(path:"a/go.mod"){contents}}}}`,
