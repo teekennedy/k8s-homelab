@@ -13,6 +13,13 @@ spec:
   enablePDB: false
   imageName: {{ .Values.psql.image }}
   primaryUpdateStrategy: unsupervised
+  # Promote an up-to-date replica before restarting the primary, so an image
+  # update never takes the primary down in place. Falls back to a plain
+  # restart when there is no replica.
+  primaryUpdateMethod: switchover
+  # Pooled clients never disconnect on their own, so a smart shutdown always
+  # waits out its full timeout (default 180s) before escalating to fast.
+  smartShutdownTimeout: 15
   # CNPG copies these labels onto the PVCs it creates. Postgres is recovered
   # through CNPG, not Longhorn backups, so the volumes only get trimmed.
   inheritedMetadata:
