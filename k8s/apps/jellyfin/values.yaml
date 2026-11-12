@@ -7,7 +7,7 @@ qbittorrentPasswordHash:
   image:
     # Python must match files/qbittorrent-password-hash/.python-version.
     repository: ghcr.io/astral-sh/uv
-    tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
+    tag: python3.15-alpine@sha256:8d2c75bbf0f4155bc2a4ae2297bcd33bea4e775fd68ca21d6c38c1220b720735
   kubectlImage: alpine/kubectl:1.37.1@sha256:a5d0fbecab3f7b6c2ab7398f1daa73a3e0ed6ece18556d21698233e9e3759cc7
 
 # Static NFS volumes for the apps' own backups (templates/nas-backups.yaml),
@@ -61,7 +61,7 @@ exporter:
     # fetch exporter.py's own dependencies. Its Python must match
     # files/jellyfin-exporter/.python-version: uv never downloads one.
     repository: ghcr.io/astral-sh/uv
-    tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
+    tag: python3.15-alpine@sha256:8d2c75bbf0f4155bc2a4ae2297bcd33bea4e775fd68ca21d6c38c1220b720735
   # Same non-root uid/gid as the jellyfin container. The exporter only ever
   # writes to its own emptyDir.
   runAsUser: 1200
@@ -746,7 +746,7 @@ app-template:
           # Python must match files/arr-backup-settings/.python-version.
           image:
             repository: ghcr.io/astral-sh/uv
-            tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
+            tag: python3.15-alpine@sha256:8d2c75bbf0f4155bc2a4ae2297bcd33bea4e775fd68ca21d6c38c1220b720735
           # uv builds the project's environment beside it, and /app is a
           # read-only ConfigMap mount, so run from a writable copy.
           command:
@@ -811,7 +811,7 @@ app-template:
           # Python must match files/jellyfin-backup/.python-version.
           image:
             repository: ghcr.io/astral-sh/uv
-            tag: python3.15-alpine@sha256:f008ab85c84befffaaa8cbde7eb2b749331769df4e18be766269d0c4904deb40
+            tag: python3.15-alpine@sha256:8d2c75bbf0f4155bc2a4ae2297bcd33bea4e775fd68ca21d6c38c1220b720735
           # uv builds the project's environment beside it, and /app is a
           # read-only ConfigMap mount, so run from a writable copy.
           command:
