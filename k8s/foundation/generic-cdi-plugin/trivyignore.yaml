@@ -1,0 +1,21 @@
+misconfigurations:
+  # `privileged: true` is an upstream hard requirement (see
+  # https://github.com/OlfillasOdikno/generic-cdi-plugin): the plugin registers
+  # CDI device interfaces directly with the kubelet. Writing to the root-owned
+  # /var/lib/kubelet takes root, and Kubernetes rejects
+  # `allowPrivilegeEscalation: false` on a privileged container.
+  - id: KSV-0017 # privileged
+    paths: &plugin [DaemonSet/generic-cdi-plugin/generic-cdi-plugin-daemonset.yaml]
+  - id: KSV-0001 # privilege escalation
+    paths: *plugin
+  - id: HL-0009 # can run as root
+    paths: *plugin
+  # Registers with the kubelet under /var/lib/kubelet and reads the host's CDI
+  # spec.
+  - id: KSV-0023 # hostPath volume
+    paths: *plugin
+  # The plugin only serves the kubelet's device-plugin socket.
+  - id: HL-0001 # liveness probe
+    paths: *plugin
+  - id: HL-0002 # readiness probe
+    paths: *plugin

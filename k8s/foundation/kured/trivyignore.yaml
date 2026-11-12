@@ -1,0 +1,15 @@
+misconfigurations:
+  # kured reboots a node by entering PID 1's namespaces from a privileged
+  # container in the host's PID namespace and calling systemctl. This is how
+  # the upstream chart is designed.
+  - id: KSV-0017 # privileged
+    paths: &kured [DaemonSet/kured/kured.yaml]
+  - id: KSV-0001 # privilege escalation
+    paths: *kured
+  - id: KSV-0010 # host PID
+    paths: *kured
+  - id: HL-0009 # can run as root
+    paths: *kured
+  # Watches the host's reboot sentinel under /var/run.
+  - id: KSV-0023 # hostPath volume
+    paths: *kured

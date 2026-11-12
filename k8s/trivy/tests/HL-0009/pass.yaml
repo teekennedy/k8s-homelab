@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: non-root-pod
+spec:
+  selector:
+    matchLabels: {app: non-root-pod}
+  template:
+    metadata:
+      labels: {app: non-root-pod}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: app
+          image: example.test/app:1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: non-root-uid
+spec:
+  selector:
+    matchLabels: {app: non-root-uid}
+  template:
+    metadata:
+      labels: {app: non-root-uid}
+    spec:
+      securityContext:
+        runAsUser: 1000
+      containers:
+        - name: app
+          image: example.test/app:1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: non-root-container
+spec:
+  selector:
+    matchLabels: {app: non-root-container}
+  template:
+    metadata:
+      labels: {app: non-root-container}
+    spec:
+      initContainers:
+        - name: init
+          image: example.test/init:1
+          securityContext:
+            runAsUser: 1000
+      containers:
+        - name: app
+          image: example.test/app:1
+          securityContext:
+            runAsNonRoot: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-user-wins
+spec:
+  selector:
+    matchLabels: {app: pod-user-wins}
+  template:
+    metadata:
+      labels: {app: pod-user-wins}
+    spec:
+      securityContext:
+        runAsUser: 1000
+      containers:
+        # Runs as the pod's user whatever runAsNonRoot says.
+        - name: app
+          image: example.test/app:1
+          securityContext:
+            runAsNonRoot: false

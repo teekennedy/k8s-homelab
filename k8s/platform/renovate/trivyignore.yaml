@@ -1,0 +1,14 @@
+misconfigurations:
+  # Renovate's post-upgrade tasks exec into the Dagger Engine pod to regenerate
+  # dagger's own artifacts. The Role grants pods/exec in the dagger-engine
+  # namespace, mirroring the woodpecker chart's dagger-pipeline grant.
+  - id: KSV-0053 # exec into pods
+    paths: [Role/dagger-engine/renovate-dagger-exec.yaml]
+  # gpg-bootstrap is a one-shot Argo CD sync hook that installs gnupg via apk
+  # and generates a GPG key for Renovate commit signing. The apk install
+  # requires root; the Job is ephemeral (deleted on HookSucceeded) so the risk
+  # window is minimal.
+  - id: HL-0009 # can run as root
+    paths: &gpgBootstrap [Job/renovate/renovate-gpg-bootstrap.yaml]
+  - id: KSV-0001 # privilege escalation
+    paths: *gpgBootstrap

@@ -1,0 +1,33 @@
+misconfigurations:
+  # Argo CD applies every manifest in the repo, so its controller and API
+  # server hold every verb on every resource.
+  - id: KSV-0044 # wildcard verbs on wildcard resources
+    paths: [ClusterRole/argocd-application-controller.yaml]
+  - id: KSV-0046 # manages all resources
+    paths:
+      - ClusterRole/argocd-application-controller.yaml
+      - ClusterRole/argocd-server.yaml
+  # The Argo Events controller runs event sources and sensors as pods and
+  # Services it creates, with the Secrets they name. The pods/exec grant is
+  # part of the upstream role.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths: &events [ClusterRole/argocd-argo-events-controller-manager.yaml]
+  - id: KSV-0053 # exec into pods
+    paths: *events
+  - id: KSV-0056 # manages networking resources
+    paths: *events
+  # The notifications controller reads the Secret its templates and triggers
+  # take credentials from.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths: [ClusterRole/argocd-notifications-controller.yaml]
+  # The chart ships the Argo Events controller with no securityContext.
+  - id: HL-0009 # can run as root
+    paths: &eventsController [Deployment/argocd/argocd-argo-events-controller-manager.yaml]
+  - id: KSV-0001 # privilege escalation
+    paths: *eventsController
+  # The helmfile config-management sidecar serves a unix socket to the repo
+  # server and has nothing to probe.
+  - id: HL-0001 # liveness probe
+    paths: &repoServer [Deployment/argocd/argocd-repo-server.yaml]
+  - id: HL-0002 # readiness probe
+    paths: *repoServer

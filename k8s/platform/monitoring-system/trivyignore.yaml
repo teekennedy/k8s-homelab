@@ -1,0 +1,60 @@
+misconfigurations:
+  # The operator turns these into StatefulSets whose pods need their token:
+  # Prometheus discovers its targets through the API.
+  - id: KSV-0036 # mounts a service account token
+    paths:
+      - Alertmanager/monitoring-system/monitoring-system-kube-pro.yaml
+      - Prometheus/monitoring-system/monitoring-system-kube-pro.yaml
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths:
+      # Reads the credentials its components name, in any namespace.
+      - ClusterRole/monitoring-system-alloy.yaml
+      # Their sidecars load dashboards, datasources and rules from labelled
+      # ConfigMaps and Secrets in any namespace.
+      - ClusterRole/monitoring-system-grafana-clusterrole.yaml
+      - ClusterRole/monitoring-system-loki-clusterrole.yaml
+      # Generates each Prometheus's and Alertmanager's configuration Secret.
+      - ClusterRole/monitoring-system-kube-pro-operator.yaml
+  # The operator creates the governing Services of what it runs, and the
+  # kubelet's Endpoints.
+  - id: KSV-0056 # manages networking resources
+    paths: [ClusterRole/monitoring-system-kube-pro-operator.yaml]
+  # The admission Jobs write the webhook's CA into its configurations.
+  - id: KSV-0114 # manages webhook configurations
+    paths: [ClusterRole/monitoring-system-kube-pro-admission.yaml]
+  # The Service that lets Prometheus scrape CoreDNS has to sit beside it.
+  - id: KSV-0037 # resource in kube-system
+    paths: [Service/kube-system/monitoring-system-kube-pro-coredns.yaml]
+  # node-exporter needs hostNetwork to expose true node-level network stats and
+  # to bind on the node IP, and hostPID to see host process and systemd state.
+  - id: KSV-0009 # host network
+    paths: &nodeExporter [DaemonSet/monitoring-system/monitoring-system-prometheus-node-exporter.yaml]
+  - id: KSV-0010 # host PID
+    paths: *nodeExporter
+  # It reads host metrics from /proc, /sys and the root filesystem.
+  - id: KSV-0121 # sensitive host directory mounted
+    paths: *nodeExporter
+  - id: KSV-0023 # hostPath volume
+    paths:
+      - DaemonSet/monitoring-system/monitoring-system-prometheus-node-exporter.yaml
+      # alloy tails the host's pod and journal logs.
+      - DaemonSet/monitoring-system/monitoring-system-alloy.yaml
+  # alloy must run as root to read host log paths like /var/log/pods (mode 750,
+  # owned by root:root) and /var/log/journal across nodes with varying
+  # systemd-journal GIDs. Verified on-cluster 2026-07-01.
+  - id: HL-0009 # can run as root
+    paths: [DaemonSet/monitoring-system/monitoring-system-alloy.yaml]
+  - id: HL-0001 # liveness probe
+    paths: &noProbes
+      # The alloy chart has no probe settings for its config-reloader sidecar.
+      - DaemonSet/monitoring-system/monitoring-system-alloy.yaml
+      # The k8s-sidecar config watchers have no health endpoint at this
+      # version.
+      - Deployment/monitoring-system/monitoring-system-grafana.yaml
+      - StatefulSet/monitoring-system/monitoring-system-loki.yaml
+  - id: HL-0002 # readiness probe
+    paths: *noProbes
+  # The Tempo chart cannot label its volumeClaimTemplate; the labelled PVC it
+  # adopts is declared in templates/tempo-pvc.yaml.
+  - id: HL-0005 # Longhorn volume outside a recurring-job group
+    paths: [StatefulSet/monitoring-system/monitoring-system-tempo.yaml]

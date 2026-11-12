@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pull-always
+spec:
+  selector:
+    matchLabels: {app: pull-always}
+  template:
+    metadata:
+      labels: {app: pull-always}
+    spec:
+      initContainers:
+        - name: init
+          image: example.test/init:1
+          imagePullPolicy: Always
+      containers:
+        - name: app
+          image: example.test/app:1

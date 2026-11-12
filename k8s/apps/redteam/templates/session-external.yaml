@@ -15,12 +15,6 @@ metadata:
   name: redteam-external
   labels:
     app: redteam-external
-  annotations:
-    # gluetun genuinely requires NET_ADMIN + root to build the VPN tunnel/killswitch;
-    # these two checks are irreducible for the sidecar (the session container is
-    # still hardened to non-root, no-caps below).
-    polaris.fairwinds.com/dangerousCapabilities-exempt: "true"
-    polaris.fairwinds.com/runAsRootAllowed-exempt: "true"
 spec:
   replicas: 0 # TODO: scale to 1 to run an engagement; back to 0 after.
   selector:

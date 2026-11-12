@@ -1,0 +1,32 @@
+misconfigurations:
+  # Not hardened yet: these were exempted without a recorded reason.
+  - id: KSV-0001 # privilege escalation
+    paths:
+      - CronJob/jellyfin/jellyfin-configarr.yaml
+      - Deployment/jellyfin/jellyfin-arrs.yaml
+      - Deployment/jellyfin/jellyfin-cleanuparr.yaml
+      - Deployment/jellyfin/jellyfin-debug.yaml
+      - Deployment/jellyfin/jellyfin-downloader.yaml
+      - Deployment/jellyfin/jellyfin-main.yaml
+      - Deployment/jellyfin/jellyfin-seerr.yaml
+      - Deployment/jellyfin/jellyfin-unpackerr.yaml
+      - Job/jellyfin/jellyfin-qbittorrent-password-hash.yaml
+  - id: HL-0009 # can run as root
+    paths:
+      - CronJob/jellyfin/jellyfin-configarr.yaml
+      - Deployment/jellyfin/jellyfin-debug.yaml
+      - Deployment/jellyfin/jellyfin-downloader.yaml
+      - Job/jellyfin/jellyfin-qbittorrent-password-hash.yaml
+  # gluetun needs NET_ADMIN to build the VPN tunnel and its killswitch.
+  - id: KSV-0022 # capabilities added
+    paths: [Deployment/jellyfin/jellyfin-downloader.yaml]
+  - id: HL-0001 # liveness probe
+    paths: &noProbes
+      # Runs `sleep infinity` to keep Jellyfin's image on the node.
+      - DaemonSet/jellyfin/jellyfin-image-prepull.yaml
+      # A `sleep infinity` shell for debugging.
+      - Deployment/jellyfin/jellyfin-debug.yaml
+      # unpackerr polls the arr APIs and listens on no port.
+      - Deployment/jellyfin/jellyfin-unpackerr.yaml
+  - id: HL-0002 # readiness probe
+    paths: *noProbes

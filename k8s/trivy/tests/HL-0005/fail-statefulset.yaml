@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: unlabelled-template
+spec:
+  serviceName: unlabelled-template
+  selector:
+    matchLabels: {app: unlabelled-template}
+  template:
+    metadata:
+      labels: {app: unlabelled-template}
+    spec:
+      containers:
+        - name: app
+          image: example.test/app:1
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 1Gi}}

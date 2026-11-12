@@ -1,0 +1,8 @@
+# No class is the cluster default, which is Longhorn.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: unlabelled
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}

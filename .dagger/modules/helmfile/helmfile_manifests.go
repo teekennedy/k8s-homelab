@@ -9,49 +9,6 @@ import (
 	"dagger/helmfile/internal/dagger"
 )
 
-// Audits the rendered manifests with Fairwinds Polaris.
-//
-// It fails when any enabled check fails, whatever its severity. The checks come
-// from the repo-wide k8s/polaris.yaml; if the chart directory contains a
-// polaris.yaml, its exemptions are added to it (for expected RBAC or privilege
-// requirements).
-// +check
-func (r *Release) Audit(ctx context.Context) error {
-	args := []string{
-		"polaris", "audit",
-		"--audit-path", "/rendered.yaml",
-		"--format", "pretty",
-		"--only-show-failed-tests",
-		"--set-exit-code-below-score", "100",
-		"--config", "/polaris.yaml",
-	}
-
-	container, err := r.polarisContainer(ctx)
-	if err != nil {
-		return err
-	}
-	if _, err := container.WithExec(args).Sync(ctx); err != nil {
-		return fmt.Errorf("polaris failed for %s (%s): %w", r.Path, r.Environment, withExecOutput(err))
-	}
-	return nil
-}
-
-// polarisContainer returns the render container with this release's Polaris
-// config at /polaris.yaml: the repo-wide config, followed by the chart's
-// polaris.yaml when it has one. The two are concatenated, so they must not
-// share a top-level key.
-func (r *Release) polarisContainer(ctx context.Context) (*dagger.Container, error) {
-	cfg, err := r.PolarisConfig.Contents(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", polarisConfigPath, err)
-	}
-	if chartCfg, err := r.Source.File(path.Join(r.Path, "polaris.yaml")).Contents(ctx); err == nil && chartCfg != "" {
-		cfg = strings.TrimRight(cfg, "\n") + "\n" + chartCfg
-	}
-
-	return r.rendered().WithNewFile("/polaris.yaml", cfg), nil
-}
-
 // Validates the rendered manifests against their schemas.
 //
 // kubeconform runs in strict mode, with the datreeio CRDs-catalog (baked into

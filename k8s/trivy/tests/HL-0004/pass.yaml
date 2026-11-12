@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pinned
+spec:
+  selector:
+    matchLabels: {app: pinned}
+  template:
+    metadata:
+      labels: {app: pinned}
+    spec:
+      containers:
+        - name: app
+          image: example.test/app:1@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

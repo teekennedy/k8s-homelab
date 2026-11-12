@@ -1,0 +1,14 @@
+misconfigurations:
+  # Dagger Engine is a container runtime: it needs a privileged root container
+  # with every capability to run arbitrary container workloads.
+  - id: KSV-0017 # privileged
+    paths: &engine [StatefulSet/dagger-engine/dagger-engine-dagger-helm-engine.yaml]
+  - id: KSV-0001 # privilege escalation
+    paths: *engine
+  - id: KSV-0022 # capabilities added
+    paths: *engine
+  - id: HL-0009 # can run as root
+    paths: *engine
+  # The chart exposes the engine's socket directory on the host by default.
+  - id: KSV-0023 # hostPath volume
+    paths: *engine

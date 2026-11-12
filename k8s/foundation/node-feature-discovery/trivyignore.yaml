@@ -1,0 +1,7 @@
+misconfigurations:
+  # The worker detects hardware features from the host's /sys, /boot and
+  # library paths.
+  - id: KSV-0023 # hostPath volume
+    paths: &worker [DaemonSet/node-feature-discovery/node-feature-discovery-worker.yaml]
+  - id: KSV-0121 # sensitive host directory mounted
+    paths: *worker

@@ -1,0 +1,8 @@
+misconfigurations:
+  # The generator fills in annotated Secrets in any namespace.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths: ["ClusterRole/mittwald:secret-system-kubernetes-secret-generator.yaml"]
+  # SECRET_LENGTH is the length of the secrets the operator generates. The
+  # upstream chart template defines it and it cannot be renamed.
+  - id: HL-0006 # sensitive env literal
+    paths: [Deployment/secret-system-kubernetes-secret-generator.yaml]

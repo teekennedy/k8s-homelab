@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unprobed-sidecar
+spec:
+  selector:
+    matchLabels: {app: unprobed-sidecar}
+  template:
+    metadata:
+      labels: {app: unprobed-sidecar}
+    spec:
+      initContainers:
+        - name: sidecar
+          image: example.test/sidecar:1
+          restartPolicy: Always
+      containers:
+        - name: app
+          image: example.test/app:1
+          livenessProbe: {httpGet: {path: /healthz, port: 80}}
+          readinessProbe: {httpGet: {path: /healthz, port: 80}}

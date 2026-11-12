@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: root-override
+spec:
+  selector:
+    matchLabels: {app: root-override}
+  template:
+    metadata:
+      labels: {app: root-override}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: app
+          image: example.test/app:1
+        # A container's own user wins over the pod's.
+        - name: sidecar
+          image: example.test/sidecar:1
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0

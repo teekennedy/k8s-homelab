@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unsized
+spec:
+  selector:
+    matchLabels: {app: unsized}
+  template:
+    metadata:
+      labels: {app: unsized}
+    spec:
+      containers:
+        - name: app
+          image: example.test/app:1

@@ -1,0 +1,66 @@
+misconfigurations:
+  # Longhorn's manager runs the cluster's storage: it owns the workloads,
+  # Services, Secrets and RBAC of its own namespace outright, reads the backup
+  # and encryption Secrets volumes name, and maintains its webhook
+  # configurations.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths:
+      - ClusterRole/longhorn-csi-secret-role.yaml
+      - ClusterRole/longhorn-role.yaml
+  - id: KSV-0045 # wildcard verbs
+    paths:
+      - ClusterRole/longhorn-role.yaml
+      - Role/longhorn-system/longhorn.yaml
+  - id: KSV-0114 # manages webhook configurations
+    paths: [ClusterRole/longhorn-role.yaml]
+  - id: KSV-0042 # deletes pod logs
+    paths: &role [Role/longhorn-system/longhorn.yaml]
+  - id: KSV-0050 # manages RBAC
+    paths: *role
+  - id: KSV-0056 # manages networking resources
+    paths: *role
+  # The support-bundle collector is bound to cluster-admin so that a bundle can
+  # include any resource.
+  - id: KSV-0111 # bound to cluster-admin
+    paths: [ClusterRoleBinding/longhorn-support-bundle.yaml]
+  # The manager manages host block devices from a privileged container, as its
+  # pre-upgrade check does. The other workloads ship with no securityContext,
+  # and the chart exposes no knob to add one, so they inherit the image
+  # default of root.
+  - id: KSV-0017 # privileged
+    paths: &privileged
+      - DaemonSet/longhorn-system/longhorn-manager.yaml
+      - Job/longhorn-system/longhorn-pre-upgrade.yaml
+  - id: KSV-0001 # privilege escalation
+    paths: &workloads
+      - DaemonSet/longhorn-system/longhorn-manager.yaml
+      - Deployment/longhorn-system/longhorn-driver-deployer.yaml
+      - Deployment/longhorn-system/longhorn-global-manager.yaml
+      - Deployment/longhorn-system/longhorn-ui.yaml
+      - Job/longhorn-system/longhorn-post-upgrade.yaml
+      - Job/longhorn-system/longhorn-pre-upgrade.yaml
+      - Job/longhorn-system/longhorn-uninstall.yaml
+  - id: HL-0009 # can run as root
+    paths: *workloads
+  # Longhorn manages host block devices and stores replicas in
+  # /var/lib/longhorn.
+  - id: KSV-0023 # hostPath volume
+    paths: *privileged
+  # The chart has no probe settings for these.
+  - id: HL-0001 # liveness probe
+    paths: &noProbes
+      - DaemonSet/longhorn-system/longhorn-manager.yaml
+      - Deployment/longhorn-system/longhorn-driver-deployer.yaml
+      - Deployment/longhorn-system/longhorn-ui.yaml
+  - id: HL-0002 # readiness probe
+    paths: *noProbes
+  # The chart has no resource settings for these, or for the manager's image
+  # pre-pull sidecar.
+  - id: HL-0010 # resource requests and memory limit
+    paths:
+      - DaemonSet/longhorn-system/longhorn-manager.yaml
+      - Deployment/longhorn-system/longhorn-driver-deployer.yaml
+      - Deployment/longhorn-system/longhorn-ui.yaml
+      - Job/longhorn-system/longhorn-post-upgrade.yaml
+      - Job/longhorn-system/longhorn-pre-upgrade.yaml
+      - Job/longhorn-system/longhorn-uninstall.yaml

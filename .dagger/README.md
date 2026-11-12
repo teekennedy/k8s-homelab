@@ -38,10 +38,10 @@ which comes first. The checks and generators share one set of verbs:
 
 | Verb | Meaning | Examples |
 | --- | --- | --- |
-| `test` | Run a test suite | `go/modules/test`, `python/projects/test`, `nix/test`, `release/test` |
+| `test` | Run a test suite | `go/modules/test`, `python/projects/test`, `nix/test`, `release/test`, `helmfile/test` |
 | `lint` | Static checks that can only fail | `helmfile/lint`, `helmfile/releases/lint`, `woodpecker/lint`, `yaml/lint` |
 | `validate` | The tool's own validator, or a schema | `nix/validate`, `terraform/modules/validate`, `helmfile/releases/validate` (kubeconform) |
-| `audit` | Policy and security scanners | `terraform/audit` (trivy), `helmfile/releases/audit` (Polaris) |
+| `audit` | Policy and security scanners | `terraform/audit`, `helmfile/releases/audit` (both trivy) |
 | `build`, `render` | Produce an artifact, or prove one can be | `nix/lab/build`, `release/build`, `helmfile/releases/render` |
 | `format`, `fix`, `lock`, … | Generators: rewrite files in place | `cue/format`, `go/modules/fix`, `python/projects/lock`, `nix/lab/vendor-hash` |
 
@@ -80,7 +80,7 @@ dagger.lock                 # pinned versions of remote modules and the Go SDK
 | --- | --- | --- | --- | --- |
 | `cue` | | | `export`, `fix`, `format`, `trim` | |
 | `go` | `modules` | per module: `test` | per module: `fix` | per module: `integration-test` |
-| `helmfile` | `releases` | `lint`; per release: `audit`, `lint`, `lint-python`, `render`, `validate` | | |
+| `helmfile` | `releases` | `lint`, `test`; per release: `audit`, `lint`, `lint-python`, `render`, `validate` | | |
 | `kubernetes` | | | | `integration-test`, `integration-reports`, `dev-cluster`, `dev-cluster-delete` |
 | `nix` | | `test`, `validate`; `lab/build` | `format`; `lab/vendor-hash` | `devenv ci-toolchain`, `devenv toolchain`, `devenv integration-toolchain`, `devenv container`, `devenv ci-release`, `devenv projects`, `devenv update`, `lab binary`, `lab binary-nix`, `builders status`, `image` |
 | `python` | `projects` | per project: `lint`, `test` | per project: `format`, `lock` | |
@@ -251,7 +251,7 @@ otherwise `dagger generate -y` would write to the repo root.
 | --- | --- |
 | Go module | Its directory, plus the targets of any local `replace` in its go.mod (`.dagger/lib` for the Dagger modules) |
 | Python project | Its directory, plus `k8s/testlib` for a release's integration tests |
-| helmfile release | `helmfile.yaml.gotmpl`, the environment's `env.json`, its chart and `k8s/charts` |
+| helmfile release | `helmfile.yaml.gotmpl`, the environment's `env.json`, its chart and `k8s/charts`; its audit also reads `k8s/trivy` |
 | Terraform module | All of `terraform/`: modules reference siblings by relative path |
 
 The modules set `legacy-default-path = true`, which keeps 0.x `+defaultPath`

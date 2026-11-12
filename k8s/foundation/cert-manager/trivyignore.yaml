@@ -1,0 +1,25 @@
+misconfigurations:
+  # cert-manager writes the certificates it issues, and reads issuer and ACME
+  # account keys, as Secrets in any namespace. The cainjector reads CA Secrets.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths:
+      - ClusterRole/cert-manager-cainjector.yaml
+      - ClusterRole/cert-manager-controller-certificates.yaml
+      - ClusterRole/cert-manager-controller-challenges.yaml
+      - ClusterRole/cert-manager-controller-clusterissuers.yaml
+      - ClusterRole/cert-manager-controller-issuers.yaml
+      - ClusterRole/cert-manager-controller-orders.yaml
+  # The cainjector's job is to write CA bundles into webhook configurations.
+  - id: KSV-0114 # manages webhook configurations
+    paths: [ClusterRole/cert-manager-cainjector.yaml]
+  # The HTTP-01 solver is a pod, Service and Ingress the controller creates.
+  - id: KSV-0056 # manages networking resources
+    paths: [ClusterRole/cert-manager-controller-challenges.yaml]
+  # The chart has no probe settings for the cainjector.
+  - id: HL-0001 # liveness probe
+    paths: [Deployment/cert-system/cert-manager-cainjector.yaml]
+  # The chart only offers a liveness probe for the controller.
+  - id: HL-0002 # readiness probe
+    paths:
+      - Deployment/cert-system/cert-manager-cainjector.yaml
+      - Deployment/cert-system/cert-manager.yaml

@@ -1,0 +1,7 @@
+misconfigurations:
+  # Reflector mirrors Secrets and ConfigMaps between namespaces, which is every
+  # verb on both, cluster-wide.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths: &reflector [ClusterRole/reflector/reflector.yaml]
+  - id: KSV-0045 # wildcard verbs
+    paths: *reflector

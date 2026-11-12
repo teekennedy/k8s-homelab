@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: env-literal-init
+spec:
+  selector:
+    matchLabels: {app: env-literal-init}
+  template:
+    metadata:
+      labels: {app: env-literal-init}
+    spec:
+      initContainers:
+        - name: init
+          image: example.test/init:1
+          env:
+            - name: UPSTREAM_API_KEY
+              value: abc123
+      containers:
+        - name: app
+          image: example.test/app:1

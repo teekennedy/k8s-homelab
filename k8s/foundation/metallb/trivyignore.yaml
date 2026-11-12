@@ -1,0 +1,22 @@
+misconfigurations:
+  # The speaker announces layer 2 addresses from the host network with raw
+  # sockets. The upstream chart leaves its securityContext without a user
+  # because the binary needs UID 0 for them even with NET_RAW.
+  - id: KSV-0009 # host network
+    paths: &speaker [DaemonSet/metallb-system/metallb-speaker.yaml]
+  - id: KSV-0022 # capabilities added
+    paths: *speaker
+  - id: KSV-0119 # NET_RAW capability
+    paths: *speaker
+  - id: HL-0009 # can run as root
+    paths: *speaker
+  # The controller writes its own CA into its webhook configuration.
+  - id: KSV-0114 # manages webhook configurations
+    paths: ["ClusterRole/metallb:controller.yaml"]
+  # The LoadBalancer Services for the Kubernetes API and for Traefik, which
+  # both live in kube-system.
+  - id: KSV-0037 # resource in kube-system
+    paths:
+      - Service/kube-system/kubernetes-api-lb.yaml
+      - Service/kube-system/traefik-public-udp.yaml
+      - Service/kube-system/traefik-public.yaml

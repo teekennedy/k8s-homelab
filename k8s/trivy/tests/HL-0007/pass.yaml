@@ -1,0 +1,17 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: one-at-a-time
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {app: app}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keep-one
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app: app}

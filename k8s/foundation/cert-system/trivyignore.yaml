@@ -1,0 +1,38 @@
+misconfigurations:
+  # The wildcard certificate is issued into kube-system, where Traefik serves
+  # it from.
+  - id: KSV-0037 # resource in kube-system
+    paths: [Certificate/kube-system/wildcard-tls-certificate.yaml]
+  # Both SSH CA workloads apk-install openssh-keygen at runtime, which needs
+  # root. The bootstrap Job is a one-shot Argo CD sync hook (deleted on
+  # HookSucceeded) and the issuer runs for a few seconds every six hours, so
+  # neither is a standing surface.
+  - id: HL-0009 # can run as root
+    paths: &sshCA
+      - CronJob/cert-system/deploybot-ssh-cert-issuer.yaml
+      - Job/cert-system/deploybot-ssh-ca-bootstrap.yaml
+  - id: KSV-0001 # privilege escalation
+    paths: *sshCA
+  # Reloads the host's tlshd after copying a renewed certificate, by entering
+  # PID 1's mount namespace from a privileged container in the host's PID
+  # namespace.
+  - id: KSV-0017 # privileged
+    paths: &certSync [DaemonSet/cert-system/nfs-mtls-cert-sync.yaml]
+  - id: KSV-0010 # host PID
+    paths: *certSync
+  - id: KSV-0001 # privilege escalation
+    paths: *certSync
+  - id: HL-0009 # can run as root
+    paths: *certSync
+  # Writes the certificates to /var/lib/nfs-mtls, where the host's NFS client
+  # reads them.
+  - id: KSV-0023 # hostPath volume
+    paths: *certSync
+  # A shell loop with no health endpoint.
+  - id: HL-0001 # liveness probe
+    paths:
+      - DaemonSet/cert-system/nfs-mtls-cert-sync.yaml
+      # The chart only offers a readiness probe.
+      - Deployment/cert-system/trust-manager.yaml
+  - id: HL-0002 # readiness probe
+    paths: *certSync

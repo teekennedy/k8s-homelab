@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sized
+spec:
+  selector:
+    matchLabels: {app: sized}
+  template:
+    metadata:
+      labels: {app: sized}
+    spec:
+      # An init container that runs to completion is not checked.
+      initContainers:
+        - name: init
+          image: example.test/init:1
+      containers:
+        - name: app
+          image: example.test/app:1
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 64Mi}

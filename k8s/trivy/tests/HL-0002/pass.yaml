@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probed
+spec:
+  selector:
+    matchLabels: {app: probed}
+  template:
+    metadata:
+      labels: {app: probed}
+    spec:
+      # A sidecar runs for the life of the pod, so it is probed too; an init
+      # container that runs to completion is not.
+      initContainers:
+        - name: sidecar
+          image: example.test/sidecar:1
+          restartPolicy: Always
+          livenessProbe: {tcpSocket: {port: 81}}
+          readinessProbe: {tcpSocket: {port: 81}}
+        - name: init
+          image: example.test/init:1
+      containers:
+        - name: app
+          image: example.test/app:1
+          livenessProbe: {httpGet: {path: /healthz, port: 80}}
+          readinessProbe: {httpGet: {path: /healthz, port: 80}}
+---
+# Jobs and CronJobs run to completion and are not probed.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: unprobed
+spec:
+  schedule: "@daily"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: job
+              image: example.test/job:1

@@ -1,0 +1,19 @@
+misconfigurations:
+  # gluetun genuinely requires NET_ADMIN and root to build the VPN tunnel and
+  # its killswitch. Both are irreducible for the sidecar; the session container
+  # beside it is non-root with no capabilities.
+  - id: KSV-0022 # capabilities added
+    paths: &external [Deployment/redteam-external.yaml]
+  - id: HL-0009 # can run as root
+    paths: *external
+  # The VPN sidecar needs the host's /dev/net/tun device to create its tunnel.
+  - id: KSV-0023 # hostPath volume
+    paths: *external
+  # The session containers are `sleep infinity` shells entered with kubectl
+  # exec.
+  - id: HL-0001 # liveness probe
+    paths: &sessions
+      - Deployment/redteam-external.yaml
+      - Deployment/redteam-internal.yaml
+  - id: HL-0002 # readiness probe
+    paths: *sessions

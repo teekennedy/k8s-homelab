@@ -121,30 +121,30 @@ func (r *Releases) UnmarshalJSON(bs []byte) error {
 
 func (r Release) MarshalJSON() ([]byte, error) {
 	var concrete struct {
-		Name          string
-		Path          string
-		Environment   string
-		Source        *dagger.Directory
-		PolarisConfig *dagger.File
-		Container     *dagger.Container
+		Name        string
+		Path        string
+		Environment string
+		Source      *dagger.Directory
+		TrivyConfig *dagger.Directory
+		Container   *dagger.Container
 	}
 	concrete.Name = r.Name
 	concrete.Path = r.Path
 	concrete.Environment = r.Environment
 	concrete.Source = r.Source
-	concrete.PolarisConfig = r.PolarisConfig
+	concrete.TrivyConfig = r.TrivyConfig
 	concrete.Container = r.Container
 	return json.Marshal(&concrete)
 }
 
 func (r *Release) UnmarshalJSON(bs []byte) error {
 	var concrete struct {
-		Name          string
-		Path          string
-		Environment   string
-		Source        *dagger.Directory
-		PolarisConfig *dagger.File
-		Container     *dagger.Container
+		Name        string
+		Path        string
+		Environment string
+		Source      *dagger.Directory
+		TrivyConfig *dagger.Directory
+		Container   *dagger.Container
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
@@ -154,7 +154,7 @@ func (r *Release) UnmarshalJSON(bs []byte) error {
 	r.Path = concrete.Path
 	r.Environment = concrete.Environment
 	r.Source = concrete.Source
-	r.PolarisConfig = concrete.PolarisConfig
+	r.TrivyConfig = concrete.TrivyConfig
 	r.Container = concrete.Container
 	return nil
 }
@@ -306,6 +306,20 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				}
 			}
 			return (*Helmfile).Releases(&parent, ctx, source)
+		case "Test":
+			var parent Helmfile
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var source *dagger.Directory
+			if inputArgs["source"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["source"]), &source)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg source", err))
+				}
+			}
+			return nil, (*Helmfile).Test(&parent, ctx, source)
 		case "":
 			var parent Helmfile
 			err = json.Unmarshal(parentJSON, &parent)
@@ -398,7 +412,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 		}
 	case "":
 		return dag.Module().
-			WithDescription("Renders, lints and validates every chart with the repo's helmfile, and\naudits the rendered manifests with Polaris.\nEach release renders from a scoped source directory, so a change to one chart\nleaves the others cached.\n").
+			WithDescription("Renders, lints and validates every chart with the repo's helmfile, and\naudits the rendered manifests with Trivy.\nEach release renders from a scoped source directory, so a change to one chart\nleaves the others cached.\n").
 			WithObject(
 				dag.TypeDef().WithObject("Helmfile", dagger.TypeDefWithObjectOpts{Description: "Helmfile runs helmfile checks over every chart.", SourceMap: dag.SourceMap("helmfile.go", 30, 6)}).
 					WithFunction(
@@ -414,6 +428,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithDescription("Releases returns every chart's release, keyed by release name.").
 							WithSourceMap(dag.SourceMap("helmfile.go", 73, 1)).
 							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{Description: "charts/*.tgz are built dependencies; they are gitignored, so leaving them\nout makes a local run resolve dependencies the way a clean checkout does.", SourceMap: dag.SourceMap("helmfile.go", 79, 2), DefaultPath: "/", Ignore: []string{"*", "!helmfile.yaml.gotmpl", "!config/gen/*/env.json", "!k8s/**/*", "k8s/**/charts/*.tgz", "k8s/**/.venv/**", "k8s/**/__pycache__/**", "k8s/**/.pytest_cache/**", "k8s/**/mixins/vendor/**"}})).
+					WithFunction(
+						dag.Function("Test",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Tests the custom Trivy checks against their fixtures.\n\nEach custom check has a directory under k8s/trivy/tests named after its ID,\nholding manifests it must fail (fail*.yaml) and manifests it must pass\n(pass*.yaml). A check with a typo in a field path would otherwise pass every\nrelease without ever being able to fail one.").
+							WithSourceMap(dag.SourceMap("helmfile_audit.go", 141, 1)).
+							WithCheck().
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("helmfile_audit.go", 145, 2), DefaultPath: "/", Ignore: []string{"*", "!k8s/trivy/**"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Helmfile")).
@@ -438,14 +459,14 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithFunction(
 						dag.Function("Audit",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
-							WithDescription("Audits the rendered manifests with Fairwinds Polaris.\n\nIt fails when any enabled check fails, whatever its severity. The checks come\nfrom the repo-wide k8s/polaris.yaml; if the chart directory contains a\npolaris.yaml, its exemptions are added to it (for expected RBAC or privilege\nrequirements).").
-							WithSourceMap(dag.SourceMap("helmfile_manifests.go", 19, 1)).
+							WithDescription("Audits the rendered manifests with Trivy.\n\nTrivy's built-in Kubernetes checks, the custom checks under\nk8s/trivy/checks and its secret scanner all run, and a finding of any\nseverity fails the audit. k8s/trivy/trivyignore.yaml lists the checks that\nare switched off; if the chart directory contains a trivyignore.yaml, it\nexempts single resources from single checks (for expected RBAC or privilege\nrequirements), naming each as <Kind>/<namespace>/<name>.yaml, or\n<Kind>/<name>.yaml if its manifest sets no namespace.").
+							WithSourceMap(dag.SourceMap("helmfile_audit.go", 122, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("Lint",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Lints the release's chart with `helmfile lint`.\n\nhelmfile lint runs helm lint with the release's merged values. It reuses the\ndependencies the render built.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 240, 1)).
+							WithSourceMap(dag.SourceMap("helmfile.go", 245, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("LintPython",
@@ -457,18 +478,18 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 						dag.Function("Output",
 							dag.TypeDef().WithObject("File")).
 							WithDescription("Returns rendered template output from `helmfile template`.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 227, 1))).
+							WithSourceMap(dag.SourceMap("helmfile.go", 232, 1))).
 					WithFunction(
 						dag.Function("Render",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Renders the release with `helmfile template`.").
-							WithSourceMap(dag.SourceMap("helmfile.go", 219, 1)).
+							WithSourceMap(dag.SourceMap("helmfile.go", 224, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("Validate",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Validates the rendered manifests against their schemas.\n\nkubeconform runs in strict mode, with the datreeio CRDs-catalog (baked into\nthe container layer) for custom resources alongside the built-in Kubernetes\nschemas. Kinds not in the catalog are skipped.\n\nIf the chart directory contains a kubeconform.yaml, its skipKinds list is\nfiltered out of the manifest before validation. Use this for kinds whose\ncatalog schema is known to be stale.").
-							WithSourceMap(dag.SourceMap("helmfile_manifests.go", 65, 1)).
+							WithSourceMap(dag.SourceMap("helmfile_manifests.go", 22, 1)).
 							WithCheck()).
 					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Name is the release name.", SourceMap: dag.SourceMap("helmfile.go", 129, 2)}).
 					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the chart's directory relative to the repo root.", SourceMap: dag.SourceMap("helmfile.go", 131, 2)}).

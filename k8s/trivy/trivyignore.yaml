@@ -1,0 +1,57 @@
+# Trivy checks that are switched off for every helmfile release. Everything
+# else runs: Trivy's built-in Kubernetes checks, its secret scanner, and the
+# custom checks in checks/ (HL-*). A failure of any severity fails the audit.
+#
+# A chart's own trivyignore.yaml is merged into this file. It exempts single
+# resources from single checks; see README.md.
+#
+# The built-in checks come with the trivy binary, so a trivy upgrade can add
+# one. If it fails, fix or exempt what it finds, or switch it off here.
+misconfigurations:
+  # Not wanted here.
+  # CPU limits throttle; requests are what scheduling needs.
+  - id: KSV-0011 # CPU not limited
+  # Images run as the low UID they were built with. HL-0009 is what keeps them
+  # from running as root.
+  - id: KSV-0020 # UID <= 10000
+  - id: KSV-0021 # GID <= 10000
+  # Wants every image to come from one of a list of private registries.
+  - id: KSV-0125 # untrusted registry
+  # What an operator or a bootstrap Job needs to do its work. The grants that
+  # lead to the whole cluster stay on: cluster-wide Secrets (KSV-0041),
+  # wildcards (KSV-0044 to KSV-0046), RBAC (KSV-0050), exec (KSV-0053).
+  - id: KSV-0048 # manage workloads and pods
+  - id: KSV-0049 # manage ConfigMaps
+  - id: KSV-0113 # manage Secrets in one namespace
+  # Reports only that another check on the same container failed.
+  - id: KSV-0118 # default security context
+
+  # Cannot work on rendered charts.
+  # Helmfile and Argo CD set the namespace at deploy time, so most manifests
+  # carry none and read as `default`.
+  - id: KSV-0110 # workloads in the default namespace
+  # Match words such as "key", "token" and "email" anywhere in a ConfigMap,
+  # which fails every script, config file and dashboard. The secret scanner
+  # looks for actual credentials instead.
+  - id: KSV-0109 # ConfigMap with secrets
+  - id: KSV-01010 # ConfigMap with sensitive content
+
+  # Replaced by a custom check.
+  # HL-0009 also accepts a non-zero runAsUser, which is as good as
+  # runAsNonRoot.
+  - id: KSV-0012 # runs as root
+  - id: KSV-0105 # runAsUser is 0
+  # HL-0010 skips init containers that run to completion.
+  - id: KSV-0015 # CPU requests
+  - id: KSV-0016 # memory requests
+  - id: KSV-0018 # memory limit
+
+  # Pending: wanted, but releases still fail them. Enable one at a time as the
+  # failures are fixed or exempted.
+  - id: KSV-0003 # capabilities: does not drop ALL
+  - id: KSV-0004 # capabilities: drops none
+  - id: KSV-0106 # capabilities: adds more than NET_BIND_SERVICE
+  - id: KSV-0014 # root filesystem is not read-only
+  - id: KSV-0030 # seccomp profile is not RuntimeDefault
+  - id: KSV-0104 # seccomp profile unset or Unconfined
+  - id: HL-0004 # image not pinned by digest

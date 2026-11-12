@@ -1,0 +1,7 @@
+misconfigurations:
+  # Traefik runs in kube-system, where k3s puts it, so everything in this
+  # release does.
+  - id: KSV-0037 # resource in kube-system
+  # Traefik reads the TLS Secret any Ingress, IngressRoute or Gateway names.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths: [ClusterRole/traefik-kube-system.yaml]

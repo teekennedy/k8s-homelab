@@ -1,0 +1,12 @@
+misconfigurations:
+  # The CrowdSec image's start script installs hub items under /etc/crowdsec as
+  # root, and the agent reads host log files. The upstream chart exposes no
+  # securityContext for any of the three.
+  - id: HL-0009 # can run as root
+    paths:
+      - DaemonSet/crowdsec-agent.yaml
+      - Deployment/crowdsec-appsec.yaml
+      - Deployment/crowdsec-lapi.yaml
+  # Reads the host's container logs from /var/log.
+  - id: KSV-0023 # hostPath volume
+    paths: [DaemonSet/crowdsec-agent.yaml]

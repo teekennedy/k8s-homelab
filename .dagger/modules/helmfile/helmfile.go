@@ -1,5 +1,5 @@
 // Renders, lints and validates every chart with the repo's helmfile, and
-// audits the rendered manifests with Polaris.
+// audits the rendered manifests with Trivy.
 // Each release renders from a scoped source directory, so a change to one chart
 // leaves the others cached.
 
@@ -21,9 +21,9 @@ import (
 const (
 	helmfilePath     = helmfile.StatePath
 	sharedChartsPath = helmfile.SharedChartsPath
-	// polarisConfigPath is the repo-wide Polaris config: which checks run, and
-	// the custom ones.
-	polarisConfigPath = "k8s/polaris.yaml"
+	// trivyConfigPath holds the repo-wide Trivy config: the custom checks and
+	// the checks that are switched off.
+	trivyConfigPath = "k8s/trivy"
 )
 
 // Helmfile runs helmfile checks over every chart.
@@ -138,8 +138,11 @@ type Release struct {
 	// release's execs untouched.
 	// +private
 	Source *dagger.Directory
+	// TrivyConfig is the part of trivyConfigPath an audit reads, and the chart's
+	// own ignore file. It is kept out of Source so that editing it leaves the
+	// render cached.
 	// +private
-	PolarisConfig *dagger.File
+	TrivyConfig *dagger.Directory
 	// +private
 	Container *dagger.Container
 }
@@ -153,10 +156,12 @@ func newRelease(source *dagger.Directory, chartPath, env string, container *dagg
 		Source: dag.Directory().
 			WithFile(helmfilePath, source.File(helmfilePath)).
 			WithFile(envValues, source.File(envValues)).
-			WithDirectory(chartPath, source.Directory(chartPath)).
+			WithDirectory(chartPath, source.Directory(chartPath), dagger.DirectoryWithDirectoryOpts{
+				Exclude: []string{trivyIgnoreFile},
+			}).
 			WithDirectory(sharedChartsPath, source.Directory(sharedChartsPath)),
-		PolarisConfig: source.File(polarisConfigPath),
-		Container:     container,
+		TrivyConfig: trivyConfig(source, chartPath),
+		Container:   container,
 	}
 }
 

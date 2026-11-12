@@ -19,11 +19,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: redteam-view
-  annotations:
-    # False positive: `view` is a built-in read-only ClusterRole (no pods/exec or
-    # pods/attach), but Polaris analyses the chart statically and can't see it, so it
-    # trips the "references a ClusterRole that ... does not exist" branch of the check.
-    polaris.fairwinds.com/clusterrolebindingPodExecAttach-exempt: "true"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

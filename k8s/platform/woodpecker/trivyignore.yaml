@@ -1,0 +1,19 @@
+misconfigurations:
+  # Woodpecker CI pipelines exec into the Dagger Engine pod to run container
+  # builds. The Role grants pods/exec in the dagger-engine namespace so the CI
+  # agent's service account can reach the engine.
+  - id: KSV-0053 # exec into pods
+    paths: [Role/dagger-engine/dagger-pipeline-exec.yaml]
+  # The agent runs each pipeline step as a pod, with a Service for every step
+  # that exposes a port.
+  - id: KSV-0056 # manages networking resources
+    paths: [Role/woodpecker/woodpecker-agent.yaml]
+  # nixos-rollout apk-installs openssh-client at runtime, which needs root (the
+  # same pattern as the SSH CA workloads in foundation/cert-system).
+  - id: HL-0009 # can run as root
+    paths: [CronJob/woodpecker/nixos-rollout.yaml]
+  # The agent chart has no probe settings.
+  - id: HL-0001 # liveness probe
+    paths: &agent [StatefulSet/woodpecker/woodpecker-agent.yaml]
+  - id: HL-0002 # readiness probe
+    paths: *agent

@@ -77,8 +77,11 @@ func helmfileFixture() cachetest.Repo {
 		// A library chart: mounted into every release, never one itself.
 		"k8s/charts/shared/Chart.yaml": chart("shared"),
 
-		// Read by the Polaris audit only, so it is in no release's mount.
-		polarisConfigPath: "checks: {}\n",
+		// Read by the Trivy audit only, so they are in no release's mount.
+		trivyGlobalIgnore: "misconfigurations: []\n",
+		trivyFixtureCheck: "package user.kubernetes.fixture\n",
+		// The checks' own fixtures, which no release reads at all.
+		trivyFixtureTest: "kind: Pod\n",
 	}
 }
 
@@ -122,6 +125,13 @@ var helmfileUnitFiles = map[string][]string{
 		"k8s/foundation/beta/Chart.yaml", "k8s/foundation/beta/production.yaml", "k8s/foundation/beta/values.yaml",
 	},
 }
+
+// The repo-wide Trivy config in helmfileFixture.
+const (
+	trivyGlobalIgnore = trivyConfigPath + "/" + trivyIgnoreFile
+	trivyFixtureCheck = trivyConfigPath + "/" + trivyChecksDir + "/fixture.rego"
+	trivyFixtureTest  = trivyConfigPath + "/" + trivyFixturesDir + "/HL-0001/fail.yaml"
+)
 
 // addedHelmChart is the chart the "adding a chart" scenario grows.
 var addedHelmChart = map[string]string{
@@ -177,18 +187,21 @@ func auditCheck() helmfileCheck {
 	return helmfileCheck{
 		Name:      "audit",
 		Fixture:   helmfileFixture,
-		Scenarios: polarisScenarios,
+		Scenarios: trivyScenarios,
 		Invoke: func(ctx context.Context, source *dagger.Directory, ctr *dagger.Container) error {
 			return eachRelease(ctx, source, ctr, func(r *Release) error { return r.Audit(ctx) })
 		},
 		UnitOf: unitByHelmfileRelease,
 		Mount:  strings.TrimPrefix(helmRepoRoot, "/"),
-		// The audit runs on the shared render's output.
+		// The audit runs on the shared render's output, split per resource.
 		WantUnitArgv: func(unit string) []string {
 			return []string{
 				helmfileTemplateArgv(unit),
-				"polaris audit --audit-path /rendered.yaml --format pretty --only-show-failed-tests" +
-					" --set-exit-code-below-score 100 --config /polaris.yaml",
+				"sh -c " + auditPrepareScript + " -- /trivy/chart/" + trivyIgnoreFile,
+				"trivy fs --quiet --skip-check-update --skip-version-check --disable-telemetry" +
+					" --scanners misconfig,secret --misconfig-scanners kubernetes" +
+					" --config-check /trivy/checks --check-namespaces user" +
+					" --ignorefile /trivyignore.yaml --table-mode detailed --exit-code 1 /manifests",
 			}
 		},
 		WantUnitFiles: helmfileUnitFiles,
@@ -233,7 +246,7 @@ func helmfileTemplateArgv(unit string) string {
 // --selector. That the mount is scoped to match is asserted separately, by
 // helmfileUnitFiles. Execs that are not a helmfile invocation return "".
 func unitByHelmfileRelease(e daggerfake.Exec) string {
-	if len(e.Args) > 0 && slices.Contains(auditTools, e.Args[0]) {
+	if isAuditExec(e) {
 		return unitByMountedRelease(e)
 	}
 	if !slices.Contains(e.Args, "helmfile") {
@@ -257,7 +270,13 @@ func unitByHelmfileRelease(e daggerfake.Exec) string {
 // auditTools are the tools that audit a release's render. Their argv names
 // neither the environment nor the release, so their unit is read off the tree
 // they run against instead; see unitByMountedRelease.
-var auditTools = []string{"polaris", "kubeconform"}
+var auditTools = []string{"trivy", "kubeconform"}
+
+// isAuditExec reports whether an exec is one of auditTools, or the script that
+// prepares a render for one.
+func isAuditExec(e daggerfake.Exec) bool {
+	return len(e.Args) > 0 && slices.Contains(auditTools, e.Args[0]) || slices.Contains(e.Args, auditPrepareScript)
+}
 
 // unitByMountedRelease names an audit exec's unit from the release tree mounted
 // at /repo, which holds exactly one environment's env.json and one non-library
@@ -327,18 +346,28 @@ func helmfileScenarios() []cachetest.Scenario {
 	}
 }
 
-// polarisScenarios and kubeconformScenarios add the per-chart config file each
+// trivyScenarios and kubeconformScenarios add the per-chart config file each
 // audit reads to the shared table: editing it re-runs that chart's audit and
 // no other.
-func polarisScenarios() []cachetest.Scenario {
+func trivyScenarios() []cachetest.Scenario {
 	return append(
 		helmfileScenarios(),
-		chartConfigScenario("k8s/apps/alpha/polaris.yaml", "exemptions: []\n"),
+		chartConfigScenario("k8s/apps/alpha/"+trivyIgnoreFile, "misconfigurations: []\n"),
+		// Expected: the repo-wide config is part of every release's audit.
 		cachetest.Scenario{
-			// Expected: the repo-wide config is part of every release's audit.
-			Name:  "editing the repo-wide polaris config invalidates every release",
-			Edit:  cachetest.Edit(polarisConfigPath, "checks: {} # edited\n"),
+			Name:  "editing the repo-wide trivy ignore file invalidates every release",
+			Edit:  cachetest.Edit(trivyGlobalIgnore, "misconfigurations: [] # edited\n"),
 			Rerun: helmfileUnits,
+		},
+		cachetest.Scenario{
+			Name:  "editing a custom trivy check invalidates every release",
+			Edit:  cachetest.Edit(trivyFixtureCheck, "package user.kubernetes.edited\n"),
+			Rerun: helmfileUnits,
+		},
+		cachetest.Scenario{
+			Name:   "editing a custom check's fixture leaves every release cached",
+			Edit:   cachetest.Edit(trivyFixtureTest, "kind: Deployment\n"),
+			Cached: helmfileUnits,
 		},
 	)
 }

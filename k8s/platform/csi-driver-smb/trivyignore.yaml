@@ -1,0 +1,30 @@
+misconfigurations:
+  # CSI drivers mount and unmount volumes in the kernel, which takes a
+  # privileged container on the host network. These are standard requirements
+  # for any CSI node plugin.
+  - id: KSV-0017 # privileged
+    paths: &driver
+      - DaemonSet/csi-driver-smb/csi-smb-node.yaml
+      - Deployment/csi-driver-smb/csi-smb-controller.yaml
+  - id: KSV-0001 # privilege escalation
+    paths: *driver
+  - id: KSV-0009 # host network
+    paths: *driver
+  - id: HL-0009 # can run as root
+    paths: *driver
+  # The node plugin registers with the kubelet and mounts volumes under
+  # /var/lib/kubelet.
+  - id: KSV-0023 # hostPath volume
+    paths: [DaemonSet/csi-driver-smb/csi-smb-node.yaml]
+  # The driver container gets its liveness from the liveness-probe sidecar. The
+  # chart has no settings for readiness, or for probing the CSI sidecars.
+  - id: HL-0001 # liveness probe
+    paths: *driver
+  - id: HL-0002 # readiness probe
+    paths: *driver
+  # The driver and its provisioner read the share credentials a StorageClass
+  # or volume names.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths:
+      - ClusterRole/csi-smb-node-secret-role.yaml
+      - ClusterRole/smb-external-provisioner-role.yaml

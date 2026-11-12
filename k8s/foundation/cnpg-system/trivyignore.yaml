@@ -1,0 +1,16 @@
+misconfigurations:
+  # The operator creates each database's credentials and certificates as
+  # Secrets and its Services in the database's namespace, runs backups and
+  # switchovers through pods/exec, and writes its own CA into its webhook
+  # configurations.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths:
+      - ClusterRole/cnpg-system-cloudnative-pg.yaml
+      # Reads the object-store credentials a cluster's backups name.
+      - ClusterRole/cnpg-system-plugin-barman-cloud.yaml
+  - id: KSV-0053 # exec into pods
+    paths: &operator [ClusterRole/cnpg-system-cloudnative-pg.yaml]
+  - id: KSV-0056 # manages networking resources
+    paths: *operator
+  - id: KSV-0114 # manages webhook configurations
+    paths: *operator

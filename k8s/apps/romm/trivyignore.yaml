@@ -1,0 +1,5 @@
+misconfigurations:
+  # The image's init script must start as root: it templates the nginx config
+  # and starts nginx, gunicorn and valkey, dropping nginx to the `romm` user.
+  - id: HL-0009 # can run as root
+    paths: [Deployment/romm.yaml]

@@ -1,0 +1,10 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  name: unlabelled-alertmanager
+spec:
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: longhorn
+        resources: {requests: {storage: 1Gi}}

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: env-from-secret
+spec:
+  selector:
+    matchLabels: {app: env-from-secret}
+  template:
+    metadata:
+      labels: {app: env-from-secret}
+    spec:
+      containers:
+        - name: app
+          image: example.test/app:1
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: db, key: password}
+            # Built from the variable above, so it holds no credential itself.
+            - name: DATABASE_TOKEN
+              value: "user:$(DB_PASSWORD)"
+            - name: API_TOKEN_FILE
+              value: /run/secrets/token
+            - name: TLS_SECRET_NAME
+              value: app-tls
+            - name: AWS_ACCESS_KEY_ID
+              value: AKIAIOSFODNN7EXAMPLE
+            - name: LOG_LEVEL
+              value: debug

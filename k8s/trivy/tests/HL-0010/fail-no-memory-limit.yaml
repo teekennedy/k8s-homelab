@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: no-memory-limit
+spec:
+  selector:
+    matchLabels: {app: no-memory-limit}
+  template:
+    metadata:
+      labels: {app: no-memory-limit}
+    spec:
+      containers:
+        - name: app
+          image: example.test/app:1
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}

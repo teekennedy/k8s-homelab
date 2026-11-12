@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: with-tls
+spec:
+  tls:
+    - hosts: [app.example.test]
+  rules:
+    - host: app.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: app, port: {number: 80}}

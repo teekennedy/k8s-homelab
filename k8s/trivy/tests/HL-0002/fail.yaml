@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unprobed
+spec:
+  selector:
+    matchLabels: {app: unprobed}
+  template:
+    metadata:
+      labels: {app: unprobed}
+    spec:
+      containers:
+        - name: app
+          image: example.test/app:1

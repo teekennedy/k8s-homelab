@@ -1,0 +1,10 @@
+misconfigurations:
+  # GITEA_ADMIN_PASSWORD_MODE says when the chart resets the admin password; it
+  # is not one.
+  - id: HL-0006 # sensitive env literal
+    paths: [Deployment/forgejo/forgejo.yaml]
+  # forgejo-resources needs pods/exec to run `forgejo admin auth`, which has no
+  # REST API equivalent. The grant is deliberately minimal: one Role, scoped to
+  # the forgejo namespace only, bound to a single job ServiceAccount.
+  - id: KSV-0053 # exec into pods
+    paths: [Role/forgejo/forgejo-resources-pod-exec.yaml]

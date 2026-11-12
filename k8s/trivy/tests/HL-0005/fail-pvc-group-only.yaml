@@ -1,0 +1,11 @@
+# The group label does nothing without recurring-job.longhorn.io/source.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: group-only
+  labels:
+    recurring-job-group.longhorn.io/backup: enabled
+spec:
+  storageClassName: longhorn
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}

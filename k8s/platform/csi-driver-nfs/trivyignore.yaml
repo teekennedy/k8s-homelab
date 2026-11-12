@@ -1,0 +1,31 @@
+misconfigurations:
+  # CSI drivers mount and unmount volumes in the kernel, which takes a
+  # privileged container with SYS_ADMIN on the host network. These are standard
+  # requirements for any CSI node plugin.
+  - id: KSV-0017 # privileged
+    paths: &driver
+      - DaemonSet/csi-driver-nfs/csi-nfs-node.yaml
+      - Deployment/csi-driver-nfs/csi-nfs-controller.yaml
+  - id: KSV-0001 # privilege escalation
+    paths: *driver
+  - id: KSV-0005 # SYS_ADMIN capability
+    paths: *driver
+  - id: KSV-0022 # capabilities added
+    paths: *driver
+  - id: KSV-0009 # host network
+    paths: *driver
+  - id: HL-0009 # can run as root
+    paths: *driver
+  # CSI plugins register with the kubelet and mount volumes under
+  # /var/lib/kubelet.
+  - id: KSV-0023 # hostPath volume
+    paths: *driver
+  # The driver container gets its liveness from the liveness-probe sidecar. The
+  # chart has no settings for readiness, or for probing the CSI sidecars.
+  - id: HL-0001 # liveness probe
+    paths: *driver
+  - id: HL-0002 # readiness probe
+    paths: *driver
+  # The provisioner reads the mount credentials a StorageClass names.
+  - id: KSV-0041 # manages Secrets cluster-wide
+    paths: [ClusterRole/nfs-external-provisioner-role.yaml]

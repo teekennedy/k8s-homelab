@@ -24,7 +24,7 @@ renovate:
     #
     # kubectl is fetched here rather than in an initContainer so it runs as the
     # same unprivileged uid in the same container, needing no extra image, no
-    # securityContext of its own, and no polaris exemption.
+    # securityContext of its own, and no audit exemption.
     # kubectl goes in tools/ rather than alongside the wrapper in bin/: kubelet
     # creates the parent directory of a nested mount root-owned 0755, so
     # /opt/dagger/bin is NOT writable by uid 12021 even though the emptyDir root

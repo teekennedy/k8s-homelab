@@ -73,13 +73,13 @@ in {
         jq
         kubeconform
         kubernetes-helm
-        kubernetes-polaris
         opentofu
         python
-        trivy # The successor to tfsec, apparently
+        trivy # Audits OpenTofu (as tfsec's successor) and rendered charts
         uv
         woodpecker-cli
         yamllint
+        yq-go # Splits a rendered chart into the per-resource files trivy audits
       ];
     };
 

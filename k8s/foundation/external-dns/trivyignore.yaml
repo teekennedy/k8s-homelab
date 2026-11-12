@@ -1,0 +1,6 @@
+misconfigurations:
+  # A shell loop with no health endpoint.
+  - id: HL-0001 # liveness probe
+    paths: &ddns [Deployment/external-dns/ddns-updater.yaml]
+  - id: HL-0002 # readiness probe
+    paths: *ddns

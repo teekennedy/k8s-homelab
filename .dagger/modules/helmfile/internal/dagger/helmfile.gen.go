@@ -15,6 +15,9 @@ type HelmfileLintOpts = core.HelmfileLintOpts
 // HelmfileReleasesOpts contains options for Helmfile.Releases
 type HelmfileReleasesOpts = core.HelmfileReleasesOpts
 
+// HelmfileTestOpts contains options for Helmfile.Test
+type HelmfileTestOpts = core.HelmfileTestOpts
+
 // Release is one release of the helmfile.
 type HelmfileRelease = core.HelmfileRelease
 

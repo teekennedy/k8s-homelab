@@ -19,6 +19,7 @@ type Helmfile struct { // helmfile (../../../../../../:0:0)
 
 	id   *ID
 	lint *Void
+	test *Void
 }
 
 func (r *Helmfile) WithGraphQLQuery(q *querybuilder.Selection) *Helmfile {
@@ -133,6 +134,32 @@ func (r *Helmfile) Releases(opts ...HelmfileReleasesOpts) *HelmfileReleases {
 	}
 }
 
+// HelmfileTestOpts contains options for Helmfile.Test
+type HelmfileTestOpts struct {
+	Source *Directory
+}
+
+// Tests the custom Trivy checks against their fixtures.
+//
+// Each custom check has a directory under k8s/trivy/tests named after its ID,
+// holding manifests it must fail (fail*.yaml) and manifests it must pass
+// (pass*.yaml). A check with a typo in a field path would otherwise pass every
+// release without ever being able to fail one.
+func (r *Helmfile) Test(ctx context.Context, opts ...HelmfileTestOpts) error {
+	if r.test != nil {
+		return nil
+	}
+	q := r.query.Select("test")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `source` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Source) {
+			q = q.Arg("source", opts[i].Source)
+		}
+	}
+
+	return q.Execute(ctx)
+}
+
 // Release is one release of the helmfile.
 type HelmfileRelease struct { // helmfile (../../../../../../:0:0)
 	query *querybuilder.Selection
@@ -161,12 +188,15 @@ func (r *HelmfileRelease) WithGraphQLQuery(q *querybuilder.Selection) *HelmfileR
 	}
 }
 
-// Audits the rendered manifests with Fairwinds Polaris.
+// Audits the rendered manifests with Trivy.
 //
-// It fails when any enabled check fails, whatever its severity. The checks come
-// from the repo-wide k8s/polaris.yaml; if the chart directory contains a
-// polaris.yaml, its exemptions are added to it (for expected RBAC or privilege
-// requirements).
+// Trivy's built-in Kubernetes checks, the custom checks under
+// k8s/trivy/checks and its secret scanner all run, and a finding of any
+// severity fails the audit. k8s/trivy/trivyignore.yaml lists the checks that
+// are switched off; if the chart directory contains a trivyignore.yaml, it
+// exempts single resources from single checks (for expected RBAC or privilege
+// requirements), naming each as <Kind>/<namespace>/<name>.yaml, or
+// <Kind>/<name>.yaml if its manifest sets no namespace.
 func (r *HelmfileRelease) Audit(ctx context.Context) error {
 	if r.audit != nil {
 		return nil

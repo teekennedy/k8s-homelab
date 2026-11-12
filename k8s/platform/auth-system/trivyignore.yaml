@@ -1,0 +1,5 @@
+misconfigurations:
+  # TARGET_SECRET is the name of the Secret the sync job writes. Every value it
+  # handles is read from the API at runtime.
+  - id: HL-0006 # sensitive env literal
+    paths: [Job/auth-system/authelia-oidc-client-secrets-sync.yaml]
