@@ -1,9 +1,9 @@
 apiVersion: v2
 name: kube-prometheus-stack
-version: 0.1.91
+version: 0.1.92
 dependencies:
   - name: kube-prometheus-stack
-    version: 93.2.2
+    version: 93.3.0
     repository: oci://ghcr.io/prometheus-community/charts
   - name: loki
     version: 7.6.0
