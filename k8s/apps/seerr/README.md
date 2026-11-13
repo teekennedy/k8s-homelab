@@ -64,6 +64,20 @@ Enhanced plugin, acts as the owner for every request. Per-user tokens, limited
 to discovery and requests and expiring after at most 90 days, can be created
 under **Profile → Settings → Client Tokens**.
 
+### X-Api-User proxy
+
+`seerr-api-user-proxy` (`files/api-user-proxy/`) restores per-user requests for
+clients that send `X-Api-User`. It rewrites those calls onto SeerrNG's own
+on-behalf-of parameters, so quotas, auto-approval and permissions are the
+named user's. For example, `POST /request` gets `"userId"`, and `GET /request`
+is filtered to the user's own requests. Writes it doesn't know how to map are
+refused (403) instead of being made as the owner. Calls without the header
+pass through unchanged.
+
+Only the admin API key may name a user, and only the `jellyfin` namespace can
+reach the proxy. Its address is
+`http://seerr-api-user-proxy.seerr.svc.cluster.local`.
+
 ## Storage
 
 | Volume | Contents | Backed up |

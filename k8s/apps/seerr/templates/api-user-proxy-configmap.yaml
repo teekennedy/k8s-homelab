@@ -1,0 +1,18 @@
+{{- if .Values.apiUserProxy.enabled }}
+{{- /*
+The uv project in files/api-user-proxy/, without its tests.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-api-user-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "seerr.ownLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api-user-proxy
+data:
+  {{- range list "proxy.py" "pyproject.toml" "uv.lock" ".python-version" }}
+  {{ . }}: |-
+    {{- $.Files.Get (printf "files/api-user-proxy/%s" .) | nindent 4 }}
+  {{- end }}
+{{- end }}

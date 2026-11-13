@@ -1,0 +1,162 @@
+{{- if .Values.apiUserProxy.enabled }}
+{{- $v := .Values.apiUserProxy }}
+{{- /*
+Maps the X-Api-User header that Jellyfin Enhanced sends onto SeerrNG's
+on-behalf-of parameters. See files/api-user-proxy/proxy.py.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api-user-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "seerr.ownLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api-user-proxy
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: api-user-proxy
+  template:
+    metadata:
+      annotations:
+        # uv reads the project once at startup; a ConfigMap change alone never
+        # restarts the pod.
+        checksum/config: {{ include (print $.Template.BasePath "/api-user-proxy-configmap.yaml") . | sha256sum }}
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: api-user-proxy
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: proxy
+          image: "{{ $v.image.repository }}:{{ $v.image.tag }}"
+          command:
+            - sh
+            - -c
+            - |-
+              set -eu
+              # uv builds the project's environment beside it, and /app is a
+              # read-only ConfigMap mount, so run from a writable copy.
+              cp -rL /app/. /project/
+              mkdir -p /project/tmp
+              cd /project
+              exec uv run --frozen --no-dev --no-cache --no-python-downloads --link-mode copy \
+                python proxy.py
+          env:
+            - name: SEERR_URL
+              value: http://{{ .Release.Name }}.{{ .Release.Namespace }}.svc.cluster.local:{{ index .Values "seerr-chart" "service" "port" }}
+            # Looks up the permissions of the user named in X-Api-User, and is
+            # the only key allowed to name one.
+            - name: SEERR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-api-key
+                  key: api-key
+            - name: PORT
+              value: "8080"
+            - name: HOME
+              value: /project
+            - name: TMPDIR
+              value: /project/tmp
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 3
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 3
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          volumeMounts:
+            - name: project
+              mountPath: /app
+              readOnly: true
+            - name: workdir
+              mountPath: /project
+      volumes:
+        - name: project
+          configMap:
+            name: {{ .Release.Name }}-api-user-proxy
+        - name: workdir
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api-user-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "seerr.ownLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api-user-proxy
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: api-user-proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# Only the clients that send X-Api-User may reach the proxy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-api-user-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "seerr.ownLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api-user-proxy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: api-user-proxy
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- range $v.allowedNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+      ports:
+        - port: http
+          protocol: TCP
+{{- end }}

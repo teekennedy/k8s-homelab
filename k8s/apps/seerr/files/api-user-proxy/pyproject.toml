@@ -1,0 +1,14 @@
+[project]
+name = "seerr-api-user-proxy"
+version = "0.1.0"
+description = "Maps Seerr's X-Api-User header onto SeerrNG's on-behalf-of parameters"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
