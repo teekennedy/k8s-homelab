@@ -1,0 +1,31 @@
+{{- $route := index .Values "seerr-chart" "route" "main" }}
+{{- if and $route.enabled .Values.apiUserProxy.enabled .Values.apiUserProxy.withdrawCleanup.enabled }}
+# Sends users' request withdrawals through the proxy, which forwards them to
+# SeerrNG unchanged and then may remove the movie from Radarr. More specific
+# than the chart's `/` rule, so it takes precedence for these calls only.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}-withdrawals
+  namespace: {{ .Release.Namespace }}
+  {{- with $route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "seerr.ownLabels" . | nindent 4 }}
+spec:
+  parentRefs:
+    {{- toYaml $route.parentRefs | nindent 4 }}
+  hostnames:
+    {{- toYaml $route.hostnames | nindent 4 }}
+  rules:
+    - matches:
+        - method: DELETE
+          path:
+            type: PathPrefix
+            value: /api/v1/request/
+      backendRefs:
+        - name: {{ .Release.Name }}-api-user-proxy
+          port: 80
+{{- end }}

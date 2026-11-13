@@ -11,7 +11,7 @@ metadata:
     {{- include "seerr.ownLabels" . | nindent 4 }}
     app.kubernetes.io/component: api-user-proxy
 data:
-  {{- range list "proxy.py" "pyproject.toml" "uv.lock" ".python-version" }}
+  {{- range list "proxy.py" "withdraw.py" "pyproject.toml" "uv.lock" ".python-version" }}
   {{ . }}: |-
     {{- $.Files.Get (printf "files/api-user-proxy/%s" .) | nindent 4 }}
   {{- end }}

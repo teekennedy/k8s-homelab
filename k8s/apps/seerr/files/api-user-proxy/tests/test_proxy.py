@@ -6,6 +6,7 @@ import http.client
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,6 +14,7 @@ import proxy
 
 API_KEY = "admin-key"
 PERMISSIONS = {7: proxy.REQUEST, 8: proxy.MANAGE_REQUESTS}
+SESSION = "connect.sid=user-7"
 
 
 class FakeSeerr(BaseHTTPRequestHandler):
@@ -24,6 +26,24 @@ class FakeSeerr(BaseHTTPRequestHandler):
     def _handle(self):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length).decode() if length else ""
+        if self.command == "GET" and self.path == "/api/v1/auth/me":
+            if self.headers.get("Cookie") == SESSION:
+                self._reply(200, {"id": 7})
+            else:
+                self._reply(401, {"message": "Please sign in."})
+            return
+        if self.command == "GET" and self.path.startswith("/api/v1/request/"):
+            request_id = int(self.path.rsplit("/", 1)[1])
+            self._reply(200, {"id": request_id, "requestedBy": {"id": 7}})
+            return
+        if self.command == "DELETE" and self.path.startswith("/api/v1/request/"):
+            FakeSeerr.received.append({"method": "DELETE", "path": self.path})
+            # Request 9 is not the caller's to withdraw.
+            refused = self.path.startswith("/api/v1/request/9")
+            self.send_response(403 if refused else 204)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if self.command == "GET" and self.path.startswith("/api/v1/user/"):
             user_id = int(self.path.rsplit("/", 1)[1])
             if user_id not in PERMISSIONS:
@@ -63,22 +83,48 @@ def run(server: ThreadingHTTPServer):
 
 
 @pytest.fixture
-def proxy_port():
+def seerr_url():
     FakeSeerr.received = []
     seerr = ThreadingHTTPServer(("127.0.0.1", 0), FakeSeerr)
     run(seerr)
+    yield f"http://127.0.0.1:{seerr.server_address[1]}"
+    seerr.shutdown()
+
+
+def start_proxy(seerr_url, services=None):
     config = proxy.Config.from_env(
-        {
-            "SEERR_URL": f"http://127.0.0.1:{seerr.server_address[1]}",
-            "SEERR_API_KEY": API_KEY,
-            "PORT": "0",
-        }
+        {"SEERR_URL": seerr_url, "SEERR_API_KEY": API_KEY, "PORT": "0"}
     )
-    server = proxy.serve(config)
+    server = proxy.serve(config, services)
     run(server)
+    return server
+
+
+@pytest.fixture
+def proxy_port(seerr_url):
+    server = start_proxy(seerr_url)
     yield server.server_address[1]
     server.shutdown()
-    seerr.shutdown()
+
+
+@pytest.fixture
+def cleanups(monkeypatch):
+    """withdraw.run calls, recorded instead of made."""
+    recorded = SimpleNamespace(calls=[], done=threading.Event())
+
+    def record(services, request, actor_id, **kwargs):
+        recorded.calls.append((request["id"], actor_id))
+        recorded.done.set()
+
+    monkeypatch.setattr(proxy.withdraw, "run", record)
+    return recorded
+
+
+@pytest.fixture
+def cleanup_port(seerr_url, cleanups):
+    server = start_proxy(seerr_url, services=object())
+    yield server.server_address[1]
+    server.shutdown()
 
 
 def call(port, method, path, headers=None, body=None):
@@ -182,3 +228,62 @@ def test_a_wrong_key_cannot_name_a_user(proxy_port):
 def test_bad_user_ids_are_refused(proxy_port):
     status, _ = call(proxy_port, "GET", "/api/v1/request", as_user("seven"))
     assert status == 400
+
+
+def withdraw_request(port, path, headers=None):
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.request("DELETE", path, headers=headers or {})
+        response = connection.getresponse()
+        response.read()
+        return response.status
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/request/5/status", "/api/v1/request/5"])
+def test_a_withdrawal_is_forwarded_then_cleaned_up(cleanup_port, cleanups, path):
+    assert withdraw_request(cleanup_port, path, {"Cookie": SESSION}) == 204
+    assert FakeSeerr.received == [{"method": "DELETE", "path": path}]
+    assert cleanups.done.wait(5)
+    assert cleanups.calls == [(5, 7)]
+
+
+def test_the_withdrawer_is_unknown_without_credentials(cleanup_port, cleanups):
+    assert withdraw_request(cleanup_port, "/api/v1/request/5/status") == 204
+    assert cleanups.done.wait(5)
+    assert cleanups.calls == [(5, None)]
+
+
+def test_a_refused_withdrawal_is_not_cleaned_up(cleanup_port, cleanups):
+    status = withdraw_request(
+        cleanup_port, "/api/v1/request/9/status", {"Cookie": SESSION}
+    )
+    assert status == 403
+    assert not cleanups.done.wait(0.3)
+
+
+def test_on_behalf_deletes_are_still_refused(cleanup_port, cleanups):
+    status = withdraw_request(cleanup_port, "/api/v1/request/5/status", as_user(7))
+    assert status == 403
+    assert FakeSeerr.received == []
+    assert not cleanups.done.wait(0.3)
+
+
+def test_withdrawals_pass_through_when_cleanup_is_off(proxy_port, cleanups):
+    assert (
+        withdraw_request(proxy_port, "/api/v1/request/5/status", {"Cookie": SESSION})
+        == 204
+    )
+    assert not cleanups.done.wait(0.3)
+
+
+def test_config_enables_cleanup_only_with_radarr():
+    base = {"SEERR_URL": "http://seerr", "SEERR_API_KEY": "k"}
+    assert not proxy.Config.from_env(base).cleans_up
+    assert not proxy.Config.from_env({**base, "RADARR_URL": "http://radarr"}).cleans_up
+    config = proxy.Config.from_env(
+        {**base, "RADARR_URL": "http://radarr:7878", "RADARR_API_KEY": "r"}
+    )
+    assert config.cleans_up
+    assert config.jellyfin_key is None

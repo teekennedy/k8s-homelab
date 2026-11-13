@@ -81,6 +81,12 @@ radarr:
         rename: true
         standard: jellyfin-tmdb
 
+    # Deleted movies (including Seerr withdrawals) go to the recycle bin first.
+    # The folder is created by the arrs pod's recycle-bin init container.
+    media_management:
+      recycleBin: /data/media/.recycle/radarr
+      recycleBinCleanupDays: 14
+
     include:
       # Quality profiles
       # https://github.com/TRaSH-Guides/Guides/tree/master/docs/json/radarr/quality-profiles

@@ -18,6 +18,10 @@ through untouched. Calls with it are rewritten to use SeerrNG's own
 - GET /discover/watchlist reads the user's watchlist, not the owner's.
 - Any other write is refused rather than made as the owner.
 - Other reads are made as the owner. They are not per-user.
+
+It also receives users' own request withdrawals from the browser (DELETE
+/request/<id> and /request/<id>/status). Those are forwarded unchanged, and
+once SeerrNG accepts one, withdraw.py may remove the movie from Radarr.
 """
 
 from __future__ import annotations
@@ -32,7 +36,10 @@ import threading
 import time
 import urllib.parse
 from dataclasses import dataclass
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import withdraw
 
 # server/lib/permissions.ts
 ADMIN = 2
@@ -68,6 +75,9 @@ REQUEST_PERMISSIONS = {
 
 API = "/api/v1"
 REQUEST_ACTION = re.compile(rf"^{API}/request/\d+/(approve|decline)/?$")
+WITHDRAWAL = re.compile(rf"^{API}/request/(\d+)(?:/status)?/?$")
+# What identifies the caller to SeerrNG, for asking it who that is.
+CREDENTIAL_HEADERS = ("cookie", "authorization", "x-api-key")
 
 # Headers that describe one hop, not the message (RFC 9110 section 7.6.1).
 HOP_BY_HOP = {
@@ -172,24 +182,51 @@ class UserCache:
         return value
 
 
+def http_url(env, name: str) -> urllib.parse.SplitResult | None:
+    if not env.get(name):
+        return None
+    url = urllib.parse.urlsplit(env[name])
+    if url.scheme != "http" or not url.hostname:
+        raise ValueError(f"{name} must be an http:// URL")
+    return url
+
+
 @dataclass(frozen=True)
 class Config:
     seerr: urllib.parse.SplitResult
     api_key: str
     port: int
     user_cache_seconds: float
+    # Withdrawal cleanup runs only with Radarr's URL and key. Without
+    # Jellyfin's, movies with a file are always kept.
+    radarr: urllib.parse.SplitResult | None = None
+    radarr_key: str | None = None
+    radarr_server_id: int = 0
+    jellyfin: urllib.parse.SplitResult | None = None
+    jellyfin_key: str | None = None
+    added_grace: timedelta = timedelta(minutes=1)
 
     @classmethod
     def from_env(cls, env=os.environ) -> Config:
-        seerr = urllib.parse.urlsplit(env["SEERR_URL"])
-        if seerr.scheme != "http" or not seerr.hostname:
-            raise ValueError("SEERR_URL must be an http:// URL")
+        seerr = http_url(env, "SEERR_URL")
+        if seerr is None:
+            raise ValueError("SEERR_URL is required")
         return cls(
             seerr=seerr,
             api_key=env["SEERR_API_KEY"],
             port=int(env.get("PORT", "8080")),
             user_cache_seconds=float(env.get("USER_CACHE_SECONDS", "60")),
+            radarr=http_url(env, "RADARR_URL"),
+            radarr_key=env.get("RADARR_API_KEY") or None,
+            radarr_server_id=int(env.get("RADARR_SERVER_ID", "0")),
+            jellyfin=http_url(env, "JELLYFIN_URL"),
+            jellyfin_key=env.get("JELLYFIN_API_KEY") or None,
+            added_grace=timedelta(seconds=float(env.get("ADDED_GRACE_SECONDS", "60"))),
         )
+
+    @property
+    def cleans_up(self) -> bool:
+        return bool(self.radarr and self.radarr_key)
 
 
 def upstream(config: Config) -> http.client.HTTPConnection:
@@ -218,7 +255,21 @@ def fetch_permissions(config: Config, user_id: int) -> int | None:
     return int(json.loads(payload)["permissions"])
 
 
-def make_handler(config: Config, users: UserCache):
+def fetch_json(config: Config, path: str, headers: dict[str, str]):
+    """GET a SeerrNG API path, or None unless it answers 200."""
+    connection = upstream(config)
+    try:
+        connection.request(
+            "GET", path, headers={**headers, "Accept": "application/json"}
+        )
+        response = connection.getresponse()
+        payload = response.read()
+    finally:
+        connection.close()
+    return json.loads(payload) if response.status == 200 else None
+
+
+def make_handler(config: Config, users: UserCache, services: withdraw.Services | None):
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -275,11 +326,56 @@ def make_handler(config: Config, users: UserCache):
                         return
                     target, body = decision.target, decision.body
 
-            self._forward(target, headers, body)
+            withdrawal = None
+            if api_user is None and self.command == "DELETE" and services:
+                match = WITHDRAWAL.match(urllib.parse.urlsplit(target).path)
+                if match:
+                    withdrawal = self._before_withdrawal(int(match[1]))
+
+            status = self._forward(target, headers, body)
+            if withdrawal and status == 204:
+                threading.Thread(
+                    target=withdraw.run,
+                    args=(services, *withdrawal),
+                    kwargs={
+                        "radarr_server_id": config.radarr_server_id,
+                        "added_grace": config.added_grace,
+                        "log": lambda line: self.log_message("%s", line),
+                    },
+                    daemon=True,
+                ).start()
 
         do_HEAD = do_POST = do_PUT = do_PATCH = do_DELETE = _handle
 
-        def _forward(self, target: str, headers: dict[str, str], body: bytes):
+        def _before_withdrawal(self, request_id: int):
+            """The request as it was, and who is withdrawing it. Both must be
+            read before SeerrNG deletes the request."""
+            try:
+                request = fetch_json(
+                    config, f"{API}/request/{request_id}", {"X-Api-Key": config.api_key}
+                )
+                credentials = {
+                    k: v
+                    for k, v in self.headers.items()
+                    if k.lower() in CREDENTIAL_HEADERS
+                }
+                me = (
+                    fetch_json(config, f"{API}/auth/me", credentials)
+                    if credentials
+                    else None
+                )
+            except (
+                Exception
+            ) as error:  # noqa: BLE001 -- the withdrawal still goes ahead
+                self.log_error(
+                    "reading request %d before withdrawal: %s", request_id, error
+                )
+                return None
+            if request is None:
+                return None
+            return request, (me or {}).get("id")
+
+        def _forward(self, target: str, headers: dict[str, str], body: bytes) -> int:
             connection = upstream(config)
             try:
                 connection.request(self.command, target, body=body, headers=headers)
@@ -288,7 +384,7 @@ def make_handler(config: Config, users: UserCache):
             except OSError as error:
                 self.log_error("forwarding %s %s: %s", self.command, target, error)
                 self._deny(Deny(502, "Seerr is unreachable."))
-                return
+                return 502
             finally:
                 connection.close()
             self.send_response(response.status, response.reason)
@@ -299,6 +395,7 @@ def make_handler(config: Config, users: UserCache):
             self.end_headers()
             if self.command != "HEAD":
                 self.wfile.write(payload)
+            return response.status
 
         def _deny(self, decision: Deny):
             body = json.dumps({"message": decision.message}).encode()
@@ -325,17 +422,36 @@ class Server(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
-def serve(config: Config) -> ThreadingHTTPServer:
+def serve(
+    config: Config, services: withdraw.Services | None = None
+) -> ThreadingHTTPServer:
     users = UserCache(
         lambda user_id: fetch_permissions(config, user_id), config.user_cache_seconds
     )
-    return Server(("", config.port), make_handler(config, users))
+    if services is None and config.cleans_up:
+        services = withdraw.HttpServices(
+            config.seerr,
+            config.api_key,
+            config.radarr,
+            config.radarr_key,
+            config.jellyfin,
+            config.jellyfin_key,
+        )
+    return Server(("", config.port), make_handler(config, users, services))
 
 
 def main() -> int:
     config = Config.from_env()
     server = serve(config)
     print(f"listening on :{config.port}, forwarding to {config.seerr.geturl()}")
+    if not config.cleans_up:
+        print("withdrawal cleanup off: no Radarr URL and key")
+    elif not config.jellyfin_key:
+        print(
+            "withdrawal cleanup on, but without a Jellyfin key: movies with a file are kept"
+        )
+    else:
+        print("withdrawal cleanup on")
     server.serve_forever()
     return 0
 

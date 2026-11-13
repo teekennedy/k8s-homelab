@@ -37,6 +37,18 @@ apiUserProxy:
   # Namespaces whose pods may call it.
   allowedNamespaces:
     - jellyfin
+  # When a user withdraws their own movie request and nobody else wants the
+  # movie, remove it from Radarr. See files/api-user-proxy/withdraw.py.
+  withdrawCleanup:
+    enabled: true
+    radarr:
+      url: http://jellyfin-arrs.jellyfin.svc.cluster.local:7878
+      # Radarr's ID in SeerrNG's settings.json (`radarr[].id`).
+      seerrServerId: 0
+    jellyfin:
+      url: http://jellyfin-main.jellyfin.svc.cluster.local:8096
+      # Holds JELLYFIN_API_KEY; created by hand, see README.
+      apiKeySecret: seerr-jellyfin-api-key
   resources:
     requests:
       cpu: 10m

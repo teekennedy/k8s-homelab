@@ -74,9 +74,52 @@ is filtered to the user's own requests. Writes it doesn't know how to map are
 refused (403) instead of being made as the owner. Calls without the header
 pass through unchanged.
 
-Only the admin API key may name a user, and only the `jellyfin` namespace can
-reach the proxy. Its address is
+Only the admin API key may name a user, and only the `jellyfin` namespace (and
+Traefik, for the withdrawals below) can reach the proxy. Its address is
 `http://seerr-api-user-proxy.seerr.svc.cluster.local`.
+
+### Withdrawn requests
+
+Users can withdraw their own requests (Requests page in the full UI, or Lumen),
+but SeerrNG only cancels downloads still in progress; the movie stays in
+Radarr. The same proxy fixes that. `templates/withdrawal-httproute.yaml` routes
+`DELETE /api/v1/request/*` from the browser to it, and it forwards the call
+unchanged. If SeerrNG accepts the withdrawal (204), the proxy runs SeerrNG's
+"Delete from Library" as the owner, but only when all of these hold
+(`files/api-user-proxy/withdraw.py`):
+
+- the withdrawing user made the request, and it is a non-4K movie request;
+- no other request for the movie remains;
+- every copy is in the one Radarr configured here, added no earlier than the
+  request (so the request is what brought it in);
+- if Radarr has a file, no other Jellyfin user has played any of it.
+
+Anything it can't verify keeps the movie. Note that SeerrNG's own wording for
+the button ("Delete", "permanently remove this entry and its history") says
+nothing about the movie, so users should know that deleting a request they no
+longer want also deletes the movie when nobody else wants it.
+
+Each withdrawal logs one line,
+`withdrawn request <id> (tmdb <id>): removed|kept, <reason>`:
+
+```sh
+kubectl -n seerr logs deploy/seerr-api-user-proxy | grep withdrawn
+```
+
+Radarr's recycle bin (`/data/media/.recycle/radarr`, 14 days, set by configarr
+in the jellyfin chart) keeps deleted files recoverable for a while.
+
+Radarr's key comes from `jellyfin/api-keys`, reflected as `seerr-arr-api-keys`.
+The Jellyfin key for the play check has to be created by hand, because Jellyfin
+keeps API keys in its own database. Until it exists, movies that have a file
+are always kept.
+
+1. Jellyfin → Dashboard → API Keys → **+**, name it `seerr-withdrawals`.
+2. ```sh
+   kubectl -n seerr create secret generic seerr-jellyfin-api-key \
+     --from-literal=JELLYFIN_API_KEY=<the key>
+   kubectl -n seerr rollout restart deploy/seerr-api-user-proxy
+   ```
 
 ### Jellyfin Enhanced
 
