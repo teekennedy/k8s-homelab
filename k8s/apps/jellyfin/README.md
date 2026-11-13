@@ -6,7 +6,7 @@ This helm chart contains the jellyfin media server, as well as some supporting s
 
 After deploying the helm chart, you'll need to do some manual steps to setup users and sync API keys:
 - Go to prowlarr and add apps for sonarr and radarr. The API keys for sonarr and radarr are in the `api-keys` secret.
-- Create your administrator account on jellyfin, then go to https://jellyfin.msng.to/web/#/dashboard/keys and create API keys for seerr, radarr, sonarr, and jellyfin-exporter.
+- Create your administrator account on jellyfin, then go to https://jellyfin.msng.to/web/#/dashboard/keys and create API keys for seerr (`k8s/apps/seerr`), radarr, sonarr, and jellyfin-exporter.
   Add the jellyfin-exporter key as described in [its README](files/jellyfin-exporter/README.md#api-key).
   Add the other jellyfin API keys to the corresponding service.
 - Qbittorrent will generate a temporary password for the admin user and log it to stdout on startup.
@@ -57,17 +57,17 @@ to S3 daily (`k8s/platform/restic`).
 
   Metadata and trickplay are refetched or regenerated, so `jellyfin-data` is
   trim-only in Longhorn.
-- **Seerr, qBittorrent**: no built-in backups; their volumes stay in Longhorn's
-  backup group.
+- **qBittorrent**: no built-in backups; its volume stays in Longhorn's backup
+  group.
 - **Cleanuparr**: not backed up; its settings are quick to recreate.
 
 ### Logging
 
 Logs go to stdout, where Alloy collects them. File logging is turned off where
 the app allows it (`<APP>__LOG__LEVEL=off` for the arr apps, `FileLogger` in
-qBittorrent's config, a console-only `logging.json` for Jellyfin). Seerr,
-Cleanuparr and Jellyfin's FFmpeg and plugin logs can't be turned off, so their
-log directories are emptyDirs.
+qBittorrent's config, a console-only `logging.json` for Jellyfin). Cleanuparr
+and Jellyfin's FFmpeg and plugin logs can't be turned off, so their log
+directories are emptyDirs.
 
 ## Observability
 
@@ -133,8 +133,8 @@ Two of those are load-bearing:
 - **`LDAP Username Attribute` must be `uid`.** It defaults to `cn`, which in
   LLDAP is the display name (`MsFitz`, not `msfitz`). On the wrong value the
   plugin does not match the existing Jellyfin account and creates a *second*
-  one, orphaning watch history and breaking the Jellyfin Enhanced → Seerr
-  `X-Api-User` match, which keys on the Jellyfin user GUID.
+  one, orphaning watch history and the user's link to their Seerr account,
+  which keys on the Jellyfin user GUID.
 - **The search filter scopes login to the jellyfin groups**, so service accounts
   like `authelia_bind_user` cannot log in.
 

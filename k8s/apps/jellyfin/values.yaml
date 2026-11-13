@@ -214,72 +214,6 @@ app-template:
             limits:
               memory: 6Gi
               gpu.intel.com/i915: "1"
-    seerr:
-      replicas: 1
-      pod:
-        securityContext:
-          fsGroup: *gid
-          fsGroupChangePolicy: "OnRootMismatch"
-          runAsUser: 1200
-          runAsGroup: *gid
-      containers:
-        seerr:
-          image:
-            repository: ghcr.io/seerr-team/seerr
-            tag: v3.5.2@sha256:aadee014b40e28cf9aa4928bc9d1183a6eb08f8c44d543cddc9efdcb16549be2
-          env:
-            TZ: America/Denver
-            API_KEY:
-              valueFrom:
-                secretKeyRef:
-                  name: api-keys
-                  key: SEERR_API_KEY
-          resources:
-            # observed resource usage:
-            #   cpu: 2m average, 45m max
-            #   mem: ~275Mi min, 331Mi max
-            requests:
-              cpu: 500m
-              memory: 400Mi
-            limits:
-              memory: 800Mi
-          # https://docs.seerr.dev/getting-started/docker
-          probes:
-            # Gate liveness until the app is actually serving, so a slow first
-            # boot can't be mistaken for a hang. Seerr runs schema migrations on
-            # startup, and liveness alone would restart the pod ~65s in,
-            # potentially mid-migration.
-            startup:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /api/v1/status
-                  port: 5055
-                failureThreshold: 30
-                periodSeconds: 5
-                successThreshold: 1
-                timeoutSeconds: 3
-            liveness:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /api/v1/status
-                  port: 5055
-                failureThreshold: 3
-                periodSeconds: 15
-                successThreshold: 1
-                timeoutSeconds: 3
-            readiness:
-              enabled: true
-              custom: true
-              spec:
-                httpGet:
-                  path: /api/v1/status
-                  port: 5055
-                periodSeconds: 10
-                timeoutSeconds: 3
     arrs:
       replicas: 1
       pod:
@@ -855,12 +789,6 @@ app-template:
         http:
           port: 8096
           protocol: HTTP
-    seerr:
-      controller: seerr
-      ports:
-        http:
-          port: 5055
-          protocol: HTTP
     cleanuparr:
       controller: cleanuparr
       ports:
@@ -905,41 +833,6 @@ app-template:
       tls:
         - hosts:
             - *jellyfinHost
-    seerr:
-      enabled: true
-      hosts:
-        - host: &seerrHost seerr.msng.to
-          paths:
-            - path: /
-              pathType: Prefix
-              service:
-                identifier: seerr
-                port: http
-      tls:
-        - hosts:
-            - *seerrHost
-    # Jellyseerr was renamed to Seerr upstream, and the service moved from
-    # jellyseerr.msng.to to seerr.msng.to. This Ingress keeps the old hostname
-    # resolvable (external-dns reads the host, Traefik terminates TLS for it) so
-    # bookmarks and app-configured URLs get a permanent redirect to the new host
-    # instead of a dead name. Traefik's redirectRegex answers `permanent: true`
-    # with a 308, not a 301, so the method and body survive the hop.
-    # The backend is never reached: the middleware redirects first.
-    seerr-legacy-redirect:
-      enabled: true
-      annotations:
-        traefik.ingress.kubernetes.io/router.middlewares: jellyfin-seerr-legacy-redirect@kubernetescrd
-      hosts:
-        - host: &seerrLegacyHost jellyseerr.msng.to
-          paths:
-            - path: /
-              pathType: Prefix
-              service:
-                identifier: seerr
-                port: http
-      tls:
-        - hosts:
-            - *seerrLegacyHost
     qbittorrent:
       enabled: true
       hosts:
@@ -1194,41 +1087,6 @@ app-template:
         configarr:
           arr-backup-settings:
             - path: /project
-    seerr-data:
-      accessMode: ReadWriteOnce
-      type: persistentVolumeClaim
-      # As of 2025-07-22 this was using 7.4MB
-      size: 1Gi
-      storageClass: longhorn
-      labels:
-        recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/backup: "enabled"
-      advancedMounts:
-        seerr:
-          seerr:
-            - path: /app/config
-    # Seerr's file logs can't be turned off; keep them off the PVC. Its
-    # in-app log viewer reads these, so it only shows the current pod's logs.
-    seerr-logs:
-      type: emptyDir
-      advancedMounts:
-        seerr:
-          seerr:
-            - path: /app/config/logs
-    seerr-cache:
-      accessMode: ReadWriteOnce
-      type: persistentVolumeClaim
-      # As of 2025-10-27 this was using 165MB
-      # As of 2026-06-03 this was using 897MB
-      size: 5Gi
-      storageClass: longhorn
-      labels:
-        recurring-job.longhorn.io/source: "enabled"
-        recurring-job-group.longhorn.io/ephemeral: "enabled"
-      advancedMounts:
-        seerr:
-          seerr:
-            - path: /app/config/cache
     prowlarr-data:
       accessMode: ReadWriteOnce
       type: persistentVolumeClaim
@@ -1344,11 +1202,10 @@ app-template:
   secrets:
     # This autogenerated secret is used wherever environment variables and configuration files allow, but still need to manually be setup with the following:
     # - prowlarr: add apps for sonarr and radarr
-    # - seerr: add sonarr, radarr, and jellyfin API keys
     api-keys:
       forceRename: api-keys
       annotations:
-        secret-generator.v1.mittwald.de/autogenerate: SONARR_API_KEY,RADARR_API_KEY,PROWLARR_API_KEY,SEERR_API_KEY
+        secret-generator.v1.mittwald.de/autogenerate: SONARR_API_KEY,RADARR_API_KEY,PROWLARR_API_KEY
         secret-generator.v1.mittwald.de/encoding: hex
         # Arr apps use 32 hex characters for their own autogenerated API keys.
         # If you use a different length, Radarr errors out (and possibly others do too)

@@ -8,7 +8,6 @@ misconfigurations:
       - Deployment/jellyfin/jellyfin-debug.yaml
       - Deployment/jellyfin/jellyfin-downloader.yaml
       - Deployment/jellyfin/jellyfin-main.yaml
-      - Deployment/jellyfin/jellyfin-seerr.yaml
       - Deployment/jellyfin/jellyfin-unpackerr.yaml
       - Job/jellyfin/jellyfin-qbittorrent-password-hash.yaml
   - id: HL-0009 # can run as root

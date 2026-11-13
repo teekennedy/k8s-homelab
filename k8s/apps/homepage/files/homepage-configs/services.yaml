@@ -35,9 +35,8 @@
         icon: sh-seerr.svg
         href: https://seerr.msng.to
         description: Request media
-        namespace: jellyfin
-        app: jellyfin
-        podSelector: "app.kubernetes.io/controller=seerr"
+        namespace: seerr
+        app: seerr
 - Apps:
     - Forgejo:
         icon: sh-forgejo.svg

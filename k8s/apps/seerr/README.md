@@ -78,6 +78,20 @@ Only the admin API key may name a user, and only the `jellyfin` namespace can
 reach the proxy. Its address is
 `http://seerr-api-user-proxy.seerr.svc.cluster.local`.
 
+### Jellyfin Enhanced
+
+The Jellyfin Enhanced plugin shows Seerr results in Jellyfin's search and
+recommendations, and requests from inside Jellyfin. It reaches Seerr through
+the X-Api-User proxy above, which files each request as the matching Seerr
+user (matched on the Jellyfin user ID). The plugin is configured in the
+Jellyfin dashboard, not in any chart:
+
+- **Seerr URL**: `http://seerr-api-user-proxy.seerr.svc.cluster.local`
+- **API key**: `kubectl -n seerr get secret seerr-api-key -o jsonpath='{.data.api-key}' | base64 -d`
+
+Keep the plugin's issue reporting and watchlist sync off: the proxy refuses
+those writes rather than make them as the owner.
+
 ## Storage
 
 | Volume | Contents | Backed up |

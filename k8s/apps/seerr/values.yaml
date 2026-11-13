@@ -60,9 +60,7 @@ seerr-chart:
 
   route:
     main:
-      # Off until the migration from the jellyfin chart's Seerr is done: its
-      # Ingress still serves seerr.msng.to.
-      enabled: false
+      enabled: true
       annotations:
         # external-dns selector; not read by the router.
         traefik.ingress.kubernetes.io/router.entrypoints: wspublic
