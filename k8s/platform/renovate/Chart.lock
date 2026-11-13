@@ -1,6 +1,6 @@
 dependencies:
 - name: renovate
   repository: oci://ghcr.io/renovatebot/charts
-  version: 46.430.0
-digest: sha256:1ae6668f3f1c36a40c9a4996fee009092e45ccd3f397c1f400400628a2a94309
-generated: "2026-11-13T03:25:45.619363622Z"
+  version: 46.430.1
+digest: sha256:6834842891bd72375b41862d6370cbfcd86669477c5c8e586a14903b369a7467
+generated: "2026-11-13T04:26:31.538682769Z"
