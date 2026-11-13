@@ -203,7 +203,7 @@ argo-cd:
     # via `source.plugin.name: helmfile`.
     extraContainers:
       - name: cmp-helmfile
-        image: ghcr.io/helmfile/helmfile:v1.8.3@sha256:4b48dff9278362abea796067eea5b8f9682d101431403a7de50ca4fab82265f4
+        image: ghcr.io/helmfile/helmfile:v1.8.4@sha256:ccaa1854dffc789617e13dde016144e7e164016933e7d20ec6786c6f8a342681
         imagePullPolicy: IfNotPresent
         command:
           - /var/run/argocd/argocd-cmp-server
