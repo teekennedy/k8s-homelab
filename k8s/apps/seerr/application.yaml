@@ -22,6 +22,12 @@ spec:
       kind: Secret
       name: seerr-oidc-authelia
       namespace: seerr
+    # Filled in-cluster by reflector from jellyfin/api-keys.
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: seerr-arr-api-keys
+      namespace: seerr
     - jsonPointers:
         - /spec/volumeName
         - /spec/storageClassName
