@@ -22,14 +22,14 @@ const apply = () => {
   }
   provider.clientSecret = clientSecret;
 
-  // Missing on first start. Seerr fills in every default around what is
-  // written here.
-  let settings = {};
-  try {
-    settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+  // On first start, leave the file for Seerr to create: a stub here would
+  // make it treat the install as an upgrade. The provider is added on the next
+  // start instead.
+  if (!fs.existsSync(settingsPath)) {
+    console.log('[oidc-settings] no settings.json yet; skipping until restart');
+    return;
   }
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 
   settings.main = {
     ...settings.main,

@@ -1,6 +1,7 @@
 {{/*
-Labels for the resources this chart owns, as opposed to the ones rendered by
-the seerr-chart dependency.
+Labels for the resources this chart renders itself. They carry the same
+name/instance pair as the seerr-chart dependency's, so the whole release
+selects together.
 */}}
 {{- define "seerr.ownLabels" -}}
 app.kubernetes.io/name: {{ .Chart.Name }}

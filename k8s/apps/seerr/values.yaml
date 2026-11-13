@@ -1,20 +1,9 @@
 # Default values for seerr.
 
-route:
-  # Off until the migration from the jellyfin chart's Seerr is done: its
-  # Ingress still serves seerr.msng.to.
-  enabled: false
-  host: seerr.msng.to
-  # Previous hostnames, permanently redirected to `host`. Seerr was Jellyseerr
-  # until it was renamed upstream.
-  legacyHosts:
-    - jellyseerr.msng.to
-  # Selects the public entrypoint. Consumed by external-dns, not by the router.
-  entrypoint: wspublic
-  gateway:
-    name: traefik-gateway
-    namespace: kube-system
-    sectionName: websecurepublic
+# Previous hostnames, permanently redirected to the route's hostname while the
+# route is enabled. Seerr was Jellyseerr until it was renamed upstream.
+legacyHosts:
+  - jellyseerr.msng.to
 
 # Longhorn volumes, created as seerr-<name>. Logs are on an emptyDir instead:
 # Seerr also writes them to stdout, and its file logs can't be turned off.
@@ -50,6 +39,25 @@ seerr-chart:
     persistence:
       existingClaim: seerr-data
 
+  route:
+    main:
+      # Off until the migration from the jellyfin chart's Seerr is done: its
+      # Ingress still serves seerr.msng.to.
+      enabled: false
+      annotations:
+        # external-dns selector; not read by the router.
+        traefik.ingress.kubernetes.io/router.entrypoints: wspublic
+      parentRefs:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          name: traefik-gateway
+          namespace: kube-system
+          sectionName: websecurepublic
+      # Also in SEERR_APPLICATION_URL below and in the seerr client's
+      # redirect_uris in k8s/platform/auth-system.
+      hostnames:
+        - seerr.msng.to
+
   extraEnv:
     - name: TZ
       value: America/Denver
@@ -66,6 +74,7 @@ seerr-chart:
     # written into settings.json by files/oidc-settings.mjs on every start.
     - name: NODE_OPTIONS
       value: --import=/oidc-settings/oidc-settings.mjs
+    # Must match the route's hostname and the Authelia client's redirect_uris.
     - name: SEERR_APPLICATION_URL
       value: https://seerr.msng.to
     # The client secret is added from SEERR_OIDC_CLIENT_SECRET.

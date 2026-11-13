@@ -1,0 +1,30 @@
+{{- $route := index .Values "seerr-chart" "route" "main" }}
+{{- if $route.enabled }}
+{{- range .Values.legacyHosts }}
+---
+# Permanently redirects a previous hostname to the route's first hostname,
+# keeping the path. 308 rather than 301 so the method and body survive the hop.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $.Release.Name }}-redirect-{{ . | replace "." "-" }}
+  namespace: {{ $.Release.Namespace }}
+  {{- with $route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "seerr.ownLabels" $ | nindent 4 }}
+spec:
+  parentRefs:
+    {{- toYaml $route.parentRefs | nindent 4 }}
+  hostnames:
+    - {{ . | quote }}
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            hostname: {{ first $route.hostnames | quote }}
+            statusCode: 308
+{{- end }}
+{{- end }}

@@ -16,10 +16,16 @@ connections, notifications, and users' permissions are all edited in the UI.
 Use FQDNs (`*.jellyfin.svc.cluster.local`) for in-cluster hosts. Seerr's DNS
 cache ignores the pod's search domains.
 
+`settings.json` holds every integration secret in clear text (the Radarr,
+Sonarr, and Jellyfin API keys, and the OIDC client secret below), and Seerr
+copies it to `settings.old.json` on start. Both are in the volume's Longhorn
+backups.
+
 Two things are declared here:
 
 - **API key**: the `API_KEY` env var, from the generated `seerr-api-key`
-  Secret, overrides the key in `settings.json`.
+  Secret, overrides the key in `settings.json`. That Secret was seeded with the
+  old Seerr's key at migration, so existing clients kept working.
 - **OIDC**: see below.
 
 ## Auth
@@ -42,7 +48,8 @@ edit them. The upstream chart takes no init containers either, so
 `NODE_OPTIONS=--import` and writes the provider from `SEERR_OIDC_PROVIDER` (in
 `values.yaml`) into `settings.json` before Seerr reads it. That runs on every
 start, so the chart always wins over hand edits to the provider, the OIDC
-login toggle, or the application URL.
+login toggle, or the application URL. On a fresh install it waits for Seerr to
+create `settings.json`, so OIDC appears after the second start.
 
 `newUserLogin` is off. An account created through OIDC would be a new local
 account with no link to the user's Jellyfin account. Existing users link

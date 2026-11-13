@@ -313,6 +313,10 @@ releases:
   - name: seerr
     inherit:
       - template: apps
+    # Replaces the template's values list to add the helmfile-templated file.
+    values:
+      - k8s/apps/seerr/values.yaml
+      - k8s/apps/seerr/values.yaml.gotmpl
     needs:
       - cert-system/cert-system
       - reflector/reflector
