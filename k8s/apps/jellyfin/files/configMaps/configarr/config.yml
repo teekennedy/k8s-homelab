@@ -45,7 +45,8 @@ sonarr:
       - template: 20e0fc959f1f1704bed501f23bdae76f # [Anime] Remux-1080p
         source: TRASH
 
-    # configarr deletes root folders missing from this list. Anime has its own,
+    # configarr removes root folders missing from this list from Sonarr's
+    # settings (the folders and files stay on disk). Anime has its own,
     # Seerr's anime root folder, so Jellyfin can give it its own library. The
     # folders are created by the arrs pod's media-folders init container.
     root_folders:
@@ -84,6 +85,11 @@ radarr:
       enabled: true
       # ignore: # optional
       #   - some-cf
+
+    # Removed from Radarr's settings if missing from this list (the folders
+    # and files stay on disk).
+    root_folders:
+      - /data/media/movies
 
     # Media Naming Configuration
     media_naming:
