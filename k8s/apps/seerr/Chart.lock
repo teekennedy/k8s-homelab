@@ -1,0 +1,6 @@
+dependencies:
+- name: seerr-chart
+  repository: oci://ghcr.io/snapetech-org/seerrng
+  version: 1.0.159
+digest: sha256:185de1b306fb1dadfe30629bde46ef1db19fb0931d49691d12f821080476e466
+generated: "2026-11-12T20:02:18.968433-07:00"

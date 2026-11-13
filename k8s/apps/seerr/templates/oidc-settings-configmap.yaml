@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-oidc-settings
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "seerr.ownLabels" . | nindent 4 }}
+data:
+  oidc-settings.mjs: |
+    {{- .Files.Get "files/oidc-settings.mjs" | nindent 4 }}

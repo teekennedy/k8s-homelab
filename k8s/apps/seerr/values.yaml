@@ -1,0 +1,119 @@
+# Default values for seerr.
+
+route:
+  # Off until the migration from the jellyfin chart's Seerr is done: its
+  # Ingress still serves seerr.msng.to.
+  enabled: false
+  host: seerr.msng.to
+  # Previous hostnames, permanently redirected to `host`. Seerr was Jellyseerr
+  # until it was renamed upstream.
+  legacyHosts:
+    - jellyseerr.msng.to
+  # Selects the public entrypoint. Consumed by external-dns, not by the router.
+  entrypoint: wspublic
+  gateway:
+    name: traefik-gateway
+    namespace: kube-system
+    sectionName: websecurepublic
+
+# Longhorn volumes, created as seerr-<name>. Logs are on an emptyDir instead:
+# Seerr also writes them to stdout, and its file logs can't be turned off.
+persistence:
+  # settings.json and the SQLite database.
+  data:
+    # As of 2026-11-12 Seerr used 5MB here.
+    size: 1Gi
+    storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/backup: "enabled"
+  # Image cache, refetched on demand.
+  cache:
+    # As of 2026-11-12 this was using 470MB.
+    size: 5Gi
+    storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/ephemeral: "enabled"
+
+# https://github.com/snapetech-org/seerrng/tree/main/charts/seerr-chart
+seerr-chart:
+  # Names everything `seerr` rather than `seerr-seerr-chart`.
+  nameOverride: seerr
+
+  image:
+    registry: ghcr.io
+    repository: snapetech-org/seerrng
+    tag: v3.72.32@sha256:24141e2b68529e6490d437c10341cf2c38c06c4634abc5de5da5ce1bef46f561
+
+  config:
+    persistence:
+      existingClaim: seerr-data
+
+  extraEnv:
+    - name: TZ
+      value: America/Denver
+    - name: API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: seerr-api-key
+          key: api-key
+    # Traefik's pods. Without this Seerr ignores X-Forwarded-For and sees every
+    # client as the proxy.
+    - name: SEERR_TRUSTED_PROXIES
+      value: 10.42.0.0/16
+    # Sign-in through Authelia (client `seerr` in k8s/platform/auth-system),
+    # written into settings.json by files/oidc-settings.mjs on every start.
+    - name: NODE_OPTIONS
+      value: --import=/oidc-settings/oidc-settings.mjs
+    - name: SEERR_APPLICATION_URL
+      value: https://seerr.msng.to
+    # The client secret is added from SEERR_OIDC_CLIENT_SECRET.
+    #
+    # newUserLogin is off: an account created through OIDC would not be linked
+    # to the user's Jellyfin account. Existing users link Authelia from
+    # Profile → Settings → Linked Accounts instead.
+    - name: SEERR_OIDC_PROVIDER
+      value: |-
+        {
+          "slug": "authelia",
+          "name": "Authelia",
+          "issuerUrl": "https://authelia.msng.to",
+          "clientId": "seerr",
+          "scopes": "openid profile email",
+          "newUserLogin": false
+        }
+    - name: SEERR_OIDC_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: seerr-oidc-authelia
+          key: client-secret
+    # authelia.msng.to resolves to the LAN gateway, and Seerr refuses private
+    # addresses for OIDC endpoints by default.
+    - name: OIDC_ALLOW_PRIVATE_ADDRESSES
+      value: "true"
+
+  volumes:
+    - name: cache
+      persistentVolumeClaim:
+        claimName: seerr-cache
+    - name: logs
+      emptyDir: {}
+    - name: oidc-settings
+      configMap:
+        name: seerr-oidc-settings
+  volumeMounts:
+    - name: cache
+      mountPath: /app/config/cache
+    - name: logs
+      mountPath: /app/config/logs
+    - name: oidc-settings
+      mountPath: /oidc-settings
+      readOnly: true
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 400Mi
+    limits:
+      memory: 800Mi

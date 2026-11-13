@@ -310,6 +310,14 @@ releases:
       - s3-proxy/s3-proxy
       - secret-system/secret-system
 
+  - name: seerr
+    inherit:
+      - template: apps
+    needs:
+      - cert-system/cert-system
+      - reflector/reflector
+      - secret-system/secret-system
+
   - name: spoolman
     inherit:
       - template: apps

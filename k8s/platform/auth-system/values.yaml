@@ -81,6 +81,7 @@ oidcClientSecrets:
     copyparty: copyparty/copyparty-oauth2-proxy-secrets
     freshrss: freshrss/freshrss-oidc-authelia
     romm: romm/romm-oidc-authelia
+    seerr: seerr/seerr-oidc-authelia
   # The python-flavoured tag ships an interpreter, which must match
   # files/oidc-client-secrets/.python-version: uv never downloads one.
   image:
@@ -400,6 +401,17 @@ authelia:
                 subject: "group:full-admin"
               - policy: one_factor
                 subject: "group:romm-users"
+          # Seerr (k8s/apps/seerr). Users only request media, so one_factor is
+          # enough for them; admins approve requests and manage settings.
+          seerr:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:seerr-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
+              - policy: one_factor
+                subject: "group:seerr-users"
           # Longhorn UI (k8s/foundation/longhorn-system). Can delete volumes,
           # replicas and backups, so admins only, always two_factor.
           longhorn:
@@ -685,6 +697,30 @@ authelia:
               - code
             redirect_uris:
               - https://romm.msng.to/api/oauth/openid
+          # Seerr (k8s/apps/seerr), via SeerrNG's built-in OIDC (openid-client),
+          # which sends PKCE (S256) and authenticates with client_secret_post.
+          # The redirect URI is the page sign-in started from: /login, or the
+          # linked-accounts page when a signed-in user links Authelia.
+          - client_id: seerr
+            client_name: Seerr
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/seerr
+            token_endpoint_auth_method: client_secret_post
+            authorization_policy: seerr
+            consent_mode: implicit
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://seerr.msng.to/login
+              - https://seerr.msng.to/profile/settings/linked-accounts
         jwks:
           - key_id: RS256
             algorithm: RS256
@@ -771,6 +807,8 @@ authelia:
             path: oauth2-proxy-internal
           - key: romm
             path: romm
+          - key: seerr
+            path: seerr
       smtp-creds:
         items:
           - key: password

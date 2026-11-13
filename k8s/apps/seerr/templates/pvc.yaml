@@ -1,0 +1,20 @@
+{{- range $name, $pvc := .Values.persistence }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "seerr.ownLabels" $ | nindent 4 }}
+    {{- with $pvc.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ $pvc.storageClass }}
+  resources:
+    requests:
+      storage: {{ $pvc.size }}
+{{- end }}

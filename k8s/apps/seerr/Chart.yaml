@@ -1,0 +1,13 @@
+apiVersion: v2
+name: seerr
+description: Seerr media request manager, with Authelia OIDC sign-in.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the SeerrNG image tag deployed by this chart (values.yaml).
+appVersion: "v3.72.32"
+dependencies:
+  # SeerrNG, a Seerr fork. It adds OIDC sign-in, which is why it is used here.
+  - name: seerr-chart
+    version: 1.0.159
+    repository: oci://ghcr.io/snapetech-org/seerrng

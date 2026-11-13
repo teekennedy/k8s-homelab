@@ -59,6 +59,7 @@ _productionApps: {
 			"openhands": true
 			"redteam":   true
 			"romm":      true
+			"seerr":     true
 			"spoolman":  true
 			"syncthing": true
 			"terraria":  true
