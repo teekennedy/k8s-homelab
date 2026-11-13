@@ -26,12 +26,6 @@ class FakeSeerr(BaseHTTPRequestHandler):
     def _handle(self):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length).decode() if length else ""
-        if self.command == "GET" and self.path == "/api/v1/auth/me":
-            if self.headers.get("Cookie") == SESSION:
-                self._reply(200, {"id": 7})
-            else:
-                self._reply(401, {"message": "Please sign in."})
-            return
         if self.command == "GET" and self.path.startswith("/api/v1/request/"):
             request_id = int(self.path.rsplit("/", 1)[1])
             self._reply(200, {"id": request_id, "requestedBy": {"id": 7}})
@@ -112,8 +106,8 @@ def cleanups(monkeypatch):
     """withdraw.run calls, recorded instead of made."""
     recorded = SimpleNamespace(calls=[], done=threading.Event())
 
-    def record(services, request, actor_id, **kwargs):
-        recorded.calls.append((request["id"], actor_id))
+    def record(services, request, **kwargs):
+        recorded.calls.append(request["id"])
         recorded.done.set()
 
     monkeypatch.setattr(proxy.withdraw, "run", record)
@@ -246,13 +240,7 @@ def test_a_withdrawal_is_forwarded_then_cleaned_up(cleanup_port, cleanups, path)
     assert withdraw_request(cleanup_port, path, {"Cookie": SESSION}) == 204
     assert FakeSeerr.received == [{"method": "DELETE", "path": path}]
     assert cleanups.done.wait(5)
-    assert cleanups.calls == [(5, 7)]
-
-
-def test_the_withdrawer_is_unknown_without_credentials(cleanup_port, cleanups):
-    assert withdraw_request(cleanup_port, "/api/v1/request/5/status") == 204
-    assert cleanups.done.wait(5)
-    assert cleanups.calls == [(5, None)]
+    assert cleanups.calls == [5]
 
 
 def test_a_refused_withdrawal_is_not_cleaned_up(cleanup_port, cleanups):
@@ -278,12 +266,22 @@ def test_withdrawals_pass_through_when_cleanup_is_off(proxy_port, cleanups):
     assert not cleanups.done.wait(0.3)
 
 
-def test_config_enables_cleanup_only_with_radarr():
+def test_config_enables_cleanup_per_service():
     base = {"SEERR_URL": "http://seerr", "SEERR_API_KEY": "k"}
     assert not proxy.Config.from_env(base).cleans_up
     assert not proxy.Config.from_env({**base, "RADARR_URL": "http://radarr"}).cleans_up
-    config = proxy.Config.from_env(
+    movies = proxy.Config.from_env(
         {**base, "RADARR_URL": "http://radarr:7878", "RADARR_API_KEY": "r"}
     )
-    assert config.cleans_up
-    assert config.jellyfin_key is None
+    assert movies.cleans_up_movies and not movies.cleans_up_shows
+    assert movies.jellyfin_key is None
+    shows = proxy.Config.from_env(
+        {
+            **base,
+            "SONARR_URL": "http://sonarr:8989",
+            "SONARR_API_KEY": "s",
+            "SONARR_SERVER_ID": "2",
+        }
+    )
+    assert shows.cleans_up and shows.cleans_up_shows and not shows.cleans_up_movies
+    assert shows.sonarr_server_id == 2

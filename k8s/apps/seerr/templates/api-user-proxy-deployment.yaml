@@ -66,7 +66,8 @@ spec:
               value: "8080"
             {{- with $v.withdrawCleanup }}
             {{- if .enabled }}
-            # Removes a withdrawn movie from Radarr. See files/api-user-proxy/withdraw.py.
+            # Removes withdrawn movies from Radarr and episodes from Sonarr.
+            # See files/api-user-proxy/withdraw.py.
             - name: RADARR_URL
               value: {{ .radarr.url | quote }}
             # Radarr's ID among SeerrNG's Radarr servers (Settings → Services).
@@ -77,9 +78,19 @@ spec:
                 secretKeyRef:
                   name: {{ $.Release.Name }}-arr-api-keys
                   key: RADARR_API_KEY
+            - name: SONARR_URL
+              value: {{ .sonarr.url | quote }}
+            # Sonarr's ID among SeerrNG's Sonarr servers (Settings → Services).
+            - name: SONARR_SERVER_ID
+              value: {{ .sonarr.seerrServerId | quote }}
+            - name: SONARR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Release.Name }}-arr-api-keys
+                  key: SONARR_API_KEY
             - name: JELLYFIN_URL
               value: {{ .jellyfin.url | quote }}
-            # Created by hand (see README); until then, movies with a file are kept.
+            # Created by hand (see README); until then, downloaded media is kept.
             - name: JELLYFIN_API_KEY
               valueFrom:
                 secretKeyRef:

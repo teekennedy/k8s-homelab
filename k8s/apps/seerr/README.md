@@ -80,39 +80,63 @@ Traefik, for the withdrawals below) can reach the proxy. Its address is
 
 ### Withdrawn requests
 
-Users can withdraw their own requests (Requests page in the full UI, or Lumen),
-but SeerrNG only cancels downloads still in progress; the movie stays in
-Radarr. The same proxy fixes that. `templates/withdrawal-httproute.yaml` routes
-`DELETE /api/v1/request/*` from the browser to it, and it forwards the call
-unchanged. If SeerrNG accepts the withdrawal (204), the proxy runs SeerrNG's
-"Delete from Library" as the owner, but only when all of these hold
-(`files/api-user-proxy/withdraw.py`):
+Users can withdraw requests from the Requests page in the full UI, or Lumen:
+their own, or anyone's if they may manage requests. SeerrNG only cancels
+downloads still in progress, so whatever was already downloaded stays in
+Radarr or Sonarr. The same proxy fixes that.
+`templates/withdrawal-httproute.yaml` routes `DELETE /api/v1/request/*` from
+the browser to it, and it forwards the call unchanged. If SeerrNG accepts the
+withdrawal (204), the proxy cleans up after it (`files/api-user-proxy/withdraw.py`).
+Only non-4K requests are cleaned up, and a request someone declined doesn't
+count as wanting anything.
 
-- the withdrawing user made the request, and it is a non-4K movie request;
+A **movie** is deleted with SeerrNG's "Delete from Library", run as the owner,
+when all of these hold:
+
 - no other request for the movie remains;
 - every copy is in the one Radarr configured here, added no earlier than the
   request (so the request is what brought it in);
-- if Radarr has a file, no other Jellyfin user has played any of it.
+- if Radarr has a file, no Jellyfin user other than the requester has played
+  any of it.
 
-Anything it can't verify keeps the movie. Note that SeerrNG's own wording for
-the button ("Delete", "permanently remove this entry and its history") says
-nothing about the movie, so users should know that deleting a request they no
-longer want also deletes the movie when nobody else wants it.
+A **show** is trimmed to what the remaining requests still cover, if the
+withdrawn request was approved. Its episodes that no other request covers are
+unmonitored in Sonarr and their files deleted, except:
+
+- episodes whose file is older than the request;
+- seasons a Jellyfin user other than the requester has played any episode of
+  (without the Jellyfin key below, every season with a file);
+- shows where SeerrNG maps its season numbers onto different Sonarr ones.
+
+A season left with no monitored episodes is unmonitored as well. When no
+request remains, Sonarr added the show no earlier than the request, and no
+season had to be kept, the whole show is deleted with "Delete from Library"
+instead. A show that was in Sonarr before its requests is only ever trimmed,
+so it can be left in Sonarr with nothing monitored.
+
+Anything it can't verify is kept. Note that SeerrNG's own wording for the
+button ("Delete", "permanently remove this entry and its history") says
+nothing about the media, so users should know that deleting a request they no
+longer want also deletes what nobody else wants.
 
 Each withdrawal logs one line,
-`withdrawn request <id> (tmdb <id>): removed|kept, <reason>`:
+`withdrawn request <id> (<type>, tmdb <id>): removed|trimmed|kept, <reason>`:
 
 ```sh
 kubectl -n seerr logs deploy/seerr-api-user-proxy | grep withdrawn
 ```
 
-Radarr's recycle bin (`/data/media/.recycle/radarr`, 14 days, set by configarr
-in the jellyfin chart) keeps deleted files recoverable for a while.
+Radarr's and Sonarr's recycle bins (`/data/media/.recycle/{radarr,sonarr}`,
+14 days, set by the configarr CronJob's `arr-backup-settings` container in the
+jellyfin chart) keep deleted files recoverable for a while. To restore one,
+re-add the title in Radarr or Sonarr without searching, move its folder back
+into the library, and rescan. The NAS keeps no snapshots, so after 14 days a
+deletion is permanent.
 
-Radarr's key comes from `jellyfin/api-keys`, reflected as `seerr-arr-api-keys`.
-The Jellyfin key for the play check has to be created by hand, because Jellyfin
-keeps API keys in its own database. Until it exists, movies that have a file
-are always kept.
+The Radarr and Sonarr keys come from `jellyfin/api-keys`, reflected as
+`seerr-arr-api-keys`. The Jellyfin key for the play check has to be created by
+hand, because Jellyfin keeps API keys in its own database. Until it exists,
+downloaded media is kept.
 
 1. Jellyfin → Dashboard → API Keys → **+**, name it `seerr-withdrawals`.
 2. ```sh

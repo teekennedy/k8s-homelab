@@ -1,7 +1,7 @@
 {{- $route := index .Values "seerr-chart" "route" "main" }}
 {{- if and $route.enabled .Values.apiUserProxy.enabled .Values.apiUserProxy.withdrawCleanup.enabled }}
-# Sends users' request withdrawals through the proxy, which forwards them to
-# SeerrNG unchanged and then may remove the movie from Radarr. More specific
+# Sends request withdrawals through the proxy, which forwards them to SeerrNG
+# unchanged and then may remove the media from Radarr or Sonarr. More specific
 # than the chart's `/` rule, so it takes precedence for these calls only.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
