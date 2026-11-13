@@ -23,6 +23,22 @@ After deploying the helm chart, you'll need to do some manual steps to setup use
 - Set `InactiveSessionThreshold` to `60` minutes in Jellyfin's `/data/config/config.xml` (the setting cannot be edited via the UI). It defaults to `0`,
   which disables paused-session cleanup. This could lead to 'stuck' sessions that block reboot indefinitely.
 
+## Anime
+
+Sonarr handles anime and other shows alike. configarr adds TRaSH's
+`[Anime] Remux-1080p` quality profile and a `/data/media/anime` root folder.
+Seerr recognizes anime by TMDB's "anime" keyword and sends it to the same
+Sonarr with its anime profile, root folder and series type. The rest is set by
+hand:
+
+- Seerr → Settings → Services → Sonarr: set the anime quality profile to
+  `[Anime] Remux-1080p` and the anime root folder to `/data/media/anime`.
+- Seerr → Settings → Metadata: set Anime to TVDB. Sonarr numbers anime
+  seasons by TVDB, so requested seasons then match what it downloads.
+- Jellyfin: an **Anime** library (content type Shows) on `/media/anime`.
+- Existing anime: in Sonarr's series editor, change the root folder (moving
+  the files) and the quality profile, then rescan both Jellyfin libraries.
+
 ## Backups
 
 Apps that can back themselves up write their backups to the NAS, one static

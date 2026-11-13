@@ -223,14 +223,20 @@ app-template:
           runAsUser: 1200
           runAsGroup: *gid
       initContainers:
-        # Radarr's and Sonarr's recycle bins (files/arr-backup-settings): they
-        # refuse a folder that doesn't exist. Same share as the library, so
-        # deleting is a move rather than a copy.
-        recycle-bin:
+        # Folders the arrs refuse to use unless they exist: Sonarr's anime root
+        # folder (configarr), and Radarr's and Sonarr's recycle bins
+        # (files/arr-backup-settings), which are on the same share as the
+        # library, so deleting is a move rather than a copy.
+        media-folders:
           image:
             repository: alpine
             tag: "3.24.4@sha256:93b41ef40b1677fce8fcc64ff4af09daddfacf5040afde618bc46c1e2d1cc7d4"
-          command: ["mkdir", "-p", "/data/media/.recycle/radarr", "/data/media/.recycle/sonarr"]
+          command:
+            - mkdir
+            - -p
+            - /data/media/anime
+            - /data/media/.recycle/radarr
+            - /data/media/.recycle/sonarr
           resources:
             requests:
               cpu: 10m
@@ -929,7 +935,7 @@ app-template:
               readOnly: true
               subPath: media
         arrs:
-          recycle-bin:
+          media-folders:
             - path: /data
           radarr:
             - path: /data

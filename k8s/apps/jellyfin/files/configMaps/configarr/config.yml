@@ -40,6 +40,17 @@ sonarr:
         source: TRASH
       - template: 9d142234e45d6143785ac55f5a9e8dc9 # Web 1080p alternative (what I'd call "flexible")
         source: TRASH
+      # Seerr's anime quality profile. Its custom format scores apply only to
+      # this profile, so other shows are unaffected.
+      - template: 20e0fc959f1f1704bed501f23bdae76f # [Anime] Remux-1080p
+        source: TRASH
+
+    # configarr deletes root folders missing from this list. Anime has its own,
+    # Seerr's anime root folder, so Jellyfin can give it its own library. The
+    # folders are created by the arrs pod's media-folders init container.
+    root_folders:
+      - /data/media/shows
+      - /data/media/anime
 
     # Delete everything not managed by configarr
     delete_unmanaged_custom_formats:
