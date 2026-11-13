@@ -1,10 +1,15 @@
+{{- /*
+Modules preloaded into the Seerr server process through NODE_OPTIONS.
+*/}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-oidc-settings
+  name: {{ .Release.Name }}-preload
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "seerr.ownLabels" . | nindent 4 }}
 data:
-  oidc-settings.mjs: |
-    {{- .Files.Get "files/oidc-settings.mjs" | nindent 4 }}
+  {{- range list "oidc-settings.mjs" "rate-limits.cjs" }}
+  {{ . }}: |
+    {{- $.Files.Get (printf "files/%s" .) | nindent 4 }}
+  {{- end }}

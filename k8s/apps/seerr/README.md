@@ -135,6 +135,21 @@ Jellyfin dashboard, not in any chart:
 Keep the plugin's issue reporting and watchlist sync off: the proxy refuses
 those writes rather than make them as the owner.
 
+## Rate limits
+
+SeerrNG hardcodes its API rate limits, and some are too low for ordinary
+browsing. Every title card on a page fetches that title's details, and those
+lookups share a budget of 60 a minute per user, so a few pages of search
+results or Discover shelves end in 429s, which the UI shows as "Movie details
+could not be fetched" or "please try again later". Search allows 30 a minute.
+Jellyfin Enhanced's calls all count against the owner.
+
+`files/rate-limits.cjs`, preloaded with `NODE_OPTIONS=--require` like the OIDC
+settings, multiplies every limit with a window of a minute or less by
+`SEERR_RATE_LIMIT_SCALE` (10). Sign-in, password, and upload limits, which use
+longer windows, are unchanged. The current limit is in each response's
+`RateLimit-Policy` header.
+
 ## Storage
 
 | Volume | Contents | Backed up |

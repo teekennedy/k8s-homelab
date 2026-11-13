@@ -1,5 +1,5 @@
 # Values only helmfile can compute; plain Helm ignores this file.
 seerr-chart:
   podAnnotations:
-    # The preload only runs at process start, so restart Seerr when it changes.
-    checksum/oidc-settings: {{ readFile "files/oidc-settings.mjs" | sha256sum }}
+    # Preloads only run at process start, so restart Seerr when one changes.
+    checksum/preload: {{ print (readFile "files/oidc-settings.mjs") (readFile "files/rate-limits.cjs") | sha256sum }}

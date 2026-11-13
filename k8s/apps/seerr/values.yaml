@@ -99,10 +99,16 @@ seerr-chart:
     # client as the proxy.
     - name: SEERR_TRUSTED_PROXIES
       value: 10.42.0.0/16
-    # Sign-in through Authelia (client `seerr` in k8s/platform/auth-system),
-    # written into settings.json by files/oidc-settings.mjs on every start.
+    # files/oidc-settings.mjs writes the Authelia sign-in (client `seerr` in
+    # k8s/platform/auth-system) into settings.json on every start, and
+    # files/rate-limits.cjs raises Seerr's per-minute API rate limits.
     - name: NODE_OPTIONS
-      value: --import=/oidc-settings/oidc-settings.mjs
+      value: --import=/preload/oidc-settings.mjs --require=/preload/rate-limits.cjs
+    # Seerr allows each user 60 title lookups a minute, and every title card
+    # on a page makes one, so normal browsing hits 429s. Jellyfin Enhanced's
+    # calls all count against the owner. Sign-in limits are not scaled.
+    - name: SEERR_RATE_LIMIT_SCALE
+      value: "10"
     # Must match the route's hostname and the Authelia client's redirect_uris.
     - name: SEERR_APPLICATION_URL
       value: https://seerr.msng.to
@@ -137,16 +143,16 @@ seerr-chart:
         claimName: seerr-cache
     - name: logs
       emptyDir: {}
-    - name: oidc-settings
+    - name: preload
       configMap:
-        name: seerr-oidc-settings
+        name: seerr-preload
   volumeMounts:
     - name: cache
       mountPath: /app/config/cache
     - name: logs
       mountPath: /app/config/logs
-    - name: oidc-settings
-      mountPath: /oidc-settings
+    - name: preload
+      mountPath: /preload
       readOnly: true
 
   resources:
@@ -154,4 +160,5 @@ seerr-chart:
       cpu: 500m
       memory: 400Mi
     limits:
-      memory: 800Mi
+      # Peaked at 690Mi in Nov 2026, before the rate limits were raised.
+      memory: 1Gi
