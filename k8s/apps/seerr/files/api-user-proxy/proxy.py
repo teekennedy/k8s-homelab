@@ -19,6 +19,11 @@ through untouched. Calls with it are rewritten to use SeerrNG's own
 - Any other write is refused rather than made as the owner.
 - Other reads are made as the owner. They are not per-user.
 
+Users read from GET /user and /user/<id>, with or without the header, have
+their permissions cut to the bits that fit a 32-bit signed integer, which is
+all of Seerr's. SeerrNG added higher ones, and the plugin cannot parse a list
+holding any of them, so it finds no users at all.
+
 It also receives request withdrawals from the browser (DELETE /request/<id>
 and /request/<id>/status). Those are forwarded unchanged, and once SeerrNG
 accepts one, withdraw.py may remove the media from Radarr or Sonarr.
@@ -76,6 +81,10 @@ REQUEST_PERMISSIONS = {
 API = "/api/v1"
 REQUEST_ACTION = re.compile(rf"^{API}/request/\d+/(approve|decline)/?$")
 WITHDRAWAL = re.compile(rf"^{API}/request/(\d+)(?:/status)?/?$")
+USERS = re.compile(rf"^{API}/user(?:/\d+)?/?$")
+
+# The plugin parses permissions as a C# int.
+INT32_PERMISSIONS = 0x7FFFFFFF
 
 # Headers that describe one hop, not the message (RFC 9110 section 7.6.1).
 HOP_BY_HOP = {
@@ -157,6 +166,24 @@ def plan(
         return Forward(target, body)
 
     return Deny(403, "This proxy only makes requests on a user's behalf.")
+
+
+def clamp_permissions(payload: bytes) -> bytes:
+    """A user, or a page of them, with only the permissions Seerr had."""
+    try:
+        document = json.loads(payload)
+    except ValueError:
+        return payload
+    users = document.get("results") if isinstance(document, dict) else None
+    if not isinstance(users, list):
+        users = [document]
+    changed = False
+    for user in users:
+        if isinstance(user, dict) and isinstance(user.get("permissions"), int):
+            clamped = user["permissions"] & INT32_PERMISSIONS
+            changed = changed or clamped != user["permissions"]
+            user["permissions"] = clamped
+    return json.dumps(document).encode() if changed else payload
 
 
 class UserCache:
@@ -302,6 +329,15 @@ def make_handler(config: Config, users: UserCache, services: withdraw.Services |
                 and k.lower() not in ("host", "content-length", "x-api-user")
             }
 
+            reads_users = self.command in ("GET", "HEAD") and USERS.match(
+                urllib.parse.urlsplit(target).path
+            )
+            if reads_users:
+                # Users are rewritten, which a compressed body would prevent.
+                headers = {
+                    k: v for k, v in headers.items() if k.lower() != "accept-encoding"
+                }
+
             api_user = self.headers.get("X-Api-User")
             if api_user is not None:
                 # Only the admin key may name a user, as in Seerr. Anything else
@@ -346,7 +382,7 @@ def make_handler(config: Config, users: UserCache, services: withdraw.Services |
 
             # SeerrNG accepts a withdrawal only from the requester or someone
             # who may manage requests.
-            status = self._forward(target, headers, body)
+            status = self._forward(target, headers, body, bool(reads_users))
             if withdrawn and status == 204:
                 threading.Thread(
                     target=withdraw.run,
@@ -376,7 +412,13 @@ def make_handler(config: Config, users: UserCache, services: withdraw.Services |
                 )
                 return None
 
-        def _forward(self, target: str, headers: dict[str, str], body: bytes) -> int:
+        def _forward(
+            self,
+            target: str,
+            headers: dict[str, str],
+            body: bytes,
+            reads_users: bool = False,
+        ) -> int:
             connection = upstream(config)
             try:
                 connection.request(self.command, target, body=body, headers=headers)
@@ -388,6 +430,8 @@ def make_handler(config: Config, users: UserCache, services: withdraw.Services |
                 return 502
             finally:
                 connection.close()
+            if reads_users and response.status == 200:
+                payload = clamp_permissions(payload)
             self.send_response(response.status, response.reason)
             for key, value in response.getheaders():
                 if key.lower() not in HOP_BY_HOP and key.lower() != "content-length":

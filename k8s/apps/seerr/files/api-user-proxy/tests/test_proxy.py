@@ -13,7 +13,12 @@ import pytest
 import proxy
 
 API_KEY = "admin-key"
-PERMISSIONS = {7: proxy.REQUEST, 8: proxy.MANAGE_REQUESTS}
+# User 9 has a permission only SeerrNG has, past what a 32-bit int holds.
+PERMISSIONS = {
+    7: proxy.REQUEST,
+    8: proxy.MANAGE_REQUESTS,
+    9: proxy.REQUEST_MOVIE | proxy.REQUEST_MUSIC,
+}
 SESSION = "connect.sid=user-7"
 
 
@@ -37,6 +42,17 @@ class FakeSeerr(BaseHTTPRequestHandler):
             self.send_response(403 if refused else 204)
             self.send_header("Content-Length", "0")
             self.end_headers()
+            return
+        if self.command == "GET" and self.path.startswith("/api/v1/user?"):
+            FakeSeerr.received.append(
+                {
+                    "method": "GET",
+                    "path": self.path,
+                    "headers": {k.lower(): v for k, v in self.headers.items()},
+                }
+            )
+            users = [{"id": i, "permissions": p} for i, p in PERMISSIONS.items()]
+            self._reply(200, {"pageInfo": {"results": len(users)}, "results": users})
             return
         if self.command == "GET" and self.path.startswith("/api/v1/user/"):
             user_id = int(self.path.rsplit("/", 1)[1])
@@ -285,3 +301,36 @@ def test_config_enables_cleanup_per_service():
     )
     assert shows.cleans_up and shows.cleans_up_shows and not shows.cleans_up_movies
     assert shows.sonarr_server_id == 2
+
+
+def test_listed_users_have_only_seerrs_permissions(proxy_port):
+    status, page = call(
+        proxy_port,
+        "GET",
+        "/api/v1/user?take=1000",
+        {"X-Api-Key": API_KEY, "Accept-Encoding": "gzip"},
+    )
+    assert status == 200
+    assert {u["id"]: u["permissions"] for u in page["results"]} == {
+        7: proxy.REQUEST,
+        8: proxy.MANAGE_REQUESTS,
+        9: proxy.REQUEST_MOVIE,
+    }
+    assert page["pageInfo"] == {"results": 3}
+    # Asked for uncompressed, so the body can be rewritten.
+    assert FakeSeerr.received[-1]["headers"]["accept-encoding"] == "identity"
+
+
+@pytest.mark.parametrize("headers", [{"X-Api-Key": API_KEY}, as_user(9)])
+def test_a_user_has_only_seerrs_permissions(proxy_port, headers):
+    status, user = call(proxy_port, "GET", "/api/v1/user/9", headers)
+    assert status == 200
+    assert user == {"id": 9, "permissions": proxy.REQUEST_MOVIE}
+
+
+def test_permission_checks_still_see_seerrngs_permissions(proxy_port):
+    status, seen = call(
+        proxy_port, "POST", "/api/v1/request", as_user(9), {"mediaType": "music"}
+    )
+    assert status == 201
+    assert json.loads(seen["body"])["userId"] == 9

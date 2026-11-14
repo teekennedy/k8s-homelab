@@ -159,6 +159,12 @@ Jellyfin dashboard, not in any chart:
 Keep the plugin's issue reporting and watchlist sync off: the proxy refuses
 those writes rather than make them as the owner.
 
+The plugin reads permissions as a 32-bit integer, and one user it can't parse
+makes it find no Seerr users at all ("Your Seerr account isn't linked yet").
+SeerrNG's music, book, comic, magazine, sports and adult permissions don't
+fit, so the proxy drops those bits from the users it returns. The plugin
+doesn't use them, and the proxy's own permission checks still see them.
+
 ## Rate limits
 
 SeerrNG hardcodes its API rate limits, and some are too low for ordinary
