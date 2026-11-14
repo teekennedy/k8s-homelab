@@ -489,17 +489,6 @@
       ]
     },
     {
-      "description": "qBittorrent tags are <qbt>_v<libtorrent>-ls<n>. Ignore the libtorrent version; the leading-digit anchor excludes the libtorrentv1- track.",
-      "matchDatasources": [
-        "docker"
-      ],
-      "sourceUrl": "https://github.com/qbittorrent/qBittorrent",
-      "matchPackageNames": [
-        "/^(?:gh|ls)cr\\.io/linuxserver/qbittorrent$/"
-      ],
-      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)_v\\d+\\.\\d+\\.\\d+-ls(?<revision>\\d+)$"
-    },
-    {
       "description": "Forgejo releases on codeberg link out to a separate release-notes markdown doc instead of inlining notes; point changelogUrl at that doc directly.",
       "matchPackageNames": [
         "forgejo/forgejo"
@@ -716,6 +705,18 @@
       ],
       "schedule": ["* 2-9 * * *"],
       "automergeSchedule": ["* 2-9 * * *"]
+    },
+    {
+      "description": "qBittorrent settings. Ignore the libtorrent version in tag. Do not automerge.",
+      "automerge": false,
+      "matchDatasources": [
+        "docker"
+      ],
+      "sourceUrl": "https://github.com/qbittorrent/qBittorrent",
+      "matchPackageNames": [
+        "/^(?:gh|ls)cr\\.io/linuxserver/qbittorrent$/"
+      ],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)_v\\d+\\.\\d+\\.\\d+-ls(?<revision>\\d+)$"
     }
   ]
 }
