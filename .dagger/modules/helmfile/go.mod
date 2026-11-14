@@ -13,7 +13,7 @@ require (
 	golang.org/x/sync v0.25.0
 )
 
-require go.yaml.in/yaml/v3 v3.0.6
+require go.yaml.in/yaml/v3 v3.0.4
 
 require (
 	github.com/99designs/gqlgen v0.17.89 // indirect
