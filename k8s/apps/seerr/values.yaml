@@ -69,7 +69,7 @@ seerr-chart:
   image:
     registry: ghcr.io
     repository: snapetech-org/seerrng
-    tag: v3.72.35@sha256:d875dd0041c0dcfdba624b5eda3286719cbf81e24966543cf70fdc358cf2292e
+    tag: v3.72.36@sha256:fdb30b7dc0f43ca2d427d30928859e6b9b0c22da07188b934d9b0bc585160a51
 
   config:
     persistence:
