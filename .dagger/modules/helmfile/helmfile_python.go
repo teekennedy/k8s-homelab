@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // pythonProjectFiles must be mounted next to a Python ConfigMap's scripts, so
