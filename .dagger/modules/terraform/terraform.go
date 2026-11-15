@@ -44,6 +44,13 @@ func terraformContainer(toolchain *dagger.Container) *dagger.Container {
 		WithMountedCache(tfPluginCache, dag.CacheVolume("homelab-tf-plugins"))
 }
 
+// tofu builds a tofu command line that runs without OpenTofu's own tracing.
+// Dagger sets OTEL_TRACES_EXPORTER=otlp in every exec, which makes tofu export
+// a span per module and provider install into the run's trace.
+func tofu(args ...string) []string {
+	return append([]string{"env", "-u", "OTEL_TRACES_EXPORTER", "tofu"}, args...)
+}
+
 // Modules returns every OpenTofu module under terraform/ — every directory
 // with a .terraform.lock.hcl — keyed by path.
 func (m *Terraform) Modules(
@@ -112,7 +119,7 @@ func (tm *TerraformModule) initialized(ctx context.Context) (*dagger.Container, 
 		WithMountedDirectory("/src", tm.Source).
 		WithWorkdir("/src/" + tm.Path).
 		WithExec([]string{"echo", "================ " + tm.name() + " ================"}).
-		WithExec([]string{"tofu", "init", "-backend=false", "-input=false"}).
+		WithExec(tofu("init", "-backend=false", "-input=false")).
 		Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("terraform module %s: init failed: %w", tm.Path, withExecOutput(err))
@@ -127,7 +134,7 @@ func (tm *TerraformModule) Validate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := initialized.WithExec([]string{"tofu", "validate"}).Sync(ctx); err != nil {
+	if _, err := initialized.WithExec(tofu("validate")).Sync(ctx); err != nil {
 		return fmt.Errorf("terraform module %s: validation failed: %w", tm.Path, withExecOutput(err))
 	}
 	return nil
@@ -148,7 +155,7 @@ func (tm *TerraformModule) Lock(ctx context.Context) (*dagger.Changeset, error) 
 	if err != nil {
 		return nil, err
 	}
-	args := []string{"tofu", "providers", "lock"}
+	args := tofu("providers", "lock")
 	for _, platform := range tm.Platforms {
 		args = append(args, "-platform="+platform)
 	}
@@ -175,7 +182,7 @@ func (m *Terraform) Format(
 	formatted := terraformContainer(m.Container).
 		WithMountedDirectory("/src", source).
 		WithWorkdir("/src").
-		WithExec([]string{"tofu", "fmt", "-recursive", "terraform"}).
+		WithExec(tofu("fmt", "-recursive", "terraform")).
 		Directory("/src")
 
 	return formatted.Changes(source)
