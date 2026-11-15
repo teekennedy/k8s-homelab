@@ -35,7 +35,7 @@ Quick start:
 
 1. Add the host to `flake.nix` in the `borgHosts` list
 2. Build and boot the installer ISO: `nix build .#nixosConfigurations.installIso.config.system.build.isoImage`
-3. Run `dagger api call nix host --name=<hostname> bootstrap --ip=<installer-ip> --sops-age-key=file:$HOME/.config/sops/age/keys.txt --password=env:HOST_PASSWORD --auto-apply`, commit, then `dagger api call nix host --name=<hostname> install --ip=<installer-ip> --sops-age-key=file:$HOME/.config/sops/age/keys.txt`
+3. Run `dagger api call nix host --name=<hostname> bootstrap --ip=<installer-ip> --sops-age-key=file:$HOME/.config/sops/age/keys.txt --password=env://HOST_PASSWORD --auto-apply`, commit, then `dagger api call nix host --name=<hostname> install --ip=<installer-ip> --sops-age-key=file:$HOME/.config/sops/age/keys.txt`
 
 Bootstrap generates the host's secrets, its sops configuration and its hardware report; install formats the disks and installs NixOS.
 

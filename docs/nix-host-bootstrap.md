@@ -34,7 +34,7 @@ Both take the age key sops decrypts with. It must be one of the common keys `.so
 HOST_PASSWORD=... dagger api call nix host --name=<hostname> bootstrap \
   --ip=<installer-ip> \
   --sops-age-key=file:$HOME/.config/sops/age/keys.txt \
-  --password=env:HOST_PASSWORD \
+  --password=env://HOST_PASSWORD \
   --auto-apply
 ```
 

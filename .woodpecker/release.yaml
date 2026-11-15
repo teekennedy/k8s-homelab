@@ -41,7 +41,7 @@ steps:
       - . scripts/nix-ci-ssh-agent.sh
       - git config --global --add safe.directory "$CI_WORKSPACE"
       - scripts/release-metadata.sh "$CI_COMMIT_TAG" > /tmp/release-metadata.json
-      - dagger --env ci api call release publish --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env:GHCR_ACCESS_TOKEN --metadata=/tmp/release-metadata.json
+      - dagger --env ci api call release publish --tag="$CI_COMMIT_TAG" --username=teekennedy --token=env://GHCR_ACCESS_TOKEN --metadata=/tmp/release-metadata.json
       # Record the published devenv-ci image for the next step to commit.
       - |
         case "$CI_COMMIT_TAG" in

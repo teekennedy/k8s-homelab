@@ -29,7 +29,7 @@ starts at `openhands-sandbox-0.2.0`, likewise with its own cliff.toml.
 
 `scripts/release.sh` creates Forgejo releases on main pushes. The shared tag
 pipeline invokes `dagger api call release publish --tag=<tag> --username=teekennedy
---token=env:GHCR_ACCESS_TOKEN`, selecting profiles or a Dockerfile build from
+--token=env://GHCR_ACCESS_TOKEN`, selecting profiles or a Dockerfile build from
 the manifest. Images use `ghcr.io/teekennedy/k8s-homelab:<tag>`.
 After publishing a `devenv-ci` tag, the pipeline records the image with
 `dagger api call nix devenv ci-release --tag=<tag>` and
