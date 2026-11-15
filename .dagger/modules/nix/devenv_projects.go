@@ -55,13 +55,12 @@ type DevenvProject struct {
 
 // Projects returns all discovered devenv projects with scoped source directories.
 // The +ignore list mirrors the constructor's file selection: devenv.yaml/
-// devenv.nix/devenv.lock are what devenv itself reads, plus cmd/lab because
-// the root project's devenv.yaml imports it. This doesn't generalize to a
-// future devenv project that imports some other path.
+// devenv.nix/devenv.lock are what devenv itself reads. A project whose
+// devenv.yaml imports another path would need that path added.
 func (m *Devenv) Projects(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"]
+	// +ignore=["*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock"]
 	source *dagger.Directory,
 ) []*DevenvProject {
 	var projects []*DevenvProject
@@ -104,7 +103,7 @@ func (p *DevenvProject) Update(ctx context.Context) (*dagger.Changeset, error) {
 //
 // Deliberately not tagged +generate. +generate implies a reproducible step
 // that recomputes a value from other checked-in inputs (like
-// lab's vendor-hash). devenv update instead fetches whatever the latest
+// cue's export). devenv update instead fetches whatever the latest
 // commit happens to be for each input right now, so running it twice in a
 // row can produce different output — it belongs to CI as a scheduled
 // "refresh" step, not as generated code to keep in sync.
@@ -112,7 +111,7 @@ func (p *DevenvProject) Update(ctx context.Context) (*dagger.Changeset, error) {
 func (m *Devenv) Update(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock", "!cmd/lab/**"]
+	// +ignore=["*", "!**/devenv.yaml", "!**/devenv.nix", "!**/devenv.lock"]
 	source *dagger.Directory,
 ) (*dagger.Changeset, error) {
 	projects := m.Projects(ctx, source)

@@ -11,7 +11,7 @@ set -eu
 record=.dagger/modules/nix/devenv-ci.json
 # The ci toolchain's files, whose hashes the record holds; see toolchainFiles in
 # .dagger/modules/nix/devenv_prebuilt.go.
-toolchain="devenv.nix devenv.yaml devenv.lock cmd/lab/devenv.nix"
+toolchain="devenv.nix devenv.yaml devenv.lock"
 source=$(git rev-parse HEAD)
 remote=${RELEASE_REMOTE:-"https://release-bot:$FORGEJO_TOKEN@${CI_FORGE_URL#*://}/$CI_REPO.git"}
 saved=$(mktemp)

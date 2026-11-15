@@ -23,7 +23,7 @@ for tool in ssh-to-age jq; do
 done
 
 # The fleet inventory comes from the CUE config rather than a copy here; it is
-# exported to config/gen/production/env.json by `lab config export`. Only name
+# exported to config/gen/production/env.json by `dagger generate cue`. Only name
 # and ip are used -- the k3s roles in that file are known to disagree with
 # flake.nix, so nothing should derive ordering or roles from it.
 mapfile -t HOSTS < <(jq -r '.hosts[] | "\(.name) \(.ip)"' "$ENV_JSON")

@@ -3,7 +3,7 @@
 CI for this repo is a Dagger 1.0 workspace with one module per language or
 platform, all under `.dagger/modules` and installed in the root `dagger.toml`.
 A module's name is the first part of every link to it: `dagger check python`,
-`dagger api call go modules`, `dagger check nix/lab/build`.
+`dagger api call go modules`, `dagger check nix/validate`.
 
 `dagger check` runs every check, and fails on any generator that would change a
 file; `dagger generate -y` applies the generators.
@@ -12,7 +12,7 @@ file; `dagger generate -y` applies the generators.
 dagger check                            # everything
 dagger check -l                         # list checks; --all lists every item
 dagger check go                         # one module
-dagger check go --go-module=cmd/lab     # one item of a collection
+dagger check go --go-module=.dagger/lib # one item of a collection
 dagger check helmfile --helmfile-release=traefik
 dagger check nix/validate               # one check outside a collection
 
@@ -42,8 +42,8 @@ which comes first. The checks and generators share one set of verbs:
 | `lint` | Static checks that can only fail | `helmfile/lint`, `helmfile/releases/lint`, `woodpecker/lint`, `yaml/lint` |
 | `validate` | The tool's own validator, or a schema | `nix/validate`, `terraform/modules/validate`, `helmfile/releases/validate` (kubeconform) |
 | `audit` | Policy and security scanners | `terraform/audit`, `helmfile/releases/audit` (both trivy) |
-| `build`, `render` | Produce an artifact, or prove one can be | `nix/lab/build`, `release/build`, `helmfile/releases/render` |
-| `format`, `fix`, `lock`, … | Generators: rewrite files in place | `cue/format`, `go/modules/fix`, `python/projects/lock`, `nix/lab/vendor-hash` |
+| `build`, `render` | Produce an artifact, or prove one can be | `release/build`, `helmfile/releases/render` |
+| `format`, `fix`, `lock`, … | Generators: rewrite files in place | `cue/format`, `go/modules/fix`, `python/projects/lock`, `nix/format` |
 
 A check's or generator's description is what `dagger check -l` lists beside
 it, and the listing prints only the doc comment's first line. So that line is
@@ -82,7 +82,7 @@ dagger.lock                 # pinned versions of remote modules and the Go SDK
 | `go` | `modules` | per module: `test` | per module: `fix` | per module: `integration-test` |
 | `helmfile` | `releases` | `lint`, `test`; per release: `audit`, `lint`, `lint-python`, `render`, `validate` | | |
 | `kubernetes` | | | | `integration-test`, `integration-reports`, `dev-cluster`, `dev-cluster-delete` |
-| `nix` | | `test`, `validate`; `lab/build` | `format`; `lab/vendor-hash` | `devenv ci-toolchain`, `devenv toolchain`, `devenv integration-toolchain`, `devenv container`, `devenv ci-release`, `devenv projects`, `devenv update`, `lab binary`, `lab binary-nix`, `builders status`, `image` |
+| `nix` | | `test`, `validate` | `format` | `devenv ci-toolchain`, `devenv toolchain`, `devenv integration-toolchain`, `devenv container`, `devenv ci-release`, `devenv projects`, `devenv update`, `host diff`, `host bootstrap`, `host install`, `builders status`, `image` |
 | `python` | `projects` | per project: `lint`, `test` | per project: `format`, `lock` | |
 | `release` | | `build`, `test` | | `image`, `publish` |
 | `terraform` | `modules` | `audit`; per module: `validate` | `format`; per module: `lock` | |
@@ -148,18 +148,15 @@ A setting's `dag://` address is evaluated in the workspace, so it reaches the
 profiles, which add kubectl and curl. The cache tests construct a module
 directly, with a cheap stand-in for the container instead of a Nix build.
 
-What invalidates the toolchain is the `nix` constructor's `toolchainSource`:
-`devenv.nix`, `devenv.yaml`, `devenv.lock` and `cmd/lab/devenv.nix`, which
-devenv.yaml imports. Nothing a check reads can reach it. The lab CLI itself is
-only installed by the `interactive` profile, so editing its Go source leaves the
-toolchain cached; `devenv container`, which builds the published images and may
-include that profile, reads all of `cmd/lab` from `devenvSource`.
+What invalidates the toolchain is the `nix` constructor's `devenvSource`:
+`devenv.nix`, `devenv.yaml` and `devenv.lock`. Nothing a check reads can reach
+it.
 
 The exceptions build with plain Nix rather than devenv: `nix/validate`,
-`nix/test`'s probe, and `nix/lab/build`, `nix lab binary-nix` and
-`nix/lab/vendor-hash`. All but the probe, which needs a cold store, keep their
-store and Nix's fetcher cache in cache volumes, and can hand their builds to
-[remote builders](docs/nix-builders.md), as can the devenv builds. They all
+`nix/test`'s probe, and the `nix host` functions. All but the probe, which
+needs a cold store, keep their store and Nix's fetcher cache in cache volumes,
+and can hand their builds to [remote builders](docs/nix-builders.md), as can
+the devenv builds. They all
 live in the `nix` module so that they share one store and one set of builders.
 
 `release` builds the devenv images by calling the `nix` module as a dependency
@@ -238,7 +235,7 @@ that directory, so each unit's check caches on its own files:
 
 ```
 dagger check go
-├─ go-module=cmd/lab                    → cached (unchanged)
+├─ go-module=.dagger/lib                 → cached (unchanged)
 ├─ go-module=k8s/.../woodpecker-resources → re-runs (file changed)
 └─ go-module=.dagger/modules/go          → cached (unchanged)
 ```
@@ -358,7 +355,7 @@ Not done, on purpose. A module in a monorepo is versioned by tagging with its
 subpath as a prefix (`<subpath>/v1.2.3`) — which a module under `.dagger/`
 cannot have, because git rejects a ref component that starts with a dot. And
 these modules hardcode the repo's layout (`k8s/<tier>/<chart>`, `config/gen`,
-`cmd/lab`, `.golangci.yaml` at the root) and run in a toolchain that only
+`nix/hosts`, `.golangci.yaml` at the root) and run in a toolchain that only
 exists for this repo.
 
 The best candidates are `lib/daggerfake` and `lib/cachetest`, which are

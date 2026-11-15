@@ -14,9 +14,9 @@ in {
 
   # Use zsh for shell instead of bash
   # https://github.com/mcdonc/devenv-zsh
-  # Imported unconditionally so `zsh.extraInit` (set by cmd/lab/devenv.nix) is
-  # always a declared option; the zsh package itself only enters the closure
-  # when zsh.enable is true, which only the `interactive` profile sets.
+  # Imported unconditionally, since devenv imports can't be per profile; the
+  # zsh package itself only enters the closure when zsh.enable is true, which
+  # only the `interactive` profile sets.
   imports = [devenv-zsh.plugin];
 
   # https://devenv.sh/basics/
@@ -120,11 +120,7 @@ in {
         kubectl-cnpg
         kubetail
         kustomize
-        nixos-anywhere
         sops
-        # lab host bootstrap packages
-        mkpasswd
-        ssh-to-age
       ];
 
       zsh.enable = true;
@@ -193,7 +189,7 @@ in {
 
   containers.shell.maxLayers = 100;
   # The default copies the project directory into the image, so any edit to it
-  # (a comment, the lab CLI's Go code) would make a different image. Releases
+  # (a comment, a chart, a README) would make a different image. Releases
   # compare image store paths to skip publishing an unchanged image.
   containers.shell.copyToRoot = [];
 

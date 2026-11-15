@@ -10,7 +10,7 @@ import (
 )
 
 // Nix formats, validates and builds the repo's Nix code and devenv toolchain.
-type Nix struct { // nix (../../../../../../.dagger/modules/nix/main.go:16:6)
+type Nix struct { // nix (../../../../../../.dagger/modules/nix/main.go:15:6)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
@@ -30,7 +30,7 @@ func (r *Nix) WithGraphQLQuery(q *querybuilder.Selection) *Nix {
 }
 
 // Builders reports on the remote Nix builders the Nix and devenv builds use.
-func (r *Nix) Builders() *NixBuilders { // nix (../../../../../../.dagger/modules/nix/main.go:71:1)
+func (r *Nix) Builders() *NixBuilders { // nix (../../../../../../.dagger/modules/nix/main.go:60:1)
 	q := r.query.Select("builders")
 
 	return &NixBuilders{
@@ -41,7 +41,7 @@ func (r *Nix) Builders() *NixBuilders { // nix (../../../../../../.dagger/module
 
 // Devenv builds the devenv shell as a container: the toolchain the checks run
 // in, and the devenv images releases publish.
-func (r *Nix) Devenv() *NixDevenv { // nix (../../../../../../.dagger/modules/nix/main.go:77:1)
+func (r *Nix) Devenv() *NixDevenv { // nix (../../../../../../.dagger/modules/nix/main.go:66:1)
 	q := r.query.Select("devenv")
 
 	return &NixDevenv{
@@ -75,6 +75,17 @@ func (r *Nix) Format(opts ...NixFormatOpts) *Changeset { // nix (../../../../../
 	}
 
 	return &Changeset{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// Host operates on a NixOS host: diff a deploy, bootstrap or install it.
+func (r *Nix) Host(name string) *NixNixosHost { // nix (../../../../../../.dagger/modules/nix/host.go:31:1)
+	q := r.query.Select("host")
+	q = q.Arg("name", name)
+
+	return &NixNixosHost{
 		query:     q,
 		refetchID: r.refetchID,
 	}
@@ -140,16 +151,6 @@ func (r *Nix) Image() *Container { // nix (../../../../../../.dagger/modules/nix
 	q := r.query.Select("image")
 
 	return &Container{
-		query:     q,
-		refetchID: r.refetchID,
-	}
-}
-
-// Lab builds the lab CLI and keeps its Nix vendorHash current.
-func (r *Nix) Lab() *NixLab { // nix (../../../../../../.dagger/modules/nix/main.go:82:1)
-	q := r.query.Select("lab")
-
-	return &NixLab{
 		query:     q,
 		refetchID: r.refetchID,
 	}
@@ -361,7 +362,7 @@ func (r *NixDevenv) CiRelease(tag string) *File { // nix (../../../../../../.dag
 // runs in, taken from the published devenv-ci image when that image is what a
 // build would produce: see publishedCiShell. Otherwise it is built, as
 // Toolchain builds it.
-func (r *NixDevenv) CiToolchain() *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:77:1)
+func (r *NixDevenv) CiToolchain() *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:68:1)
 	q := r.query.Select("ciToolchain")
 
 	return &Container{
@@ -380,7 +381,7 @@ type NixDevenvContainerOpts struct {
 	// (e.g. Linux-to-Linux). Does not work with macOS host daemons due to
 	// cross-platform path handling differences.
 	//
-	NixDaemon *Socket // nix (../../../../../../.dagger/modules/nix/devenv.go:111:2)
+	NixDaemon *Socket // nix (../../../../../../.dagger/modules/nix/devenv.go:102:2)
 	//
 	// devenv profiles to activate (https://devenv.sh/profiles/). Defaults to
 	// the "ci" profile, which holds exactly the toolchain the checks need. The
@@ -390,7 +391,7 @@ type NixDevenvContainerOpts struct {
 	//
 	//
 	// Default: ["ci"]
-	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:119:2)
+	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:110:2)
 }
 
 // Container builds the devenv nix environment as a minimal "from scratch"
@@ -398,7 +399,7 @@ type NixDevenvContainerOpts struct {
 // produce a minimal nix2container image containing only the runtime closure
 // (no build dependencies). The nix store is cached across runs so packages are
 // only built once.
-func (r *NixDevenv) Container(opts ...NixDevenvContainerOpts) *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:102:1)
+func (r *NixDevenv) Container(opts ...NixDevenvContainerOpts) *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:93:1)
 	q := r.query.Select("container")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `nixDaemon` optional argument
@@ -479,14 +480,14 @@ type NixDevenvImageOutPathOpts struct {
 	//
 	//
 	// Default: ["ci"]
-	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:280:2)
+	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:271:2)
 }
 
 // ImageOutPath evaluates the Nix store path of the image Container builds for
 // profiles, on the engine's platform, without building anything. Two
 // checkouts with the same path build the same image, so a release whose path
 // matches the published image's has nothing new to publish.
-func (r *NixDevenv) ImageOutPath(ctx context.Context, opts ...NixDevenvImageOutPathOpts) (string, error) { // nix (../../../../../../.dagger/modules/nix/devenv.go:275:1)
+func (r *NixDevenv) ImageOutPath(ctx context.Context, opts ...NixDevenvImageOutPathOpts) (string, error) { // nix (../../../../../../.dagger/modules/nix/devenv.go:266:1)
 	if r.imageOutPath != nil {
 		return *r.imageOutPath, nil
 	}
@@ -507,7 +508,7 @@ func (r *NixDevenv) ImageOutPath(ctx context.Context, opts ...NixDevenvImageOutP
 // IntegrationToolchain is Toolchain for the "ci" and "integration" profiles:
 // the container the Kubernetes integration workflow runs in. No release
 // publishes it, so it is always built.
-func (r *NixDevenv) IntegrationToolchain() *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:93:1)
+func (r *NixDevenv) IntegrationToolchain() *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:84:1)
 	q := r.query.Select("integrationToolchain")
 
 	return &Container{
@@ -518,15 +519,14 @@ func (r *NixDevenv) IntegrationToolchain() *Container { // nix (../../../../../.
 
 // NixDevenvProjectsOpts contains options for NixDevenv.Projects
 type NixDevenvProjectsOpts struct {
-	Source *Directory // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:65:2)
+	Source *Directory // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:64:2)
 }
 
 // Projects returns all discovered devenv projects with scoped source directories.
 // The +ignore list mirrors the constructor's file selection: devenv.yaml/
-// devenv.nix/devenv.lock are what devenv itself reads, plus cmd/lab because
-// the root project's devenv.yaml imports it. This doesn't generalize to a
-// future devenv project that imports some other path.
-func (r *NixDevenv) Projects(ctx context.Context, opts ...NixDevenvProjectsOpts) ([]NixDevenvProject, error) { // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:61:1)
+// devenv.nix/devenv.lock are what devenv itself reads. A project whose
+// devenv.yaml imports another path would need that path added.
+func (r *NixDevenv) Projects(ctx context.Context, opts ...NixDevenvProjectsOpts) ([]NixDevenvProject, error) { // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:60:1)
 	q := r.query.Select("projects")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
@@ -590,7 +590,7 @@ type NixDevenvToolchainOpts struct {
 	//
 	//
 	// Default: ["ci"]
-	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:64:2)
+	Profiles []string // nix (../../../../../../.dagger/modules/nix/devenv.go:55:2)
 }
 
 // Toolchain returns the devenv shell for profiles with the language toolchain
@@ -600,10 +600,7 @@ type NixDevenvToolchainOpts struct {
 // integration workflow adds "integration", which brings kubectl and curl; no
 // check runs with it, so `dagger check` keeps running in a container that
 // cannot reach a cluster even if something tried.
-//
-// It is built without the lab CLI's source, so it cannot build the
-// "interactive" profile, which installs the CLI; use Container for that.
-func (r *NixDevenv) Toolchain(opts ...NixDevenvToolchainOpts) *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:59:1)
+func (r *NixDevenv) Toolchain(opts ...NixDevenvToolchainOpts) *Container { // nix (../../../../../../.dagger/modules/nix/devenv.go:50:1)
 	q := r.query.Select("toolchain")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `profiles` optional argument
@@ -620,7 +617,7 @@ func (r *NixDevenv) Toolchain(opts ...NixDevenvToolchainOpts) *Container { // ni
 
 // NixDevenvUpdateOpts contains options for NixDevenv.Update
 type NixDevenvUpdateOpts struct {
-	Source *Directory // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:116:2)
+	Source *Directory // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:115:2)
 }
 
 // Update runs `devenv update` for every discovered devenv project and
@@ -630,12 +627,12 @@ type NixDevenvUpdateOpts struct {
 //
 // Deliberately not tagged +generate. +generate implies a reproducible step
 // that recomputes a value from other checked-in inputs (like
-// lab's vendor-hash). devenv update instead fetches whatever the latest
+// cue's export). devenv update instead fetches whatever the latest
 // commit happens to be for each input right now, so running it twice in a
 // row can produce different output — it belongs to CI as a scheduled
 // "refresh" step, not as generated code to keep in sync.
 // Use `dagger api call nix devenv update -y` to apply.
-func (r *NixDevenv) Update(opts ...NixDevenvUpdateOpts) *Changeset { // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:112:1)
+func (r *NixDevenv) Update(opts ...NixDevenvUpdateOpts) *Changeset { // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:111:1)
 	q := r.query.Select("update")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
@@ -764,7 +761,7 @@ func (r *NixDevenvProject) Source() *Directory { // nix (../../../../../../.dagg
 // Update runs `devenv update` for this project, refreshing its devenv.lock
 // with the latest commit for every input (nixpkgs, etc.). Returns the
 // resulting changeset.
-func (r *NixDevenvProject) Update() *Changeset { // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:80:1)
+func (r *NixDevenvProject) Update() *Changeset { // nix (../../../../../../.dagger/modules/nix/devenv_projects.go:79:1)
 	q := r.query.Select("update")
 
 	return &Changeset{
@@ -782,19 +779,22 @@ func (r *NixDevenvProject) AsNode() Node {
 	}
 }
 
-// Lab builds the lab CLI.
-type NixLab struct { // nix (../../../../../../.dagger/modules/nix/lab.go:17:6)
+// NixosHost operates on one NixOS host of the flake.
+type NixNixosHost struct { // nix (../../../../../../.dagger/modules/nix/host.go:22:6)
 	query *querybuilder.Selection
 	// refetchID is set when this object is built through a field marked
 	// @reevaluate: it fetches its ID on every use, so each use evaluates that
 	// field again.
 	refetchID bool
 
-	id *ID
+	diff    *string
+	id      *ID
+	install *string
+	name    *string
 }
 
-func (r *NixLab) WithGraphQLQuery(q *querybuilder.Selection) *NixLab {
-	return &NixLab{
+func (r *NixNixosHost) WithGraphQLQuery(q *querybuilder.Selection) *NixNixosHost {
+	return &NixNixosHost{
 		query: q,
 		// The query's origin is unknown: it may go through a field that
 		// must be reevaluated.
@@ -802,79 +802,87 @@ func (r *NixLab) WithGraphQLQuery(q *querybuilder.Selection) *NixLab {
 	}
 }
 
-// NixLabBinaryOpts contains options for NixLab.Binary
-type NixLabBinaryOpts struct {
-	Source *Directory // nix (../../../../../../.dagger/modules/nix/lab.go:46:2)
+// NixNixosHostBootstrapOpts contains options for NixNixosHost.Bootstrap
+type NixNixosHostBootstrapOpts struct {
 	//
-	// Platform to build for. Defaults to the engine's.
+	// The password for the host's default user. Needed only when
+	// secrets.yaml has no hash for it yet.
 	//
-	Platform Platform // nix (../../../../../../.dagger/modules/nix/lab.go:49:2)
+	Password *Secret // nix (../../../../../../.dagger/modules/nix/host_bootstrap.go:80:2)
+
+	Source *Directory // nix (../../../../../../.dagger/modules/nix/host_bootstrap.go:83:2)
 }
 
-// Binary returns the built lab CLI binary, built with Go for speed.
-func (r *NixLab) Binary(opts ...NixLabBinaryOpts) *File { // nix (../../../../../../.dagger/modules/nix/lab.go:43:1)
-	q := r.query.Select("binary")
+// Bootstraps a new host's files: its secrets, its .sops.yaml entries and its
+// hardware report.
+//
+// Returns the changes to apply to the repo; run it with --auto-apply from the
+// repo root. It never touches the target's disks. Every step keeps what the
+// repo already has, so a configured host comes back with no changes.
+//
+//  1. Generates whatever nix/hosts/<name>/secrets.yaml lacks (SSH host key
+//     pair, the default user's password hash, the restic password) and
+//     writes it encrypted.
+//  2. Adds the host's age key, its secrets' creation rule and its access to
+//     the nix/modules secrets to .sops.yaml, re-keying those secrets.
+//  3. Generates nix/hosts/<name>/facter.json from the installer at ip.
+//  4. Builds the host's system once disko.devices.disk.main.device is set,
+//     and otherwise lists the disks to choose it from.
+//
+// The host must be in the flake's nixosConfigurations, and the target booted
+// from the installer ISO, which accepts the forwarded agent's keys as root.
+func (r *NixNixosHost) Bootstrap(ip string, sopsAgeKey *Secret, opts ...NixNixosHostBootstrapOpts) *Changeset { // nix (../../../../../../.dagger/modules/nix/host_bootstrap.go:69:1)
+	assertNotNil("sopsAgeKey", sopsAgeKey)
+	q := r.query.Select("bootstrap")
 	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
+		// `password` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Password) {
+			q = q.Arg("password", opts[i].Password)
 		}
-		// `platform` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Platform) {
-			q = q.Arg("platform", opts[i].Platform)
-		}
-	}
-
-	return &File{
-		query:     q,
-		refetchID: r.refetchID,
-	}
-}
-
-// NixLabBinaryNixOpts contains options for NixLab.BinaryNix
-type NixLabBinaryNixOpts struct {
-	Source *Directory // nix (../../../../../../.dagger/modules/nix/lab.go:84:2)
-}
-
-// BinaryNix returns the built lab CLI binary, built with Nix.
-func (r *NixLab) BinaryNix(opts ...NixLabBinaryNixOpts) *File { // nix (../../../../../../.dagger/modules/nix/lab.go:80:1)
-	q := r.query.Select("binaryNix")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `source` optional argument
-		if !querybuilder.IsZeroValue(opts[i].Source) {
-			q = q.Arg("source", opts[i].Source)
-		}
-	}
-
-	return &File{
-		query:     q,
-		refetchID: r.refetchID,
-	}
-}
-
-// NixLabBuildOpts contains options for NixLab.Build
-type NixLabBuildOpts struct {
-	Source *Directory // nix (../../../../../../.dagger/modules/nix/lab.go:29:2)
-}
-
-// Builds the lab CLI with Nix, as production does.
-func (r *NixLab) Build(opts ...NixLabBuildOpts) *Check { // nix (../../../../../../.dagger/modules/nix/lab.go:26:1)
-	q := r.query.Select("build")
-	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Source) {
 			q = q.Arg("source", opts[i].Source)
 		}
 	}
+	q = q.Arg("ip", ip)
+	q = q.Arg("sopsAgeKey", sopsAgeKey)
 
-	return &Check{
+	return &Changeset{
 		query:     q,
 		refetchID: r.refetchID,
 	}
 }
 
-// A unique identifier for this NixLab.
-func (r *NixLab) ID(ctx context.Context) (ID, error) {
+// NixNixosHostDiffOpts contains options for NixNixosHost.Diff
+type NixNixosHostDiffOpts struct {
+	Source *Directory // nix (../../../../../../.dagger/modules/nix/host.go:87:2)
+}
+
+// Diff shows what deploying the given source would change on the host.
+//
+// The new system is built in the host's own store, which already holds nearly
+// all of it, and compared there with the running one by `nix store
+// diff-closures`. The system's label names the commit, so it always differs.
+func (r *NixNixosHost) Diff(ctx context.Context, opts ...NixNixosHostDiffOpts) (string, error) { // nix (../../../../../../.dagger/modules/nix/host.go:83:1)
+	if r.diff != nil {
+		return *r.diff, nil
+	}
+	q := r.query.Select("diff")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `source` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Source) {
+			q = q.Arg("source", opts[i].Source)
+		}
+	}
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// A unique identifier for this NixNixosHost.
+func (r *NixNixosHost) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
 		return *r.id, nil
 	}
@@ -893,17 +901,17 @@ func (r *NixLab) ID(ctx context.Context) (ID, error) {
 }
 
 // XXX_GraphQLType is an internal function. It returns the native GraphQL type name
-func (r *NixLab) XXX_GraphQLType() string {
-	return "NixLab"
+func (r *NixNixosHost) XXX_GraphQLType() string {
+	return "NixNixosHost"
 }
 
 // XXX_GraphQLIDType is an internal function. It returns the native GraphQL type name for the ID of this object
-func (r *NixLab) XXX_GraphQLIDType() string {
+func (r *NixNixosHost) XXX_GraphQLIDType() string {
 	return "ID"
 }
 
 // XXX_GraphQLID is an internal function. It returns the underlying type ID
-func (r *NixLab) XXX_GraphQLID(ctx context.Context) (string, error) {
+func (r *NixNixosHost) XXX_GraphQLID(ctx context.Context) (string, error) {
 	id, err := r.ID(ctx)
 	if err != nil {
 		return "", err
@@ -911,55 +919,72 @@ func (r *NixLab) XXX_GraphQLID(ctx context.Context) (string, error) {
 	return string(id), nil
 }
 
-func (r *NixLab) MarshalJSON() ([]byte, error) {
+func (r *NixNixosHost) MarshalJSON() ([]byte, error) {
 	id, err := r.ID(marshalCtx)
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(id)
 }
-func (r *NixLab) UnmarshalJSON(bs []byte) error {
+func (r *NixNixosHost) UnmarshalJSON(bs []byte) error {
 	var id string
 	err := json.Unmarshal(bs, &id)
 	if err != nil {
 		return err
 	}
-	*r = NixLab{query: selectNode(dag.QueryBuilder(), id, "NixLab")}
+	*r = NixNixosHost{query: selectNode(dag.QueryBuilder(), id, "NixNixosHost")}
 	return nil
 }
 
-// NixLabVendorHashOpts contains options for NixLab.VendorHash
-type NixLabVendorHashOpts struct {
-	//
-	// buildGoModule vendors only the packages the source actually imports, so
-	// the whole module directory is needed to produce the right hash.
-	//
-	Source *Directory // nix (../../../../../../.dagger/modules/nix/lab_vendorhash.go:34:2)
+// NixNixosHostInstallOpts contains options for NixNixosHost.Install
+type NixNixosHostInstallOpts struct {
+	Source *Directory // nix (../../../../../../.dagger/modules/nix/host_bootstrap.go:323:2)
 }
 
-// Recomputes the lab CLI's Nix vendorHash in cmd/lab/gomod.json.
+// Installs NixOS on a bootstrapped host with nixos-anywhere. THIS ERASES THE
+// TARGET'S DISKS.
 //
-// buildGoModule pins the module's vendored dependencies by hash, so without
-// this a change to a Go dependency of the lab CLI fails the Nix (and therefore
-// devenv) build with a fixed-output hash mismatch.
-func (r *NixLab) VendorHash(opts ...NixLabVendorHashOpts) *Changeset { // nix (../../../../../../.dagger/modules/nix/lab_vendorhash.go:28:1)
-	q := r.query.Select("vendorHash")
+// Run bootstrap first and apply its changes. The host's SSH key from
+// secrets.yaml is installed at /persistent/etc/ssh, so the new system can
+// decrypt its secrets. The target reboots into NixOS when done.
+func (r *NixNixosHost) Install(ctx context.Context, ip string, sopsAgeKey *Secret, opts ...NixNixosHostInstallOpts) (string, error) { // nix (../../../../../../.dagger/modules/nix/host_bootstrap.go:315:1)
+	assertNotNil("sopsAgeKey", sopsAgeKey)
+	if r.install != nil {
+		return *r.install, nil
+	}
+	q := r.query.Select("install")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `source` optional argument
 		if !querybuilder.IsZeroValue(opts[i].Source) {
 			q = q.Arg("source", opts[i].Source)
 		}
 	}
+	q = q.Arg("ip", ip)
+	q = q.Arg("sopsAgeKey", sopsAgeKey)
 
-	return &Changeset{
-		query:     q,
-		refetchID: r.refetchID,
-	}
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
 }
 
-// AsNode returns this NixLab as a Node.
+// The host's name in the flake's nixosConfigurations, which is also how
+// SSH reaches it.
+func (r *NixNixosHost) Name(ctx context.Context) (string, error) { // nix (../../../../../../.dagger/modules/nix/host.go:25:2)
+	if r.name != nil {
+		return *r.name, nil
+	}
+	q := r.query.Select("name")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
+}
+
+// AsNode returns this NixNixosHost as a Node.
 // This is a local type conversion — no GraphQL call.
-func (r *NixLab) AsNode() Node {
+func (r *NixNixosHost) AsNode() Node {
 	return &NodeClient{
 		query:     r.query,
 		refetchID: r.refetchID,
@@ -969,20 +994,10 @@ func (r *NixLab) AsNode() Node {
 // NixOpts contains options for Query.Nix
 type NixOpts struct {
 	//
-	// The files devenv reads to build any profile: devenv.nix, devenv.yaml,
-	// devenv.lock, and all of cmd/lab, which devenv.yaml imports and whose CLI
-	// the interactive profile builds from source.
+	// The files devenv reads to build any profile: devenv.nix, devenv.yaml
+	// and devenv.lock. Keep it in step with toolchainFiles.
 	//
-	DevenvSource *Directory // nix (../../../../../../.dagger/modules/nix/main.go:30:2)
-	//
-	// devenvSource without the lab CLI's own source, which the toolchain the
-	// checks run in never builds, so that editing it leaves the toolchain
-	// cached. Loaded separately rather than filtered out of devenvSource, so
-	// that it is content-addressed from the client filesystem: a directory
-	// derived from devenvSource would carry its identity, Go files and all.
-	// Keep it in step with toolchainFiles.
-	//
-	ToolchainSource *Directory // nix (../../../../../../.dagger/modules/nix/main.go:39:2)
+	DevenvSource *Directory // nix (../../../../../../.dagger/modules/nix/main.go:28:2)
 	//
 	// Remote builders for the Nix and devenv builds, in the format of Nix's
 	// `builders` setting: one machine per line or per ";", such as the
@@ -990,39 +1005,35 @@ type NixOpts struct {
 	// used, and they authenticate with sshAuthSock alone. Builds fall back to
 	// the container when no builder answers.
 	//
-	NixBuilders string // nix (../../../../../../.dagger/modules/nix/main.go:46:2)
+	NixBuilders string // nix (../../../../../../.dagger/modules/nix/main.go:35:2)
 	//
 	// The SSH agent the builders authenticate with, as unix:///path/to/socket.
 	// Only the agent is forwarded; no key leaves the host.
 	//
-	SSHAuthSock *Socket // nix (../../../../../../.dagger/modules/nix/main.go:50:2)
+	SSHAuthSock *Socket // nix (../../../../../../.dagger/modules/nix/main.go:39:2)
 	//
 	// An ssh_config for reaching the builders, such as ~/.ssh/config. Its
 	// IdentityFile, known_hosts and connection-sharing options are overridden.
 	//
-	SSHConfig *File // nix (../../../../../../.dagger/modules/nix/main.go:54:2)
+	SSHConfig *File // nix (../../../../../../.dagger/modules/nix/main.go:43:2)
 	//
 	// The user to log in to the builders as, where neither their machine URI
 	// nor sshConfig names one.
 	//
-	SSHUser string // nix (../../../../../../.dagger/modules/nix/main.go:58:2)
+	SSHUser string // nix (../../../../../../.dagger/modules/nix/main.go:47:2)
 	//
 	// The builders' SSH host keys.
 	//
-	SSHKnownHosts *File // nix (../../../../../../.dagger/modules/nix/main.go:61:2)
+	SSHKnownHosts *File // nix (../../../../../../.dagger/modules/nix/main.go:50:2)
 }
 
 // Formats, validates and builds the repo's Nix code and devenv toolchain.
-func (r *Query) Nix(opts ...NixOpts) *Nix { // nix (../../../../../../.dagger/modules/nix/main.go:24:1)
+func (r *Query) Nix(opts ...NixOpts) *Nix { // nix (../../../../../../.dagger/modules/nix/main.go:23:1)
 	q := r.query.Select("nix")
 	for i := len(opts) - 1; i >= 0; i-- {
 		// `devenvSource` optional argument
 		if !querybuilder.IsZeroValue(opts[i].DevenvSource) {
 			q = q.Arg("devenvSource", opts[i].DevenvSource)
-		}
-		// `toolchainSource` optional argument
-		if !querybuilder.IsZeroValue(opts[i].ToolchainSource) {
-			q = q.Arg("toolchainSource", opts[i].ToolchainSource)
 		}
 		// `nixBuilders` optional argument
 		if !querybuilder.IsZeroValue(opts[i].NixBuilders) {

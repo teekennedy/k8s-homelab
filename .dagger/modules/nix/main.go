@@ -1,14 +1,13 @@
 // Everything this repo builds with Nix: the flake and host configuration's
-// checks, the devenv toolchain every other module's checks run in, and the lab
-// CLI. They share one set of remote builders and one Nix store cache.
+// checks, the devenv toolchain every other module's checks run in, and the
+// hosts themselves. They share one set of remote builders and one Nix store
+// cache.
 //
 // The other modules take their toolchain as a constructor argument, which
 // dagger.toml wires to `dag://nix/devenv/ci-toolchain`.
 package main
 
 import (
-	"context"
-
 	"dagger/nix/internal/dagger"
 )
 
@@ -22,21 +21,11 @@ type Nix struct {
 
 // Formats, validates and builds the repo's Nix code and devenv toolchain.
 func New(
-	// The files devenv reads to build any profile: devenv.nix, devenv.yaml,
-	// devenv.lock, and all of cmd/lab, which devenv.yaml imports and whose CLI
-	// the interactive profile builds from source.
+	// The files devenv reads to build any profile: devenv.nix, devenv.yaml
+	// and devenv.lock. Keep it in step with toolchainFiles.
 	// +defaultPath="/"
-	// +ignore=["*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!cmd/lab/**", "cmd/lab/result", "cmd/lab/.direnv"]
+	// +ignore=["*", "!devenv.nix", "!devenv.yaml", "!devenv.lock"]
 	devenvSource *dagger.Directory,
-	// devenvSource without the lab CLI's own source, which the toolchain the
-	// checks run in never builds, so that editing it leaves the toolchain
-	// cached. Loaded separately rather than filtered out of devenvSource, so
-	// that it is content-addressed from the client filesystem: a directory
-	// derived from devenvSource would carry its identity, Go files and all.
-	// Keep it in step with toolchainFiles.
-	// +defaultPath="/"
-	// +ignore=["*", "!devenv.nix", "!devenv.yaml", "!devenv.lock", "!cmd/lab/devenv.nix"]
-	toolchainSource *dagger.Directory,
 	// Remote builders for the Nix and devenv builds, in the format of Nix's
 	// `builders` setting: one machine per line or per ";", such as the
 	// contents of /etc/nix/machines. Only ssh-ng:// and ssh:// machines are
@@ -62,7 +51,7 @@ func New(
 ) *Nix {
 	builders := newBuilders(nixBuilders, sshAuthSock, sshConfig, sshUser, sshKnownHosts)
 	return &Nix{
-		Toolchains: &Devenv{Source: devenvSource, ToolchainSource: toolchainSource, Builders: builders},
+		Toolchains: &Devenv{Source: devenvSource, Builders: builders},
 		Remote:     builders,
 	}
 }
@@ -76,13 +65,4 @@ func (m *Nix) Builders() *Builders {
 // in, and the devenv images releases publish.
 func (m *Nix) Devenv() *Devenv {
 	return m.Toolchains
-}
-
-// Lab builds the lab CLI and keeps its Nix vendorHash current.
-func (m *Nix) Lab(ctx context.Context) (*Lab, error) {
-	container, err := m.Toolchains.CiToolchain(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Lab{Container: container, Builders: m.Remote}, nil
 }

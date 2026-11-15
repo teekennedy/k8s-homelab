@@ -44,9 +44,9 @@ linters:
     gosec:
       excludes:
         # G204 (subprocess launched with variable/tainted args) fires on nearly
-        # every exec.Command call in cmd/lab and .dagger by design: both are CLI
-        # wrappers that shell out to trusted local tools (nix, helm, kubectl,
-        # dagger, git, kind) with programmatically-built args. Per-callsite
+        # every exec.Command call in .dagger by design: it shells out to
+        # trusted tools (nix, helm, kubectl, dagger, git) with
+        # programmatically-built args. Per-callsite
         # nolint would just be noise on the normal case here.
         - G204
 

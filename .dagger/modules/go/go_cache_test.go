@@ -42,7 +42,7 @@ func eachModule(ctx context.Context, source *dagger.Directory, ctr *dagger.Conta
 // the Go fixture
 // ---------------------------------------------------------------------------
 
-// goFixture mirrors the real repo's Go layout: the lab CLI under cmd/lab, two
+// goFixture mirrors the shape of the repo's Go layout: a module under tools/cli, two
 // unrelated modules under k8s/, a module building against a sibling through a
 // local replace, and a vendored module that discovery must skip.
 // Each module carries a distinctly named file so its exec can be identified by
@@ -52,8 +52,8 @@ func goFixture() cachetest.Repo {
 	return cachetest.Repo{
 		".golangci.yaml": "version: \"2\"\n",
 
-		"cmd/lab/go.mod": "module lab\n\ngo 1.26\n",
-		"cmd/lab/lab.go": body,
+		"tools/cli/go.mod": "module cli\n\ngo 1.26\n",
+		"tools/cli/cli.go": body,
 
 		"k8s/platform/woodpecker/files/woodpecker-resources/go.mod":              "module woodpecker-resources\n\ngo 1.26\n",
 		"k8s/platform/woodpecker/files/woodpecker-resources/woodpeckerconfig.go": body,
@@ -67,8 +67,8 @@ func goFixture() cachetest.Repo {
 		".dagger/modules/tool/tool.go": body,
 
 		// Vendored: a go.mod, but not one of the repo's own modules.
-		"cmd/lab/vendor/example.com/dep/go.mod": "module example.com/dep\n",
-		"cmd/lab/vendor/example.com/dep/dep.go": "package dep\n",
+		"tools/cli/vendor/example.com/dep/go.mod": "module example.com/dep\n",
+		"tools/cli/vendor/example.com/dep/dep.go": "package dep\n",
 	}
 }
 
@@ -76,7 +76,7 @@ func goFixture() cachetest.Repo {
 // so a unit is named by the one .go file at the root of that mount — see
 // unitByScopedGoModule.
 const (
-	labUnit        = "lab.go"
+	cliUnit        = "cli.go"
 	woodpeckerUnit = "woodpeckerconfig.go"
 	forgejoUnit    = "forgejoconfig.go"
 	toolUnit       = "tool.go"
@@ -91,10 +91,10 @@ const (
 )
 
 // goUnitFiles is what each unit must have mounted: its own files and
-// nothing from its siblings. cmd/lab additionally carries its vendor tree,
+// nothing from its siblings. tools/cli additionally carries its vendor tree,
 // which rides along inside the module directory by design.
 var goUnitFiles = map[string][]string{
-	labUnit:        {"go.mod", "lab.go", "vendor/example.com/dep/dep.go", "vendor/example.com/dep/go.mod"},
+	cliUnit:        {"cli.go", "go.mod", "vendor/example.com/dep/dep.go", "vendor/example.com/dep/go.mod"},
 	woodpeckerUnit: {"go.mod", "woodpeckerconfig.go"},
 	forgejoUnit:    {"forgejoconfig.go", "go.mod"},
 	toolUnit:       {"go.mod", "tool.go"},
@@ -156,7 +156,7 @@ func fixCheck() goCheck {
 // work is told apart from another's: every module runs the same argv in the
 // same workdir, and only the mounted source differs.
 //
-// Nested paths are skipped, which is what keeps cmd/lab's vendored dep from
+// Nested paths are skipped, which is what keeps tools/cli's vendored dep from
 // being mistaken for its unit name. Execs with no such file — anything
 // running on an earlier exec's output — are not
 // per-unit work and return "".
@@ -181,14 +181,14 @@ func goScenarios() []cachetest.Scenario {
 			Name:   "editing one module invalidates only that module",
 			Edit:   cachetest.Edit(woodpeckerPath, "package main // edited\n\nfunc main() { println(1) }\n"),
 			Rerun:  []string{woodpeckerUnit},
-			Cached: []string{labUnit, forgejoUnit, toolUnit, libUnit},
+			Cached: []string{cliUnit, forgejoUnit, toolUnit, libUnit},
 		},
 		{
 			// The same question from the other end of the tree.
 			Name:   "editing another module invalidates only that module",
 			Edit:   cachetest.Edit("k8s/platform/forgejo/files/forgejo-resources/forgejoconfig.go", "package main\n\nfunc main() { _ = 1 }\n"),
 			Rerun:  []string{forgejoUnit},
-			Cached: []string{labUnit, woodpeckerUnit, toolUnit, libUnit},
+			Cached: []string{cliUnit, woodpeckerUnit, toolUnit, libUnit},
 		},
 		{
 			// Discovery growing a new module must not itself be a
@@ -196,7 +196,7 @@ func goScenarios() []cachetest.Scenario {
 			Name:   "adding a module leaves the existing modules cached",
 			Edit:   cachetest.AddFiles(addedGoModule),
 			Rerun:  []string{addedUnit},
-			Cached: []string{labUnit, woodpeckerUnit, forgejoUnit, toolUnit, libUnit},
+			Cached: []string{cliUnit, woodpeckerUnit, forgejoUnit, toolUnit, libUnit},
 		},
 		{
 			// A module that replaces another with a local path builds against
@@ -204,7 +204,7 @@ func goScenarios() []cachetest.Scenario {
 			Name:   "editing a local replace target invalidates it and the modules replacing it",
 			Edit:   cachetest.Edit(libPath, "package lib\n\nconst X = 2\n"),
 			Rerun:  []string{libUnit, toolUnit},
-			Cached: []string{labUnit, woodpeckerUnit, forgejoUnit},
+			Cached: []string{cliUnit, woodpeckerUnit, forgejoUnit},
 		},
 	}
 }

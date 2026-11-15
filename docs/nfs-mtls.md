@@ -89,17 +89,7 @@ ssh borg-0 ls -la /var/lib/nfs-mtls/
 
 ### 2. Deploy NixOS changes
 
-Deploy borg-2 first — it's the NFS server and must be ready before clients try mTLS mounts:
-
-```sh
-lab host deploy borg-2 --kured-reboot
-# Wait for kured to orchestrate the borg-2 reboot, then:
-lab host deploy borg-0 --kured-reboot
-lab host deploy borg-1 --kured-reboot
-lab host deploy borg-3 --kured-reboot
-```
-
-`--kured-reboot` activates the profile on next boot, and creates the sentinel file kured looks for to schedule the reboot with proper cordoning.
+Merge the change to `main`. The rollout ([nixos-cd.md](nixos-cd.md)) stages it on every host and reboots them one at a time through kured, borg-2 first. That order matters here: borg-2 is the NFS server and must be ready before clients try mTLS mounts.
 
 ### 3. Verify
 

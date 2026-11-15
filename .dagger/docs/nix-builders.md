@@ -8,9 +8,8 @@ be used, builds run in the Dagger engine's container as they always have.
 | --- | --- |
 | `status` | Probe every configured builder and say which ones a build would use |
 
-Builds that use the builders: `nix/validate` (see below), `nix/lab/build`,
-`nix lab binary-nix`, `nix/lab/vendor-hash`, and every devenv shell built from
-source (the ci toolchain when no published image applies, `nix devenv
+Builds that use the builders: `nix/validate` (see below), the system build in
+`nix host bootstrap`, and every devenv shell built from source (the ci toolchain when no published image applies, `nix devenv
 toolchain`, `nix devenv container`, and so the devenv releases). `nix/test`
 never uses them: its assertions need a cold, local store.
 
@@ -20,6 +19,10 @@ Builders are settings of the `nix` module's constructor, so they apply to
 `dagger check` and `dagger api call` alike. The `release` module builds the
 devenv images by calling `nix` as a dependency, which workspace settings do not
 reach, so it takes the same settings and passes them on: set both.
+
+The `nix host` functions (`diff`, `bootstrap`, `install`) log in to the hosts
+and installers with the same `sshAuthSock`, `sshConfig`, `sshUser` and
+`sshKnownHosts`, whether or not `nixBuilders` is set.
 
 | Setting | Value |
 | --- | --- |
@@ -161,15 +164,15 @@ evaluates them.
 
 ### Why the builders aren't substituters too
 
-Making each builder an `ssh-ng` substituter as well made evaluating the lab
-CLI's flake take about 10 seconds instead of 1, since Nix asked every builder
+Making each builder an `ssh-ng` substituter as well made evaluating a small Go
+package's flake take about 10 seconds instead of 1, since Nix asked every builder
 about every path. Asked to build a derivation it already has, a builder hands
 back the output instead, so nothing is lost.
 
 ## When builders help
 
 Measured on 2026-10-21, with the engine on borg-3 (i7-9750H, 12 threads) and
-a one-line change to the lab CLI:
+a one-line change to a small Go CLI (the since-removed `cmd/lab`):
 
 | | In the container | On borg-1 or borg-2 |
 | --- | --- | --- |

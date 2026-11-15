@@ -112,7 +112,7 @@ func newModule(ctx context.Context, source *dagger.Directory, modPath string, co
 
 // GoModule is one Go module.
 type GoModule struct {
-	// Path is the module's directory relative to the repo root (e.g. "cmd/lab").
+	// Path is the module's directory relative to the repo root (e.g. ".dagger/lib").
 	Path string
 	// +private
 	Source *dagger.Directory

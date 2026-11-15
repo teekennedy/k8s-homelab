@@ -296,7 +296,7 @@
       "enabled": false
     },
     {
-      "description": "Group every update by the directory its package file lives in, so each project folder (helm chart, Go module, Python project, nix flake, etc.) gets a single PR. A folder holding multiple ecosystems (e.g. cmd/lab has go.mod + flake.nix) is grouped together because they share the same packageFileDir. separateMajorMinor (default) still splits majors into their own PR.",
+      "description": "Group every update by the directory its package file lives in, so each project folder (helm chart, Go module, Python project, nix flake, etc.) gets a single PR. A folder holding multiple ecosystems is grouped together because they share the same packageFileDir. separateMajorMinor (default) still splits majors into their own PR.",
       "matchFileNames": [
         "**"
       ],
@@ -605,12 +605,11 @@
       "enabled": false
     },
     {
-      "description": "Tidy go.mod/go.sum and apply golangci-lint autofixes after any gomod update, for Go modules that need no other generated artifact. cmd/lab (nix vendorHash) and .dagger (SDK codegen via the dagger-go-sdk generator) have their own rules below with extra steps beyond go/modules/fix, so they're excluded here — matchFileNames uses negative patterns rather than rule ordering because postUpgradeTasks isn't a mergeable config option: if two matching packageRules both set it, the later match fully replaces the earlier one's commands rather than combining them. Without this rule, a bumped dependency can leave go.sum untidy (extra/stale checksum lines) and fail the `dagger check` gomod-tidy gate, blocking automerge — this is how a Go module's go.sum went untidy in the first place. go/modules/fix operates on every discovered Go module in the repo, not just the one that triggered it (same as the other `dagger generate` rules below), so fileFilters isn't scoped to a single directory.",
+      "description": "Tidy go.mod/go.sum and apply golangci-lint autofixes after any gomod update, for Go modules that need no other generated artifact. .dagger (SDK codegen via the dagger-go-sdk generator) has its own rule below with extra steps beyond go/modules/fix, so it's excluded here — matchFileNames uses negative patterns rather than rule ordering because postUpgradeTasks isn't a mergeable config option: if two matching packageRules both set it, the later match fully replaces the earlier one's commands rather than combining them. Without this rule, a bumped dependency can leave go.sum untidy (extra/stale checksum lines) and fail the `dagger check` gomod-tidy gate, blocking automerge — this is how a Go module's go.sum went untidy in the first place. go/modules/fix operates on every discovered Go module in the repo, not just the one that triggered it (same as the other `dagger generate` rules below), so fileFilters isn't scoped to a single directory.",
       "matchManagers": [
         "gomod"
       ],
       "matchFileNames": [
-        "!cmd/lab/**",
         "!.dagger/**"
       ],
       "postUpgradeTasks": {
@@ -618,25 +617,6 @@
           "dagger --progress=report generate go --generator fix -y"
         ],
         "fileFilters": [
-          "**/go.mod",
-          "**/go.sum",
-          "**/*.go"
-        ],
-        "executionMode": "branch"
-      }
-    },
-    {
-      "description": "Recompute the nix buildGoModule vendorHash after anything under cmd/lab changes. Renovate rewrites go.mod/go.sum which breaks the nix package. go/modules/fix runs first (tidying go.mod/go.sum and applying any golangci-lint autofixes a dependency bump requires, e.g. import changes) so the vendor hash is computed from the final, tidy go.mod/go.sum rather than Renovate's raw edit. go/modules/fix also touches every other Go module in the repo, hence the broad fileFilters alongside cmd/lab/** (needed for gomod.json, which holds the vendor hash).",
-      "matchFileNames": [
-        "cmd/lab/**"
-      ],
-      "postUpgradeTasks": {
-        "commands": [
-          "dagger --progress=report generate go --generator fix -y",
-          "dagger --progress=report generate nix/lab/vendor-hash -y"
-        ],
-        "fileFilters": [
-          "cmd/lab/**",
           "**/go.mod",
           "**/go.sum",
           "**/*.go"

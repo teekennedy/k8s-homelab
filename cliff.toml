@@ -21,7 +21,7 @@ conventional_commits = true
 filter_unconventional = true
 tag_pattern = "^devenv-(ci|shell)-[0-9]+\\.[0-9]+\\.[0-9]+$"
 # Only the devenv closure inputs trigger a release.
-include_paths = ["devenv.nix", "devenv.yaml", "devenv.lock", "cmd/lab/**"]
+include_paths = ["devenv.nix", "devenv.yaml", "devenv.lock"]
 # Any conventional commit touching those paths releases at least a patch, so a
 # Renovate `chore(deps)` lockfile bump publishes a refreshed image.
 sort_commits = "oldest"

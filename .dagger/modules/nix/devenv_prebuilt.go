@@ -33,8 +33,8 @@ const (
 var releaseVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 
 // toolchainFiles are the files the ci toolchain is built from: what the
-// toolchainSource constructor argument's +ignore lets through.
-var toolchainFiles = []string{"devenv.nix", "devenv.yaml", "devenv.lock", "cmd/lab/devenv.nix"}
+// devenvSource constructor argument's +ignore lets through.
+var toolchainFiles = []string{"devenv.nix", "devenv.yaml", "devenv.lock"}
 
 // ciReleaseJSON is the latest devenv-ci release, as CiRelease records it.
 // The release pipeline commits it to main after publishing the image.
@@ -73,7 +73,7 @@ func (m *Devenv) CiRelease(ctx context.Context, tag string) (*dagger.File, error
 	if err != nil {
 		return nil, fmt.Errorf("reading the platform of %s: %w", ref, err)
 	}
-	files, err := fileDigests(ctx, m.ToolchainSource, toolchainFiles)
+	files, err := fileDigests(ctx, m.Source, toolchainFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (m *Devenv) publishedCiShell(ctx context.Context) (*dagger.Container, error
 // changedSince returns the toolchain files whose contents differ from
 // release's.
 func (m *Devenv) changedSince(ctx context.Context, release ciRelease) ([]string, error) {
-	current, err := fileDigests(ctx, m.ToolchainSource, toolchainFiles)
+	current, err := fileDigests(ctx, m.Source, toolchainFiles)
 	if err != nil {
 		return nil, err
 	}

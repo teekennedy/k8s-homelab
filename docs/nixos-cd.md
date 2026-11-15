@@ -165,7 +165,7 @@ database.
    ```bash
    ./scripts/setup-ssh-ca.sh
    git add nix/modules/selfupdate/deploybot_user_ca.pub
-   lab host deploy borg-2 --boot   # and each other host
+   deploy --targets .#borg-2 --boot   # and each other host
    ```
 
    Until `deploybot_user_ca.pub` exists the module leaves the account, the

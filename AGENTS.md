@@ -1,8 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure
-- `cmd/lab/` contains the unified `lab` CLI (Go + cobra) for managing the homelab; built via its own `flake.nix` and available in devenv.
-- `config/` holds CUE-based configuration defining the different deployment environments. This config is used by the `lab` cli, Nix configuration, and kubernetes manifests (through helmfile).
+- `config/` holds CUE-based configuration defining the different deployment environments. This config is used by Nix configuration and kubernetes manifests (through helmfile).
 - `.dagger/modules/` holds the Dagger modules (Go SDK) that run CI checks, one per language or platform (`go`, `python`, `helmfile`, `nix`, …), installed in the root `dagger.toml`. `.dagger/lib` is Go code they share. See `.dagger/README.md`.
 - `nix/hosts/<hostname>/` holds host-specific NixOS modules, sops-encrypted `secrets.yaml`, and facter reports; Add configuration to `nix/hosts/common` for shared bits.
 - `nix/modules/` provides reusable Nix modules (e.g. `nix/modules/k3s`) that get imported by multiple hosts; extend here before duplicating config.
@@ -26,7 +25,7 @@ In-cluster secrets, such OIDC client secrets or an admin password for an in-clus
 
 ## Release Automation
 - Container releases share `.dagger/modules/release/releases.json`, `scripts/release.sh`, and `.woodpecker/release-{tag,}.yaml`. Each project defines a working directory, git-cliff config, and artifact tag prefixes. `dagger api call release publish` selects the build from that manifest.
-- Devenv uses root `cliff.toml`. One semver bump creates `devenv-ci-<version>` (ci) and `devenv-shell-<version>` (ci + interactive), skipping either whose image Nix store path matches its latest release (`scripts/release-plan.sh`). Only `devenv.nix`, `devenv.yaml`, `devenv.lock`, and `cmd/lab/**` trigger devenv releases.
+- Devenv uses root `cliff.toml`. One semver bump creates `devenv-ci-<version>` (ci) and `devenv-shell-<version>` (ci + interactive), skipping either whose image Nix store path matches its latest release (`scripts/release-plan.sh`). Only `devenv.nix`, `devenv.yaml`, and `devenv.lock` trigger devenv releases.
 - Forgejo resources uses `k8s/platform/forgejo/files/forgejo-resources/cliff.toml` and publishes `forgejo-resources-<version>`, starting at 1.0.0. The first release includes source history from before the directory rename.
 - The OpenHands sandbox uses `k8s/apps/openhands/files/sandbox/cliff.toml` and publishes `openhands-sandbox-<version>`, starting at 0.2.0.
 - The wake word trainer uses `k8s/apps/wake-word-trainer/files/image/cliff.toml` and publishes `wake-word-trainer-<version>`, starting at 0.1.0.

@@ -1,6 +1,4 @@
 require_version: true
-imports:
-  - ./cmd/lab
 inputs:
   dagger:
     url: github:dagger/nix?ref=main

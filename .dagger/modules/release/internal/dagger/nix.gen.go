@@ -50,20 +50,17 @@ type NixDevenvUpdateOpts = core.NixDevenvUpdateOpts
 // the cache for other projects.
 type NixDevenvProject = core.NixDevenvProject
 
-// Lab builds the lab CLI.
-type NixLab = core.NixLab
+// NixosHost operates on one NixOS host of the flake.
+type NixNixosHost = core.NixNixosHost
 
-// NixLabBinaryOpts contains options for NixLab.Binary
-type NixLabBinaryOpts = core.NixLabBinaryOpts
+// NixNixosHostBootstrapOpts contains options for NixNixosHost.Bootstrap
+type NixNixosHostBootstrapOpts = core.NixNixosHostBootstrapOpts
 
-// NixLabBinaryNixOpts contains options for NixLab.BinaryNix
-type NixLabBinaryNixOpts = core.NixLabBinaryNixOpts
+// NixNixosHostDiffOpts contains options for NixNixosHost.Diff
+type NixNixosHostDiffOpts = core.NixNixosHostDiffOpts
 
-// NixLabBuildOpts contains options for NixLab.Build
-type NixLabBuildOpts = core.NixLabBuildOpts
-
-// NixLabVendorHashOpts contains options for NixLab.VendorHash
-type NixLabVendorHashOpts = core.NixLabVendorHashOpts
+// NixNixosHostInstallOpts contains options for NixNixosHost.Install
+type NixNixosHostInstallOpts = core.NixNixosHostInstallOpts
 
 // NixOpts contains options for Query.Nix
 type NixOpts = core.NixOpts

@@ -386,7 +386,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithDescription("Runs the module's Go tests.\n\nTests that need a real engine skip here; IntegrationTest runs them.").
 							WithSourceMap(dag.SourceMap("go.go", 199, 1)).
 							WithCheck()).
-					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root (e.g. \"cmd/lab\").", SourceMap: dag.SourceMap("go.go", 116, 2)})), nil
+					WithField("Path", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "Path is the module's directory relative to the repo root (e.g. \".dagger/lib\").", SourceMap: dag.SourceMap("go.go", 116, 2)})), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

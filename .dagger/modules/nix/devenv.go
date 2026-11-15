@@ -29,15 +29,9 @@ const imageSource = "https://github.com/teekennedy/k8s-homelab"
 // Devenv builds containers from the repo's devenv definition.
 type Devenv struct {
 	// Source holds the files devenv reads to build any profile: devenv.nix,
-	// devenv.yaml, devenv.lock, and all of cmd/lab, which devenv.yaml imports
-	// and whose CLI the interactive profile builds from source.
+	// devenv.yaml and devenv.lock.
 	// +private
 	Source *dagger.Directory
-	// ToolchainSource is Source without the lab CLI's own source. The ci and
-	// integration profiles never build the CLI, so editing it must not
-	// invalidate the container every check runs in.
-	// +private
-	ToolchainSource *dagger.Directory
 	// +private
 	Builders *Builders
 }
@@ -53,9 +47,6 @@ var ciProfiles = []string{"ci"}
 // integration workflow adds "integration", which brings kubectl and curl; no
 // check runs with it, so `dagger check` keeps running in a container that
 // cannot reach a cluster even if something tried.
-//
-// It is built without the lab CLI's source, so it cannot build the
-// "interactive" profile, which installs the CLI; use Container for that.
 func (m *Devenv) Toolchain(
 	ctx context.Context,
 	// devenv profiles to activate (https://devenv.sh/profiles/).
@@ -63,7 +54,7 @@ func (m *Devenv) Toolchain(
 	// +default=["ci"]
 	profiles []string,
 ) (*dagger.Container, error) {
-	shell, err := m.shell(ctx, m.ToolchainSource, nil, profiles)
+	shell, err := m.shell(ctx, m.Source, nil, profiles)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +71,7 @@ func (m *Devenv) CiToolchain(ctx context.Context) (*dagger.Container, error) {
 		warnf("building the devenv ci toolchain from source: %v", err)
 	}
 	if shell == nil {
-		if shell, err = m.shell(ctx, m.ToolchainSource, nil, ciProfiles); err != nil {
+		if shell, err = m.shell(ctx, m.Source, nil, ciProfiles); err != nil {
 			return nil, err
 		}
 	}

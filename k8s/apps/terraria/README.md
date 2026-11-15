@@ -21,7 +21,7 @@ This application deploys a TShock-based Terraria server using the bjw-s-labs `ap
 ## First-time setup
 
 1. Deploy/sync the Argo CD application:
-   - `lab k8s --env production sync terraria`
+   - `argocd app sync terraria`
 2. Verify the pod and PVCs:
    - `kubectl -n terraria get pods,pvc`
 3. Confirm Traefik has the TCP route:

@@ -9,7 +9,6 @@ when:
         - devenv.nix
         - devenv.yaml
         - devenv.lock
-        - "cmd/lab/**"
         - "k8s/platform/forgejo/files/forgejo-resources/**"
         - "k8s/apps/openhands/files/sandbox/**"
 
@@ -39,7 +38,6 @@ steps:
             - devenv.nix
             - devenv.yaml
             - devenv.lock
-            - "cmd/lab/**"
     image: alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     environment:
       _EXPERIMENTAL_DAGGER_RUNNER_HOST: "kube-pod://dagger-engine-dagger-helm-engine-0?namespace=dagger-engine&container=dagger-engine"

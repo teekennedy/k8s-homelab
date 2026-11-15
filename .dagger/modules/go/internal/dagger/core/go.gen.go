@@ -219,7 +219,7 @@ func (r *GoModule) IntegrationTest(ctx context.Context) error {
 	return q.Execute(ctx)
 }
 
-// Path is the module's directory relative to the repo root (e.g. "cmd/lab").
+// Path is the module's directory relative to the repo root (e.g. ".dagger/lib").
 func (r *GoModule) Path(ctx context.Context) (string, error) {
 	if r.path != nil {
 		return *r.path, nil

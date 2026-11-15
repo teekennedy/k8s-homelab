@@ -394,7 +394,7 @@ func (b *Builders) withSSH(c *dagger.Container) *dagger.Container {
 // what they hand out.
 //
 // The builders are not substituters as well. Asking each of them about every
-// path made evaluating the lab CLI take 10 seconds rather than 1, and a
+// path made evaluating a small flake take 10 seconds rather than 1, and a
 // builder hands back a path it already has when it is asked to build it.
 func (r *remoteNix) configure(c *dagger.Container) *dagger.Container {
 	config := []string{
