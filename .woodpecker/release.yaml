@@ -30,8 +30,9 @@ steps:
         serviceAccountName: dagger-pipeline
     commands:
       - apk add --no-cache curl kubectl jq git git-cliff openssh-client
-      # The CLI must match the in-cluster engine, so take its version from there.
-      - export DAGGER_VERSION="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:v||p' k8s/platform/dagger-engine/values.yaml)"
+      # The CLI must match the engine that is running now, which is not necessarily
+      # the version in values.yaml until the change is deployed.
+      - export DAGGER_VERSION="$(kubectl --namespace dagger-engine get pod dagger-engine-dagger-helm-engine-0 --output jsonpath='{.spec.containers[?(@.name=="dagger-engine")].image}' | sed -E 's|^.*:v([^:@]+)(@.*)?$|\1|')"
       - test -n "$DAGGER_VERSION"
       - curl -fsSL https://dl.dagger.io/dagger/install.sh | BIN_DIR=/usr/local/bin sh
       # Export the run's traces, logs and metrics to Grafana (Tempo/Loki/Prometheus).

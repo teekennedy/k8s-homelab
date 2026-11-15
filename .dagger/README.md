@@ -306,8 +306,8 @@ load errors it reports, then run it again to confirm. Doc comments are part of
 the bindings, so editing one makes them stale too.
 
 Keep `engineVersion` in each `dagger-module.toml` at the engine's version
-(`k8s/platform/dagger-engine/values.yaml`), which is also the CLI that CI and
-Renovate install.
+(`k8s/platform/dagger-engine/values.yaml`). Renovate installs that version;
+Woodpecker installs whichever version the running engine pod reports.
 
 ## Cache-granularity tests
 
