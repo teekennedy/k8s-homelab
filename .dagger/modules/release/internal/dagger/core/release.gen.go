@@ -79,6 +79,12 @@ func (r *Release) WithGraphQLQuery(q *querybuilder.Selection) *Release {
 	}
 }
 
+// withLoadedID is the Release that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Release) withLoadedID(q *querybuilder.Selection, id ID) *Release {
+	return &Release{query: q, id: &id}
+}
+
 // ReleaseBuildOpts contains options for Release.Build
 type ReleaseBuildOpts struct {
 	Source *Directory

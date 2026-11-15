@@ -31,6 +31,12 @@ func (r *Kubernetes) WithGraphQLQuery(q *querybuilder.Selection) *Kubernetes {
 	}
 }
 
+// withLoadedID is the Kubernetes that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Kubernetes) withLoadedID(q *querybuilder.Selection, id ID) *Kubernetes {
+	return &Kubernetes{query: q, id: &id}
+}
+
 // DevCluster is a k3s cluster that keeps its state between runs: starting a
 // cluster of the same name again resumes it, with its releases and volumes.
 // It runs for as long as the call that started it does, so it is used with
@@ -270,6 +276,12 @@ func (r *KubernetesIntegrationReport) WithGraphQLQuery(q *querybuilder.Selection
 	}
 }
 
+// withLoadedID is the KubernetesIntegrationReport that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *KubernetesIntegrationReport) withLoadedID(q *querybuilder.Selection, id ID) *KubernetesIntegrationReport {
+	return &KubernetesIntegrationReport{query: q, id: &id}
+}
+
 // A unique identifier for this KubernetesIntegrationReport.
 func (r *KubernetesIntegrationReport) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
@@ -372,6 +384,12 @@ func (r *KubernetesIntegrationRun) WithGraphQLQuery(q *querybuilder.Selection) *
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the KubernetesIntegrationRun that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *KubernetesIntegrationRun) withLoadedID(q *querybuilder.Selection, id ID) *KubernetesIntegrationRun {
+	return &KubernetesIntegrationRun{query: q, id: &id}
 }
 
 // Failed names the releases whose tests did not all pass. Empty is a pass;

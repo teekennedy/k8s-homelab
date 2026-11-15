@@ -29,6 +29,12 @@ func (r *Cue) WithGraphQLQuery(q *querybuilder.Selection) *Cue {
 	}
 }
 
+// withLoadedID is the Cue that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Cue) withLoadedID(q *querybuilder.Selection, id ID) *Cue {
+	return &Cue{query: q, id: &id}
+}
+
 // CueExportOpts contains options for Cue.Export
 type CueExportOpts struct {
 	Source *Directory

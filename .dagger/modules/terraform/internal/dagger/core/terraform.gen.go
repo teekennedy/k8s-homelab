@@ -55,6 +55,12 @@ func (r *Terraform) WithGraphQLQuery(q *querybuilder.Selection) *Terraform {
 	}
 }
 
+// withLoadedID is the Terraform that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Terraform) withLoadedID(q *querybuilder.Selection, id ID) *Terraform {
+	return &Terraform{query: q, id: &id}
+}
+
 // TerraformAuditOpts contains options for Terraform.Audit
 type TerraformAuditOpts struct {
 	Source *Directory
@@ -208,6 +214,12 @@ func (r *TerraformModule) WithGraphQLQuery(q *querybuilder.Selection) *Terraform
 	}
 }
 
+// withLoadedID is the TerraformModule that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *TerraformModule) withLoadedID(q *querybuilder.Selection, id ID) *TerraformModule {
+	return &TerraformModule{query: q, id: &id}
+}
+
 // A unique identifier for this TerraformModule.
 func (r *TerraformModule) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
@@ -330,6 +342,12 @@ func (r *TerraformModules) WithGraphQLQuery(q *querybuilder.Selection) *Terrafor
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the TerraformModules that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *TerraformModules) withLoadedID(q *querybuilder.Selection, id ID) *TerraformModules {
+	return &TerraformModules{query: q, id: &id}
 }
 
 // Module returns the OpenTofu module at path. It carries all of terraform/,

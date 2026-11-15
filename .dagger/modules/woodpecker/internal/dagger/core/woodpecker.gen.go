@@ -41,6 +41,12 @@ func (r *Woodpecker) WithGraphQLQuery(q *querybuilder.Selection) *Woodpecker {
 	}
 }
 
+// withLoadedID is the Woodpecker that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Woodpecker) withLoadedID(q *querybuilder.Selection, id ID) *Woodpecker {
+	return &Woodpecker{query: q, id: &id}
+}
+
 // A unique identifier for this Woodpecker.
 func (r *Woodpecker) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {

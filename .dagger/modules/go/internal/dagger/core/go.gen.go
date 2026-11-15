@@ -29,6 +29,12 @@ func (r *Go) WithGraphQLQuery(q *querybuilder.Selection) *Go {
 	}
 }
 
+// withLoadedID is the Go that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Go) withLoadedID(q *querybuilder.Selection, id ID) *Go {
+	return &Go{query: q, id: &id}
+}
+
 // A unique identifier for this Go.
 func (r *Go) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
@@ -129,6 +135,12 @@ func (r *GoModule) WithGraphQLQuery(q *querybuilder.Selection) *GoModule {
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the GoModule that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *GoModule) withLoadedID(q *querybuilder.Selection, id ID) *GoModule {
+	return &GoModule{query: q, id: &id}
 }
 
 // Tidies go.mod and applies golangci-lint's fixes.
@@ -270,6 +282,12 @@ func (r *GoModules) WithGraphQLQuery(q *querybuilder.Selection) *GoModules {
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the GoModules that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *GoModules) withLoadedID(q *querybuilder.Selection, id ID) *GoModules {
+	return &GoModules{query: q, id: &id}
 }
 
 // Module returns the Go module at path, carrying only its own files and its

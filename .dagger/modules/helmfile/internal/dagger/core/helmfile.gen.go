@@ -31,6 +31,12 @@ func (r *Helmfile) WithGraphQLQuery(q *querybuilder.Selection) *Helmfile {
 	}
 }
 
+// withLoadedID is the Helmfile that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Helmfile) withLoadedID(q *querybuilder.Selection, id ID) *Helmfile {
+	return &Helmfile{query: q, id: &id}
+}
+
 // A unique identifier for this Helmfile.
 func (r *Helmfile) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
@@ -186,6 +192,12 @@ func (r *HelmfileRelease) WithGraphQLQuery(q *querybuilder.Selection) *HelmfileR
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the HelmfileRelease that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *HelmfileRelease) withLoadedID(q *querybuilder.Selection, id ID) *HelmfileRelease {
+	return &HelmfileRelease{query: q, id: &id}
 }
 
 // Audits the rendered manifests with Trivy.
@@ -393,6 +405,12 @@ func (r *HelmfileReleases) WithGraphQLQuery(q *querybuilder.Selection) *Helmfile
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the HelmfileReleases that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *HelmfileReleases) withLoadedID(q *querybuilder.Selection, id ID) *HelmfileReleases {
+	return &HelmfileReleases{query: q, id: &id}
 }
 
 // Release returns the release called name.

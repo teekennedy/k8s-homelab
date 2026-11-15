@@ -29,6 +29,12 @@ func (r *Python) WithGraphQLQuery(q *querybuilder.Selection) *Python {
 	}
 }
 
+// withLoadedID is the Python that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Python) withLoadedID(q *querybuilder.Selection, id ID) *Python {
+	return &Python{query: q, id: &id}
+}
+
 // A unique identifier for this Python.
 func (r *Python) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
@@ -127,6 +133,12 @@ func (r *PythonProject) WithGraphQLQuery(q *querybuilder.Selection) *PythonProje
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the PythonProject that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *PythonProject) withLoadedID(q *querybuilder.Selection, id ID) *PythonProject {
+	return &PythonProject{query: q, id: &id}
 }
 
 // Formats the project with black.
@@ -280,6 +292,12 @@ func (r *PythonProjects) WithGraphQLQuery(q *querybuilder.Selection) *PythonProj
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the PythonProjects that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *PythonProjects) withLoadedID(q *querybuilder.Selection, id ID) *PythonProjects {
+	return &PythonProjects{query: q, id: &id}
 }
 
 // Project returns the Python project at path, carrying only its own files, so

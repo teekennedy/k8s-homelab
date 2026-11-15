@@ -31,6 +31,12 @@ func (r *Nix) WithGraphQLQuery(q *querybuilder.Selection) *Nix {
 	}
 }
 
+// withLoadedID is the Nix that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Nix) withLoadedID(q *querybuilder.Selection, id ID) *Nix {
+	return &Nix{query: q, id: &id}
+}
+
 // Builders reports on the remote Nix builders the Nix and devenv builds use.
 func (r *Nix) Builders() *NixBuilders {
 	q := r.query.Select("builders")
@@ -235,6 +241,12 @@ func (r *NixBuilders) WithGraphQLQuery(q *querybuilder.Selection) *NixBuilders {
 	}
 }
 
+// withLoadedID is the NixBuilders that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *NixBuilders) withLoadedID(q *querybuilder.Selection, id ID) *NixBuilders {
+	return &NixBuilders{query: q, id: &id}
+}
+
 // A unique identifier for this NixBuilders.
 func (r *NixBuilders) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
@@ -325,6 +337,12 @@ func (r *NixDevenv) WithGraphQLQuery(q *querybuilder.Selection) *NixDevenv {
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the NixDevenv that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *NixDevenv) withLoadedID(q *querybuilder.Selection, id ID) *NixDevenv {
+	return &NixDevenv{query: q, id: &id}
 }
 
 // CiRelease records the published devenv-ci image for tag and the toolchain
@@ -647,6 +665,12 @@ func (r *NixDevenvProject) WithGraphQLQuery(q *querybuilder.Selection) *NixDeven
 	}
 }
 
+// withLoadedID is the NixDevenvProject that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *NixDevenvProject) withLoadedID(q *querybuilder.Selection, id ID) *NixDevenvProject {
+	return &NixDevenvProject{query: q, id: &id}
+}
+
 // A unique identifier for this NixDevenvProject.
 func (r *NixDevenvProject) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
@@ -758,6 +782,12 @@ func (r *NixNixosHost) WithGraphQLQuery(q *querybuilder.Selection) *NixNixosHost
 		// must be reevaluated.
 		refetchID: true,
 	}
+}
+
+// withLoadedID is the NixNixosHost that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *NixNixosHost) withLoadedID(q *querybuilder.Selection, id ID) *NixNixosHost {
+	return &NixNixosHost{query: q, id: &id}
 }
 
 // NixNixosHostBootstrapOpts contains options for NixNixosHost.Bootstrap

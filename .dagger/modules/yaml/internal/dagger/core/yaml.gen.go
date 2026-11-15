@@ -41,6 +41,12 @@ func (r *Yaml) WithGraphQLQuery(q *querybuilder.Selection) *Yaml {
 	}
 }
 
+// withLoadedID is the Yaml that q, a query of the node whose
+// ID is id, selects, knowing that ID (Loaded).
+func (r *Yaml) withLoadedID(q *querybuilder.Selection, id ID) *Yaml {
+	return &Yaml{query: q, id: &id}
+}
+
 // A unique identifier for this Yaml.
 func (r *Yaml) ID(ctx context.Context) (ID, error) {
 	if r.id != nil {
