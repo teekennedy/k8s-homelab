@@ -50,19 +50,20 @@ _productionApps: {
 			"woodpecker":        true
 		}
 		apps: {
-			"copyparty": true
-			"freshrss":  true
-			"gauntlet":  true
-			"homepage":  true
-			"jellyfin":  true
-			"joplin":    true
-			"openhands": true
-			"redteam":   true
-			"romm":      true
-			"seerr":     true
-			"spoolman":  true
-			"syncthing": true
-			"terraria":  true
+			"copyparty":         true
+			"freshrss":          true
+			"gauntlet":          true
+			"homepage":          true
+			"jellyfin":          true
+			"joplin":            true
+			"openhands":         true
+			"redteam":           true
+			"romm":              true
+			"seerr":             true
+			"spoolman":          true
+			"syncthing":         true
+			"terraria":          true
+			"wake-word-trainer": true
 		}
 	}
 }

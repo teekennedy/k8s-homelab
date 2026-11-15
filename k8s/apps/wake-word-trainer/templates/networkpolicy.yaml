@@ -1,0 +1,105 @@
+{{- $fullName := include "wake-word-trainer.fullname" . -}}
+---
+# The collector trusts nothing about its callers but their route: people and
+# the device arrive through oauth2-proxy (which skips SSO only for POST
+# /capture, where the capture token is checked), the trainer and publisher
+# call the token-checked /internal API, and the scraper reads /metrics.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullName }}-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "wake-word-trainer.collectorSelectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: oauth2-proxy
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        - podSelector:
+            matchLabels:
+              {{- include "wake-word-trainer.trainerSelectorLabels" . | nindent 14 }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.monitoringNamespace }}
+      ports:
+        - port: http
+          protocol: TCP
+  egress:
+    {{- include "wake-word-trainer.egressDNS" . | nindent 4 }}
+    # The apiserver, for "train now": host-networked, so the node VLAN.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.nodeCidr }}
+      ports:
+        - port: 6443
+          protocol: TCP
+    # Hugging Face, for the one-time Whisper model download.
+    {{- include "wake-word-trainer.egressInternet" . | nindent 4 }}
+---
+# Training needs nothing outside the cluster: the datasets are on the work
+# volume. Only the collector's API, for the gate, the dataset and the result.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullName }}-trainer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "wake-word-trainer.trainerSelectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    {{- include "wake-word-trainer.egressDNS" . | nindent 4 }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "wake-word-trainer.collectorSelectorLabels" . | nindent 14 }}
+      ports:
+        - port: {{ .Values.collector.port }}
+          protocol: TCP
+---
+# The seed downloads from Hugging Face, GitHub and the dataset mirrors, and
+# talks to nothing in the cluster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullName }}-seed
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "wake-word-trainer.seedSelectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    {{- include "wake-word-trainer.egressDNS" . | nindent 4 }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 80
+          protocol: TCP

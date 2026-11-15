@@ -1,0 +1,81 @@
+{{- $fullName := include "wake-word-trainer.fullname" . -}}
+{{- if .Values.metrics.serviceMonitor.enabled }}
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/monitoring.coreos.com/servicemonitor_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $fullName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "wake-word-trainer.collectorSelectorLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+{{- end }}
+{{- if .Values.metrics.prometheusRule.enabled }}
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/datreeio/CRDs-catalog/refs/heads/main/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: wake-word-trainer
+      rules:
+        - alert: WakeWordTrainerQueueStuck
+          # The processor transcribes a clip in seconds; a queue that has not
+          # drained for an hour means Whisper or the processor thread is stuck.
+          expr: min_over_time(wake_word_trainer_queue_depth[1h]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: {{ "Wake word clips are not being processed" | quote }}
+            description: {{ "The collector's processing queue has not emptied for an hour." | quote }}
+        - alert: WakeWordTrainerProcessorDown
+          expr: wake_word_trainer_processor_alive == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: {{ "The wake word clip processor thread has stopped" | quote }}
+        - alert: WakeWordTrainerRunFailed
+          expr: wake_word_trainer_last_run_success == 0
+          labels:
+            severity: warning
+          annotations:
+            summary: {{ "The last wake word training run failed" | quote }}
+            description: {{ "See the run page at https://wake-word.msng.to/runs." | quote }}
+        - alert: WakeWordTrainerGateNotRunning
+          # The CronJob runs the gate every night, whether or not it trains.
+          expr: time() - wake_word_trainer_last_gate_timestamp_seconds > 2 * 86400
+          labels:
+            severity: warning
+          annotations:
+            summary: {{ "The nightly wake word training gate has not run for two days" | quote }}
+        - alert: WakeWordTrainerNoCaptures
+          # Ambient samples alone arrive several times a day.
+          expr: time() - wake_word_trainer_last_capture_timestamp_seconds > 2 * 86400
+          labels:
+            severity: info
+          annotations:
+            summary: {{ "No wake word clips have arrived for two days" | quote }}
+            description: {{ "Check the Voice PE's capture token, firewall rule and logs." | quote }}
+{{- end }}

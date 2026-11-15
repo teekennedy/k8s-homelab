@@ -1,0 +1,18 @@
+apiVersion: v2
+name: wake-word-trainer
+description: Collects tagged audio from the Voice PE, holds doubtful clips for review, and retrains and publishes the "Okay GLaDOS" wake word model.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the wake-word-trainer image tag deployed by this chart.
+appVersion: "0.1.0"
+dependencies:
+  # Dedicated oauth2-proxy in reverse-proxy mode: it owns the hostname and
+  # forwards to the collector. See values.yaml.
+  - name: oauth2-proxy
+    version: 10.7.4
+    repository: oci://ghcr.io/oauth2-proxy/charts
+  # Shared glue: the Secret auth-system reflects to hash the client secret.
+  - name: oauth2-proxy-instance
+    version: 0.1.0
+    repository: file://../../charts/oauth2-proxy-instance

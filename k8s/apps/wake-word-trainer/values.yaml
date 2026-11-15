@@ -1,0 +1,231 @@
+# Wake word trainer: collects tagged audio from the Voice PE, holds doubtful
+# clips for review, retrains at night and publishes a model that beats the
+# current one. See README.md and docs/wake-word-trainer-plan.md.
+
+image:
+  # Built from files/image and released as wake-word-trainer-<version>.
+  repository: ghcr.io/teekennedy/k8s-homelab
+  tag: wake-word-trainer-0.1.0
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Owner of /storage/nas/backups/wake-word-trainer (nix/modules/nfs-mtls).
+uid: 2400
+# copyparty's UID: the publish folder belongs to it, and NFS ignores fsGroup.
+publishUid: 3923
+
+# --- Exposure ---------------------------------------------------------------
+# LAN only: the internal gateway's websecure listener. oauth2-proxy owns the
+# hostname (oauth2-proxy.gatewayApi below); POST /capture skips SSO and is
+# authenticated by the X-Capture-Token header instead.
+
+# --- Collector --------------------------------------------------------------
+collector:
+  port: 8080
+  whisper:
+    # whisper.cpp large-v3-turbo, the model family micro-wake-word's
+    # segmenter used, so its matching rules carry over. Downloaded once onto
+    # the state volume.
+    url: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+    file: ggml-large-v3-turbo.bin
+    threads: 4
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      # large-v3-turbo needs ~1.7 GiB resident while transcribing.
+      memory: 3Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --- Gate ---------------------------------------------------------------------
+# A nightly run needs this much new, usable (reviewed or unflagged) data
+# since the last successful run. true_reject clips alone never start a run.
+gate:
+  minPositives: 20
+  minFalseAccepts: 10
+
+# --- Trainer --------------------------------------------------------------------
+trainer:
+  # The gate runs nightly; a run only starts when it passes.
+  schedule: "0 2 * * *"
+  timeZone: America/Denver
+  # A full run took ~25 min on an M1 Max per repeat; give it most of a day.
+  activeDeadlineSeconds: 79200
+  # Training runs are high-variance: train this many times and keep the best
+  # by validation score.
+  repeats: 3
+  # Arguments to step4_train.py: v2g's recipe.
+  trainArgs: >-
+    --steps 18000 12000 --learning-rates 0.001 0.0003 --negative-class-weight 20 20
+    --batch-size 256 --eval-step-interval 500 --spec-augment-stages 1 --recorded-weight 0.4
+  # Parallel workers for checkpoint selection and evaluation. Keep equal to
+  # the CPU request.
+  workers: 6
+  # Promote only at or under this many false accepts per hour on the test set.
+  targetFaph: 0.1
+  # CPU only: TensorFlow has no usable path to the Intel iGPUs, which stay
+  # with Jellyfin. Size from the first measured run.
+  resources:
+    requests:
+      cpu: "6"
+      memory: 12Gi
+    limits:
+      memory: 24Gi
+  # Pin to a node with spare cores overnight.
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  publish:
+    # Rehearse on a scratch copy of the live folder; set false to publish.
+    dryRun: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
+# --- Seed -----------------------------------------------------------------------
+# One-time: downloads ~35 GB of datasets, generates the TTS samples and builds
+# the static feature sets onto the work volume. Exits at once when
+# <work>/.seeded exists, so it is safe to leave enabled.
+seed:
+  enabled: true
+  resources:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+    limits:
+      memory: 16Gi
+  nodeSelector: {}
+
+# Phone recordings to train alongside the device clips: copy them into
+# clips/phone/ on the NAS (recordings/ layout from micro-wake-word) before the
+# seed runs, which segments them once.
+phoneRecordings:
+  enabled: false
+
+# --- Persistence ------------------------------------------------------------------
+persistence:
+  # SQLite (clips, reviews, runs) and the Whisper model. Never NFS. Backed
+  # up: the review decisions are not rebuildable.
+  state:
+    storageClass: longhorn
+    size: 5Gi
+  # Downloaded datasets (~35 GB) and features (~45 GB): all rebuildable by
+  # the seed Job, so not backed up.
+  work:
+    storageClass: longhorn
+    size: 150Gi
+  # Device clips and run history on the NAS, where restic snapshots them.
+  # Pre-created with clips/ and runs/ by nix/modules/nfs-mtls.
+  data:
+    server: borg-2.msng.to
+    path: /backups/wake-word-trainer
+    storage: 200Gi
+  # Exactly the folder behind files.msng.to/share/public/glados_voice_assistant/.
+  publish:
+    server: borg-2.msng.to
+    path: /backups/copyparty/data/public/glados_voice_assistant
+    storage: 1Gi
+
+# --- Network ------------------------------------------------------------------------
+traefikNamespace: kube-system
+monitoringNamespace: monitoring-system
+networkPolicy:
+  # The apiserver is host-networked: the collector reaches it on the node
+  # VLAN, for the "train now" button.
+  nodeCidr: "10.69.80.0/25"
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: 60s
+    # kube-prometheus-stack in monitoring-system discovers by this label.
+    labels:
+      release: monitoring-system
+  prometheusRule:
+    enabled: true
+
+# --- SSO front door -----------------------------------------------------------------
+oauth2ProxyInstance:
+  # Must equal the Authelia client_id and the auth-system
+  # oidcClientSecrets.clients key.
+  clientId: wake-word-trainer
+  # Must equal oauth2-proxy.config.existingSecret.
+  secretName: wake-word-trainer-oauth2-proxy-secrets
+  labelsTemplate: wake-word-trainer.labels
+
+oauth2-proxy:
+  fullnameOverride: wake-word-trainer-auth
+  config:
+    existingSecret: wake-word-trainer-oauth2-proxy-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://wake-word.msng.to/oauth2/callback"
+      cookie_domains = ["wake-word.msng.to"]
+      cookie_name = "_oauth2_proxy_wake_word"
+      cookie_expire = "168h"
+      cookie_secure = true
+      cookie_httponly = true
+      # lax: a cross-site form cannot POST a review action with the cookie.
+      cookie_samesite = "lax"
+      whitelist_domains = ["wake-word.msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      code_challenge_method = "S256"
+      scope = "openid profile email groups"
+      real_client_ip_header = "X-Real-Ip"
+      skip_provider_button = true
+      allowed_groups = ["wake-word-reviewers", "full-admin"]
+      # The one hole: the device cannot do SSO. The collector checks
+      # X-Capture-Token on this route.
+      skip_auth_routes = ["POST=^/capture$"]
+      # The collector reads the reviewer's name from X-Forwarded-Preferred-Username.
+      pass_user_headers = true
+      upstreams = ["http://wake-word-trainer.wake-word-trainer.svc.cluster.local:8080/"]
+      trusted_proxy_ips = ["10.42.0.0/16"]
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  ingress:
+    enabled: false
+  # group, kind and weight are what the API server defaults them to. Spelled
+  # out because server-side apply otherwise reports them as drift.
+  gatewayApi:
+    enabled: true
+    gatewayRef:
+      group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecure
+    hostnames:
+      - wake-word.msng.to
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - group: ""
+            kind: Service
+            name: wake-word-trainer-auth
+            port: 80
+            weight: 1

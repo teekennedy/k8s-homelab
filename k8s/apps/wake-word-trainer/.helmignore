@@ -1,0 +1,2 @@
+# The image source is built by the release pipeline, not packaged with the chart.
+files/

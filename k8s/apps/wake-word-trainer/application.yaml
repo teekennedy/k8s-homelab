@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: wake-word-trainer
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: wake-word-trainer
+  project: default
+  ignoreDifferences:
+    - jsonPointers:
+        - /spec/volumeName
+        - /spec/storageClassName
+        # Longhorn reports the size in bytes, which ArgoCD reads as a diff.
+        - /spec/resources/requests/storage
+      kind: PersistentVolumeClaim
+    # Filled in-cluster by mittwald secret-generator; don't fight it.
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: wake-word-trainer-oauth2-proxy-secrets
+      namespace: wake-word-trainer
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: wake-word-trainer-capture-token
+      namespace: wake-word-trainer
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: wake-word-trainer-internal-token
+      namespace: wake-word-trainer
+  source:
+    path: k8s/apps/wake-word-trainer
+    repoURL: https://git.msng.to/ops/k8s-homelab
+    targetRevision: main
+    # Render with `helmfile template` instead of ArgoCD's native Helm support.
+    plugin:
+      name: helmfile
+  syncPolicy:
+    # LAN only: the internal gateway, never wspublic.
+    managedNamespaceMetadata:
+      labels:
+        internal-gateway-access: "true"
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true

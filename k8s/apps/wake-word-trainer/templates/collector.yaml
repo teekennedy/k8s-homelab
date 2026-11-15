@@ -1,0 +1,213 @@
+{{- $fullName := include "wake-word-trainer.fullname" . -}}
+{{- $c := .Values.collector -}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $fullName }}-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+# "Train now": read the nightly CronJob and create a Job from it. Nothing else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $fullName }}-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["cronjobs"]
+    resourceNames: [{{ include "wake-word-trainer.cronjobName" . | quote }}]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $fullName }}-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $fullName }}-collector
+subjects:
+  - kind: ServiceAccount
+    name: {{ $fullName }}-collector
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collector
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ $c.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "wake-word-trainer.collectorSelectorLabels" . | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullName }}-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collector
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  # Single writer: one SQLite database on a ReadWriteOnce volume.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "wake-word-trainer.collectorSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wake-word-trainer.labels" . | nindent 8 }}
+        app.kubernetes.io/component: collector
+    spec:
+      serviceAccountName: {{ $fullName }}-collector
+      # Only for "train now"; see the Role above.
+      automountServiceAccountToken: true
+      enableServiceLinks: false
+      securityContext:
+        {{- include "wake-word-trainer.podSecurityContext" . | nindent 8 }}
+      initContainers:
+        # Once per volume: later starts find the file and exit.
+        - name: fetch-model
+          image: {{ include "wake-word-trainer.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - fetch-model
+            - --url={{ $c.whisper.url }}
+            - --dest=/data/state/models/{{ $c.whisper.file }}
+          securityContext:
+            {{- include "wake-word-trainer.containerSecurityContext" . | nindent 12 }}
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: state
+              mountPath: /data/state
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: collector
+          image: {{ include "wake-word-trainer.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - serve
+            - --port={{ $c.port }}
+          env:
+            - name: WWT_STATE_DIR
+              value: /data/state
+            - name: WWT_CLIPS_DIR
+              value: /data/clips
+            - name: WWT_RUNS_DIR
+              value: /data/runs
+            - name: WWT_CAPTURE_TOKEN_FILE
+              value: /secrets/capture/token
+            - name: WWT_INTERNAL_TOKEN_FILE
+              value: /secrets/internal/token
+            - name: WWT_WHISPER_MODEL
+              value: /data/state/models/{{ $c.whisper.file }}
+            - name: WWT_WHISPER_THREADS
+              value: {{ $c.whisper.threads | quote }}
+            - name: WWT_GATE_MIN_POSITIVES
+              value: {{ .Values.gate.minPositives | quote }}
+            - name: WWT_GATE_MIN_FALSE_ACCEPTS
+              value: {{ .Values.gate.minFalseAccepts | quote }}
+            - name: WWT_RUN_TIMEOUT_HOURS
+              value: {{ div .Values.trainer.activeDeadlineSeconds 3600 | add1 | quote }}
+            - name: WWT_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: WWT_CRONJOB
+              value: {{ include "wake-word-trainer.cronjobName" . }}
+          ports:
+            - name: http
+              containerPort: {{ $c.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+            failureThreshold: 4
+          securityContext:
+            {{- include "wake-word-trainer.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml $c.resources | nindent 12 }}
+          volumeMounts:
+            - name: state
+              mountPath: /data/state
+            - name: data
+              mountPath: /data/clips
+              subPath: clips
+            - name: data
+              mountPath: /data/runs
+              subPath: runs
+              readOnly: true
+            - name: capture-token
+              mountPath: /secrets/capture
+              readOnly: true
+            - name: internal-token
+              mountPath: /secrets/internal
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: {{ $fullName }}-state
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $fullName }}-data
+        - name: capture-token
+          secret:
+            secretName: {{ $fullName }}-capture-token
+        - name: internal-token
+          secret:
+            secretName: {{ $fullName }}-internal-token
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+      {{- with $c.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $c.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $c.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

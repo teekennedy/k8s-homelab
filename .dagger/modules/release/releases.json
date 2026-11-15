@@ -43,5 +43,16 @@
         "description": "OpenHands agent server with kubectl, Dagger, and the Claude Code ACP adapter."
       }
     ]
+  },
+  "wake-word-trainer": {
+    "directory": "k8s/apps/wake-word-trainer/files/image",
+    "config": "cliff.toml",
+    "artifacts": [
+      {
+        "prefix": "wake-word-trainer",
+        "title": "Wake word trainer",
+        "description": "Collects, reviews and retrains the Okay GLaDOS microWakeWord model."
+      }
+    ]
   }
 }

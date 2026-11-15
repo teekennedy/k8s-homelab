@@ -342,3 +342,10 @@ releases:
     needs:
       - cert-system/cert-system
       - secret-system/secret-system
+
+  - name: wake-word-trainer
+    inherit:
+      - template: apps
+    needs:
+      - auth-system/auth-system
+      - secret-system/secret-system

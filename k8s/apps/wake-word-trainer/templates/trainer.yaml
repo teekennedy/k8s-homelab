@@ -1,0 +1,184 @@
+{{- $fullName := include "wake-word-trainer.fullname" . -}}
+{{- $t := .Values.trainer -}}
+---
+# Nightly: the gate, and a training run only when it passes. Two steps in one
+# pod: `train` (init container, the pipeline's UID) leaves a hand-off file,
+# and `publish` (copyparty's UID, the only writer of the public folder) acts
+# on it. The collector's "train now" button creates a Job from this template
+# with WWT_FORCE=1.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "wake-word-trainer.cronjobName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: trainer
+spec:
+  schedule: {{ $t.schedule | quote }}
+  timeZone: {{ $t.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "wake-word-trainer.labels" . | nindent 8 }}
+        app.kubernetes.io/component: trainer
+    spec:
+      # A failed run is reported to the collector and retried by the next
+      # night's gate, not by the Job.
+      backoffLimit: 0
+      activeDeadlineSeconds: {{ $t.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "wake-word-trainer.labels" . | nindent 12 }}
+            app.kubernetes.io/component: trainer
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          securityContext:
+            {{- include "wake-word-trainer.podSecurityContext" . | nindent 12 }}
+          initContainers:
+            - name: train
+              image: {{ include "wake-word-trainer.image" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: [train]
+              env:
+                {{- include "wake-word-trainer.pipelineEnv" . | nindent 16 }}
+                - name: WWT_COLLECTOR_URL
+                  value: {{ include "wake-word-trainer.collectorUrl" . }}
+                - name: WWT_INTERNAL_TOKEN_FILE
+                  value: /secrets/internal/token
+                - name: WWT_PUBLISHED_DIR
+                  value: /publish
+                - name: WWT_HANDOFF
+                  value: /handoff/run.json
+                - name: WWT_REPEATS
+                  value: {{ $t.repeats | quote }}
+                - name: WWT_TRAIN_ARGS
+                  value: {{ $t.trainArgs | quote }}
+                - name: WWT_WORKERS
+                  value: {{ $t.workers | quote }}
+                - name: WWT_TARGET_FAPH
+                  value: {{ $t.targetFaph | quote }}
+                - name: WWT_FORCE
+                  value: "0"
+              securityContext:
+                {{- include "wake-word-trainer.containerSecurityContext" . | nindent 16 }}
+              resources:
+                {{- toYaml $t.resources | nindent 16 }}
+              volumeMounts:
+                - name: work
+                  mountPath: /data/work
+                - name: data
+                  mountPath: /data/clips
+                  subPath: clips
+                  readOnly: true
+                - name: data
+                  mountPath: /data/runs
+                  subPath: runs
+                # The published model, to re-measure it on this run's test data.
+                - name: publish
+                  mountPath: /publish
+                  readOnly: true
+                - name: handoff
+                  mountPath: /handoff
+                - name: internal-token
+                  mountPath: /secrets/internal
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+                - name: shm
+                  mountPath: /dev/shm
+          containers:
+            - name: publish
+              image: {{ include "wake-word-trainer.image" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+                - publish
+                {{- if $t.publish.dryRun }}
+                - --dry-run
+                - --live-dir=/publish-live
+                {{- end }}
+              env:
+                - name: WWT_COLLECTOR_URL
+                  value: {{ include "wake-word-trainer.collectorUrl" . }}
+                - name: WWT_INTERNAL_TOKEN_FILE
+                  value: /secrets/internal/token
+                - name: WWT_PUBLISHED_DIR
+                  value: /publish
+                - name: WWT_HANDOFF
+                  value: /handoff/run.json
+              securityContext:
+                {{- include "wake-word-trainer.containerSecurityContext" . | nindent 16 }}
+                runAsUser: {{ .Values.publishUid }}
+                runAsGroup: {{ .Values.publishUid }}
+              resources:
+                {{- toYaml $t.publish.resources | nindent 16 }}
+              volumeMounts:
+                - name: data
+                  mountPath: /data/runs
+                  subPath: runs
+                  readOnly: true
+                {{- if $t.publish.dryRun }}
+                # A scratch copy: the dry run never touches the public folder.
+                - name: publish-scratch
+                  mountPath: /publish
+                - name: publish
+                  mountPath: /publish-live
+                  readOnly: true
+                {{- else }}
+                - name: publish
+                  mountPath: /publish
+                {{- end }}
+                - name: handoff
+                  mountPath: /handoff
+                  readOnly: true
+                - name: internal-token
+                  mountPath: /secrets/internal
+                  readOnly: true
+          volumes:
+            - name: work
+              persistentVolumeClaim:
+                claimName: {{ $fullName }}-work
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ $fullName }}-data
+            - name: publish
+              persistentVolumeClaim:
+                claimName: {{ $fullName }}-publish
+            {{- if $t.publish.dryRun }}
+            - name: publish-scratch
+              emptyDir:
+                sizeLimit: 64Mi
+            {{- end }}
+            - name: handoff
+              emptyDir:
+                sizeLimit: 1Mi
+            - name: internal-token
+              secret:
+                secretName: {{ $fullName }}-internal-token
+            - name: tmp
+              emptyDir:
+                sizeLimit: 8Gi
+            # Python multiprocessing (feature building, checkpoint sweeps).
+            - name: shm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 2Gi
+          {{- with $t.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $t.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $t.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

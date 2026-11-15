@@ -1,0 +1,93 @@
+{{- $fullName := include "wake-word-trainer.fullname" . -}}
+---
+# SQLite (clips, reviews, runs) and the Whisper model. Longhorn, never NFS.
+# Backed up: the review decisions cannot be rebuilt.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullName }}-state
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+    recurring-job.longhorn.io/source: "enabled"
+    recurring-job-group.longhorn.io/backup: "enabled"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.persistence.state.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.state.size }}
+---
+# Datasets, TTS samples, features and checkpoints: everything the seed Job
+# rebuilds, so only in the ephemeral (snapshot, no backup) group.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullName }}-work
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+    recurring-job.longhorn.io/source: "enabled"
+    recurring-job-group.longhorn.io/ephemeral: "enabled"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.persistence.work.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.work.size }}
+{{- range $vol := list "data" "publish" }}
+{{- with index $.Values.persistence $vol }}
+---
+{{- if eq $vol "data" }}
+# Device clips (clips/) and every run's logs, report and model (runs/), at
+# /storage/nas/backups/wake-word-trainer: restic snapshots the irreplaceable
+# part. Static mTLS NFS volume; the directories are pre-created by
+# nix/modules/nfs-mtls, owned by .Values.uid.
+{{- else }}
+# The public copyparty folder the device's model is served from
+# (files.msng.to/share/public/glados_voice_assistant/), and nothing above it.
+# Owned 3923 (copyparty), so only the publisher container, running as that
+# UID, writes here; the trainer mounts it read-only.
+{{- end }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $fullName }}-{{ $vol }}
+  labels:
+    {{- include "wake-word-trainer.labels" $ | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .storage }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.2
+    - xprtsec=mtls
+  nfs:
+    server: {{ .server }}
+    path: {{ .path }}
+  claimRef:
+    name: {{ $fullName }}-{{ $vol }}
+    namespace: {{ $.Release.Namespace }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullName }}-{{ $vol }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wake-word-trainer.labels" $ | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: {{ $fullName }}-{{ $vol }}
+  resources:
+    requests:
+      storage: {{ .storage }}
+{{- end }}
+{{- end }}
