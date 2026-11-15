@@ -82,6 +82,7 @@ oidcClientSecrets:
     freshrss: freshrss/freshrss-oidc-authelia
     romm: romm/romm-oidc-authelia
     seerr: seerr/seerr-oidc-authelia
+    wake-word-trainer: wake-word-trainer/wake-word-trainer-oauth2-proxy-secrets
   # The python-flavoured tag ships an interpreter, which must match
   # files/oidc-client-secrets/.python-version: uv never downloads one.
   image:
@@ -412,6 +413,15 @@ authelia:
                 subject: "group:full-admin"
               - policy: one_factor
                 subject: "group:seerr-users"
+          # Wake word trainer (k8s/apps/wake-word-trainer). Reviewers relabel
+          # and discard recorded room audio and can start a training run.
+          wake-word-trainer:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:full-admin"
+              - policy: one_factor
+                subject: "group:wake-word-reviewers"
           # Longhorn UI (k8s/foundation/longhorn-system). Can delete volumes,
           # replicas and backups, so admins only, always two_factor.
           longhorn:
@@ -462,6 +472,28 @@ authelia:
               - code
             redirect_uris:
               - https://openhands.msng.to/oauth2/callback
+          # The wake word trainer's review UI, fronted by oauth2-proxy in
+          # reverse-proxy mode; the device's capture upload skips it.
+          - client_id: wake-word-trainer
+            client_name: Wake word trainer
+            consent_mode: implicit
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/wake-word-trainer
+            token_endpoint_auth_method: client_secret_post
+            authorization_policy: wake-word-trainer
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+              - groups
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://wake-word.msng.to/oauth2/callback
           - client_id: argocd
             client_name: Argo CD
             consent_mode: implicit
@@ -809,6 +841,8 @@ authelia:
             path: romm
           - key: seerr
             path: seerr
+          - key: wake-word-trainer
+            path: wake-word-trainer
       smtp-creds:
         items:
           - key: password
