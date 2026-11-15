@@ -96,3 +96,33 @@ resource "unifi_firewall_policy" "allow_voice_assistant_tts" {
     port_matching_type = "SPECIFIC"
   }
 }
+
+# Allow the Voice PE to upload wake word captures to the wake-word-trainer
+# collector (k8s/apps/wake-word-trainer). Matches the /27 that covers both
+# MetalLB pools (internal 10.69.80.100-119, public 10.69.80.120-126) and none of
+# the node addresses, so the rule survives a VIP reassignment without opening
+# the nodes themselves.
+resource "unifi_firewall_policy" "allow_esphome_wake_word_capture" {
+  name        = "Allow ESPHome wake word capture"
+  description = "Allow ESPHome devices to upload wake word clips to the cluster ingress"
+  action      = "ALLOW"
+  protocol    = "tcp"
+  ip_version  = "IPV4"
+
+  source = {
+    zone_id         = unifi_firewall_zone.iot.id
+    matching_target = "NETWORK"
+    network_ids = [
+      unifi_network.vlans["esphome"].id,
+    ]
+  }
+
+  destination = {
+    zone_id         = data.unifi_firewall_zone.dmz.id
+    matching_target = "IP"
+    ips             = ["10.69.80.96/27"]
+
+    port               = "443"
+    port_matching_type = "SPECIFIC"
+  }
+}
