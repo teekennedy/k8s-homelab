@@ -370,6 +370,15 @@ forgejo-resources:
           members:
             - woodpecker-resources
   repositories:
+    # The okay_glados wake word pipeline (a fork of OHF-Voice/micro-wake-word)
+    # that k8s/apps/wake-word-trainer builds its image from. Push-mirrored to
+    # github.com/teekennedy/micro-wake-word by hand (README.md, "Manual steps")
+    # so the ESPHome builder can fetch its component without credentials:
+    # keep audio out of it.
+    - name: micro-wake-word
+      owner: tkennedy
+      description: microWakeWord fork with the Okay GLaDOS training pipeline
+      private: false
     - name: k8s-homelab
       owner: ops
       description: my bare-metal k8s homelab

@@ -112,6 +112,10 @@ the error usually surfaces at render time instead.
   `github.com/teekennedy/k8s-homelab` mirror has to be recreated in the Forgejo
   UI. `k8s/foundation/argocd/values-seed.yaml` bootstraps a fresh cluster from
   that mirror, so it is not optional.
+- **The micro-wake-word GitHub mirror.** Same limitation: the
+  `tkennedy/micro-wake-word` → `github.com/teekennedy/micro-wake-word` push
+  mirror is made in the Forgejo UI. The wake word trainer image and the Voice
+  PE's ESPHome build both fetch from that mirror.
 - **Woodpecker state.** Repo ownership is keyed on forge user IDs, which differ
   in a fresh instance. Expect to re-enable repositories, and be ready to wipe
   its volume.
