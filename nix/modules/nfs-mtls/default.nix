@@ -109,6 +109,9 @@ in {
     #                               kubelet would otherwise create root-owned)
     #   jellyfin        1200:1200   jellyfin server backups
     #   spoolman        1000:1000   spoolman database backups
+    #   wake-word-      2400:2400   device clips (0750: room audio) and training
+    #   trainer                     runs (0755: the publisher, as copyparty's
+    #                               3923, reads the model it promotes)
     systemd.tmpfiles.rules = lib.mkIf cfg.serverMode ([
         "d /storage/nas/k8s 0755 root root -"
         "d /storage/nas/backups/syncthing 0755 8384 8384 -"
@@ -119,6 +122,9 @@ in {
         "d /storage/nas/backups/arr-stack 0750 1200 1200 -"
         "d /storage/nas/backups/jellyfin 0750 1200 1200 -"
         "d /storage/nas/backups/spoolman 0750 1000 1000 -"
+        "d /storage/nas/backups/wake-word-trainer 0755 2400 2400 -"
+        "d /storage/nas/backups/wake-word-trainer/clips 0750 2400 2400 -"
+        "d /storage/nas/backups/wake-word-trainer/runs 0755 2400 2400 -"
       ]
       ++ map (app: "d /storage/nas/backups/arr-stack/${app} 0750 1200 1200 -") [
         "prowlarr"
