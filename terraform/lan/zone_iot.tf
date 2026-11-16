@@ -2,10 +2,10 @@
 resource "unifi_firewall_zone" "iot" {
   name = "IoT"
   network_ids = [
+    unifi_network.vlans["rain_machine"].id,
     unifi_network.vlans["xcel"].id,
     unifi_network.vlans["esphome"].id,
     unifi_network.vlans["roombas"].id,
-    unifi_network.vlans["rain_machine"].id,
   ]
 }
 
@@ -108,6 +108,10 @@ resource "unifi_firewall_policy" "allow_esphome_wake_word_capture" {
   action      = "ALLOW"
   protocol    = "tcp"
   ip_version  = "IPV4"
+
+  # DMZ -> IoT is blocked by default, so without this the SYN-ACK from the
+  # ingress is dropped and the device's connect times out.
+  create_allow_respond = true
 
   source = {
     zone_id         = unifi_firewall_zone.iot.id
