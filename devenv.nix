@@ -145,7 +145,7 @@ in {
       git-hooks.hooks.dagger-check = {
         enable = true;
         name = "dagger check";
-        entry = "${dagger}/bin/dagger --progress=plain check";
+        entry = "${dagger}/bin/dagger --progress=report check";
         language = "system";
         # Nothing about this hook is per-file: it always runs the whole suite.
         pass_filenames = false;
@@ -158,7 +158,7 @@ in {
       git-hooks.hooks.dagger-go-sdk-generate = {
         enable = true;
         name = "dagger generate dagger-go-sdk";
-        entry = "${dagger}/bin/dagger --progress=plain generate dagger-go-sdk -y";
+        entry = "${dagger}/bin/dagger --progress=report generate dagger-go-sdk -y";
         language = "system";
         files = "^(\\.dagger/|dagger\\.(lock|toml)$)";
         pass_filenames = false;
