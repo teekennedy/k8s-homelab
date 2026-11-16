@@ -314,6 +314,15 @@ def test_pages_render(client, app, transcriber):
     assert client.get(f"/clips/{clip['id']}/audio?n=5").status_code == 404
 
 
+def test_clip_page_boosts_playback_in_the_browser(client, app, transcriber):
+    # Quiet device clips are made audible client side; the stored WAV stays as recorded.
+    upload(client, "detected")
+    clip = only_clip(app)
+    html = client.get(f"/clips/{clip['id']}").text
+    assert "createMediaElementSource" in html
+    assert "playback level" in html
+
+
 def test_metrics(client, app, transcriber):
     upload(client, "detected")
     text = client.get("/metrics").text

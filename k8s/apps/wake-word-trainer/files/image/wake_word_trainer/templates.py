@@ -74,7 +74,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tile { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 .tile b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
 .tile span { color: var(--muted); font-size: 13px; }
-audio { width: 100%; max-width: 420px; height: 34px; }
+.player { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: 620px; }
+audio { flex: 1 1 260px; width: 100%; max-width: 420px; height: 34px; }
+.boost-note { font-variant-numeric: tabular-nums; }
 form.inline { display: inline-flex; gap: 6px; align-items: center; margin: 4px 8px 4px 0; }
 button, select { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line);
   background: var(--card); color: var(--fg); cursor: pointer; }
@@ -105,6 +107,90 @@ img.plot { max-width: 100%; border: 1px solid var(--line); border-radius: 6px; b
 <main>
 {% block content %}{% endblock %}
 </main>
+<script>
+// Playback boost for quiet device clips, done in the browser: the stored
+// WAV is never changed. Each player gets a level menu. "Auto" fetches the
+// clip once, finds its loudest sample and scales it to PEAK; the fixed
+// steps add plain gain. A limiter after the gain keeps any setting from
+// clipping or blasting a loud clip.
+(function () {
+  const PEAK = 0.5;          // auto target: -6 dBFS
+  const MAX_AUTO_DB = 48;    // never boost near-digital-silence by more
+  const STEPS = [["auto", "Auto level"], ["0", "Original"], ["12", "+12 dB"], ["24", "+24 dB"], ["36", "+36 dB"]];
+  const KEY = "wwt-boost";
+  let ctx = null;
+  const peaks = new Map();   // url -> Promise<peak>
+
+  function saved() {
+    try { return localStorage.getItem(KEY) || "auto"; } catch (e) { return "auto"; }
+  }
+  function save(v) {
+    try { localStorage.setItem(KEY, v); } catch (e) {}
+  }
+  function peakOf(url) {
+    if (!peaks.has(url)) {
+      peaks.set(url, fetch(url).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).then(buf => {
+        let p = 0;
+        for (let c = 0; c < buf.numberOfChannels; c++) {
+          const d = buf.getChannelData(c);
+          for (let i = 0; i < d.length; i++) { const v = Math.abs(d[i]); if (v > p) p = v; }
+        }
+        return p;
+      }).catch(() => 0));
+    }
+    return peaks.get(url);
+  }
+  async function apply(audio) {
+    const s = audio._boost;
+    if (!s || !s.gain) return;
+    const v = s.select.value;
+    let db = 0;
+    if (v === "auto") {
+      const p = await peakOf(audio.currentSrc || audio.src);
+      db = p > 0 ? Math.min(MAX_AUTO_DB, Math.max(0, 20 * Math.log10(PEAK / p))) : 0;
+    } else {
+      db = Number(v);
+    }
+    s.gain.gain.value = Math.pow(10, db / 20);
+    s.note.textContent = v === "auto" ? "+" + db.toFixed(0) + " dB" : "";
+  }
+  function wire(audio) {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+    const s = audio._boost;
+    if (s.gain) return;
+    const src = ctx.createMediaElementSource(audio);
+    s.gain = ctx.createGain();
+    const lim = ctx.createDynamicsCompressor();
+    lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20;
+    lim.attack.value = 0.002; lim.release.value = 0.1;
+    src.connect(s.gain).connect(lim).connect(ctx.destination);
+    // Silent until the level is known, so a play never starts at full boost.
+    s.gain.gain.value = 0;
+    apply(audio);
+  }
+  document.querySelectorAll("audio").forEach(audio => {
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "playback level");
+    select.className = "boost";
+    for (const [v, t] of STEPS) select.add(new Option(t, v));
+    select.value = saved();
+    const note = document.createElement("small");
+    note.className = "muted boost-note";
+    const box = document.createElement("span");
+    box.className = "player";
+    audio.replaceWith(box);
+    box.append(audio, select, note);
+    audio._boost = { select, note, gain: null };
+    audio.addEventListener("play", () => wire(audio));
+    select.addEventListener("change", () => {
+      save(select.value);
+      document.querySelectorAll("select.boost").forEach(o => { o.value = select.value; });
+      document.querySelectorAll("audio").forEach(apply);
+    });
+  });
+})();
+</script>
 </body>
 </html>
 """
