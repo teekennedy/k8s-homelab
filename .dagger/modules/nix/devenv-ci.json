@@ -4,7 +4,7 @@
   "platform": "linux/amd64",
   "files": {
     "devenv.lock": "sha256:635f86c98ca22d2771b8c6733f54f25fd2e6319517444756ea380d2deedddc67",
-    "devenv.nix": "sha256:45c599081f325397fba80b6eb02b5f8c2897e55be4de1cb57a6351289a396779",
+    "devenv.nix": "sha256:b1993d6be992f2dbf3ad981777d4c410a8df39b1fbc7aef4902d33155ca34d8a",
     "devenv.yaml": "sha256:9159b05660b8c9c408324f9a4da4726fd42d122893474065ca29689fef9abe74"
   }
 }
