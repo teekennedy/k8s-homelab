@@ -34,6 +34,7 @@ ACP_PROFILE_FIELDS = (
     "acp_model",
     "acp_session_mode",
     "acp_prompt_timeout",
+    "acp_effort",
     "acp_command",
     "acp_args",
 )
@@ -41,6 +42,7 @@ ACP_PROFILE_DEFAULTS = {
     "acp_model": None,
     "acp_session_mode": None,
     "acp_prompt_timeout": 1800.0,
+    "acp_effort": None,
     "acp_command": None,
     "acp_args": None,
 }

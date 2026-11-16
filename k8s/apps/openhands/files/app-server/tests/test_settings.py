@@ -263,3 +263,17 @@ def test_the_declared_session_mode_overrides_a_profile(api, user, state):
     assert state.settings_store.resolve_agent(None)["acp_session_mode"] == (
         "bypassPermissions"
     )
+
+
+def test_acp_effort_is_carried_from_profile_to_agent_settings(api, user, state):
+    api.post(
+        "/api/agent-profiles/default",
+        headers=user,
+        json={
+            "agent_kind": "acp",
+            "acp_server": "claude-code",
+            "acp_effort": "high",
+        },
+    )
+
+    assert state.settings_store.resolve_agent(None)["acp_effort"] == "high"
