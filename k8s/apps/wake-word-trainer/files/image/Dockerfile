@@ -33,7 +33,7 @@ RUN set -eux; \
 
 COPY --from=pipeline / /opt/micro-wake-word
 
-# Versions match the environments the published model was trained with.
+# versions match the environments the published model was trained with
 RUN set -eux; \
     uv venv --python 3.10 /opt/venv; \
     uv pip install --no-cache --python /opt/venv /opt/micro-wake-word \
