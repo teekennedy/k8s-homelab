@@ -33,7 +33,7 @@ TAIL_S = 0.15
 DETECTED_WINDOW_S = 2.5
 HARD_NEGATIVE_S = 3.2
 CHUNK_S = 3.0
-SILENT_DBFS = -55.0
+SILENT_DBFS = -70.0
 
 
 def plan(label: str, split: str, samples, words: list[Word]):
