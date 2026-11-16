@@ -23,23 +23,26 @@ START_GRACE_SECONDS = 120
 # to the conversation mid-run starts another turn, and the sandbox goes as
 # soon as the run ends, so a turn's end is not taken for the run's.
 IDLE_POLLS = 3
+# How long the app server may take to start the run's conversation: longer
+# than its repository checkout (300s) and its agent server start (120s).
+START_TIMEOUT_SECONDS = 600
 FAILED_STATES = ("error", "stuck", "paused", "waiting_for_confirmation", "deleting")
 
 
-def call(method: str, url: str, key: str, body: dict | None = None) -> dict:
+def call(
+    method: str, url: str, key: str, body: dict | None = None, timeout: int = 120
+) -> dict:
     request = urllib.request.Request(
         url,
         method=method,
         data=None if body is None else json.dumps(body).encode(),
         headers={"X-Session-API-Key": key, "Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(request, timeout=120) as response:
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read() or b"{}")
 
 
-def reason(agent_url: str, conversation_id: str, key: str) -> str:
-    """The conversation's last error, as a suffix for the run's own: without
-    it a run that hit a usage limit reads the same as one that crashed."""
+def latest_events(agent_url: str, conversation_id: str, key: str) -> list[dict]:
     try:
         page = call(
             "GET",
@@ -48,8 +51,20 @@ def reason(agent_url: str, conversation_id: str, key: str) -> str:
             key,
         )
     except Exception:
-        return ""
-    for event in page.get("items") or []:
+        return []
+    return page.get("items") or []
+
+
+def answered(agent_url: str, conversation_id: str, key: str) -> bool:
+    """Whether the agent has acted: a turn can start and end between polls."""
+    events = latest_events(agent_url, conversation_id, key)
+    return any(e.get("source") == "agent" for e in events)
+
+
+def reason(agent_url: str, conversation_id: str, key: str) -> str:
+    """The conversation's last error, as a suffix for the run's own: without
+    it a run that hit a usage limit reads the same as one that crashed."""
+    for event in latest_events(agent_url, conversation_id, key):
         if event.get("kind") == "ConversationErrorEvent":
             return f": {event.get('code')}: {(event.get('detail') or '')[:400]}"
     return ""
@@ -65,17 +80,18 @@ def wait(agent_url: str, conversation_id: str, key: str) -> str | None:
         status = info.get("execution_status")
         if status == "running":
             ran = True
-            idle = 0
-        elif status == "finished" or (status == "idle" and ran):
+        elif status == "idle" and not ran:
+            ran = answered(agent_url, conversation_id, key)
+        if status == "finished" or (status == "idle" and ran):
             idle += 1
             if idle >= IDLE_POLLS:
                 return None
-        elif status in FAILED_STATES:
-            return (
-                f"conversation ended {status}{reason(agent_url, conversation_id, key)}"
-            )
-        elif time.monotonic() - started > START_GRACE_SECONDS:
-            return f"conversation never started (status {status})"
+        else:
+            idle = 0
+            if status in FAILED_STATES:
+                return f"conversation ended {status}{reason(agent_url, conversation_id, key)}"
+            if status != "running" and time.monotonic() - started > START_GRACE_SECONDS:
+                return f"conversation never started (status {status})"
         time.sleep(POLL_SECONDS)
 
 
@@ -109,6 +125,7 @@ def main() -> int:
                 "follow_up_turns": payload.get("follow_up_turns"),
                 "conversation_id": os.environ.get("AUTOMATION_CONVERSATION_ID"),
             },
+            timeout=START_TIMEOUT_SECONDS,
         )
         result["conversation_id"] = started["id"]
         error = wait(agent_url, started["id"], key)

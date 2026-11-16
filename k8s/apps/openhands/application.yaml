@@ -52,6 +52,18 @@ spec:
       kind: Secret
       name: openhands-canvas-keys
       namespace: openhands
+    # Mirrors of monitoring-system Secrets, filled by reflector: Alertmanager's
+    # token for the alerts port, and the Discord webhook.
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: alertmanager-openhands-token
+      namespace: openhands
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: alertmanager-secrets
+      namespace: openhands
   source:
     path: k8s/apps/openhands
     repoURL: https://git.msng.to/ops/k8s-homelab

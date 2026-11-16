@@ -19,7 +19,7 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException, Request, Response
 from starlette.background import BackgroundTask
 
-from . import notify
+from . import alerts, notify
 from .sandboxes import SandboxManager
 
 log = logging.getLogger(__name__)
@@ -122,19 +122,26 @@ async def automation_complete(
         headers={"X-Session-API-Key": state.settings.automation_api_key},
         timeout=60,
     )
+    definition = state.automations.definition(name) or {}
+    if (
+        definition.get("trigger", {}).get("source") == alerts.SOURCE
+        and body.get("status") == "COMPLETED"
+    ):
+        state.alerts.triaged()
     return Response(
         resp.content,
         status_code=resp.status_code,
         media_type=resp.headers.get("content-type"),
         # After the response: the run script is waiting on it, not on Discord.
-        background=BackgroundTask(_report, state, name, body),
+        background=BackgroundTask(_report, state, name, definition, body),
     )
 
 
-async def _report(state: Any, name: str | None, body: dict[str, Any]) -> None:
+async def _report(
+    state: Any, name: str | None, definition: dict[str, Any], body: dict[str, Any]
+) -> None:
     """Post a finished run's outcome where its automation's `notify` says."""
-    definition = state.automations.definition(name)
-    if not definition or definition.get("notify") != "discord":
+    if definition.get("notify") != "discord":
         return
     try:
         await _post_report(state, name, body)
@@ -152,6 +159,7 @@ async def _post_report(state: Any, name: str, body: dict[str, Any]) -> None:
     await notify.discord(
         state.http,
         state.settings.discord_webhook_file,
+        avatar_url=state.settings.discord_avatar_url,
         title=name,
         url=(
             f"{state.settings.public_url}/conversations/{conv_id}"

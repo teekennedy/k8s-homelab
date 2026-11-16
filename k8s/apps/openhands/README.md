@@ -601,9 +601,11 @@ run script is a new upload, and the automations are moved onto it.
 
 A definition may also name a `repository` and `branch`, checked out at
 `/workspace/project` before the agent starts; the ACP `model` the run uses in
-place of the active profile's; and `notify: discord`, which posts the agent's
+place of the active profile's (a model of that profile's ACP server; with a
+non-ACP profile active it is ignored, with a warning in the log); and `notify: discord`, which posts the agent's
 final message, or why the run failed, to the webhook in the
-`notify.discord.secretName` Secret, linked to the conversation. The app server
+`notify.discord.secret` Secret under its own name and picture, linked to the
+conversation. The app server
 posts it when the run completes, so the agent never holds the webhook URL.
 These fields stay in the app server; the automation service sees only the
 trigger and timeout.
@@ -673,11 +675,14 @@ An alert storm becomes one run, through three layers:
    drain silences included) apply as they do to Discord. Its matcher is the
    ignore list: add an alert to `alertname !~ "…"` in
    `k8s/platform/monitoring-system/values.yaml`.
-2. **The app server** drops (not delays) an alert name forwarded within
-   `alerts.cooldownMinutes`: the same group from another Alertmanager
-   replica, a group re-notified as more instances join it, or the same alert
-   firing again soon after it resolved. An alert still firing a day later is
-   repeated by Alertmanager after the cooldown, and gets a fresh look.
+2. **The app server** drops (not delays) an alert name that a completed run
+   has triaged within `alerts.cooldownMinutes`: the same group from another
+   Alertmanager replica, a group re-notified as more instances join it, or
+   the same alert firing again soon after it resolved. Until a run completes,
+   a forwarded name is held only for as long as a run can take (30 minutes),
+   so a run that was skipped at the sandbox limit, or failed, does not mute
+   it. An alert still firing a day later is repeated by Alertmanager after
+   the cooldown, and gets a fresh look.
 3. **The automation service** routes every event to one subject (`'alerts'`,
    `destination: continue_conversation`). While a run holds that subject,
    another event never starts a run. Before the run starts, the event is
@@ -688,11 +693,15 @@ An alert storm becomes one run, through three layers:
    still answered. An event that arrives after the run has ended starts the
    next run.
 
-The Discord webhook is made in Discord, so its Secret is created by hand:
+Reports go to the alerts channel through the webhook Alertmanager uses,
+posted as "OpenHands" with its own picture (`notify.discord`). That Secret,
+`alertmanager-secrets` in `monitoring-system`, is made by hand, so the
+annotations that let reflector mirror it here are too:
 
 ```sh
-kubectl -n openhands create secret generic openhands-discord-webhook \
-  --from-literal=url='https://discord.com/api/webhooks/…'
+kubectl -n monitoring-system annotate secret alertmanager-secrets \
+  reflector.v1.k8s.emberstack.com/reflection-allowed=true \
+  reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces=openhands
 ```
 
 ## Limits

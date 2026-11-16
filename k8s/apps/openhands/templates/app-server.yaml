@@ -61,6 +61,20 @@ metadata:
     {{- include "openhands.labels" . | nindent 4 }}
 type: Opaque
 data: {}
+---
+# The Discord webhook automations report to, mirrored from the Secret
+# Alertmanager posts alerts with.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.notify.discord.secret }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openhands.labels" . | nindent 4 }}
+  annotations:
+    reflector.v1.k8s.emberstack.com/reflects: {{ printf "%s/%s" .Values.monitoringNamespace .Values.notify.discord.secret | quote }}
+type: Opaque
+data: {}
 {{- if .Values.alerts.enabled }}
 ---
 # The bearer token Alertmanager presents on the alerts port. Generated in
@@ -311,7 +325,9 @@ spec:
               value: {{ mul .Values.alerts.cooldownMinutes 60 | quote }}
             {{- end }}
             - name: DISCORD_WEBHOOK_FILE
-              value: /etc/openhands-app-server/discord/url
+              value: /etc/openhands-app-server/discord/{{ .Values.notify.discord.key }}
+            - name: DISCORD_AVATAR_URL
+              value: {{ .Values.notify.discord.avatarURL | quote }}
             # uv keeps its state under HOME and unpacks wheels through a temp
             # directory; the root filesystem is read-only, so both point at the
             # emptyDir.
@@ -436,7 +452,7 @@ spec:
         {{- end }}
         - name: discord
           secret:
-            secretName: {{ .Values.notify.discord.secretName }}
+            secretName: {{ .Values.notify.discord.secret }}
             optional: true
 ---
 apiVersion: v1

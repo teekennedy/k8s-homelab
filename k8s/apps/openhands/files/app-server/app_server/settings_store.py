@@ -9,6 +9,7 @@ them; POST sends `*_diff` objects plus preferences) and the agent server's own
 
 import copy
 import json
+import logging
 import re
 import shlex
 import uuid
@@ -16,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 from .db import Database
+
+log = logging.getLogger(__name__)
 
 SETTINGS_KEY = "settings"
 PROFILES_KEY = "agent_profiles"
@@ -463,11 +466,16 @@ class SettingsStore:
             for field in ACP_PROFILE_FIELDS:
                 if profile.get(field) is not None:
                     agent[field] = profile[field]
-            if acp_model:
-                agent["acp_model"] = acp_model
         elif profile and profile["agent_kind"] == "openhands":
             agent = {k: v for k, v in agent.items() if not k.startswith("acp_")}
             agent["agent_kind"] = "openhands"
             name = self._llm_profiles()["active"] or profile["llm_profile_ref"]
             agent["llm"] = self.llm_config(name)
+        if acp_model and agent.get("agent_kind") == "acp":
+            agent["acp_model"] = acp_model
+        elif acp_model:
+            log.warning(
+                "model %s not applied: the active agent profile is not an ACP agent",
+                acp_model,
+            )
         return self._with_command(agent)

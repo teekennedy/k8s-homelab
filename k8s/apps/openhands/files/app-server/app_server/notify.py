@@ -26,6 +26,7 @@ async def discord(
     http: httpx.AsyncClient,
     webhook_file: Path | None,
     *,
+    avatar_url: str,
     title: str,
     url: str,
     text: str,
@@ -37,21 +38,22 @@ async def discord(
         return
     if len(text) > MAX_DESCRIPTION:
         text = text[: MAX_DESCRIPTION - 2] + " …"
-    resp = await http.post(
-        webhook,
-        json={
-            "username": "OpenHands",
-            "embeds": [
-                {
-                    "title": title[:256],
-                    "url": url,
-                    "description": text,
-                    "color": GREEN if ok else RED,
-                }
-            ],
-            # The agent's text is quoted, never a ping.
-            "allowed_mentions": {"parse": []},
-        },
-        timeout=10,
-    )
+    message = {
+        # Its own name and picture: the webhook may be shared with other
+        # senders, such as Alertmanager.
+        "username": "OpenHands",
+        "embeds": [
+            {
+                "title": title[:256],
+                "url": url,
+                "description": text,
+                "color": GREEN if ok else RED,
+            }
+        ],
+        # The agent's text is quoted, never a ping.
+        "allowed_mentions": {"parse": []},
+    }
+    if avatar_url:
+        message["avatar_url"] = avatar_url
+    resp = await http.post(webhook, json=message, timeout=10)
     resp.raise_for_status()

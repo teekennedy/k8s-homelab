@@ -62,6 +62,7 @@ def settings(settings, tmp_path):
         alerts_token_file=token,
         alerts_cooldown_seconds=3600,
         discord_webhook_file=discord,
+        discord_avatar_url="https://example/avatar.png",
     )
 
 
@@ -135,6 +136,28 @@ def test_an_alert_name_cools_down_once_forwarded(intake, service):
         "forwarded": 0
     }
     assert len(_events(service)) == 2
+
+
+def test_the_cooldown_starts_when_a_run_completes(intake, service, state, monkeypatch):
+    body = _notification(_alert("KubePodNotReady"))
+
+    def forward() -> int:
+        return intake.post("/alertmanager", json=body, headers=TOKEN).json()[
+            "forwarded"
+        ]
+
+    assert forward() == 1
+    # Held while a run may still be on it ...
+    assert forward() == 0
+    # ... but a run that was skipped or failed never reports, and the hold lapses.
+    with monkeypatch.context() as m:
+        m.setattr(alerts, "PENDING_SECONDS", 0)
+        assert forward() == 1
+    # Once a run completes, the name cools down for the whole cooldown, and
+    # outlives the hold.
+    state.alerts.triaged()
+    monkeypatch.setattr(alerts, "PENDING_SECONDS", 0)
+    assert forward() == 0
 
 
 def test_a_refused_event_is_retried_not_cooled_down(intake, service):
@@ -249,7 +272,10 @@ def test_a_finished_run_is_reported_to_discord(api, hooks, state, discord_posts,
     assert embed["title"] == "triage"
     assert embed["description"].startswith("Cause: disk on borg-2 died.")
     assert embed["url"] == f"https://openhands.example/conversations/{CONV_ID}"
-    assert json.loads(message.content)["allowed_mentions"] == {"parse": []}
+    posted = json.loads(message.content)
+    assert posted["allowed_mentions"] == {"parse": []}
+    assert posted["username"] == "OpenHands"
+    assert posted["avatar_url"] == "https://example/avatar.png"
 
     # A run that never got a conversation still says so.
     discord_posts.clear()
@@ -265,3 +291,31 @@ def test_a_run_without_notify_reports_nothing(api, hooks, state, discord_posts, 
     sandbox = api.post("/api/v1/sandboxes", headers=user).json()
     _complete(hooks, sandbox, status="FAILED", error="x")
     assert discord_posts == []
+
+
+def test_a_completed_alert_run_starts_the_cooldown(
+    api, hooks, state, discord_posts, user
+):
+    _define(state, triage=TRIAGE)
+    sandbox = api.post("/api/v1/sandboxes", headers=user).json()
+    calls = []
+    state.alerts.triaged = lambda: calls.append(1)
+    _complete(hooks, sandbox, status="FAILED", error="x")
+    assert calls == []
+    _complete(hooks, sandbox, status="COMPLETED")
+    assert calls == [1]
+
+
+def test_a_model_for_a_non_acp_profile_is_ignored_with_a_warning(
+    state, caplog, monkeypatch
+):
+    store = state.settings_store
+    codex = {"id": "p1", "agent_kind": "openhands", "llm_profile_ref": "codex"}
+    monkeypatch.setattr(
+        store, "_profiles", lambda: {"active": "p1", "profiles": {"codex": codex}}
+    )
+    monkeypatch.setattr(store, "_llm_profiles", lambda: {"active": None})
+    monkeypatch.setattr(store, "llm_config", lambda name: {"model": name})
+    agent = store.resolve_agent(None, acp_model="haiku")
+    assert agent["agent_kind"] == "openhands" and "acp_model" not in agent
+    assert "model haiku not applied" in caplog.text

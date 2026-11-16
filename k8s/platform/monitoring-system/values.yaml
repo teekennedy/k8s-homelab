@@ -226,10 +226,9 @@ kube-prometheus-stack:
           - receiver: "null"
             matchers:
               - alertname =~ "ResticBackupRunning|JellyfinStreamActive|WoodpeckerPipelineRunning|LonghornVolumeDegraded"
-          # A first-response agent run per alert, in OpenHands. `continue`
-          # so the alert also reaches Discord below. Grouped by name alone,
-          # so a storm of one alert is one notification; OpenHands folds
-          # whatever arrives while a run is going into that run. The matcher
+          # Firing alerts to OpenHands for an agent's first response.
+          # `continue` so they also reach Discord below. Grouped by name
+          # alone, so a storm of one alert is one notification. The matcher
           # is the ignore list: alerts that are notifications, not problems.
           - receiver: openhands
             continue: true

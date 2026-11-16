@@ -6,10 +6,15 @@ Alertmanager posts here, and this server forwards the delivery signed with a
 secret derived from its own automation key, after two cuts:
 
 - Firing alerts only. A resolution is not something to investigate.
-- An alert name forwarded within the cooldown is dropped, not delayed: the
-  same group from another Alertmanager replica, a group notified again as
-  more instances join it, and the same alert firing again soon after it
-  resolved are all taken as the incident a run has already looked at.
+- An alert name a run has triaged within the cooldown is dropped, not
+  delayed: the same group from another Alertmanager replica, a group notified
+  again as more instances join it, and the same alert firing again soon after
+  it resolved are all taken as the incident that run looked at.
+
+A name counts as triaged once a run that could have seen it completes
+(`triaged`). Until then it is only held for as long as a run can take, so
+duplicates are dropped while one is going, and a run that was skipped or
+failed does not mute the alert for the whole cooldown.
 
 Grouping alerts that do get through into one run is the automation's trigger,
 not this module: see README.md, "Alert triage".
@@ -38,6 +43,9 @@ SIGNATURE_HEADER = "X-OpenHands-Signature"
 # Alerts rendered into one event. A storm of one alert name is one group and
 # can carry hundreds of instances; the first few say what the rest do.
 MAX_ALERTS = 25
+# How long a forwarded name is held before a run reports on it: the longest a
+# run can take, after which it was skipped or failed.
+PENDING_SECONDS = 30 * 60
 _KEPT_FIELDS = ("labels", "annotations", "startsAt", "generatorURL", "fingerprint")
 
 
@@ -100,31 +108,47 @@ class AlertIntake:
         if not hmac.compare_digest(expected, (authorization or "").encode()):
             raise HTTPException(401, "not authenticated")
 
+    def _ago(self, stamp: str, seconds: float) -> str:
+        return (datetime.fromisoformat(stamp) - timedelta(seconds=seconds)).isoformat()
+
     def _claim(self, names: set[str]) -> tuple[set[str], str]:
-        """The names not forwarded within the cooldown, marked as forwarded
-        now. Checked and marked in one transaction, so two replicas
-        delivering the same group cannot both get through."""
+        """The names neither triaged within the cooldown nor waiting on a run,
+        marked as forwarded now. Checked and marked in one transaction, so two
+        replicas delivering the same group cannot both get through."""
         stamp = now()
         if self.cooldown <= 0:
             return names, stamp
-        cutoff = (
-            datetime.fromisoformat(stamp) - timedelta(seconds=self.cooldown)
-        ).isoformat()
         with self.db.tx() as c:
-            recent = {
+            held = {
                 r[0]
                 for r in c.execute(
-                    "SELECT alertname FROM alert_cooldowns WHERE forwarded_at > ?",
-                    (cutoff,),
+                    "SELECT alertname FROM alert_cooldowns"
+                    " WHERE triaged_at > ? OR (triaged_at IS NULL AND forwarded_at > ?)",
+                    (
+                        self._ago(stamp, self.cooldown),
+                        self._ago(stamp, PENDING_SECONDS),
+                    ),
                 )
             }
-            fresh = names - recent
+            fresh = names - held
             c.executemany(
                 "INSERT INTO alert_cooldowns (alertname, forwarded_at) VALUES (?, ?)"
-                " ON CONFLICT (alertname) DO UPDATE SET forwarded_at = excluded.forwarded_at",
+                " ON CONFLICT (alertname) DO UPDATE"
+                " SET forwarded_at = excluded.forwarded_at, triaged_at = NULL",
                 [(n, stamp) for n in fresh],
             )
         return fresh, stamp
+
+    def triaged(self) -> None:
+        """A run on this source completed: every name forwarded while it could
+        still see them starts its cooldown now."""
+        stamp = now()
+        self.db.run(
+            "UPDATE alert_cooldowns SET triaged_at = ?"
+            " WHERE triaged_at IS NULL AND forwarded_at > ?",
+            stamp,
+            self._ago(stamp, PENDING_SECONDS),
+        )
 
     def _release(self, names: set[str], stamp: str) -> None:
         with self.db.tx() as c:

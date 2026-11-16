@@ -257,11 +257,15 @@ def test_users_me_answers_the_automation_services_auth_check(api, user, service_
 def test_run_script_waits_for_the_conversation_to_stop(monkeypatch):
     from app_server import automation_run
 
-    def outcome(*statuses: str) -> str | None:
+    def outcome(*statuses: str, events: list | None = None) -> str | None:
         replies = iter(statuses)
-        monkeypatch.setattr(
-            automation_run, "call", lambda *a: {"execution_status": next(replies)}
-        )
+
+        def call(method, url, *a, **kw):
+            if "/events/search" in url:
+                return {"items": events or []}
+            return {"execution_status": next(replies)}
+
+        monkeypatch.setattr(automation_run, "call", call)
         monkeypatch.setattr(automation_run.time, "sleep", lambda s: None)
         return automation_run.wait("http://agent", CONV_ID, "key")
 
@@ -272,10 +276,43 @@ def test_run_script_waits_for_the_conversation_to_stop(monkeypatch):
     assert outcome("running", "idle", "running", "error") == "conversation ended error"
     assert outcome("running", "error") == "conversation ended error"
     assert outcome("running", "waiting_for_confirmation").endswith("confirmation")
+    # A whole turn between two polls: never seen running, but the agent acted.
+    assert outcome(*["idle"] * 3, events=[{"source": "agent"}]) is None
 
     clock = iter(range(0, 10_000, 100))
     monkeypatch.setattr(automation_run.time, "monotonic", lambda: next(clock))
-    assert outcome(*["idle"] * 5).startswith("conversation never started")
+    assert outcome(*["idle"] * 5, events=[{"source": "user"}]).startswith(
+        "conversation never started"
+    )
+
+
+def test_run_script_waits_out_the_checkout(monkeypatch, tmp_path):
+    """Starting the conversation includes cloning the repository, which takes
+    longer than any other call the script makes."""
+    from app_server import automation_run
+
+    timeouts = {}
+
+    def call(method, url, key, body=None, timeout=120):
+        timeouts[url.rsplit("/", 1)[-1]] = timeout
+        if url.endswith("/conversations"):
+            return {"id": CONV_ID}
+        return {"execution_status": "finished"}
+
+    monkeypatch.setattr(automation_run, "call", call)
+    monkeypatch.setattr(automation_run.time, "sleep", lambda s: None)
+    # What the tarball unpacks, and the script deletes before it starts.
+    (tmp_path / "run.json").write_text(
+        json.dumps({"webhook_url": "http://hooks", "agent_server_port": 8000})
+    )
+    (tmp_path / "run.py").write_text("")
+    monkeypatch.setattr(automation_run, "HERE", str(tmp_path))
+    monkeypatch.setenv("SESSION_API_KEY", "key")
+    monkeypatch.setenv("SANDBOX_ID", "sbx")
+    monkeypatch.setenv("AUTOMATION_RUN_ID", "run")
+    assert automation_run.main() == 0
+    assert timeouts["conversations"] > 300 + 120
+    assert timeouts["complete"] == 120
 
 
 @pytest.mark.anyio

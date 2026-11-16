@@ -87,12 +87,15 @@ alerts:
   cooldownMinutes: 360
 
 # --- Notifications ----------------------------------------------------------
-# Where an automation with `notify: discord` reports its outcome. The webhook
-# is made in Discord, so the Secret is created by hand (README.md, "Alert
-# triage"); key: url. Without it nothing is posted.
+# Where an automation with `notify: discord` reports its outcome: the alerts
+# channel's webhook, posting under a name and picture of its own. The Secret
+# lives in monitoringNamespace, made by hand, and is mirrored here under the
+# same name (README.md, "Alert triage"). Without it nothing is posted.
 notify:
   discord:
-    secretName: openhands-discord-webhook
+    secret: alertmanager-secrets
+    key: discord_webhook_url
+    avatarURL: https://github.com/OpenHands.png
 
 # --- CI (Woodpecker) --------------------------------------------------------
 ci:
@@ -433,7 +436,9 @@ sandboxSpecs:
 #     # Checked out at /workspace/project before the agent starts.
 #     repository: ops/k8s-homelab
 #     branch: main
-#     # The ACP model the run uses instead of the active profile's.
+#     # The ACP model the run uses instead of the active profile's: one of
+#     # that profile's ACP server's models. Ignored, with a warning, when the
+#     # active profile is not ACP.
 #     model: sonnet
 #     # Post the agent's last message, or why the run failed, to Discord.
 #     notify: discord

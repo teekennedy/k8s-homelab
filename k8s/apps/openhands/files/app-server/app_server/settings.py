@@ -77,9 +77,10 @@ class Settings:
     alerts_port: int = 0
     alerts_token_file: Path | None = None
     alerts_cooldown_seconds: float = 0
-    # A Discord webhook URL that automations with `notify: discord` report to.
-    # Missing or empty: nothing is posted.
+    # A Discord webhook URL that automations with `notify: discord` report to,
+    # and the picture they post under. Missing or empty: nothing is posted.
     discord_webhook_file: Path | None = None
+    discord_avatar_url: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -126,6 +127,7 @@ class Settings:
                 os.environ.get("ALERTS_COOLDOWN_SECONDS", "0")
             ),
             discord_webhook_file=_optional_path("DISCORD_WEBHOOK_FILE"),
+            discord_avatar_url=os.environ.get("DISCORD_AVATAR_URL", ""),
         )
 
 
