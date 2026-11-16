@@ -265,10 +265,9 @@
       "enabled": false
     },
     {
-      "description": "Update homelab packages immediately after publication",
+      "description": "Update our own packages immediately after publication",
       "matchPackageNames": [
-        "ghcr.io/teekennedy/k8s-homelab",
-        "ghcr.io/teekennedy/k8s-homelab/**",
+        "ghcr.io/teekennedy/**",
         "github.com/teekennedy/k8s-homelab",
         "github.com/teekennedy/k8s-homelab/**",
         "teekennedy/k8s-homelab"
@@ -276,10 +275,10 @@
       "minimumReleaseAge": "0 days"
     },
     {
-      "description": "Version homelab images within their artifact tag prefix",
+      "description": "Version homelab images within their artifact tag prefix (e.g. wake-word-trainer-0.1.4)",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["ghcr.io/teekennedy/k8s-homelab"],
-      "versioning": "regex:^(?<compatibility>devenv-ci|devenv-shell|forgejo-resources|openhands-sandbox)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+      "versioning": "regex:^(?<compatibility>[a-z][a-z0-9-]*)-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
       "pinDigests": true
     },
     {
