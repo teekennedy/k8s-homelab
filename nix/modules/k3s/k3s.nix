@@ -114,12 +114,28 @@ in {
       tokenFile = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) config.sops.secrets.k3s_token.path;
     };
 
-    # Enable graceful shutdown
-    # https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#graceful-node-shutdown
+    # Graceful node shutdown, stopping pods in priority tiers from lowest up.
+    # kubelet waits for a tier's volumes to unmount before starting the next,
+    # so Longhorn (longhorn-critical, 1000000000) keeps serving app volumes
+    # until they are unmounted. The two-bucket gracefulNodeShutdown options
+    # treat longhorn-critical as non-critical and stop it alongside the apps.
+    # Mutually exclusive with services.k3s.gracefulNodeShutdown.
+    # https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/#pod-priority-graceful-node-shutdown
     # Note that due to a regression in local-path-provisioner, this won't work with k3s versions 1.30.x up to 1.31.2.
-    services.k3s.gracefulNodeShutdown.enable = true;
-    services.k3s.gracefulNodeShutdown.shutdownGracePeriodCriticalPods = "60s";
-    services.k3s.gracefulNodeShutdown.shutdownGracePeriod = "120s";
+    services.k3s.extraKubeletConfig.shutdownGracePeriodByPodPriority = [
+      {
+        priority = 0;
+        shutdownGracePeriodSeconds = 60;
+      }
+      {
+        priority = 1000000000;
+        shutdownGracePeriodSeconds = 30;
+      }
+      {
+        priority = 2000000000;
+        shutdownGracePeriodSeconds = 15;
+      }
+    ];
 
     # Persist important k3s data across reboots
     environment.persistence."/persistent" = {
