@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
-# One image, every wake word trainer workload: the collector
-# (`wake-word-trainer serve`), the nightly trainer and publisher, and the seed
-# Job. Holds three Python environments:
+# One image for every workload: the collector (`wake-word-trainer serve`), the
+# nightly trainer and publisher, and the seed Job. Holds three Python envs:
 #   /opt/venv        the okay_glados training pipeline (TensorFlow, Python 3.10)
 #   /opt/venv-piper  Piper TTS for step 2 (piper-sample-generator pins numpy<2)
 #   /opt/service     this directory's package, with whisper.cpp
