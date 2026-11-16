@@ -157,6 +157,62 @@ in {
       ];
     };
 
+    # etcd fsyncs its WAL and rewrites bbolt pages in place several times a
+    # second. On copy-on-write, compressed btrfs every one of those small
+    # writes relocates extents and rewrites metadata, which turned ~20KB/s of
+    # WAL into 4-9MB/s of SSD writes per server. nodatacow (+C) makes them
+    # in-place; etcd checksums its own WAL and snapshots.
+    #
+    # +C only takes effect on files created empty inside a +C directory, so
+    # existing files are copied into place. That only happens while k3s is
+    # stopped, normally at boot; otherwise just the directories are marked and
+    # etcd's own WAL rotation and defrags pick it up over time.
+    # Snapshots under db/snapshots are left alone so they stay compressed.
+    systemd.services.k3s-etcd-nocow = lib.mkIf isServer {
+      description = "Disable btrfs copy-on-write for the k3s etcd data dir";
+      wantedBy = ["k3s.service"];
+      before = ["k3s.service"];
+      unitConfig.RequiresMountsFor = ["/var/lib/rancher/k3s/server/db"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      path = with pkgs; [coreutils e2fsprogs findutils gawk systemd util-linux];
+      script = ''
+        dir=/var/lib/rancher/k3s/server/db/etcd
+        if [ ! -d "$dir" ]; then
+          echo "$dir does not exist yet; nothing to do"
+          exit 0
+        fi
+
+        find "$dir" -type d -exec chattr +C {} +
+
+        db="$dir/member/snap/db"
+        if systemctl is-active --quiet k3s.service \
+          || { [ -f "$db" ] && ! flock --nonblock --exclusive "$db" true; }; then
+          echo "etcd is running; only marked directories +C"
+          exit 0
+        fi
+
+        # Left behind if a previous run was interrupted mid-copy.
+        find "$dir" -type f -name '*.nocow.tmp' -delete
+
+        find "$dir" -type f -print0 | while IFS= read -r -d "" f; do
+          if lsattr -d -- "$f" | awk '{ exit ($1 ~ /C/) ? 0 : 1 }'; then
+            continue
+          fi
+          tmp="$f.nocow.tmp"
+          rm -f -- "$tmp"
+          # --reflink=never: a reflinked copy would share the old COW extents.
+          cp --reflink=never --preserve=mode,ownership,timestamps -- "$f" "$tmp"
+          sync -- "$tmp"
+          mv -f -- "$tmp" "$f"
+          echo "rewrote $f without copy-on-write"
+        done
+        sync -f "$dir"
+      '';
+    };
+
     # Setup secrets
     sops.secrets = lib.mkIf (builtins.pathExists ./secrets.enc.yaml) (let
       sopsConfig = {
