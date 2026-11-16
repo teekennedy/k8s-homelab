@@ -105,6 +105,25 @@ partial reconciliation of a malformed hook is worse than none. `webhook_test.go`
 pins that behaviour, and the chart's own template `fail`s on the singular key so
 the error usually surfaces at render time instead.
 
+### Repository merge styles
+
+`repositories[].mergeStyles` declares which pull request merge styles a
+repository allows. Every style not listed is turned off, and the job only
+PATCHes when something has drifted. Leave the key out to leave a repo's settings
+alone.
+
+```yaml
+mergeStyles:
+  allowed: [rebase, fast-forward-only, squash]  # merge, rebase, rebase-merge, squash, fast-forward-only
+  default: rebase                                # must be one of allowed
+```
+
+k8s-homelab allows `squash` because Renovate automerges with it. Forgejo's
+rebase merge trusts a cached "commits behind" count. When two sibling PRs go
+green together, the second is tried before that count updates, the
+fast-forward fails, and Forgejo has already deleted the auto-merge schedule.
+Squash merges don't read the count.
+
 ### Manual steps this chart does not cover
 
 - **The GitHub push mirror.** `forgejo-resources` has no push-mirror support

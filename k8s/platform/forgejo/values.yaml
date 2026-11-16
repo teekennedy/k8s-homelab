@@ -383,6 +383,11 @@ forgejo-resources:
       owner: ops
       description: my bare-metal k8s homelab
       private: false
+      # squash is Renovate's automerge strategy (README.md, "Repository merge
+      # styles"); rebase and fast-forward-only are for hand merges.
+      mergeStyles:
+        allowed: [rebase, fast-forward-only, squash]
+        default: rebase
       # Reconciled by URL on every job run — events, branchFilter and the shared
       # secret all converge, and a `type` change is handled as a delete +
       # recreate (the Forgejo API cannot PATCH a hook's payload format).

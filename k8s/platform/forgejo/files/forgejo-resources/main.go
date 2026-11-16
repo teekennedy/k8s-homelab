@@ -76,6 +76,85 @@ type Repository struct {
 	// dropped by yaml.v3, which ignores unknown keys.
 	Webhook  *RepoWebhook  `yaml:"webhook"`
 	Webhooks []RepoWebhook `yaml:"webhooks"`
+	// MergeStyles is left unmanaged when nil.
+	MergeStyles *MergeStyles `yaml:"mergeStyles"`
+}
+
+// MergeStyles declares which pull request merge styles a repository allows.
+// Every style not listed is disallowed.
+type MergeStyles struct {
+	Allowed []gitea.MergeStyle `yaml:"allowed"`
+	// Default must be one of Allowed.
+	Default gitea.MergeStyle `yaml:"default"`
+}
+
+// mergeStyleNames are the styles a repository can allow, in Forgejo's terms.
+var mergeStyleNames = []gitea.MergeStyle{
+	gitea.MergeStyleMerge,
+	gitea.MergeStyleRebase,
+	gitea.MergeStyleRebaseMerge,
+	gitea.MergeStyleSquash,
+	gitea.MergeStyleFastForwardOnly,
+}
+
+func (m MergeStyles) validate(ref string) []error {
+	var errs []error
+	if len(m.Allowed) == 0 {
+		errs = append(errs, fmt.Errorf("%s: mergeStyles.allowed must list at least one style", ref))
+	}
+	seen := map[gitea.MergeStyle]bool{}
+	for _, s := range m.Allowed {
+		if !slices.Contains(mergeStyleNames, s) {
+			errs = append(errs, fmt.Errorf("%s: mergeStyles.allowed: unknown style %q, want one of %v", ref, s, mergeStyleNames))
+		}
+		if seen[s] {
+			errs = append(errs, fmt.Errorf("%s: mergeStyles.allowed: %q listed twice", ref, s))
+		}
+		seen[s] = true
+	}
+	if !slices.Contains(m.Allowed, m.Default) {
+		errs = append(errs, fmt.Errorf("%s: mergeStyles.default %q must be one of allowed %v", ref, m.Default, m.Allowed))
+	}
+	return errs
+}
+
+// editOption sets every allow flag, so a style removed from Allowed is
+// disallowed rather than left as it was.
+func (m MergeStyles) editOption() gitea.EditRepoOption {
+	allowed := func(s gitea.MergeStyle) *bool {
+		v := slices.Contains(m.Allowed, s)
+		return &v
+	}
+	def := m.Default
+	return gitea.EditRepoOption{
+		AllowMerge:                allowed(gitea.MergeStyleMerge),
+		AllowRebase:               allowed(gitea.MergeStyleRebase),
+		AllowRebaseMerge:          allowed(gitea.MergeStyleRebaseMerge),
+		AllowSquash:               allowed(gitea.MergeStyleSquash),
+		AllowFastForwardOnlyMerge: allowed(gitea.MergeStyleFastForwardOnly),
+		DefaultMergeStyle:         &def,
+	}
+}
+
+// drift names the settings on r that differ from m.
+func (m MergeStyles) drift(r *gitea.Repository) []string {
+	have := map[gitea.MergeStyle]bool{
+		gitea.MergeStyleMerge:           r.AllowMerge,
+		gitea.MergeStyleRebase:          r.AllowRebase,
+		gitea.MergeStyleRebaseMerge:     r.AllowRebaseMerge,
+		gitea.MergeStyleSquash:          r.AllowSquash,
+		gitea.MergeStyleFastForwardOnly: r.AllowFastForwardOnlyMerge,
+	}
+	var out []string
+	for _, s := range mergeStyleNames {
+		if want := slices.Contains(m.Allowed, s); have[s] != want {
+			out = append(out, fmt.Sprintf("%s allowed %t -> %t", s, have[s], want))
+		}
+	}
+	if r.DefaultMergeStyle != m.Default {
+		out = append(out, fmt.Sprintf("default %s -> %s", r.DefaultMergeStyle, m.Default))
+	}
+	return out
 }
 
 // RepoWebhook is one Forgejo repository webhook, reconciled by URL.
@@ -122,6 +201,9 @@ func (r Repository) validate() []error {
 	seen := map[string]bool{}
 	for i, wh := range r.Webhooks {
 		errs = append(errs, wh.validate(fmt.Sprintf("%s/%s webhooks[%d]", r.Owner, r.Name, i), seen)...)
+	}
+	if r.MergeStyles != nil {
+		errs = append(errs, r.MergeStyles.validate(r.Owner+"/"+r.Name)...)
 	}
 	return errs
 }
@@ -1008,6 +1090,28 @@ func syncRepository(ctx context.Context, client *gitea.Client, k8sClient *kubern
 			log.Printf("Upsert webhook %s for %s/%s: %v", wh.URL, repo.Owner, repo.Name, err)
 		}
 	}
+
+	if repo.MergeStyles != nil {
+		if err := syncMergeStyles(client, repo.Owner, repo.Name, *repo.MergeStyles); err != nil {
+			log.Printf("Sync merge styles for %s/%s: %v", repo.Owner, repo.Name, err)
+		}
+	}
+}
+
+func syncMergeStyles(client *gitea.Client, owner, name string, m MergeStyles) error {
+	existing, _, err := client.GetRepo(owner, name)
+	if err != nil {
+		return fmt.Errorf("get repo: %w", err)
+	}
+	drift := m.drift(existing)
+	if len(drift) == 0 {
+		return nil
+	}
+	if _, _, err := client.EditRepo(owner, name, m.editOption()); err != nil {
+		return fmt.Errorf("edit repo: %w", err)
+	}
+	log.Printf("Reconciled merge styles on %s/%s: %s", owner, name, strings.Join(drift, ", "))
+	return nil
 }
 
 func syncRunners(ctx context.Context, k8sClient *kubernetes.Clientset, forgejoHost, forgejoUser, forgejoPassword string, runners []Runner) {
