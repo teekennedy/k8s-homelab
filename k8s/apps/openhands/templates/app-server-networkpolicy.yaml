@@ -2,9 +2,10 @@
 # The app server holds the sandbox lifecycle and the only route into any
 # sandbox, so its ingress is exactly its callers: the canvas pod (the
 # browser's API calls and the automation service, on the API port), sandbox
-# pods (their webhooks, on a port of their own) and the metrics scraper (on a
-# third). A sandbox therefore cannot
-# reach the API, and so cannot create sandboxes.
+# pods (their webhooks, on a port of their own), the metrics scraper (on a
+# third) and Alertmanager (on a fourth). A sandbox therefore cannot reach the
+# API, and so cannot create sandboxes, nor the alerts port, and so cannot
+# start a run.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -34,6 +35,18 @@ spec:
       ports:
         - port: webhook
           protocol: TCP
+    {{- if .Values.alerts.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.monitoringNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - port: alerts
+          protocol: TCP
+    {{- end }}
     {{- if .Values.metrics.enabled }}
     # The metrics port, and only it, for the scraper.
     - from:
@@ -71,5 +84,6 @@ spec:
           protocol: TCP
     # The forge's API, for the repository picker.
     {{- include "openhands.egressForge" . | nindent 4 }}
-    # PyPI, for the dependencies installed at startup.
+    # PyPI, for the dependencies installed at startup, and Discord, for
+    # automations that report there.
     {{- include "openhands.egressInternet" . | nindent 4 }}

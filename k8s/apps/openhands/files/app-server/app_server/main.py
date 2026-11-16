@@ -1,5 +1,5 @@
 """Entry point: the API on one port, the sandbox webhook receiver on another,
-metrics on a third."""
+metrics on a third, and Alertmanager's webhook on a fourth."""
 
 import asyncio
 import contextlib
@@ -12,6 +12,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from . import (
+    alerts,
     metrics,
     proxy,
     routes_account,
@@ -96,6 +97,15 @@ class State:
             usage_limit_wait=settings.usage_limit_wait_seconds,
         )
         self.automations = Automations(self.http, settings)
+        self.alerts = alerts.AlertIntake(
+            db,
+            self.http,
+            automation_url=settings.automation_url,
+            automation_api_key=settings.automation_api_key,
+            source=settings.alerts_source,
+            token_file=settings.alerts_token_file,
+            cooldown=settings.alerts_cooldown_seconds,
+        )
         # Where sandbox webhooks land.
         self.event_sink = self.conversations
 
@@ -128,6 +138,12 @@ def build_api(state: State) -> FastAPI:
 def build_webhooks(state: State) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.include_router(webhooks.router)
+    return state.attach(app)
+
+
+def build_alerts(state: State) -> FastAPI:
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    app.include_router(alerts.router)
     return state.attach(app)
 
 
@@ -184,6 +200,17 @@ async def serve() -> None:
             )
         ),
     ]
+    if settings.alerts_port:
+        servers.append(
+            uvicorn.Server(
+                uvicorn.Config(
+                    build_alerts(state),
+                    host="0.0.0.0",
+                    port=settings.alerts_port,
+                    log_config=None,
+                )
+            )
+        )
     if settings.metrics_port:
         servers.append(
             uvicorn.Server(

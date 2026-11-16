@@ -75,7 +75,8 @@ Three consequences worth stating plainly:
   sandbox**, through the agent. Both groups are `two_factor` in the `openhands`
   authorization policy; there is no viewer tier, because there is nothing a
   viewer could be restricted to.
-- **A sandbox cannot reach the app server's API**, only its webhook port, and
+- **A sandbox cannot reach the app server's API**, only its webhook port (not
+  the alerts port either, so an agent cannot post an alert to start a run), and
   can only read the Kubernetes API, never write it: an agent cannot start more
   agents. A spec with `clusterRead` sees everything the built-in `view` role
   does, which excludes Secrets.
@@ -598,6 +599,15 @@ run script is a new upload, and the automations are moved onto it.
 - A run that outlives its timeout (10 minutes unless set, 30 at most) is failed
   by the automation service and its sandbox deleted.
 
+A definition may also name a `repository` and `branch`, checked out at
+`/workspace/project` before the agent starts; the ACP `model` the run uses in
+place of the active profile's; and `notify: discord`, which posts the agent's
+final message, or why the run failed, to the webhook in the
+`notify.discord.secretName` Secret, linked to the conversation. The app server
+posts it when the run completes, so the agent never holds the webhook URL.
+These fields stay in the app server; the automation service sees only the
+trigger and timeout.
+
 ### Event triggers
 
 An event trigger names a webhook *source* registered in the automation
@@ -631,6 +641,58 @@ the path answers 404 for a source nobody has registered.
 > Forgejo, not that the commenter is allowed to spend model budget. A Forgejo
 > webhook cannot filter on author, so the place to enforce one is the trigger's
 > `filter`, as `forge-mention` does with `sender.login == '…'`.
+
+### Alert triage
+
+`alert-triage` is a first response to Prometheus alerts: an agent on the
+`repo` spec, with `main` checked out, that investigates, opens pull requests
+for a fix or a prevention where one is warranted, and reports to Discord.
+
+```
+  Alertmanager ──► app server :8082 /alertmanager      (bearer token)
+  receiver           │  firing only; drop names forwarded within the cooldown
+  `openhands`        └─► automation service /events/<org>/alertmanager (HMAC)
+                            │  subject 'alerts' held?  ── yes ─► a message in that run
+                            └─ no ─► a run ──► run complete ──► Discord
+```
+
+The automation service only verifies HMAC-signed deliveries, which
+Alertmanager cannot produce, so Alertmanager posts to the app server on a port
+of its own instead. The NetworkPolicy admits Alertmanager's pods alone, and
+the request must carry the token from `alertmanager-openhands-token`, which is
+generated in `monitoring-system` and reflected here. The app server signs what
+it forwards with a secret derived from its automation key, and registers the
+`alertmanager` source with that secret itself.
+
+An alert storm becomes one run, through three layers:
+
+1. **Alertmanager** groups the `openhands` route by `alertname` alone, so
+   thirty instances of one alert are one notification. Which alerts reach the
+   route at all is decided there too. The route sits after the `"null"`
+   routes, so muted maintenance gates never arrive, and silences (kured's
+   drain silences included) apply as they do to Discord. Its matcher is the
+   ignore list: add an alert to `alertname !~ "…"` in
+   `k8s/platform/monitoring-system/values.yaml`.
+2. **The app server** drops an alert name forwarded within
+   `alerts.cooldownMinutes`. That covers the same group arriving from each
+   Alertmanager replica, a group re-notified as more instances join it, and a
+   long-firing alert's daily repeat.
+3. **The automation service** routes every event to one subject (`'alerts'`,
+   `destination: continue_conversation`). While a run holds that subject,
+   another event never starts a run. Before the run starts, the event is
+   folded into its first message. Once it is running, the event is sent to its
+   conversation as a message (the trigger's `turn_text_expr`, the alerts as
+   text). The run's script waits for the conversation to stay idle for a few
+   polls before it ends, so a message that arrives just as a turn ends is
+   still answered. An event that arrives after the run has ended starts the
+   next run.
+
+The Discord webhook is made in Discord, so its Secret is created by hand:
+
+```sh
+kubectl -n openhands create secret generic openhands-discord-webhook \
+  --from-literal=url='https://discord.com/api/webhooks/…'
+```
 
 ## Limits
 

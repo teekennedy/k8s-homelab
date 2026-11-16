@@ -1,0 +1,15 @@
+---
+# The bearer token Alertmanager presents to the OpenHands app server's alerts
+# port (receiver `openhands` in values.yaml). Mirrored into openhands, which
+# checks it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-openhands-token
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    secret-generator.v1.mittwald.de/autogenerate: token
+    secret-generator.v1.mittwald.de/length: "48"
+    reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+    reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: openhands
+type: Opaque

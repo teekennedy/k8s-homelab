@@ -265,10 +265,40 @@ class ConversationService:
         if sandbox is None:
             raise LookupError(sandbox_id)
         agent_settings = self.settings.resolve_agent(request.get("agent_profile_id"))
+        if request.get("acp_model") and agent_settings.get("agent_kind") == "acp":
+            agent_settings["acp_model"] = request["acp_model"]
+        if request.get("selected_repository"):
+            await self._clone(sandbox, request)
         info = await self._start_on_sandbox(sandbox, request, agent_settings)
         self._insert_conversation(info, sandbox_id, request, agent_settings, created_by)
         log.info("conversation %s started on %s", info["id"], sandbox_id)
         return conversation_id(info["id"])
+
+    def final_message(self, conv_id: str) -> str | None:
+        """What the agent said last: its finish message, or its last plain
+        message, from the copy of the history kept here."""
+        rows = self.db.all(
+            "SELECT body FROM events WHERE conversation_id = ?"
+            " AND kind IN ('ActionEvent', 'MessageEvent')"
+            " ORDER BY timestamp DESC, id DESC LIMIT 200",
+            conversation_id(conv_id),
+        )
+        for row in rows:
+            event = json.loads(row["body"])
+            if event.get("source") != "agent":
+                continue
+            if event["kind"] == "ActionEvent":
+                message = (event.get("action") or {}).get("message")
+                if event.get("tool_name") == "finish" and message:
+                    return str(message).strip()
+                continue
+            content = (event.get("llm_message") or {}).get("content") or []
+            text = "\n".join(
+                c.get("text", "") for c in content if c.get("type") == "text"
+            ).strip()
+            if text:
+                return text
+        return None
 
     async def _start_on_sandbox(
         self,

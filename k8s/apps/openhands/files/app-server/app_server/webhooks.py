@@ -18,6 +18,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, Request, Response
 
+from . import notify
 from .sandboxes import SandboxManager
 
 log = logging.getLogger(__name__)
@@ -68,12 +69,12 @@ async def automation_conversation(
     """Start a run's conversation in the sandbox the automation service made
     for it."""
     _authenticate(request, sandbox_id)
+    automations = request.app.state.automations
     name = body.get("automation")
-    prompt = request.app.state.automations.prompt(
-        name, body.get("event"), body.get("follow_up_turns")
-    )
+    prompt = automations.prompt(name, body.get("event"), body.get("follow_up_turns"))
     if prompt is None:
         raise HTTPException(404, f"no automation named {name!r} is defined")
+    definition = automations.definition(name)
     started = await request.app.state.conversations.start_in(
         sandbox_id,
         {
@@ -84,6 +85,10 @@ async def automation_conversation(
             },
             "conversation_id": body.get("conversation_id"),
             "trigger": "automation",
+            "selected_repository": definition.get("repository"),
+            "selected_branch": definition.get("branch"),
+            "git_provider": "forgejo" if definition.get("repository") else None,
+            "acp_model": definition.get("model"),
         },
         "automation",
     )
@@ -100,6 +105,8 @@ async def automation_complete(
     on receiving it, so the transcript is completed first."""
     _authenticate(request, sandbox_id)
     state = request.app.state
+    # Ours, not the service's: its schema rejects unknown fields.
+    name = body.pop("automation", None)
     if body.get("conversation_id"):
         try:
             await state.conversations.drain(sandbox_id, body["conversation_id"])
@@ -111,8 +118,37 @@ async def automation_complete(
         headers={"X-Session-API-Key": state.settings.automation_api_key},
         timeout=60,
     )
+    try:
+        await _report(state, name, body)
+    except Exception:
+        log.exception("could not report the outcome of run %s", run_id)
     return Response(
         resp.content,
         status_code=resp.status_code,
         media_type=resp.headers.get("content-type"),
+    )
+
+
+async def _report(state: Any, name: str | None, body: dict[str, Any]) -> None:
+    """Post a finished run's outcome where its automation's `notify` says."""
+    definition = state.automations.definition(name)
+    if not definition or definition.get("notify") != "discord":
+        return
+    conv_id = body.get("conversation_id")
+    ok = body.get("status") == "COMPLETED"
+    text = state.conversations.final_message(conv_id) if ok and conv_id else None
+    if not text:
+        text = f"The run did not finish: {body.get('error') or body.get('status')}"
+        ok = False
+    await notify.discord(
+        state.http,
+        state.settings.discord_webhook_file,
+        title=name,
+        url=(
+            f"{state.settings.public_url}/conversations/{conv_id}"
+            if conv_id
+            else state.settings.public_url
+        ),
+        text=text,
+        ok=ok,
     )

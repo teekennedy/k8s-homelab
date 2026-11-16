@@ -71,6 +71,33 @@ forge:
   # mounted. GIT_CONFIG_GLOBAL points every git invocation in the pod at it.
   gitConfigPath: /etc/openhands/gitconfig
 
+# --- Alertmanager -----------------------------------------------------------
+# Alertmanager as an event source for automations (README.md, "Alert
+# triage"). Its webhook posts to the app server on a port of its own; the app
+# server forwards firing alerts to the automation service as `source`. Which
+# alerts are sent at all is Alertmanager's routing, in
+# k8s/platform/monitoring-system.
+alerts:
+  enabled: true
+  port: 8082
+  source: alertmanager
+  # The bearer token Alertmanager presents: generated in monitoring-system and
+  # mirrored here; key: token.
+  tokenSecret:
+    name: openhands-alertmanager-token
+    reflects: monitoring-system/alertmanager-openhands-token
+  # An alert name, once forwarded, is dropped for this long: more instances
+  # joining a storm, another Alertmanager replica, a repeat notification.
+  cooldownMinutes: 360
+
+# --- Notifications ----------------------------------------------------------
+# Where an automation with `notify: discord` reports its outcome. The webhook
+# is made in Discord, so the Secret is created by hand (README.md, "Alert
+# triage"); key: url. Without it nothing is posted.
+notify:
+  discord:
+    secretName: openhands-discord-webhook
+
 # --- CI (Woodpecker) --------------------------------------------------------
 ci:
   url: https://ci.msng.to
@@ -407,10 +434,68 @@ sandboxSpecs:
 #       List the open issues on ops/k8s-homelab and label the unlabelled ones.
 #     # Seconds a run may take; the automation service's default is 10 minutes.
 #     timeout: 1800
+#     # Checked out at /workspace/project before the agent starts.
+#     repository: ops/k8s-homelab
+#     branch: main
+#     # The ACP model the run uses instead of the active profile's.
+#     model: sonnet
+#     # Post the agent's last message, or why the run failed, to Discord.
+#     notify: discord
 #     # false switches it off. An automation the service disabled after
 #     # repeated failures is re-enabled from the UI, not from here.
 #     enabled: true
 automations:
+  # First response to an alert. Alertmanager's `openhands` receiver sends
+  # firing alerts; the constant subject key makes every alert that arrives
+  # while a run is queued or running part of that run, a message in its
+  # conversation, rather than a run of its own.
+  alert-triage:
+    trigger:
+      type: event
+      source: alertmanager
+      "on": firing
+      destination: continue_conversation
+      subject_key_expr: "'alerts'"
+      turn_text_expr: summary
+    repository: ops/k8s-homelab
+    branch: main
+    model: sonnet
+    notify: discord
+    timeout: 1800
+    prompt: |
+      You are the first responder for alerts from the homelab Kubernetes
+      cluster. The alerts that started this run are in the event payload
+      below; more may arrive as messages while you work. Alerts that arrive
+      together usually share one root cause: find it rather than treating
+      each alert on its own.
+
+      The ops/k8s-homelab repository, which defines the cluster, is checked
+      out at main in the working directory. You can read the cluster with
+      kubectl (no Secrets, no writes), query metrics and logs through the
+      Grafana MCP server (`ALERTS{alertstate="firing"}` in Prometheus is what
+      is firing now), and open pull requests on the forge following the
+      forgejo-iterate skill.
+
+      1. Investigate. Establish what is actually broken, since when, and
+         why. Check whether the alerts are still firing; if they resolved on
+         their own, find out what caused them anyway.
+      2. Fix the present problem where a change to the repository does it,
+         on a branch with a pull request. You cannot change the cluster
+         directly; when the fix is an action only a person can take (deleting
+         a stuck pod, replacing hardware), say exactly what to run.
+      3. Prevent a recurrence: a pull request that removes the cause, or a
+         better alert, limit or probe, when one is warranted. Do not open a
+         pull request just to have opened one, and never merge one.
+
+      Stop when you know the cause, or when you have learned what you can
+      without changing anything. Your final message is posted to Discord as
+      the report on this incident, so make it stand alone and keep it under
+      1500 characters, in this shape:
+
+      **Cause:** one or two sentences, with how sure you are.
+      **State:** still firing or resolved; what is affected.
+      **Done:** pull requests opened, with links and one line each, or "none".
+      **Needs you:** manual steps, or "nothing".
   # Exists to be dispatched by hand when checking that runs still work; the
   # schedule is once a year so that it costs nothing left alone.
   # A comment that mentions the agent, on an issue or a pull request, from the

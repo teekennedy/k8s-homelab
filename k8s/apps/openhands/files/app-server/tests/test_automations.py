@@ -24,6 +24,7 @@ class FakeAutomationService:
         self.made = 0
         self.uploads: dict[str, dict] = {}
         self.sources: list[dict] = []
+        self.refuse_events = False
 
     def add(self, name: str, **fields) -> dict:
         row = {
@@ -60,6 +61,13 @@ class FakeAutomationService:
             return httpx.Response(200, json=self.rows[tail])
         del self.rows[tail]
         return httpx.Response(204)
+
+    def event(self, request: httpx.Request) -> httpx.Response:
+        """A signed delivery to /events/<org>/<source>; no service key."""
+        self.calls.append(request)
+        if self.refuse_events:
+            return httpx.Response(500, text="database is locked")
+        return httpx.Response(200, json={"matched": 1})
 
     def webhook(self, request: httpx.Request, webhook_id: str) -> httpx.Response:
         if request.method == "GET":
@@ -257,9 +265,11 @@ def test_run_script_waits_for_the_conversation_to_stop(monkeypatch):
         monkeypatch.setattr(automation_run.time, "sleep", lambda s: None)
         return automation_run.wait("http://agent", CONV_ID, "key")
 
-    assert outcome("idle", "running", "running", "finished") is None
+    assert outcome("idle", "running", "running", *["finished"] * 3) is None
     # An ACP turn can end back at idle rather than finished.
-    assert outcome("running", "idle") is None
+    assert outcome("running", *["idle"] * 3) is None
+    # A turn delivered mid-run starts the conversation again before it settles.
+    assert outcome("running", "idle", "running", "error") == "conversation ended error"
     assert outcome("running", "error") == "conversation ended error"
     assert outcome("running", "waiting_for_confirmation").endswith("confirmation")
 

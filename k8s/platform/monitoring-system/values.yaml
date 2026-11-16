@@ -184,6 +184,7 @@ kube-prometheus-stack:
       replicas: 3
       secrets:
         - alertmanager-secrets
+        - alertmanager-openhands-token
       configMaps:
         - alert-templates
       nodeSelector:
@@ -225,6 +226,22 @@ kube-prometheus-stack:
           - receiver: "null"
             matchers:
               - alertname =~ "ResticBackupRunning|JellyfinStreamActive|WoodpeckerPipelineRunning|LonghornVolumeDegraded"
+          # A first-response agent run per alert, in OpenHands. `continue`
+          # so the alert also reaches Discord below. Grouped by name alone,
+          # so a storm of one alert is one notification; OpenHands folds
+          # whatever arrives while a run is going into that run. The matcher
+          # is the ignore list: alerts that are notifications, not problems.
+          - receiver: openhands
+            continue: true
+            matchers:
+              - alertname !~ "KuredNodeRebooting"
+            group_by: ['alertname']
+            group_wait: 1m
+            group_interval: 5m
+            repeat_interval: 24h
+          # The root receiver, spelled out: once the route above has matched,
+          # the root's own receiver no longer applies.
+          - receiver: discord
 
       receivers:
         - name: "null"
@@ -234,6 +251,13 @@ kube-prometheus-stack:
               title: '{{ template "__discord_subject" . }}'
               message: '{{ template "__discord_alert_list" . }}'
               webhook_url_file: /etc/alertmanager/secrets/alertmanager-secrets/discord_webhook_url
+        - name: openhands
+          webhook_configs:
+            - url: http://openhands-app-server.openhands.svc.cluster.local:8082/alertmanager
+              send_resolved: false
+              http_config:
+                authorization:
+                  credentials_file: /etc/alertmanager/secrets/alertmanager-openhands-token/token
 
   ## Install Prometheus Operator CRDs
   ##

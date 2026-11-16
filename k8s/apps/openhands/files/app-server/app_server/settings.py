@@ -71,6 +71,17 @@ class Settings:
     # The longest a conversation waits out a usage limit before continuing by
     # itself; past it, its sandbox is suspended instead. 0: never waits.
     usage_limit_wait_seconds: float = 0
+    # Alertmanager as an event source: the port its webhook posts to (0: not
+    # served), the source name automations trigger on, the file holding the
+    # bearer token it presents, and how long alerts of one name are dropped
+    # after being forwarded.
+    alerts_port: int = 0
+    alerts_source: str = "alertmanager"
+    alerts_token_file: Path | None = None
+    alerts_cooldown_seconds: float = 0
+    # A Discord webhook URL that automations with `notify: discord` report to.
+    # Missing or empty: nothing is posted.
+    discord_webhook_file: Path | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -111,4 +122,16 @@ class Settings:
             usage_limit_wait_seconds=float(
                 os.environ.get("USAGE_LIMIT_WAIT_SECONDS", "0")
             ),
+            alerts_port=int(os.environ.get("ALERTS_PORT", "0")),
+            alerts_source=os.environ.get("ALERTS_SOURCE", "alertmanager"),
+            alerts_token_file=_optional_path("ALERTS_TOKEN_FILE"),
+            alerts_cooldown_seconds=float(
+                os.environ.get("ALERTS_COOLDOWN_SECONDS", "0")
+            ),
+            discord_webhook_file=_optional_path("DISCORD_WEBHOOK_FILE"),
         )
+
+
+def _optional_path(name: str) -> Path | None:
+    value = os.environ.get(name)
+    return Path(value) if value else None

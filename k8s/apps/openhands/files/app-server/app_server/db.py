@@ -89,6 +89,13 @@ MIGRATIONS: list[str] = [
     -- When it was last suspended, while it still is.
     ALTER TABLE sandboxes ADD COLUMN suspended_at TEXT;
     """,
+    """
+    -- When alerts of each name were last handed to the automation service.
+    CREATE TABLE alert_cooldowns (
+        alertname TEXT PRIMARY KEY,
+        forwarded_at TEXT NOT NULL
+    );
+    """,
 ]
 
 

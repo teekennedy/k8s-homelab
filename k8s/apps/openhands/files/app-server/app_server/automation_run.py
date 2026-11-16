@@ -19,6 +19,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 POLL_SECONDS = 5
 # How long a new conversation may sit idle before it counts as never started.
 START_GRACE_SECONDS = 120
+# Polls a conversation must stay idle before the run ends. An event delivered
+# to the conversation mid-run starts another turn, and the sandbox goes as
+# soon as the run ends, so a turn's end is not taken for the run's.
+IDLE_POLLS = 3
 FAILED_STATES = ("error", "stuck", "paused", "waiting_for_confirmation", "deleting")
 
 
@@ -55,13 +59,17 @@ def wait(agent_url: str, conversation_id: str, key: str) -> str | None:
     """Block until the conversation stops; the reason it failed, or None."""
     started = time.monotonic()
     ran = False
+    idle = 0
     while True:
         info = call("GET", f"{agent_url}/api/conversations/{conversation_id}", key)
         status = info.get("execution_status")
         if status == "running":
             ran = True
+            idle = 0
         elif status == "finished" or (status == "idle" and ran):
-            return None
+            idle += 1
+            if idle >= IDLE_POLLS:
+                return None
         elif status in FAILED_STATES:
             return (
                 f"conversation ended {status}{reason(agent_url, conversation_id, key)}"
@@ -84,7 +92,12 @@ def main() -> int:
     run_id = os.environ["AUTOMATION_RUN_ID"]
     payload = json.loads(os.environ.get("AUTOMATION_EVENT_PAYLOAD") or "{}")
 
-    result: dict = {"status": "FAILED", "run_id": run_id}
+    # `automation` is for the app server, which removes it before relaying.
+    result: dict = {
+        "status": "FAILED",
+        "run_id": run_id,
+        "automation": payload.get("automation_name"),
+    }
     try:
         started = call(
             "POST",
