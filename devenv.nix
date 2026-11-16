@@ -152,6 +152,19 @@ in {
         always_run = true;
       };
 
+      # The Go SDK bindings generator is skipped by `dagger check` because it
+      # is slow and never cached, so it only runs when a staged file could
+      # change its output. Any rewritten binding fails the commit for review.
+      git-hooks.hooks.dagger-go-sdk-generate = {
+        enable = true;
+        name = "dagger generate dagger-go-sdk";
+        entry = "${dagger}/bin/dagger --progress=plain generate dagger-go-sdk -y";
+        language = "system";
+        files = "^(\\.dagger/|dagger\\.(lock|toml)$)";
+        pass_filenames = false;
+        before = ["dagger-check"];
+      };
+
       # The hook config above is a gitignored symlink that only exists where a
       # devenv shell has been entered, so `git worktree add` creates checkouts
       # whose pre-commit hook fails with "config file not found". This
