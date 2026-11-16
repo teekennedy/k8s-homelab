@@ -57,7 +57,8 @@ spec:
           annotations:
             summary: {{ "The wake word clip processor thread has stopped" | quote }}
         - alert: WakeWordTrainerRunFailed
-          expr: wake_word_trainer_last_run_success == 0
+          # 3 is the failed status code; a running newest run does not match.
+          expr: wake_word_trainer_last_run_status == 3
           labels:
             severity: warning
           annotations:

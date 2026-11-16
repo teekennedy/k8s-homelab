@@ -31,6 +31,9 @@ from .processor import Processor
 from .settings import LABELS, POSITIVE_LABELS, Settings
 from .templates import TEMPLATES as PAGES
 
+# Values of wake_word_trainer_last_run_status; the RunFailed alert matches 3.
+RUN_STATUS_CODES = {"succeeded": 1, "running": 2, "failed": 3}
+
 log = logging.getLogger(__name__)
 
 TEMPLATES = Jinja2Templates(env=Environment(loader=DictLoader(PAGES), autoescape=True))
@@ -500,24 +503,9 @@ def render_metrics(store: Store, processor: Processor) -> str:
             [({"status": last["status"]}, last["started_at"])],
         )
         gauge(
-            "wake_word_trainer_last_run_success",
-            "1 if the newest finished run succeeded.",
-            [
-                (
-                    {},
-                    int(
-                        next(
-                            (
-                                r["status"]
-                                for r in reversed(runs)
-                                if r["status"] != "running"
-                            ),
-                            "",
-                        )
-                        == "succeeded"
-                    ),
-                )
-            ],
+            "wake_word_trainer_last_run_status",
+            "Status of the newest run: 1 succeeded, 2 running, 3 failed.",
+            [({}, RUN_STATUS_CODES.get(last["status"], 0))],
         )
     ok = [r for r in runs if r["status"] == "succeeded"]
     if ok:
