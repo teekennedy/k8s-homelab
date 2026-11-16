@@ -80,14 +80,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   -F | --body-file)
     need_value "$@"
-    if [[ $2 == "-" ]]; then
-      body=$(cat)
-    elif [[ -f $2 ]]; then
-      body=$(cat "$2")
-    else
-      echo "error: body file '$2' not found" >&2
-      exit 1
-    fi
+    body=$(cat -- "$2") # '-' reads stdin
     body_set=1
     shift 2
     ;;
@@ -198,11 +191,6 @@ api_call() {
     "${api}${path}" "$@"
 }
 
-find_open_pr() {
-  api_call GET "/repos/${owner}/${repo}/pulls?state=open&limit=50" |
-    jq -r --arg branch "$branch" '[.[] | select(.head.ref == $branch)][0].number // empty'
-}
-
 echo "Fetching origin/${branch}..."
 git fetch origin "$branch" --quiet || true
 
@@ -223,57 +211,50 @@ else
   git push -u origin "${branch}:${branch}"
 fi
 
-if [[ $draft -eq 1 && -n $title ]]; then
+echo "Looking for an existing open PR for ${branch}..."
+pr_number=$(api_call GET "/repos/${owner}/${repo}/pulls?state=open&limit=50" |
+  jq -r --arg branch "$branch" '[.[] | select(.head.ref == $branch)][0].number // empty')
+
+# A new PR fills what wasn't given from the commits it will carry.
+if [[ -z $pr_number && (-z $title || $body_set -eq 0) ]]; then
+  git fetch origin "$base_branch" --quiet || true
+  range="origin/${base_branch}..${branch}"
+  if ! git rev-parse --verify --quiet "origin/${base_branch}" >/dev/null; then
+    range="${base_branch}..${branch}"
+  fi
+  subjects=$(git log --reverse --format=%s "$range")
+  if [[ -z $subjects ]]; then
+    echo "error: ${branch} has no commits ahead of ${base_branch}" >&2
+    exit 1
+  fi
+  if [[ -z $title ]]; then
+    title=$(head -n1 <<<"$subjects")
+  fi
+  if [[ $body_set -eq 0 ]]; then
+    if [[ $(wc -l <<<"$subjects") -eq 1 ]]; then
+      body=$(git log --format=%b "$range")
+    else
+      body=$(awk '{print "- " $0}' <<<"$subjects")
+    fi
+  fi
+fi
+
+# Forgejo marks a PR as a draft by its title prefix.
+if [[ $draft -eq 1 ]]; then
+  if [[ -z $title ]]; then
+    title=$(api_call GET "/repos/${owner}/${repo}/pulls/${pr_number}" | jq -r .title)
+  fi
   title="WIP: ${title#WIP: }"
 fi
 
-echo "Looking for an existing open PR for ${branch}..."
-pr_number=$(find_open_pr)
-
 if [[ -z $pr_number ]]; then
-  # Fill what wasn't given from the commits the PR will carry.
-  if [[ -z $title || $body_set -eq 0 ]]; then
-    git fetch origin "$base_branch" --quiet || true
-    range="origin/${base_branch}..${branch}"
-    if ! git rev-parse --verify --quiet "origin/${base_branch}" >/dev/null; then
-      range="${base_branch}..${branch}"
-    fi
-    subjects=$(git log --reverse --format=%s "$range")
-    if [[ -z $subjects ]]; then
-      echo "error: ${branch} has no commits ahead of ${base_branch}" >&2
-      exit 1
-    fi
-    if [[ -z $title ]]; then
-      title=$(head -n1 <<<"$subjects")
-      if [[ $draft -eq 1 ]]; then
-        title="WIP: ${title#WIP: }"
-      fi
-    fi
-    if [[ $body_set -eq 0 ]]; then
-      if [[ $(wc -l <<<"$subjects") -eq 1 ]]; then
-        body=$(git log --format=%b "$range")
-      else
-        body=$(awk '{print "- " $0}' <<<"$subjects")
-      fi
-    fi
-  fi
-
   echo "Creating PR: ${branch} -> ${base_branch}..."
   create_payload=$(jq -n --arg title "$title" --arg body "$body" \
     --arg head "$branch" --arg base "$base_branch" \
     '{title: $title, body: $body, head: $head, base: $base}')
-  api_call POST "/repos/${owner}/${repo}/pulls" -d "$create_payload" >/dev/null
-  pr_number=$(find_open_pr)
-  if [[ -z $pr_number ]]; then
-    echo "error: PR creation appeared to succeed but could not find the resulting PR" >&2
-    exit 1
-  fi
+  pr_number=$(api_call POST "/repos/${owner}/${repo}/pulls" -d "$create_payload" | jq -r .number)
 else
   echo "Found existing PR #${pr_number}, updating it."
-  if [[ $draft -eq 1 && -z $title ]]; then
-    title=$(api_call GET "/repos/${owner}/${repo}/pulls/${pr_number}" | jq -r .title)
-    title="WIP: ${title#WIP: }"
-  fi
   if [[ -n $title || $body_set -eq 1 ]]; then
     edit_payload=$(jq -n --arg title "$title" --arg body "$body" \
       --argjson set_body "$body_set" \

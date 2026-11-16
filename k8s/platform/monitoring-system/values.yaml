@@ -662,7 +662,7 @@ gitSync:
   # (k8s/platform/forgejo, users[name=grafana]).
   tokenUser: grafana
   tokenSecretName: grafana-forgejo-user
-  image:
+  image: &curlImage
     repository: alpine/curl
     tag: "8.22.0@sha256:f05779b04a6f3c6f228c67118786f5c80d4c4922dd79b0b24c92dc10a74f594f"
 
@@ -670,13 +670,10 @@ gitSync:
 # minted by templates/grafana-openhands-token.yaml. The Secret it writes is
 # read by the sandboxes' Grafana MCP server.
 openhandsGrafana:
-  enabled: true
   serviceAccountName: openhands-readonly
   secretNamespace: openhands
   secretName: openhands-grafana
-  image:
-    repository: alpine/curl
-    tag: "8.22.0@sha256:f05779b04a6f3c6f228c67118786f5c80d4c4922dd79b0b24c92dc10a74f594f"
+  image: *curlImage
 
 loki:
   enabled: true

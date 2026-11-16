@@ -1,5 +1,4 @@
 {{- $cfg := .Values.openhandsGrafana }}
-{{- if $cfg.enabled }}
 {{- $grafanaSvc := printf "http://%s-grafana.%s.svc" .Release.Name .Release.Namespace }}
 {{- $adminSecret := index .Values "kube-prometheus-stack" "grafana" "admin" "existingSecret" }}
 ---
@@ -115,7 +114,8 @@ spec:
               }
 
               # Keep the current token while Grafana still accepts it.
-              current=$(kube GET "$secret_url/$TARGET_NAME" 2>/dev/null \
+              existing=$(kube GET "$secret_url/$TARGET_NAME" 2>/dev/null) || existing=
+              current=$(printf '%s' "$existing" \
                 | sed -n 's/.*"token": *"\([^"]*\)".*/\1/p' | base64 -d 2>/dev/null || true)
               if [ -n "$current" ] && curl -fsS -o /dev/null \
                 -H "Authorization: Bearer $current" "$GRAFANA_URL/api/user"; then
@@ -144,10 +144,9 @@ spec:
               [ -n "$key" ] || { echo "Grafana returned no token"; exit 1; }
 
               body="{\"apiVersion\":\"v1\",\"kind\":\"Secret\",\"metadata\":{\"name\":\"$TARGET_NAME\",\"namespace\":\"$TARGET_NAMESPACE\"},\"stringData\":{\"token\":\"$key\"}}"
-              if kube GET "$secret_url/$TARGET_NAME" >/dev/null 2>&1; then
+              if [ -n "$existing" ]; then
                 kube PUT "$secret_url/$TARGET_NAME" "$body" >/dev/null
               else
                 kube POST "$secret_url" "$body" >/dev/null
               fi
               echo "wrote $TARGET_NAMESPACE/$TARGET_NAME"
-{{- end }}
