@@ -12,6 +12,11 @@ cloudnative-pg:
     limits:
       memory: 192Mi
 plugin-barman-cloud:
+  # The chart passes --leader-elect; a later flag overrides it. With one
+  # replica and the chart's required Recreate strategy, two copies never
+  # run at once, so the lease only cost an etcd write every 2s.
+  additionalArgs:
+    - --leader-elect=false
   resources:
     requests:
       cpu: 10m

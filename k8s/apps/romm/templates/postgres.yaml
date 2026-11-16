@@ -20,6 +20,14 @@ spec:
   # Pooled clients never disconnect on their own, so a smart shutdown always
   # waits out its full timeout (default 180s) before escalating to fast.
   smartShutdownTimeout: 15
+  # Every lease renewal is an etcd write. With one instance there is no
+  # replica to promote, and a restarted pod keeps its name and so re-takes
+  # its own lease at once, so long timings cost nothing. Takes effect when
+  # the primary restarts.
+  primaryLease:
+    leaseDurationSeconds: 120
+    renewDeadlineSeconds: 90
+    retryPeriodSeconds: 30
   # CNPG copies these labels onto the PVCs it creates. Postgres is recovered
   # through CNPG, not Longhorn backups, so the volumes only get trimmed.
   inheritedMetadata:

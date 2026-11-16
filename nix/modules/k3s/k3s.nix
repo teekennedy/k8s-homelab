@@ -111,6 +111,21 @@ in {
         (lib.mkIf (isServer && config.services.k3s.embeddedRegistry.enable) [
           "--embedded-registry"
         ])
+        # Every leader lease renewal is an etcd write. Renew every 10s instead
+        # of 2s. A dead leader is replaced after up to 60s (was 15s), and the
+        # leader tolerates 40s (was 10s) of API server trouble before exiting.
+        (lib.mkIf isServer (lib.concatMap (component: [
+            "--${component}-arg"
+            "leader-elect-lease-duration=60s"
+            "--${component}-arg"
+            "leader-elect-renew-deadline=40s"
+            "--${component}-arg"
+            "leader-elect-retry-period=10s"
+          ]) [
+            "kube-controller-manager"
+            "kube-scheduler"
+            "kube-cloud-controller-manager"
+          ]))
       ];
       nodeLabel = lib.mkIf (builtins.stringLength config.disko.longhornDevice > 0) [
         "node.longhorn.io/create-default-disk=true"

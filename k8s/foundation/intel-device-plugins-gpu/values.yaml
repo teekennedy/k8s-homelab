@@ -1,5 +1,10 @@
 # Source: https://github.com/intel/helm-charts/tree/main/charts/gpu-device-plugin
 intel-device-plugins-operator:
+  # The chart passes --leader-elect; a later flag overrides it. One replica,
+  # so the lease only cost an etcd write every 2s. A rollout briefly runs
+  # two copies; both just reconcile the same GpuDevicePlugin DaemonSet.
+  controllerExtraArgs: |
+    - "--leader-elect=false"
   resources:
     limits:
       # Unsets the chart's default CPU limit.

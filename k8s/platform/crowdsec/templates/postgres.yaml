@@ -16,6 +16,14 @@ spec:
   # Pooled clients never disconnect on their own, so a smart shutdown always
   # waits out its full timeout (default 180s) before escalating to fast.
   smartShutdownTimeout: 15
+  # Every lease renewal is an etcd write. Renew every 10s instead of 2s;
+  # an abrupt primary loss now waits up to 40s (was 15s) before a replica
+  # may promote, and the primary rides out 30s (was 10s) without the API
+  # server before stopping postgres. Takes effect when the primary restarts.
+  primaryLease:
+    leaseDurationSeconds: 40
+    renewDeadlineSeconds: 30
+    retryPeriodSeconds: 10
   # CNPG copies these labels onto the PVCs it creates. Postgres is recovered
   # through CNPG, not Longhorn backups, so the volumes only get trimmed.
   inheritedMetadata:
