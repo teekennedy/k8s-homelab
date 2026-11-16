@@ -157,11 +157,12 @@ in {
       ];
     };
 
-    # etcd fsyncs its WAL and rewrites bbolt pages in place several times a
-    # second. On copy-on-write, compressed btrfs every one of those small
-    # writes relocates extents and rewrites metadata, which turned ~20KB/s of
-    # WAL into 4-9MB/s of SSD writes per server. nodatacow (+C) makes them
-    # in-place; etcd checksums its own WAL and snapshots.
+    # etcd rewrites bbolt pages in place several times a second. On
+    # copy-on-write btrfs each rewrite relocates the extent, fragmenting the
+    # db file (~9k extents vs ~1k with +C). nodatacow (+C) keeps the writes
+    # in place; etcd checksums its own WAL and snapshots. It does not reduce
+    # write volume much: that is dominated by the metadata btrfs writes on
+    # every fsync, which nodatacow files still pay.
     #
     # +C only takes effect on files created empty inside a +C directory, so
     # existing files are copied into place. That only happens while k3s is
@@ -185,6 +186,11 @@ in {
           exit 0
         fi
 
+        if [ "$(stat -f -c %T "$dir")" != btrfs ]; then
+          echo "$dir is not on btrfs; nothing to do"
+          exit 0
+        fi
+
         find "$dir" -type d -exec chattr +C {} +
 
         db="$dir/member/snap/db"
@@ -204,7 +210,9 @@ in {
           tmp="$f.nocow.tmp"
           rm -f -- "$tmp"
           # --reflink=never: a reflinked copy would share the old COW extents.
-          cp --reflink=never --preserve=mode,ownership,timestamps -- "$f" "$tmp"
+          # --sparse=never: keeps etcd's preallocated WAL files allocated.
+          cp --reflink=never --sparse=never \
+            --preserve=mode,ownership,timestamps -- "$f" "$tmp"
           sync -- "$tmp"
           mv -f -- "$tmp" "$f"
           echo "rewrote $f without copy-on-write"
