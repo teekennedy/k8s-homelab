@@ -8,9 +8,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app_server import alerts
-from app_server.db import Database
-from app_server.main import State, build_alerts
-from tests.test_automations import FakeAutomationService, service_client
+from app_server.main import build_alerts
+from tests.test_automations import FakeAutomationService, _define, service_client
 from tests.test_conversations import CONV_ID, FakeAgentServer
 
 TOKEN = {"Authorization": "Bearer am-token"}
@@ -47,22 +46,23 @@ def _notification(*alerts_: dict) -> dict:
     return {"version": "4", "status": "firing", "alerts": list(alerts_)}
 
 
+RUN_ID = "0cd7e625-a5f0-4164-a27c-d77ca5999e90"
+
+
 @pytest.fixture
-def state(settings, kube, tmp_path):
+def settings(settings, tmp_path):
+    """conftest's, with alerts served and a Discord webhook to report to."""
     token = tmp_path / "alerts-token"
     token.write_text("am-token\n")
     discord = tmp_path / "discord-url"
     discord.write_text("https://discord.example/api/webhooks/1/x\n")
-    settings = dataclasses.replace(
+    return dataclasses.replace(
         settings,
         alerts_port=8082,
         alerts_token_file=token,
         alerts_cooldown_seconds=3600,
         discord_webhook_file=discord,
     )
-    s = State(settings, kube, Database(settings.data_dir / "app.db"))
-    yield s
-    s.db.close()
 
 
 @pytest.fixture
@@ -104,7 +104,7 @@ def test_firing_alerts_are_forwarded_signed(intake, service, state):
     assert request.url.path.endswith(
         "/events/00000000-0000-4000-8000-000000000001/alertmanager"
     )
-    secret = alerts.source_secret("automation-key", "alertmanager")
+    secret = alerts.source_secret("automation-key")
     expected = hmac.new(secret.encode(), request.content, hashlib.sha256).hexdigest()
     assert request.headers[alerts.SIGNATURE_HEADER] == expected
 
@@ -152,9 +152,7 @@ async def test_alertmanager_is_registered_as_an_event_source(state, service):
     await state.automations.sync()
     (source,) = service.sources
     assert source["source"] == "alertmanager"
-    assert source["webhook_secret"] == alerts.source_secret(
-        "automation-key", "alertmanager"
-    )
+    assert source["webhook_secret"] == alerts.source_secret("automation-key")
     assert source["signature_header"] == alerts.SIGNATURE_HEADER
     assert source["event_key_expr"] == "status"
 
@@ -162,10 +160,6 @@ async def test_alertmanager_is_registered_as_an_event_source(state, service):
     await state.automations.sync()
     assert sorted(s["source"] for s in service.sources) == ["alertmanager", "forgejo"]
     assert len(service.sources) == 2
-
-
-def _define(state, **definitions) -> None:
-    state.settings.automations_file.write_text(json.dumps(definitions))
 
 
 def test_a_run_checks_out_its_repository_on_its_model(api, hooks, state, user):
@@ -198,7 +192,10 @@ def _finish(message: str) -> dict:
     }
 
 
-def test_a_finished_run_is_reported_to_discord(api, hooks, state, service, user):
+@pytest.fixture
+def discord_posts(hooks, service) -> list[httpx.Request]:
+    """What the app server posts to Discord; everything else goes to the
+    automation service."""
     posted: list[httpx.Request] = []
 
     def outside(request: httpx.Request) -> httpx.Response:
@@ -208,9 +205,20 @@ def test_a_finished_run_is_reported_to_discord(api, hooks, state, service, user)
         return service(request)
 
     hooks.app.state.http = httpx.AsyncClient(transport=httpx.MockTransport(outside))
+    return posted
+
+
+def _complete(hooks, sandbox: dict, **body) -> httpx.Response:
+    return hooks.post(
+        f"/sandboxes/{sandbox['id']}/automation/runs/{RUN_ID}/complete",
+        json={"automation": "triage", **body},
+        headers={"X-Session-API-Key": sandbox["session_api_key"]},
+    )
+
+
+def test_a_finished_run_is_reported_to_discord(api, hooks, state, discord_posts, user):
     _define(state, triage=TRIAGE)
     sandbox = api.post("/api/v1/sandboxes", headers=user).json()
-    key = {"X-Session-API-Key": sandbox["session_api_key"]}
     events = [
         {
             "id": "e1",
@@ -231,18 +239,12 @@ def test_a_finished_run_is_reported_to_discord(api, hooks, state, service, user)
     hooks.post(
         f"/sandboxes/{sandbox['id']}/automation/conversations",
         json={"automation": "triage"},
-        headers=key,
+        headers={"X-Session-API-Key": sandbox["session_api_key"]},
     )
-    run = "0cd7e625-a5f0-4164-a27c-d77ca5999e90"
-    body = {"status": "COMPLETED", "conversation_id": CONV_ID, "automation": "triage"}
-    r = hooks.post(
-        f"/sandboxes/{sandbox['id']}/automation/runs/{run}/complete",
-        json=body,
-        headers=key,
-    )
+    r = _complete(hooks, sandbox, status="COMPLETED", conversation_id=CONV_ID)
     # The service's schema forbids fields it does not know.
     assert "automation" not in r.json()["relayed"]
-    (message,) = posted
+    (message,) = discord_posts
     embed = json.loads(message.content)["embeds"][0]
     assert embed["title"] == "triage"
     assert embed["description"].startswith("Cause: disk on borg-2 died.")
@@ -250,35 +252,16 @@ def test_a_finished_run_is_reported_to_discord(api, hooks, state, service, user)
     assert json.loads(message.content)["allowed_mentions"] == {"parse": []}
 
     # A run that never got a conversation still says so.
-    posted.clear()
-    hooks.post(
-        f"/sandboxes/{sandbox['id']}/automation/runs/{run}/complete",
-        json={"status": "FAILED", "error": "could not clone", "automation": "triage"},
-        headers=key,
-    )
-    (failed,) = posted
+    discord_posts.clear()
+    _complete(hooks, sandbox, status="FAILED", error="could not clone")
+    (failed,) = discord_posts
     embed = json.loads(failed.content)["embeds"][0]
     assert "could not clone" in embed["description"]
     assert embed["color"] == 0xE74C3C
 
 
-def test_a_run_without_notify_reports_nothing(api, hooks, state, service, user):
-    posted = []
-    hooks.app.state.http = httpx.AsyncClient(
-        transport=httpx.MockTransport(
-            lambda r: (
-                posted.append(r) or httpx.Response(204)
-                if r.url.host == "discord.example"
-                else service(r)
-            )
-        )
-    )
+def test_a_run_without_notify_reports_nothing(api, hooks, state, discord_posts, user):
     _define(state, triage={k: v for k, v in TRIAGE.items() if k != "notify"})
     sandbox = api.post("/api/v1/sandboxes", headers=user).json()
-    hooks.post(
-        f"/sandboxes/{sandbox['id']}/automation/runs/"
-        "0cd7e625-a5f0-4164-a27c-d77ca5999e90/complete",
-        json={"status": "FAILED", "error": "x", "automation": "triage"},
-        headers={"X-Session-API-Key": sandbox["session_api_key"]},
-    )
-    assert posted == []
+    _complete(hooks, sandbox, status="FAILED", error="x")
+    assert discord_posts == []

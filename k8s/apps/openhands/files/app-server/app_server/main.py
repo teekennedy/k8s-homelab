@@ -9,7 +9,7 @@ import re
 
 import httpx
 import uvicorn
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 
 from . import (
     alerts,
@@ -97,15 +97,7 @@ class State:
             usage_limit_wait=settings.usage_limit_wait_seconds,
         )
         self.automations = Automations(self.http, settings)
-        self.alerts = alerts.AlertIntake(
-            db,
-            self.http,
-            automation_url=settings.automation_url,
-            automation_api_key=settings.automation_api_key,
-            source=settings.alerts_source,
-            token_file=settings.alerts_token_file,
-            cooldown=settings.alerts_cooldown_seconds,
-        )
+        self.alerts = alerts.AlertIntake(db, self.http, settings)
         # Where sandbox webhooks land.
         self.event_sink = self.conversations
 
@@ -135,22 +127,23 @@ def build_api(state: State) -> FastAPI:
     return state.attach(app)
 
 
-def build_webhooks(state: State) -> FastAPI:
+def _internal(state: State, router: APIRouter) -> FastAPI:
+    """An app for one of the ports only another component calls: no docs."""
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    app.include_router(webhooks.router)
+    app.include_router(router)
     return state.attach(app)
+
+
+def build_webhooks(state: State) -> FastAPI:
+    return _internal(state, webhooks.router)
 
 
 def build_alerts(state: State) -> FastAPI:
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    app.include_router(alerts.router)
-    return state.attach(app)
+    return _internal(state, alerts.router)
 
 
 def build_metrics(state: State) -> FastAPI:
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    app.include_router(metrics.router)
-    return state.attach(app)
+    return _internal(state, metrics.router)
 
 
 async def reconcile_forever(state: State) -> None:
@@ -181,48 +174,20 @@ async def serve() -> None:
     )
     await state.conversations.abandon_unfinished_tasks()
     state.conversations.backfill()
+    ports = [
+        (build_api(state), settings.http_port, {"proxy_headers": False}),
+        (build_webhooks(state), settings.webhook_port, {}),
+        (build_alerts(state), settings.alerts_port, {}),
+        (build_metrics(state), settings.metrics_port, {"access_log": False}),
+    ]
     servers = [
         uvicorn.Server(
-            uvicorn.Config(
-                build_api(state),
-                host="0.0.0.0",
-                port=settings.http_port,
-                proxy_headers=False,
-                log_config=None,
-            )
-        ),
-        uvicorn.Server(
-            uvicorn.Config(
-                build_webhooks(state),
-                host="0.0.0.0",
-                port=settings.webhook_port,
-                log_config=None,
-            )
-        ),
+            uvicorn.Config(app, host="0.0.0.0", port=port, log_config=None, **kw)
+        )
+        for app, port, kw in ports
+        # 0: not served.
+        if port
     ]
-    if settings.alerts_port:
-        servers.append(
-            uvicorn.Server(
-                uvicorn.Config(
-                    build_alerts(state),
-                    host="0.0.0.0",
-                    port=settings.alerts_port,
-                    log_config=None,
-                )
-            )
-        )
-    if settings.metrics_port:
-        servers.append(
-            uvicorn.Server(
-                uvicorn.Config(
-                    build_metrics(state),
-                    host="0.0.0.0",
-                    port=settings.metrics_port,
-                    log_config=None,
-                    access_log=False,
-                )
-            )
-        )
     reconciler = asyncio.create_task(reconcile_forever(state))
     try:
         # Only one of them receives the signal; whichever stops first takes

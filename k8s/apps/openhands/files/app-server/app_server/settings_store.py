@@ -444,11 +444,15 @@ class SettingsStore:
             (p["name"] for p in doc["profiles"].values() if p["id"] == wanted), None
         )
 
-    def resolve_agent(self, profile_id: str | None) -> dict[str, Any]:
+    def resolve_agent(
+        self, profile_id: str | None, acp_model: str | None = None
+    ) -> dict[str, Any]:
         """agent_settings for a new conversation: the stored settings, with
-        the named (or active) ACP profile's fields laid over them.
+        the named (or active) ACP profile's fields laid over them, and then
+        `acp_model` if given.
 
-        OpenHands profiles resolve the active LLM selection or their own ref.
+        OpenHands profiles resolve the active LLM selection or their own ref,
+        and have no ACP model to override.
         """
         agent = copy.deepcopy(self.settings()["agent_settings"])
         doc = self._profiles()
@@ -459,6 +463,8 @@ class SettingsStore:
             for field in ACP_PROFILE_FIELDS:
                 if profile.get(field) is not None:
                     agent[field] = profile[field]
+            if acp_model:
+                agent["acp_model"] = acp_model
         elif profile and profile["agent_kind"] == "openhands":
             agent = {k: v for k, v in agent.items() if not k.startswith("acp_")}
             agent["agent_kind"] = "openhands"

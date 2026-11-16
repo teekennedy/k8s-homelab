@@ -12,6 +12,8 @@ from pathlib import Path
 
 import httpx
 
+from .settings import read_secret
+
 log = logging.getLogger(__name__)
 
 # Discord's limit on an embed description.
@@ -29,9 +31,7 @@ async def discord(
     text: str,
     ok: bool,
 ) -> None:
-    webhook = ""
-    if webhook_file and webhook_file.exists():
-        webhook = webhook_file.read_text().strip()
+    webhook = read_secret(webhook_file)
     if not webhook:
         log.info("no Discord webhook configured; not reporting %s", title)
         return
@@ -52,6 +52,6 @@ async def discord(
             # The agent's text is quoted, never a ping.
             "allowed_mentions": {"parse": []},
         },
-        timeout=30,
+        timeout=10,
     )
     resp.raise_for_status()

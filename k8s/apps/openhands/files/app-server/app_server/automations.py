@@ -30,7 +30,7 @@ from typing import Any
 import httpx
 
 from . import alerts
-from .settings import Settings
+from .settings import Settings, read_secret
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +65,12 @@ class Automations:
         self.headers = {"X-Session-API-Key": settings.automation_api_key}
         self.source = settings.forge_webhook_source
         self.secret_file = settings.forge_webhook_secret_file
-        self.alerts_source = settings.alerts_source if settings.alerts_port else ""
+        # Computed once: it only changes with the automation key.
+        self.alerts_secret = (
+            alerts.source_secret(settings.automation_api_key)
+            if settings.alerts_port
+            else ""
+        )
         self.tarball = build_tarball(
             {
                 "run.py": RUN_SCRIPT.read_bytes(),
@@ -86,12 +91,10 @@ class Automations:
     def definition(self, name: str | None) -> dict[str, Any] | None:
         return self.definitions().get(name or "")
 
-    def prompt(self, name: str | None, event: Any, follow_ups: Any) -> str | None:
-        """The first message of a run, or None for an automation not defined
-        here. An event-triggered run is told what triggered it."""
-        definition = self.definition(name)
-        if definition is None:
-            return None
+    @staticmethod
+    def prompt(definition: dict[str, Any], event: Any, follow_ups: Any) -> str:
+        """The first message of a run. An event-triggered run is told what
+        triggered it."""
         parts = [definition["prompt"].strip()]
         if event:
             parts.append(
@@ -142,8 +145,8 @@ class Automations:
         """The event sources to register, each with the secret it is verified
         with (`automation/webhook_router.py`)."""
         sources = []
-        if self.source and self.secret_file.exists():
-            secret = self.secret_file.read_text().strip()
+        if self.source:
+            secret = read_secret(self.secret_file)
             # Empty until the forge has been given its webhook.
             if secret:
                 sources.append(
@@ -157,16 +160,14 @@ class Automations:
                         "webhook_secret": secret,
                     }
                 )
-        if self.alerts_source:
+        if self.alerts_secret:
             sources.append(
                 {
-                    "source": self.alerts_source,
+                    "source": alerts.SOURCE,
                     # Signed by this server (alerts.py); the key is `firing`.
                     "signature_header": alerts.SIGNATURE_HEADER,
                     "event_key_expr": "status",
-                    "webhook_secret": alerts.source_secret(
-                        self.headers["X-Session-API-Key"], self.alerts_source
-                    ),
+                    "webhook_secret": self.alerts_secret,
                 }
             )
         return sources

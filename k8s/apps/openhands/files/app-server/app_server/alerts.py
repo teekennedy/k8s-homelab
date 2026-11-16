@@ -6,9 +6,10 @@ Alertmanager posts here, and this server forwards the delivery signed with a
 secret derived from its own automation key, after two cuts:
 
 - Firing alerts only. A resolution is not something to investigate.
-- An alert name forwarded within the cooldown is dropped. That covers every
-  replica of an HA Alertmanager delivering the same group, a group notified
-  again as more instances join it, and a long-firing alert's repeats.
+- An alert name forwarded within the cooldown is dropped, not delayed: the
+  same group from another Alertmanager replica, a group notified again as
+  more instances join it, and the same alert firing again soon after it
+  resolved are all taken as the incident a run has already looked at.
 
 Grouping alerts that do get through into one run is the automation's trigger,
 not this module: see README.md, "Alert triage".
@@ -18,19 +19,21 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, Body, HTTPException, Request
 
-from .db import Database
+from .db import Database, now
 from .routes_account import USER_ID
+from .settings import Settings, read_secret
 
 log = logging.getLogger(__name__)
 router = APIRouter()
 
+# The event source automations trigger on, registered when alerts are served.
+SOURCE = "alertmanager"
 SIGNATURE_HEADER = "X-OpenHands-Signature"
 # Alerts rendered into one event. A storm of one alert name is one group and
 # can carry hundreds of instances; the first few say what the rest do.
@@ -38,11 +41,11 @@ MAX_ALERTS = 25
 _KEPT_FIELDS = ("labels", "annotations", "startsAt", "generatorURL", "fingerprint")
 
 
-def source_secret(automation_api_key: str, source: str) -> str:
-    """The HMAC secret for a source this server signs for. Derived, so there
-    is nothing to store, and rotated along with the automation key."""
+def source_secret(automation_api_key: str) -> str:
+    """The HMAC secret this server signs forwarded alerts with. Derived, so
+    there is nothing to store, and rotated along with the automation key."""
     return hmac.new(
-        automation_api_key.encode(), f"event-source:{source}".encode(), hashlib.sha256
+        automation_api_key.encode(), f"event-source:{SOURCE}".encode(), hashlib.sha256
     ).hexdigest()
 
 
@@ -78,28 +81,18 @@ def render(alerts: list[dict[str, Any]]) -> str:
 
 
 class AlertIntake:
-    def __init__(
-        self,
-        db: Database,
-        http: httpx.AsyncClient,
-        *,
-        automation_url: str,
-        automation_api_key: str,
-        source: str,
-        token_file: Path | None,
-        cooldown: float,
-    ):
+    def __init__(self, db: Database, http: httpx.AsyncClient, settings: Settings):
         self.db = db
         self.http = http
-        self.url = f"{automation_url}/api/automation/v1/events/{USER_ID}/{source}"
-        self.secret = source_secret(automation_api_key, source)
-        self.token_file = token_file
-        self.cooldown = cooldown
+        self.url = (
+            f"{settings.automation_url}/api/automation/v1/events/{USER_ID}/{SOURCE}"
+        )
+        self.secret = source_secret(settings.automation_api_key)
+        self.token_file = settings.alerts_token_file
+        self.cooldown = settings.alerts_cooldown_seconds
 
     def authenticate(self, authorization: str | None) -> None:
-        token = ""
-        if self.token_file and self.token_file.exists():
-            token = self.token_file.read_text().strip()
+        token = read_secret(self.token_file)
         if not token:
             # The Secret is mounted optional; never accept an empty token.
             raise HTTPException(503, "no token configured")
@@ -111,10 +104,12 @@ class AlertIntake:
         """The names not forwarded within the cooldown, marked as forwarded
         now. Checked and marked in one transaction, so two replicas
         delivering the same group cannot both get through."""
-        stamp = datetime.now(UTC).isoformat()
+        stamp = now()
         if self.cooldown <= 0:
             return names, stamp
-        cutoff = (datetime.now(UTC) - timedelta(seconds=self.cooldown)).isoformat()
+        cutoff = (
+            datetime.fromisoformat(stamp) - timedelta(seconds=self.cooldown)
+        ).isoformat()
         with self.db.tx() as c:
             recent = {
                 r[0]
@@ -144,13 +139,11 @@ class AlertIntake:
         ]
         if not firing:
             return {"forwarded": 0}
-        fresh, stamp = self._claim({_name(a) for a in firing})
+        names = {_name(a) for a in firing}
+        fresh, stamp = self._claim(names)
         alerts = [a for a in firing if _name(a) in fresh]
         if not alerts:
-            log.info(
-                "alerts cooling down, not forwarded: %s",
-                ", ".join(sorted({_name(a) for a in firing})),
-            )
+            log.info("alerts cooling down, not forwarded: %s", ", ".join(sorted(names)))
             return {"forwarded": 0}
         event = {
             "status": "firing",

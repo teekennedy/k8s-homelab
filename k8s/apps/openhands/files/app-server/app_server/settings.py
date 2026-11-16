@@ -72,11 +72,9 @@ class Settings:
     # itself; past it, its sandbox is suspended instead. 0: never waits.
     usage_limit_wait_seconds: float = 0
     # Alertmanager as an event source: the port its webhook posts to (0: not
-    # served), the source name automations trigger on, the file holding the
-    # bearer token it presents, and how long alerts of one name are dropped
-    # after being forwarded.
+    # served, and no source registered), the file holding the bearer token it
+    # presents, and how long alerts of one name are dropped once forwarded.
     alerts_port: int = 0
-    alerts_source: str = "alertmanager"
     alerts_token_file: Path | None = None
     alerts_cooldown_seconds: float = 0
     # A Discord webhook URL that automations with `notify: discord` report to.
@@ -123,7 +121,6 @@ class Settings:
                 os.environ.get("USAGE_LIMIT_WAIT_SECONDS", "0")
             ),
             alerts_port=int(os.environ.get("ALERTS_PORT", "0")),
-            alerts_source=os.environ.get("ALERTS_SOURCE", "alertmanager"),
             alerts_token_file=_optional_path("ALERTS_TOKEN_FILE"),
             alerts_cooldown_seconds=float(
                 os.environ.get("ALERTS_COOLDOWN_SECONDS", "0")
@@ -135,3 +132,11 @@ class Settings:
 def _optional_path(name: str) -> Path | None:
     value = os.environ.get(name)
     return Path(value) if value else None
+
+
+def read_secret(path: Path | None) -> str:
+    """A value from a Secret mounted optional: read on every use, because the
+    kubelet fills or rotates it in place; empty while there is none."""
+    if path is None or not path.exists():
+        return ""
+    return path.read_text().strip()

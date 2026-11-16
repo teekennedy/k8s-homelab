@@ -68,12 +68,12 @@ data: {}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ .Values.alerts.tokenSecret.name }}
+  name: {{ .Values.alerts.tokenSecret }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "openhands.labels" . | nindent 4 }}
   annotations:
-    reflector.v1.k8s.emberstack.com/reflects: {{ .Values.alerts.tokenSecret.reflects | quote }}
+    reflector.v1.k8s.emberstack.com/reflects: {{ printf "%s/%s" .Values.monitoringNamespace .Values.alerts.tokenSecret | quote }}
 type: Opaque
 data: {}
 {{- end }}
@@ -305,8 +305,6 @@ spec:
             {{- if .Values.alerts.enabled }}
             - name: ALERTS_PORT
               value: {{ .Values.alerts.port | quote }}
-            - name: ALERTS_SOURCE
-              value: {{ .Values.alerts.source | quote }}
             - name: ALERTS_TOKEN_FILE
               value: /etc/openhands-app-server/alerts-token/token
             - name: ALERTS_COOLDOWN_SECONDS
@@ -433,7 +431,7 @@ spec:
         {{- if .Values.alerts.enabled }}
         - name: alerts-token
           secret:
-            secretName: {{ .Values.alerts.tokenSecret.name }}
+            secretName: {{ .Values.alerts.tokenSecret }}
             optional: true
         {{- end }}
         - name: discord

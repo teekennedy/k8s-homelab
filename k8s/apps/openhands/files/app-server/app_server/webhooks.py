@@ -17,6 +17,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, Request, Response
+from starlette.background import BackgroundTask
 
 from . import notify
 from .sandboxes import SandboxManager
@@ -71,10 +72,12 @@ async def automation_conversation(
     _authenticate(request, sandbox_id)
     automations = request.app.state.automations
     name = body.get("automation")
-    prompt = automations.prompt(name, body.get("event"), body.get("follow_up_turns"))
-    if prompt is None:
-        raise HTTPException(404, f"no automation named {name!r} is defined")
     definition = automations.definition(name)
+    if definition is None:
+        raise HTTPException(404, f"no automation named {name!r} is defined")
+    prompt = automations.prompt(
+        definition, body.get("event"), body.get("follow_up_turns")
+    )
     started = await request.app.state.conversations.start_in(
         sandbox_id,
         {
@@ -87,7 +90,6 @@ async def automation_conversation(
             "trigger": "automation",
             "selected_repository": definition.get("repository"),
             "selected_branch": definition.get("branch"),
-            "git_provider": "forgejo" if definition.get("repository") else None,
             "acp_model": definition.get("model"),
         },
         "automation",
@@ -105,7 +107,9 @@ async def automation_complete(
     on receiving it, so the transcript is completed first."""
     _authenticate(request, sandbox_id)
     state = request.app.state
-    # Ours, not the service's: its schema rejects unknown fields.
+    # Ours, not the service's: its schema rejects unknown fields. Carried by
+    # the run script rather than recorded when the run asked for its
+    # conversation, so a run that never got that far still reports.
     name = body.pop("automation", None)
     if body.get("conversation_id"):
         try:
@@ -118,14 +122,12 @@ async def automation_complete(
         headers={"X-Session-API-Key": state.settings.automation_api_key},
         timeout=60,
     )
-    try:
-        await _report(state, name, body)
-    except Exception:
-        log.exception("could not report the outcome of run %s", run_id)
     return Response(
         resp.content,
         status_code=resp.status_code,
         media_type=resp.headers.get("content-type"),
+        # After the response: the run script is waiting on it, not on Discord.
+        background=BackgroundTask(_report, state, name, body),
     )
 
 
@@ -134,6 +136,13 @@ async def _report(state: Any, name: str | None, body: dict[str, Any]) -> None:
     definition = state.automations.definition(name)
     if not definition or definition.get("notify") != "discord":
         return
+    try:
+        await _post_report(state, name, body)
+    except Exception:
+        log.exception("could not report the outcome of %s", name)
+
+
+async def _post_report(state: Any, name: str, body: dict[str, Any]) -> None:
     conv_id = body.get("conversation_id")
     ok = body.get("status") == "COMPLETED"
     text = state.conversations.final_message(conv_id) if ok and conv_id else None

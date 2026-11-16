@@ -12,6 +12,7 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -208,23 +209,18 @@ class ConversationService:
         sandbox_id = None
         try:
             profile_id = request.get("agent_profile_id")
-            agent_settings = self.settings.resolve_agent(profile_id)
             self._set_task(task_id, status="WAITING_FOR_SANDBOX")
             sandbox = await self.sandboxes.create(self.spec_for(profile_id), created_by)
             sandbox_id = sandbox["id"]
             self._set_task(task_id, sandbox_id=sandbox_id)
             await self._wait_running(sandbox_id)
-
-            if request.get("selected_repository"):
-                self._set_task(task_id, status="PREPARING_REPOSITORY")
-                await self._clone(sandbox, request)
-            self._set_task(task_id, status="STARTING_CONVERSATION")
-            info = await self._start_on_sandbox(sandbox, request, agent_settings)
-            self._insert_conversation(
-                info, sandbox_id, request, agent_settings, created_by
+            conv_id = await self._start(
+                sandbox,
+                request,
+                created_by,
+                lambda status: self._set_task(task_id, status=status),
             )
-            self._set_task(task_id, status="READY", app_conversation_id=info["id"])
-            log.info("conversation %s started on %s", info["id"], sandbox_id)
+            self._set_task(task_id, status="READY", app_conversation_id=conv_id)
         except Exception as e:
             log.exception("start task %s failed", task_id)
             self._set_task(task_id, status="ERROR", detail=str(e)[:1000])
@@ -264,14 +260,29 @@ class ConversationService:
         sandbox = self.sandboxes.live_row(sandbox_id)
         if sandbox is None:
             raise LookupError(sandbox_id)
-        agent_settings = self.settings.resolve_agent(request.get("agent_profile_id"))
-        if request.get("acp_model") and agent_settings.get("agent_kind") == "acp":
-            agent_settings["acp_model"] = request["acp_model"]
+        return await self._start(sandbox, request, created_by)
+
+    async def _start(
+        self,
+        sandbox: dict[str, Any],
+        request: dict[str, Any],
+        created_by: str,
+        on_status: Callable[[str], None] = lambda status: None,
+    ) -> str:
+        """Everything between a running sandbox and a running conversation:
+        the repository checkout, the agent server's start, and the row."""
+        agent_settings = self.settings.resolve_agent(
+            request.get("agent_profile_id"), acp_model=request.get("acp_model")
+        )
         if request.get("selected_repository"):
+            on_status("PREPARING_REPOSITORY")
             await self._clone(sandbox, request)
+        on_status("STARTING_CONVERSATION")
         info = await self._start_on_sandbox(sandbox, request, agent_settings)
-        self._insert_conversation(info, sandbox_id, request, agent_settings, created_by)
-        log.info("conversation %s started on %s", info["id"], sandbox_id)
+        self._insert_conversation(
+            info, sandbox["id"], request, agent_settings, created_by
+        )
+        log.info("conversation %s started on %s", info["id"], sandbox["id"])
         return conversation_id(info["id"])
 
     def final_message(self, conv_id: str) -> str | None:

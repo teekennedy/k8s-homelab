@@ -74,18 +74,14 @@ forge:
 # --- Alertmanager -----------------------------------------------------------
 # Alertmanager as an event source for automations (README.md, "Alert
 # triage"). Its webhook posts to the app server on a port of its own; the app
-# server forwards firing alerts to the automation service as `source`. Which
-# alerts are sent at all is Alertmanager's routing, in
-# k8s/platform/monitoring-system.
+# server forwards firing alerts to the automation service as the source
+# `alertmanager`.
 alerts:
   enabled: true
   port: 8082
-  source: alertmanager
-  # The bearer token Alertmanager presents: generated in monitoring-system and
-  # mirrored here; key: token.
-  tokenSecret:
-    name: openhands-alertmanager-token
-    reflects: monitoring-system/alertmanager-openhands-token
+  # The bearer token Alertmanager presents: a Secret of this name in
+  # monitoringNamespace, mirrored here under the same name; key: token.
+  tokenSecret: alertmanager-openhands-token
   # An alert name, once forwarded, is dropped for this long: more instances
   # joining a storm, another Alertmanager replica, a repeat notification.
   cooldownMinutes: 360

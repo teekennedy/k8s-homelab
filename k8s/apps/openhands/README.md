@@ -673,10 +673,11 @@ An alert storm becomes one run, through three layers:
    drain silences included) apply as they do to Discord. Its matcher is the
    ignore list: add an alert to `alertname !~ "…"` in
    `k8s/platform/monitoring-system/values.yaml`.
-2. **The app server** drops an alert name forwarded within
-   `alerts.cooldownMinutes`. That covers the same group arriving from each
-   Alertmanager replica, a group re-notified as more instances join it, and a
-   long-firing alert's daily repeat.
+2. **The app server** drops (not delays) an alert name forwarded within
+   `alerts.cooldownMinutes`: the same group from another Alertmanager
+   replica, a group re-notified as more instances join it, or the same alert
+   firing again soon after it resolved. An alert still firing a day later is
+   repeated by Alertmanager after the cooldown, and gets a fresh look.
 3. **The automation service** routes every event to one subject (`'alerts'`,
    `destination: continue_conversation`). While a run holds that subject,
    another event never starts a run. Before the run starts, the event is
