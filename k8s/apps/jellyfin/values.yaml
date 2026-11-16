@@ -223,8 +223,8 @@ app-template:
           runAsUser: 1200
           runAsGroup: *gid
       initContainers:
-        # Folders the arrs refuse to use unless they exist: Sonarr's anime root
-        # folder (configarr), and Radarr's and Sonarr's recycle bins
+        # Folders the arrs refuse to use unless they exist: Sonarr's and
+        # Radarr's anime root folders (configarr), and Radarr's and Sonarr's recycle bins
         # (files/arr-backup-settings), which are on the same share as the
         # library, so deleting is a move rather than a copy.
         media-folders:
@@ -235,6 +235,7 @@ app-template:
             - mkdir
             - -p
             - /data/media/anime
+            - /data/media/anime-movies
             - /data/media/.recycle/radarr
             - /data/media/.recycle/sonarr
           resources:

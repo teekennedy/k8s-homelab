@@ -25,19 +25,31 @@ After deploying the helm chart, you'll need to do some manual steps to setup use
 
 ## Anime
 
-Sonarr handles anime and other shows alike. configarr adds TRaSH's
-`[Anime] Remux-1080p` quality profile and a `/data/media/anime` root folder.
-Seerr recognizes anime by TMDB's "anime" keyword and sends it to the same
-Sonarr with its anime profile, root folder and series type. The rest is set by
-hand:
+Sonarr and Radarr handle anime and everything else alike. configarr adds
+TRaSH's `[Anime] Remux-1080p` quality profile to both, and anime root folders:
+`/data/media/anime` for Sonarr and `/data/media/anime-movies` for Radarr
+(Jellyfin libraries can't mix shows and movies). Seerr recognizes anime by
+TMDB's "anime" keyword and sends it to the same Sonarr or Radarr with its
+anime profile and root folder. Radarr has a single naming scheme, so anime
+movies are named like other movies. The rest is set by hand:
 
 - Seerr → Settings → Services → Sonarr: set the anime quality profile to
   `[Anime] Remux-1080p` and the anime root folder to `/data/media/anime`.
+- Seerr → Settings → Services → Radarr → Override Rules: add a rule with
+  keyword `anime`, root folder `/data/media/anime-movies` and quality profile
+  `[Anime] Remux-1080p`. Radarr has no anime settings of its own; the rule is
+  how Seerr routes anime movies.
 - Seerr → Settings → Metadata: set Anime to TVDB. Sonarr numbers anime
   seasons by TVDB, so requested seasons then match what it downloads.
-- Jellyfin: an **Anime** library (content type Shows) on `/media/anime`.
-- Existing anime: in Sonarr's series editor, change the root folder (moving
-  the files) and the quality profile, then rescan both Jellyfin libraries.
+- Jellyfin: an **Anime** library (content type Shows) on `/media/anime`, and
+  an **Anime Movies** library (content type Movies) on `/media/anime-movies`.
+- Existing anime shows: in Sonarr's series editor, change the root folder
+  (moving the files) and the quality profile, then rescan both Jellyfin
+  libraries.
+- Existing anime movies: in Radarr, add a custom filter for Keywords contains
+  `anime`, select all the results and bulk edit them: change the root folder
+  (moving the files) and the quality profile. Then rescan both Jellyfin movie
+  libraries.
 
 ## Backups
 
