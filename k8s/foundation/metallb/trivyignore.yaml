@@ -13,10 +13,8 @@ misconfigurations:
   # The controller writes its own CA into its webhook configuration.
   - id: KSV-0114 # manages webhook configurations
     paths: ["ClusterRole/metallb:controller.yaml"]
-  # The LoadBalancer Services for the Kubernetes API and for Traefik, which
-  # both live in kube-system.
+  # Traefik's public LoadBalancer Services live in kube-system.
   - id: KSV-0037 # resource in kube-system
     paths:
-      - Service/kube-system/kubernetes-api-lb.yaml
       - Service/kube-system/traefik-public-udp.yaml
       - Service/kube-system/traefik-public.yaml
