@@ -100,7 +100,9 @@ in {
           # Lease renewals kept it committing ~5x/s, two fsyncs each, and each
           # fsync on btrfs also writes tree-log and metadata blocks. The WAL
           # is still fsynced per write, so durability is unchanged.
-          "--etcd-arg=backend-batch-interval=1s"
+          # Nanoseconds: etcd reads its config file as JSON, where a duration
+          # string such as "1s" fails to parse and etcd refuses to start.
+          "--etcd-arg=backend-batch-interval=1000000000"
           # Enable the kube-controller metrics endpoint
           "--kube-controller-manager-arg"
           "bind-address=0.0.0.0"
