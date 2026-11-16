@@ -169,7 +169,8 @@ backend, so the agent and LLM profile pages cannot be reached.
 
 ### OpenAI subscription authentication
 
-This uses the subscription transport already in `openhands-sdk==1.55.1`:
+This uses the subscription transport already in `openhands-sdk`, the same
+version as the sandbox's `agent-server` base image:
 `auth_type: subscription`, `subscription_vendor: openai`. The SDK obtains OAuth
 credentials, sends Responses requests to
 `https://chatgpt.com/backend-api/codex/responses`, and refreshes tokens itself.
@@ -180,23 +181,27 @@ plan. See the [SDK implementation][sdk-subscription] and
 [OpenAI authentication documentation][openai-auth]. A successful inference
 request verifies access; the model list alone does not.
 
-[sdk-subscription]: https://github.com/OpenHands/software-agent-sdk/blob/v1.55.1/openhands-sdk/openhands/sdk/llm/auth/openai.py
+[sdk-subscription]: https://github.com/OpenHands/software-agent-sdk/blob/main/openhands-sdk/openhands/sdk/llm/auth/openai.py
 [openai-auth]: https://learn.chatgpt.com/docs/auth
 
 1. Enable device code login in your ChatGPT account's security settings (or
    have your workspace admin enable it). Use the account/workspace with your
    eligible Codex subscription.
-2. On your workstation, use the same SDK version as the sandbox to perform a
-   fresh login into a dedicated temporary directory. This needs `uv` and
+2. On your workstation, from a checkout of this repository, perform a fresh
+   login into a dedicated temporary directory with the SDK version the
+   sandbox image is built from. This needs `uv` and
    Python 3.13; allow uv to download Python if it is not installed. It asks for
    consent, prints a device URL/code, and waits while you authorize it in your
    browser. This command authenticates without making an inference request.
 
    ```sh
+   openhands_sdk_version=$(sed -nE \
+     's|^FROM ghcr\.io/openhands/agent-server:([0-9.]+)-.*|\1|p' \
+     "$(git rev-parse --show-toplevel)/k8s/apps/openhands/files/sandbox/Dockerfile")
    openhands_auth_dir=$(mktemp -d)
    OH_PERSISTENCE_DIR="$openhands_auth_dir" \
      UV_PYTHON_DOWNLOADS=automatic UV_PYTHON_PREFERENCE=managed \
-     uv run --no-project --python 3.13 --with openhands-sdk==1.55.1 \
+     uv run --no-project --python 3.13 --with "openhands-sdk==$openhands_sdk_version" \
      python -c 'from openhands.sdk import LLM; LLM.subscription_login(vendor="openai", model="gpt-6-sol", force_login=True, open_browser=False, auth_method="device_code")'
    ```
 
@@ -211,7 +216,7 @@ request verifies access; the model list alone does not.
      --from-file=openai_oauth.json="$openhands_auth_dir/auth/openai_oauth.json" \
      --dry-run=client -o yaml | kubectl -n openhands apply -f -
    rm -rf "$openhands_auth_dir"
-   unset openhands_auth_dir
+   unset openhands_auth_dir openhands_sdk_version
    ```
 
 4. Sync the chart through Argo CD, then choose **codex** or **isolated-codex**
