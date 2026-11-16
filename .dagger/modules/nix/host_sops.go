@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // sopsConfig is a parsed .sops.yaml, edited as a node tree so that anchors,
