@@ -96,6 +96,11 @@ in {
           "--secrets-encryption"
           # Enable etcd metrics endpoint
           "--etcd-expose-metrics=true"
+          # Commit etcd's bbolt backend once a second instead of every 100ms.
+          # Lease renewals kept it committing ~5x/s, two fsyncs each, and each
+          # fsync on btrfs also writes tree-log and metadata blocks. The WAL
+          # is still fsynced per write, so durability is unchanged.
+          "--etcd-arg=backend-batch-interval=1s"
           # Enable the kube-controller metrics endpoint
           "--kube-controller-manager-arg"
           "bind-address=0.0.0.0"
