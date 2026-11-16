@@ -62,6 +62,7 @@
                 disko.longhornDevice = "/dev/disk/by-id/nvme-TEAM_TM8FP4004T_112302210210813";
                 system.stateVersion = "26.11";
                 services.k3s = {
+                  apiVip.interface = "eno1";
                   role = "server";
                   serverAddr = "https://10.69.80.101:6443";
                 };
@@ -90,6 +91,7 @@
                 hardware.cpu.intel.updateMicrocode = true;
 
                 services.k3s = {
+                  apiVip.interface = "enp1s0";
                   role = "server";
                   serverAddr = "https://10.69.80.101:6443";
                 };
@@ -121,6 +123,7 @@
                 ];
 
                 services.k3s = {
+                  apiVip.interface = "enp3s0f0np0";
                   role = "server";
                   # Cluster init node is responsible for bootstrapping the cluster
                   clusterInit = true;

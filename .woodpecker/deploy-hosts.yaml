@@ -16,6 +16,7 @@ when:
         - flake.nix
         - flake.lock
         - "nix/**"
+        - config/gen/production/env.json
 
 steps:
   - name: build

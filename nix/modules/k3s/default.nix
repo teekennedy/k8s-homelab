@@ -1,6 +1,7 @@
 {...}: {
   imports = [
     ./k3s.nix
+    ./api-vip.nix
     ./kured.nix
     ./longhorn.nix
     ./shutdown-cleanup.nix

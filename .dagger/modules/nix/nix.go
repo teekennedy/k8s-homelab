@@ -101,7 +101,7 @@ func nixFormat(toolchain *dagger.Container, source *dagger.Directory, paths []st
 // +check
 func (m *Nix) Validate(ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*"]
+	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!config/gen/production/env.json"]
 	source *dagger.Directory,
 ) error {
 	checked, err := m.Remote.build(ctx, nixImageStore, func(env nixEnv) *dagger.Container {

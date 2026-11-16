@@ -8,6 +8,7 @@ production: #Environment & _clusterDefaults & _productionApps & {
 		domain:        "k8s.localhost"
 		public_domain: "msng.to"
 		networks: host_cidr: "10.69.80.0/25"
+		api_vip: "10.69.80.101"
 	}
 
 	certificates: {
@@ -22,7 +23,7 @@ production: #Environment & _clusterDefaults & _productionApps & {
 			ip:   "10.69.80.10"
 			k3s: {
 				role:       "server"
-				serverAddr: "https://10.69.80.101:6443"
+				serverAddr: "https://\(cluster.api_vip):6443"
 			}
 		},
 		{
@@ -30,7 +31,7 @@ production: #Environment & _clusterDefaults & _productionApps & {
 			ip:   "10.69.80.11"
 			k3s: {
 				role:       "server"
-				serverAddr: "https://10.69.80.101:6443"
+				serverAddr: "https://\(cluster.api_vip):6443"
 			}
 		},
 		{
@@ -46,7 +47,7 @@ production: #Environment & _clusterDefaults & _productionApps & {
 			ip:   "10.69.80.13"
 			k3s: {
 				role:       "agent"
-				serverAddr: "https://10.69.80.101:6443"
+				serverAddr: "https://\(cluster.api_vip):6443"
 			}
 		},
 	]

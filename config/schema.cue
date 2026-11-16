@@ -24,6 +24,10 @@ package homelab
 	public_domain: #Domain | *domain
 	timezone:      string | *"America/Denver"
 	networks:      #Networks
+	// api_vip is the floating address in front of the k3s API servers. The
+	// servers hold it themselves (keepalived), so it works while the cluster
+	// is down.
+	api_vip?: #IPv4
 }
 
 // Certificates describes where publicly trusted certificates come from

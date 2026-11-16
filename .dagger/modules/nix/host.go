@@ -83,7 +83,7 @@ func withTools(ctx context.Context, c *dagger.Container, pkgs ...string) (*dagge
 func (h *NixosHost) Diff(
 	ctx context.Context,
 	// +defaultPath="/"
-	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*"]
+	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!config/gen/production/env.json"]
 	source *dagger.Directory,
 ) (string, error) {
 	c, err := h.container(source)

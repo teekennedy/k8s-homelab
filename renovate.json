@@ -315,7 +315,8 @@
       "matchFileNames": [
         "flake.nix",
         "flake.lock",
-        "nix/**"
+        "nix/**",
+        "config/gen/production/env.json"
       ],
       "groupName": "nixos hosts"
     },

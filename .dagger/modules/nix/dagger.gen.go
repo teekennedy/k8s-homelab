@@ -709,7 +709,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithDescription("Checks the flake with `nix flake check` and builds its checks.\n\nThe checks build every host's whole NixOS system, so they are built in a\nremote builder's store: the builder already holds most of it, and the hosts\nsubstitute from each other, so a deploy of the same configuration finds it\nbuilt but for its commit label. Without a usable builder, the checks are evaluated but not built.").
 							WithSourceMap(dag.SourceMap("nix.go", 102, 1)).
 							WithCheck().
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 105, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("nix.go", 105, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!config/gen/production/env.json"}})).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Nix")).
@@ -794,13 +794,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithArg("ip", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{Description: "The installer's address.", SourceMap: dag.SourceMap("host_bootstrap.go", 72, 2)}).
 							WithArg("sopsAgeKey", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{Description: "The age key sops decrypts with, such as\nfile:~/.config/sops/age/keys.txt. It must be one of the common keys\n.sops.yaml encrypts host and module secrets to.", SourceMap: dag.SourceMap("host_bootstrap.go", 76, 2)}).
 							WithArg("password", dag.TypeDef().WithObject("Secret").WithOptional(true), dagger.FunctionWithArgOpts{Description: "The password for the host's default user. Needed only when\nsecrets.yaml has no hash for it yet.", SourceMap: dag.SourceMap("host_bootstrap.go", 80, 2)}).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("host_bootstrap.go", 83, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!.sops.yaml", "!.sops/**"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("host_bootstrap.go", 83, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!config/gen/production/env.json", "!.sops.yaml", "!.sops/**"}})).
 					WithFunction(
 						dag.Function("Diff",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
 							WithDescription("Diff shows what deploying the given source would change on the host.\n\nThe new system is built in the host's own store, which already holds nearly\nall of it, and compared there with the running one by `nix store\ndiff-closures`. The system's label names the commit, so it always differs.").
 							WithSourceMap(dag.SourceMap("host.go", 83, 1)).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("host.go", 87, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("host.go", 87, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!config/gen/production/env.json"}})).
 					WithFunction(
 						dag.Function("Install",
 							dag.TypeDef().WithKind(dagger.TypeDefKindStringKind)).
@@ -808,7 +808,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							WithSourceMap(dag.SourceMap("host_bootstrap.go", 315, 1)).
 							WithArg("ip", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{Description: "The installer's address.", SourceMap: dag.SourceMap("host_bootstrap.go", 318, 2)}).
 							WithArg("sopsAgeKey", dag.TypeDef().WithObject("Secret"), dagger.FunctionWithArgOpts{Description: "The age key sops decrypts secrets.yaml with.", SourceMap: dag.SourceMap("host_bootstrap.go", 320, 2)}).
-							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("host_bootstrap.go", 323, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*"}})).
+							WithArg("source", dag.TypeDef().WithObject("Directory").WithOptional(true), dagger.FunctionWithArgOpts{SourceMap: dag.SourceMap("host_bootstrap.go", 323, 2), DefaultPath: "/", Ignore: []string{"*", "!flake.nix", "!flake.lock", "!nix/**/*", "!config/gen/production/env.json"}})).
 					WithField("Name", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.TypeDefWithFieldOpts{Description: "The host's name in the flake's nixosConfigurations, which is also how\nSSH reaches it.", SourceMap: dag.SourceMap("host.go", 25, 2)})).
 			WithObject(
 				dag.TypeDef().WithObject("DevenvProject", dagger.TypeDefWithObjectOpts{Description: "DevenvProject is a devenv project with a scoped source directory.\nEach DevenvProject carries only the files for its project, enabling\nper-project caching: changing files in one project won't invalidate\nthe cache for other projects.", SourceMap: dag.SourceMap("devenv_projects.go", 49, 6)}).

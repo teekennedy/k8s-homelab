@@ -79,7 +79,7 @@ func (h *NixosHost) Bootstrap(
 	// +optional
 	password *dagger.Secret,
 	// +defaultPath="/"
-	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!.sops.yaml", "!.sops/**"]
+	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!config/gen/production/env.json", "!.sops.yaml", "!.sops/**"]
 	source *dagger.Directory,
 ) (*dagger.Changeset, error) {
 	c, err := h.container(source)
@@ -319,7 +319,7 @@ func (h *NixosHost) Install(
 	// The age key sops decrypts secrets.yaml with.
 	sopsAgeKey *dagger.Secret,
 	// +defaultPath="/"
-	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*"]
+	// +ignore=["*", "!flake.nix", "!flake.lock", "!nix/**/*", "!config/gen/production/env.json"]
 	source *dagger.Directory,
 ) (string, error) {
 	c, err := h.container(source)
