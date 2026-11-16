@@ -11,7 +11,7 @@
 # to pick up pipeline changes. For a local build against a working tree:
 #   docker buildx build --build-context pipeline=../micro-wake-word .
 FROM scratch AS pipeline
-ADD https://github.com/teekennedy/micro-wake-word.git#43ce8c95730495cb9b103a9678518df2c81d70d2 /
+ADD https://github.com/teekennedy/micro-wake-word.git#7f7f99d517e1d16b78b0d72756d491db6ac5a8f0 /
 
 FROM ghcr.io/astral-sh/uv:0.13.5-trixie-slim@sha256:95611d89b7324e0517fe7257bb00979cf1f68461e5fb2b2d027d039da054bc07
 
