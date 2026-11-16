@@ -30,6 +30,13 @@ spec:
     size: 5Gi
     storageClass: longhorn-strict-local
   enableSuperuserAccess: true
+  postgresql:
+    parameters:
+      # CNPG's default archive_timeout of 5min forced a 16MB segment switch
+      # every five minutes on a mostly idle database, ~4.6GB/day of near-empty
+      # WAL. This widens the window of writes that exist only on this
+      # instance to 1h; Joplin clients keep full local copies and re-sync.
+      archive_timeout: "1h"
   monitoring:
     enablePodMonitor: true
     # One series per postgres setting per instance; nothing reads them.

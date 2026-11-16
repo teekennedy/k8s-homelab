@@ -43,6 +43,12 @@ spec:
       # Sized so that maximum volume usage (db + max_wal_size +
       # max_slot_wal_keep_size) is less than the volume capacity.
       max_slot_wal_keep_size: 2GB
+      # Barman archives WAL to object storage. CNPG's default archive_timeout
+      # of 5min forced a 16MB segment switch every five minutes on a mostly
+      # idle database, ~4.6GB/day of near-empty WAL per instance. Standbys
+      # stream every commit, so the archive only matters if all instances
+      # are lost at once.
+      archive_timeout: "1h"
   monitoring:
     enablePodMonitor: true
     # One series per postgres setting per instance; nothing reads them.
