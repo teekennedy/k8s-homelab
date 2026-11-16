@@ -16,7 +16,7 @@ ARG CLAUDE_ADAPTER_VERSION=0.101.1
 ARG MCP_GRAFANA_VERSION=v2.2.0
 # Must match the engine (k8s/platform/dagger-engine/values.yaml), so Renovate
 # does not track it on its own.
-ARG DAGGER_VERSION=1.0.0-beta.20
+ARG DAGGER_VERSION=1.0.0-beta.27
 ARG TARGETARCH
 
 USER root
