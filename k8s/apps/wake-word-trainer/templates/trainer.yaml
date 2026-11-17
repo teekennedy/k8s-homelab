@@ -53,6 +53,11 @@ spec:
               args: [train]
               env:
                 {{- include "wake-word-trainer.pipelineEnv" . | nindent 16 }}
+                # Drops TensorFlow's native INFO lines (oneDNN and CPU feature
+                # notices, SavedModel load steps), repeated by every TF
+                # subprocess. Warnings and errors still log.
+                - name: TF_CPP_MIN_LOG_LEVEL
+                  value: "1"
                 - name: WWT_COLLECTOR_URL
                   value: {{ include "wake-word-trainer.collectorUrl" . }}
                 - name: WWT_INTERNAL_TOKEN_FILE
