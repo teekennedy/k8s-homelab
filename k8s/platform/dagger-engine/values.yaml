@@ -8,9 +8,12 @@ dagger-helm:
       ref: registry.dagger.io/engine:v1.0.0-beta.27@sha256:5a5549e857c25a81e10b6455526b6813d8415d3be44bd491f50f82b60a15ce4e
     # https://docs.dagger.io/reference/configuration/engine/
     # insecureRootCapabilities: effectively equivalent to running actions with `docker run --privileged`
+    # logLevel: info logs every session, client and container start/stop, over
+    # 99% of the engine's output. Session and exec logs reach Loki through
+    # the clients' OTLP export, not the engine's stdout, so warn loses none.
     configJson: |
       {
-        "logLevel": "info",
+        "logLevel": "warn",
         "security": {
           "insecureRootCapabilities": true
         },
