@@ -716,6 +716,10 @@ loki:
     # At info, Loki logs every query, flush and table lookup (~400MiB/day).
     server:
       log_level: warn
+      # The distributor hands a whole push to the ingester over gRPC, and a
+      # Dagger CI log burst overflows the 4MiB default.
+      grpc_server_max_recv_msg_size: 16777216
+      grpc_server_max_send_msg_size: 16777216
     commonConfig:
       replication_factor: 1
     # Pattern ingester adds CPU/memory overhead; disable if it is too expensive.
@@ -732,6 +736,13 @@ loki:
       retention_delete_worker_count: 150
     limits_config:
       retention_period: 744h # 31 days
+      # Dagger CI runs push their logs in bursts well above the 4MB/s default,
+      # and a push larger than the burst size is rejected outright.
+      ingestion_rate_mb: 8
+      ingestion_burst_size_mb: 16
+      # Keep the first 256KB of oversized lines (Dagger's ~1MB lines) instead
+      # of dropping them.
+      max_line_size_truncate: true
     schemaConfig:
       configs:
         - from: 2026-01-01
@@ -1177,6 +1188,11 @@ opentelemetry-collector:
         limit_percentage: 80
         spike_limit_percentage: 25
       batch: {}
+      # Caps a Loki push at about 1MB of typical log lines, well under Loki's
+      # per-push limits.
+      batch/logs:
+        send_batch_size: 1024
+        send_batch_max_size: 1024
       # Spans Dagger's own UI never shows and that have no children, so
       # dropping them orphans nothing. See docs/dagger-traces.md.
       filter/dagger-trace-noise:
@@ -1309,5 +1325,5 @@ opentelemetry-collector:
           exporters: [otlp_http/prometheus]
         logs:
           receivers: [otlp]
-          processors: [memory_limiter, batch]
+          processors: [memory_limiter, batch/logs]
           exporters: [otlp_http/loki]
