@@ -45,13 +45,6 @@ spec:
       # WAL. This widens the window of writes that exist only on this
       # instance to 1h; Joplin clients keep full local copies and re-sync.
       archive_timeout: "1h"
-  monitoring:
-    enablePodMonitor: true
-    # One series per postgres setting per instance; nothing reads them.
-    podMonitorMetricRelabelings:
-      - action: drop
-        sourceLabels: [__name__]
-        regex: cnpg_pg_settings_setting
   affinity:
     nodeSelector:
       node.msng.to/cnpg-storage: "true"

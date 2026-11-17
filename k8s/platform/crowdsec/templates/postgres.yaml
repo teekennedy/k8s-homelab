@@ -61,13 +61,6 @@ spec:
       # generating 4.6GB/day of near-empty segments against ~92MB/day of real
       # WAL. At 1h that drops ~92%.
       archive_timeout: "1h"
-  monitoring:
-    enablePodMonitor: true
-    # One series per postgres setting per instance; nothing reads them.
-    podMonitorMetricRelabelings:
-      - action: drop
-        sourceLabels: [__name__]
-        regex: cnpg_pg_settings_setting
   enablePDB: true
   affinity:
     enablePodAntiAffinity: true
