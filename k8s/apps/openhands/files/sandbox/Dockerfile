@@ -11,7 +11,7 @@ FROM ghcr.io/openhands/agent-server:1.62.0-python@sha256:bd35862a12dca128715c77b
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
 ARG KUBECTL_VERSION=v1.37.2
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
-ARG CLAUDE_ADAPTER_VERSION=0.102.0
+ARG CLAUDE_ADAPTER_VERSION=0.103.0
 # renovate: datasource=github-releases depName=grafana/mcp-grafana
 ARG MCP_GRAFANA_VERSION=v2.2.0
 # Must match the engine (k8s/platform/dagger-engine/values.yaml), so Renovate
