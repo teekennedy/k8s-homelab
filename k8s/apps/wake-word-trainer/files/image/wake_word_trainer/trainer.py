@@ -55,8 +55,9 @@ class TrainerConfig:
     published_dir: Path = field(
         default_factory=lambda: Path(_env("WWT_PUBLISHED_DIR", "/publish"))
     )
-    handoff: Path = field(
-        default_factory=lambda: Path(_env("WWT_HANDOFF", "/handoff/run.json"))
+    # Only for a pod that publishes in a second container after training.
+    handoff: Path | None = field(
+        default_factory=lambda: Path(h) if (h := _env("WWT_HANDOFF", "")) else None
     )
     forced: bool = field(default_factory=lambda: _env("WWT_FORCE", "") in ("1", "true"))
     repeats: int = field(default_factory=lambda: int(_env("WWT_REPEATS", "3")))
@@ -166,6 +167,8 @@ def decide(
 
 
 def write_handoff(cfg: TrainerConfig, data: dict):
+    if cfg.handoff is None:
+        return
     cfg.handoff.parent.mkdir(parents=True, exist_ok=True)
     cfg.handoff.write_text(json.dumps(data))
 
@@ -423,15 +426,8 @@ def publish_files(model_dir: Path, target: Path, run_id: str) -> list[str]:
     return archived
 
 
-def publish(cfg: TrainerConfig, dry_run: bool, live_dir: Path | None) -> int:
-    if not cfg.handoff.exists():
-        print("no hand-off from the trainer: nothing to publish", flush=True)
-        return 0
-    handoff = json.loads(cfg.handoff.read_text())
-    run_id = handoff.get("run_id")
-    if not run_id or not handoff.get("promote"):
-        print(f"run {run_id or '-'}: nothing to publish", flush=True)
-        return 0
+def publish_run(cfg: TrainerConfig, run_id: str, dry_run: bool, live_dir: Path | None):
+    """Publish one promoted run's model and report the outcome to the collector."""
     target = cfg.published_dir
     if dry_run and live_dir is not None:
         # Rehearse on a scratch copy of the live folder.
@@ -439,7 +435,7 @@ def publish(cfg: TrainerConfig, dry_run: bool, live_dir: Path | None) -> int:
             if (live_dir / name).exists():
                 shutil.copyfile(live_dir / name, target / name)
     try:
-        archived = publish_files(Path(handoff["model_dir"]), target, run_id)
+        archived = publish_files(cfg.runs_dir / run_id / "report", target, run_id)
     except Exception as exc:
         api(
             cfg,
@@ -465,7 +461,56 @@ def publish(cfg: TrainerConfig, dry_run: bool, live_dir: Path | None) -> int:
             "tree": tree,
         },
     )
+
+
+def publish(cfg: TrainerConfig, dry_run: bool, live_dir: Path | None) -> int:
+    """Once, from the trainer's hand-off file."""
+    if cfg.handoff is None or not cfg.handoff.exists():
+        print("no hand-off from the trainer: nothing to publish", flush=True)
+        return 0
+    handoff = json.loads(cfg.handoff.read_text())
+    run_id = handoff.get("run_id")
+    if not run_id or not handoff.get("promote"):
+        print(f"run {run_id or '-'}: nothing to publish", flush=True)
+        return 0
+    publish_run(cfg, run_id, dry_run, live_dir)
     return 0
+
+
+def publish_pending(
+    cfg: TrainerConfig,
+    dry_run: bool,
+    live_dir: Path | None,
+    retry_seconds: float,
+    now: float,
+) -> str | None:
+    """One reconcile pass: publish the newest promoted run if the collector
+    says it is not published yet. A failed attempt is retried after
+    retry_seconds. Returns the run published, if any."""
+    run = api(cfg, "GET", "/internal/publish")["run"]
+    if run is None:
+        return None
+    last = run.get("published") or {}
+    if last.get("error") and now - last.get("at", 0) < retry_seconds:
+        return None
+    publish_run(cfg, run["id"], dry_run, live_dir)
+    return run["id"]
+
+
+def watch(
+    cfg: TrainerConfig,
+    dry_run: bool,
+    live_dir: Path | None,
+    interval: float,
+    retry_seconds: float,
+):
+    """Publish promoted runs as they appear, for as long as the pod runs."""
+    while True:
+        try:
+            publish_pending(cfg, dry_run, live_dir, retry_seconds, time.time())
+        except Exception:
+            log.exception("publish pass failed; retrying")
+        time.sleep(interval)
 
 
 # ---------------------------------------------------------------------- seed

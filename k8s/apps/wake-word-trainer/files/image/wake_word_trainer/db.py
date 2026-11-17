@@ -376,6 +376,17 @@ class Store:
                         (run_id, i),
                     )
 
+    def to_publish(self) -> dict | None:
+        """The newest promoted run, unless it is published already: older
+        promotions are superseded by it, never published after it."""
+        run = self.one(
+            "SELECT * FROM runs WHERE status = 'succeeded' AND promoted = 1"
+            " ORDER BY finished_at DESC LIMIT 1"
+        )
+        if run is None or (run["published"] and not run["published"].get("error")):
+            return None
+        return run
+
     def set_published(self, run_id: str, published: dict):
         with self.tx() as c:
             c.execute(

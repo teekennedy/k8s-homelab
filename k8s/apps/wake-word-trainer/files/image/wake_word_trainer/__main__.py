@@ -27,6 +27,18 @@ def main(argv=None) -> int:
         default=None,
         help="with --dry-run: the real folder, copied into the scratch target first",
     )
+    p.add_argument(
+        "--watch",
+        action="store_true",
+        help="keep publishing the newest promoted run, as the collector reports it",
+    )
+    p.add_argument("--interval", type=float, default=60, help="with --watch: seconds")
+    p.add_argument(
+        "--retry-after",
+        type=float,
+        default=900,
+        help="with --watch: seconds before a failed publish is tried again",
+    )
     sd = sub.add_parser(
         "seed", help="download datasets and build the static features (steps 1-3)"
     )
@@ -60,6 +72,10 @@ def main(argv=None) -> int:
     if args.cmd == "train":
         return trainer.train(cfg)
     if args.cmd == "publish":
+        if args.watch:
+            trainer.watch(
+                cfg, args.dry_run, args.live_dir, args.interval, args.retry_after
+            )
         return trainer.publish(cfg, args.dry_run, args.live_dir)
     if args.cmd == "seed":
         return trainer.seed(cfg, args.segment_python, args.whisper_url)

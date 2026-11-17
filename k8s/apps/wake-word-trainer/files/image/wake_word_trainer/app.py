@@ -418,6 +418,11 @@ def create_app(
         )
         return {"ok": True}
 
+    @app.get("/internal/publish")
+    def internal_to_publish(request: Request):
+        internal(request)
+        return {"run": store.to_publish()}
+
     @app.post("/internal/runs/{run_id}/published")
     def internal_published(request: Request, run_id: str, payload: dict = Body(...)):
         internal(request)
@@ -521,6 +526,11 @@ def render_metrics(store: Store, processor: Processor) -> str:
             "End of the newest run whose model beat the published one.",
             [({}, promoted[-1]["finished_at"])],
         )
+    gauge(
+        "wake_word_trainer_publish_pending",
+        "1 while the newest promoted model is not published (or its publish failed).",
+        [({}, int(store.to_publish() is not None))],
+    )
     gate = store.meta("last_gate")
     if gate:
         gauge(

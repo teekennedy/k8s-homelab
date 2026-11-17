@@ -246,3 +246,77 @@ def test_train_waits_for_the_seed(tmp_path, monkeypatch):
     assert trainer.train(trainer.TrainerConfig()) == 0
     assert calls == []
     assert json.loads((tmp_path / "run.json").read_text())["run_id"] is None
+
+
+def finish(client, run_id, promote):
+    client.post(
+        f"/internal/runs/{run_id}/result",
+        json={"status": "succeeded", "result": {"promote": promote}},
+        headers=INTERNAL,
+    )
+
+
+def pending(client):
+    return client.get("/internal/publish", headers=INTERNAL).json()["run"]
+
+
+def test_only_the_newest_promotion_is_waiting_to_publish(client, app):
+    store = app.state.store
+    older = start(client, forced=True)["run"]["id"]
+    finish(client, older, promote=True)
+    assert pending(client)["id"] == older
+    newer = start(client, forced=True)["run"]["id"]
+    finish(client, newer, promote=True)
+    assert pending(client)["id"] == newer
+    # A later run that keeps the published model leaves the promotion pending.
+    kept = start(client, forced=True)["run"]["id"]
+    finish(client, kept, promote=False)
+    assert pending(client)["id"] == newer
+    assert "wake_word_trainer_publish_pending 1" in client.get("/metrics").text
+
+    store.set_published(newer, {"published": False, "error": "disk full", "at": 1})
+    assert pending(client)["id"] == newer
+    store.set_published(newer, {"published": True, "at": 2})
+    assert pending(client) is None
+    assert "wake_word_trainer_publish_pending 0" in client.get("/metrics").text
+
+
+def test_publish_pending_publishes_from_the_run_folder(tmp_path, monkeypatch):
+    monkeypatch.setenv("WWT_RUNS_DIR", str(tmp_path / "runs"))
+    monkeypatch.setenv("WWT_PUBLISHED_DIR", str(tmp_path / "pub"))
+    report = tmp_path / "runs" / "r1" / "report"
+    report.mkdir(parents=True)
+    for name in trainer.MODEL_FILES:
+        (report / name).write_text(name)
+    (tmp_path / "pub").mkdir()
+    queue = [{"run": {"id": "r1", "published": None}}]
+    calls = []
+
+    def api(cfg, method, path, body=None):
+        calls.append((method, path, body))
+        return queue.pop(0) if method == "GET" else {"ok": True}
+
+    monkeypatch.setattr(trainer, "api", api)
+    cfg = trainer.TrainerConfig()
+    assert trainer.publish_pending(cfg, False, None, 900, now=100) == "r1"
+    assert (tmp_path / "pub" / "okay_glados.json").read_text() == "okay_glados.json"
+    assert calls[-1][1] == "/internal/runs/r1/published"
+    assert calls[-1][2]["published"] is True
+
+    # A failed attempt waits out the retry delay.
+    failed = {"published": False, "error": "x", "at": 50}
+    queue.append({"run": {"id": "r1", "published": failed}})
+    assert trainer.publish_pending(cfg, False, None, 900, now=100) is None
+    queue.append({"run": {"id": "r1", "published": failed}})
+    assert trainer.publish_pending(cfg, False, None, 900, now=1000) == "r1"
+
+    queue.append({"run": None})
+    assert trainer.publish_pending(cfg, False, None, 900, now=2000) is None
+
+
+def test_train_without_a_handoff_writes_none(tmp_path, monkeypatch):
+    monkeypatch.setenv("OKAY_GLADOS_WORK_DIR", str(tmp_path / "work"))
+    monkeypatch.delenv("WWT_HANDOFF", raising=False)
+    monkeypatch.setattr(trainer, "api", lambda *a, **k: None)
+    assert trainer.train(trainer.TrainerConfig()) == 0
+    assert list(tmp_path.iterdir()) == []
