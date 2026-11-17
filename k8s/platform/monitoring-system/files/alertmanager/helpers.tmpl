@@ -1,14 +1,26 @@
+{{/* A group with both firing and resolved alerts has status "firing", so the
+title counts each and the alert list splits them into sections. */}}
 {{ define "__discord_subject" -}}
-[{{ .Status | title }}] {{ .CommonLabels.alertname }} ({{ if .CommonLabels.severity }}{{ .CommonLabels.severity }}{{ else }}none{{ end }})
+[{{ if and .Alerts.Firing .Alerts.Resolved }}Firing {{ len .Alerts.Firing }}, Resolved {{ len .Alerts.Resolved }}{{ else }}{{ .Status | title }}{{ end }}] {{ .CommonLabels.alertname }} ({{ if .CommonLabels.severity }}{{ .CommonLabels.severity }}{{ else }}none{{ end }})
 {{- end }}
 
 {{/* Render a list of alerts */}}
-{{ define "__discord_alert_list" -}}
-{{ range .Alerts -}}
+{{ define "__discord_alerts" -}}
+{{ range . -}}
 - **{{ if .Annotations.summary }}{{ .Annotations.summary }}{{ else if .Annotations.message }}{{ .Annotations.message }}{{ else }}{{ .Labels.alertname }}{{ end }}**
   {{- if .Annotations.description }}{{ "\n" }}  {{ .Annotations.description }}{{ end }}
   Since {{ tz "America/Denver" .StartsAt  }}
   Links: {{ if .Annotations.runbook_url }} [runbook]({{ .Annotations.runbook_url }}) | {{ end }}{{ if (and .Annotations.custom_link_text .Annotations.custom_link_url) }}[{{ .Annotations.custom_link_text }}]({{ .Annotations.custom_link_url }}) | {{ end }}{{ if .GeneratorURL }}[query]({{ .GeneratorURL }}){{ end }}
 
 {{ end }}
+{{- end }}
+
+{{ define "__discord_alert_list" -}}
+{{ if and .Alerts.Firing .Alerts.Resolved -}}
+__**Firing**__
+{{ template "__discord_alerts" .Alerts.Firing }}__**Resolved**__
+{{ template "__discord_alerts" .Alerts.Resolved }}
+{{- else -}}
+{{ template "__discord_alerts" .Alerts }}
+{{- end }}
 {{- end }}

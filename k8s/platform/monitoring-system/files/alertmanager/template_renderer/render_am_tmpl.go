@@ -20,7 +20,7 @@ Loads helpers.tmpl (your Alertmanager template file), registers a few
 Alertmanager-like funcs (toUpper, title, join), builds synthetic data,
 and renders:
   - __discord_subject with the full context
-  - __discord_alert_list with .Alerts
+  - __discord_alert_list with the full context
 */
 
 type NameValue struct {
@@ -36,6 +36,7 @@ type SortedPairs struct {
 type KV map[string]string
 
 type Alert struct {
+	Status       string
 	Labels       KV
 	Annotations  KV
 	GeneratorURL string
@@ -45,10 +46,26 @@ type Alert struct {
 	StartsAt     time.Time
 }
 
+// Alerts mirrors Alertmanager's template.Alerts helpers.
+type Alerts []Alert
+
+func (as Alerts) byStatus(status string) Alerts {
+	res := Alerts{}
+	for _, a := range as {
+		if a.Status == status {
+			res = append(res, a)
+		}
+	}
+	return res
+}
+
+func (as Alerts) Firing() Alerts   { return as.byStatus("firing") }
+func (as Alerts) Resolved() Alerts { return as.byStatus("resolved") }
+
 type AMData struct {
 	Receiver string
 	Status   string
-	Alerts   []Alert
+	Alerts   Alerts
 
 	GroupLabels       KV
 	CommonLabels      KV
@@ -205,6 +222,7 @@ func makeSampleData() AMData {
 	}
 
 	a1 := Alert{
+		Status:       "firing",
 		Labels:       makeKV(map[string]string{"pod": "api-77c4bdb6f7-xw9d7", "instance": "10.0.0.12:8080", "region": "us-west-2"}),
 		Annotations:  makeKV(map[string]string{"summary": "p99 latency > 2s", "description": "Gateway p99 above SLO", "runbook_url": "https://runbooks/msng.to/gw-latency"}),
 		GeneratorURL: "https://prometheus/graph?expr=histogram_quantile(...)",
@@ -215,6 +233,7 @@ func makeSampleData() AMData {
 	}
 
 	a2 := Alert{
+		Status:       "resolved",
 		Labels:       makeKV(map[string]string{"pod": "api-77c4bdb6f7-km4bx", "instance": "10.0.0.9:8080", "region": "us-west-2"}),
 		Annotations:  makeKV(map[string]string{"summary": "p99 latency back to normal"}),
 		GeneratorURL: "https://prometheus/graph?expr=histogram_quantile(...)",
@@ -223,6 +242,7 @@ func makeSampleData() AMData {
 	}
 
 	a3 := Alert{
+		Status: "firing",
 		Labels: makeKV(map[string]string{
 			"container":     "longhorn-manager",
 			"endpoint":      "manager",
@@ -251,6 +271,6 @@ func makeSampleData() AMData {
 	data.Status = "firing"
 	data.GroupLabels = groupLabels
 	data.CommonLabels = commonLabels
-	data.Alerts = []Alert{a1, a2, a3}
+	data.Alerts = Alerts{a1, a2, a3}
 	return data
 }
