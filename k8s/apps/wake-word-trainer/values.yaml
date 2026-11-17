@@ -5,7 +5,7 @@
 image:
   # Built from files/image and released as wake-word-trainer-<version>.
   repository: ghcr.io/teekennedy/k8s-homelab
-  tag: wake-word-trainer-0.1.6@sha256:5e6d36e4a3cdd1a5ea0a52ac42cb851ae0a90ac767cf9140402edcbe8c76efa7
+  tag: wake-word-trainer-0.1.8@sha256:c3a15592c1f396fcac4792a90f106b50328d8a79c01daaa13a75f19d77ac2f60
   pullPolicy: IfNotPresent
 
 nameOverride: ""
