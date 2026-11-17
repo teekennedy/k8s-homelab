@@ -79,6 +79,7 @@ trainer:
   # Pin to a node with spare cores overnight.
   nodeSelector: {}
   tolerations: []
+  # Merged over the chart's preference for the node holding the work volume.
   affinity: {}
   publish:
     # Rehearse on a scratch copy of the live folder; set false to publish.
@@ -103,6 +104,8 @@ seed:
     limits:
       memory: 16Gi
   nodeSelector: {}
+  # Merged over the chart's preference for the node holding the work volume.
+  affinity: {}
 
 # Phone recordings to train alongside the device clips: copy them into
 # clips/phone/ on the NAS (recordings/ layout from micro-wake-word) before the

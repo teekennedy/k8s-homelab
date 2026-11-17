@@ -46,6 +46,27 @@ app.kubernetes.io/component: trainer
 app.kubernetes.io/component: seed
 {{- end }}
 
+{{/*
+Pods that mount the ReadWriteOnce work volume. It attaches to one node at a
+time, so each of them prefers the node a running one is on: without it, a pod
+sent elsewhere waits in ContainerCreating until the other one ends.
+*/}}
+{{- define "wake-word-trainer.workVolumeLabels" -}}
+wake-word-trainer.msng.to/work-volume: "true"
+{{- end }}
+
+{{/* The affinity for a work-volume pod, merged with the user's own (theirs wins). */}}
+{{- define "wake-word-trainer.workVolumeAffinity" -}}
+{{- $own := dict "podAffinity" (dict "preferredDuringSchedulingIgnoredDuringExecution" (list (dict
+  "weight" 100
+  "podAffinityTerm" (dict
+    "topologyKey" "kubernetes.io/hostname"
+    "labelSelector" (dict "matchLabels" (merge (fromYaml (include "wake-word-trainer.selectorLabels" .root)) (fromYaml (include "wake-word-trainer.workVolumeLabels" .root))))
+  )
+))) -}}
+{{- toYaml (mustMergeOverwrite $own (deepCopy (.affinity | default dict))) | trim }}
+{{- end }}
+
 {{- define "wake-word-trainer.image" -}}
 {{ .Values.image.repository }}:{{ .Values.image.tag }}
 {{- end }}

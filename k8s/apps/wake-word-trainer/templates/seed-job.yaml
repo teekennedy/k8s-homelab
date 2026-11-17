@@ -1,11 +1,12 @@
 {{- if .Values.seed.enabled }}
 {{- $fullName := include "wake-word-trainer.fullname" . -}}
 {{- /*
-The name carries a hash of the image and the phone-recordings switch: a Job's
-pod template cannot be changed in place, so a change makes a new Job (the old
-one is pruned). Each new Job exits at once once <work>/.seeded exists.
+The name carries a hash of the pod template: a Job's pod template cannot be
+changed in place, so any change makes a new Job (the old one is pruned). Each
+new Job exits at once once <work>/.seeded exists.
 */ -}}
-{{- $hash := printf "%s-%v" (include "wake-word-trainer.image" .) .Values.phoneRecordings.enabled | sha256sum | trunc 8 }}
+{{- $pod := include "wake-word-trainer.seedPod" . }}
+{{- $hash := $pod | sha256sum | trunc 8 }}
 ---
 # One-time: datasets, TTS samples and the static feature sets (pipeline steps
 # 1-3) onto the work volume, and the phone recordings split into takes.
@@ -20,56 +21,64 @@ metadata:
 spec:
   backoffLimit: 2
   template:
-    metadata:
-      labels:
-        {{- include "wake-word-trainer.labels" . | nindent 8 }}
-        app.kubernetes.io/component: seed
-    spec:
-      restartPolicy: Never
-      automountServiceAccountToken: false
-      enableServiceLinks: false
+    {{- $pod | nindent 4 }}
+{{- end }}
+
+{{- define "wake-word-trainer.seedPod" -}}
+{{- $fullName := include "wake-word-trainer.fullname" . -}}
+metadata:
+  labels:
+    {{- include "wake-word-trainer.labels" . | nindent 4 }}
+    {{- include "wake-word-trainer.workVolumeLabels" . | nindent 4 }}
+    app.kubernetes.io/component: seed
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  securityContext:
+    {{- include "wake-word-trainer.podSecurityContext" . | nindent 4 }}
+  containers:
+    - name: seed
+      image: {{ include "wake-word-trainer.image" . }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      args:
+        - seed
+        - --whisper-url={{ .Values.collector.whisper.url }}
+      env:
+        {{- include "wake-word-trainer.pipelineEnv" . | nindent 8 }}
       securityContext:
-        {{- include "wake-word-trainer.podSecurityContext" . | nindent 8 }}
-      containers:
-        - name: seed
-          image: {{ include "wake-word-trainer.image" . }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args:
-            - seed
-            - --whisper-url={{ .Values.collector.whisper.url }}
-          env:
-            {{- include "wake-word-trainer.pipelineEnv" . | nindent 12 }}
-          securityContext:
-            {{- include "wake-word-trainer.containerSecurityContext" . | nindent 12 }}
-          resources:
-            {{- toYaml .Values.seed.resources | nindent 12 }}
-          volumeMounts:
-            - name: work
-              mountPath: /data/work
-            - name: data
-              mountPath: /data/clips
-              subPath: clips
-              readOnly: true
-            - name: tmp
-              mountPath: /tmp
-            - name: shm
-              mountPath: /dev/shm
-      volumes:
+        {{- include "wake-word-trainer.containerSecurityContext" . | nindent 8 }}
+      resources:
+        {{- toYaml .Values.seed.resources | nindent 8 }}
+      volumeMounts:
         - name: work
-          persistentVolumeClaim:
-            claimName: {{ $fullName }}-work
+          mountPath: /data/work
         - name: data
-          persistentVolumeClaim:
-            claimName: {{ $fullName }}-data
+          mountPath: /data/clips
+          subPath: clips
+          readOnly: true
         - name: tmp
-          emptyDir:
-            sizeLimit: 16Gi
+          mountPath: /tmp
         - name: shm
-          emptyDir:
-            medium: Memory
-            sizeLimit: 2Gi
-      {{- with .Values.seed.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+          mountPath: /dev/shm
+  volumes:
+    - name: work
+      persistentVolumeClaim:
+        claimName: {{ $fullName }}-work
+    - name: data
+      persistentVolumeClaim:
+        claimName: {{ $fullName }}-data
+    - name: tmp
+      emptyDir:
+        sizeLimit: 16Gi
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 2Gi
+  affinity:
+    {{- include "wake-word-trainer.workVolumeAffinity" (dict "root" . "affinity" .Values.seed.affinity) | nindent 4 }}
+  {{- with .Values.seed.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}

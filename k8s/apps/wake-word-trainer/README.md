@@ -41,6 +41,11 @@ the patched piper-sample-generator) and released as
 | `data` | NFS `borg-2:/backups/wake-word-trainer` | `clips/raw/` uploads, `clips/derived/` trimmed clips, `clips/phone/` optional phone recordings, `runs/<id>/` every run's logs, report, curves, selection JSON/NPZ, dataset manifest and model | restic, with the rest of `/storage/nas/backups` |
 | `publish` | NFS `borg-2:/backups/copyparty/data/public/glados_voice_assistant` | `okay_glados.tflite`, `okay_glados.json`, `previous/<run-id>/` | restic (copyparty's tree) |
 
+`work` is ReadWriteOnce, so it attaches to one node at a time. The seed and
+trainer pods carry `wake-word-trainer.msng.to/work-volume: "true"` and prefer
+the node a running one is on, instead of waiting in `ContainerCreating` for it
+to finish.
+
 Each clip's split (60/20/20 train/validation/test) is fixed from a hash of its
 id when it arrives and never changes, so the test set stays comparable across
 runs.

@@ -35,6 +35,7 @@ spec:
         metadata:
           labels:
             {{- include "wake-word-trainer.labels" . | nindent 12 }}
+            {{- include "wake-word-trainer.workVolumeLabels" . | nindent 12 }}
             app.kubernetes.io/component: trainer
         spec:
           restartPolicy: Never
@@ -174,10 +175,8 @@ spec:
           nodeSelector:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with $t.affinity }}
           affinity:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- include "wake-word-trainer.workVolumeAffinity" (dict "root" . "affinity" $t.affinity) | nindent 12 }}
           {{- with $t.tolerations }}
           tolerations:
             {{- toYaml . | nindent 12 }}
