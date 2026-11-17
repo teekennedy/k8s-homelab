@@ -13,7 +13,7 @@ ARG KUBECTL_VERSION=v1.37.2
 # renovate: datasource=npm depName=@agentclientprotocol/claude-agent-acp
 ARG CLAUDE_ADAPTER_VERSION=0.104.1
 # renovate: datasource=github-releases depName=grafana/mcp-grafana
-ARG MCP_GRAFANA_VERSION=v2.2.0
+ARG MCP_GRAFANA_VERSION=v2.3.0
 # Must match the engine (k8s/platform/dagger-engine/values.yaml), so Renovate
 # does not track it on its own.
 ARG DAGGER_VERSION=1.0.0-beta.27
