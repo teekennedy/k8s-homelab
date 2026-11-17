@@ -2,7 +2,10 @@
 dagger-helm:
   engine:
     image:
-      ref: registry.dagger.io/engine:v1.0.0-beta.27
+      # Pinned by digest: the tag was re-pushed, and its original image ships
+      # a cache entry that expired 2026-11-17, so engines started from it crash.
+      # Update the digest with the tag on upgrades.
+      ref: registry.dagger.io/engine:v1.0.0-beta.27@sha256:5a5549e857c25a81e10b6455526b6813d8415d3be44bd491f50f82b60a15ce4e
     # https://docs.dagger.io/reference/configuration/engine/
     # insecureRootCapabilities: effectively equivalent to running actions with `docker run --privileged`
     configJson: |

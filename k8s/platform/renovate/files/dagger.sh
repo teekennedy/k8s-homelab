@@ -20,7 +20,7 @@ engine_values=k8s/platform/dagger-engine/values.yaml
 if [ -f dagger.json ]; then
 	version="$(jq -re .engineVersion dagger.json)"
 elif [ -f "${engine_values}" ]; then
-	version="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:||p' "${engine_values}")"
+	version="$(sed -n 's|^ *ref:[[:space:]]*registry.dagger.io/engine:\([^@]*\).*|\1|p' "${engine_values}")"
 fi
 if [ -z "${version:-}" ]; then
 	echo "dagger.sh: cannot tell which dagger CLI this repo expects" >&2
