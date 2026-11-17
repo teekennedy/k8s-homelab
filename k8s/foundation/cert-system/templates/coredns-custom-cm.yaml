@@ -18,6 +18,10 @@ metadata:
   name: coredns-custom
   namespace: kube-system
 data:
+  # CoreDNS warns on every reload when the *.override import glob matches
+  # nothing. Comments are the only content, so the main block is unchanged.
+  empty.override: |
+    # Intentionally empty.
   borg-nodes.server: |
     {{ .Values.publicDomain }}:53 {
       hosts {
