@@ -1,7 +1,7 @@
 apiVersion: v2
 name: reflector
-version: 0.1.15
+version: 0.1.16
 dependencies:
   - name: reflector
-    version: 10.0.78
+    version: 10.0.79
     repository: oci://ghcr.io/emberstack/helm-charts
