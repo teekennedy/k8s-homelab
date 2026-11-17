@@ -465,6 +465,13 @@ kube-prometheus-stack:
       # service.instance.id become job/instance; other resource attributes
       # only land on target_info.
       enableOTLPReceiver: true
+      # The collector's exporter sends batches over several connections at
+      # once, so during CI bursts a series' newer batch can land first. With
+      # no out-of-order window Prometheus rejects the older sample and the
+      # request returns 400, which the collector logs as dropping the whole
+      # batch.
+      tsdb:
+        outOfOrderTimeWindow: 30m
 
       # Prometheus docs say to set this to maximum 80-85% of the volume size
       # https://prometheus.io/docs/prometheus/latest/storage/#operational-aspects
