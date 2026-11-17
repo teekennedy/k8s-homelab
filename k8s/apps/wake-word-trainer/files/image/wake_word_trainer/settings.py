@@ -60,6 +60,8 @@ class Settings:
     run_timeout_hours: float = field(
         default_factory=lambda: float(_env("WWT_RUN_TIMEOUT_HOURS", "22"))
     )
+    # How often running runs are checked against their Jobs.
+    reconcile_interval_s: float = 60.0
     # Train-now creates a Job from this CronJob.
     namespace: str = field(default_factory=lambda: _env("WWT_NAMESPACE", ""))
     cronjob: str = field(default_factory=lambda: _env("WWT_CRONJOB", ""))

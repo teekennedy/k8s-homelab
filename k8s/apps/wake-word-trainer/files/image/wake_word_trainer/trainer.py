@@ -11,6 +11,7 @@ import logging
 import os
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -56,6 +57,10 @@ class TrainerConfig:
         default_factory=lambda: Path(_env("WWT_PUBLISHED_DIR", "/publish"))
     )
     forced: bool = field(default_factory=lambda: _env("WWT_FORCE", "") in ("1", "true"))
+    # This pod's Job, recorded with the run so the collector can tell when it dies.
+    job_name: str | None = field(
+        default_factory=lambda: os.environ.get("WWT_JOB_NAME") or None
+    )
     repeats: int = field(default_factory=lambda: int(_env("WWT_REPEATS", "3")))
     train_args: list[str] = field(
         default_factory=lambda: shlex.split(_env("WWT_TRAIN_ARGS", DEFAULT_TRAIN_ARGS))
@@ -89,6 +94,28 @@ def api(cfg: TrainerConfig, method: str, path: str, body=None):
             time.sleep(5 * (attempt + 1))
 
 
+class Terminated(BaseException):
+    """SIGTERM reached the trainer. A BaseException, so the per-repeat error
+    handling lets it through and the run ends at once."""
+
+
+def _raise_terminated(signum, frame):
+    raise Terminated(
+        "SIGTERM: the Job was deleted, ran past its deadline or its node is draining"
+    )
+
+
+def _stop_group(proc: subprocess.Popen, grace: float = 10):
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait(timeout=grace)
+    except ProcessLookupError:
+        pass
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+
+
 def run_step(
     cfg: TrainerConfig, script: str, args: list[str], env: dict, log_path: Path
 ):
@@ -98,18 +125,24 @@ def run_step(
     print(f"+ {shlex.join(cmd)}", flush=True)
     with open(log_path, "ab") as fh:
         fh.write(f"+ {shlex.join(cmd)}\n".encode())
+        # Its own process group, so an abort reaches the trainer it spawns.
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             env={**os.environ, **env},
             cwd=cfg.pipeline_dir,
+            start_new_session=True,
         )
-        for line in proc.stdout:
-            fh.write(line)
-            sys.stdout.buffer.write(line)
-        fh.flush()
-        sys.stdout.flush()
+        try:
+            for line in proc.stdout:
+                fh.write(line)
+                fh.flush()
+                sys.stdout.buffer.write(line)
+                sys.stdout.flush()
+        except BaseException:
+            _stop_group(proc)
+            raise
         if proc.wait() != 0:
             raise RuntimeError(
                 f"{script} {shlex.join(args)} exited with {proc.returncode}"
@@ -171,15 +204,22 @@ def train(cfg: TrainerConfig) -> int:
         # its "has not run" alert fires if seeding never finishes.
         print(f"{cfg.work_dir} is not seeded yet: no run", flush=True)
         return 0
-    started = api(cfg, "POST", "/internal/runs", {"forced": cfg.forced})
+    started = api(
+        cfg, "POST", "/internal/runs", {"forced": cfg.forced, "job": cfg.job_name}
+    )
     gate, run = started["gate"], started["run"]
     print(f"gate: {gate['reason']}", flush=True)
     if run is None:
         return 0
     run_id = run["id"]
+    # Deleting the Job, its deadline and a node drain all arrive as SIGTERM;
+    # Python's default would exit without reporting.
+    signal.signal(signal.SIGTERM, _raise_terminated)
     try:
         result, clip_ids = train_run(cfg, run_id)
-    except Exception:
+    except (Exception, Terminated) as exc:
+        # A second SIGTERM must not cut the report short.
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         err = traceback.format_exc()
         print(err, file=sys.stderr, flush=True)
         api(
@@ -188,7 +228,7 @@ def train(cfg: TrainerConfig) -> int:
             f"/internal/runs/{run_id}/result",
             {"status": "failed", "error": err[-4000:]},
         )
-        return 1
+        return 143 if isinstance(exc, Terminated) else 1
     finally:
         for d in (cfg.work_dir / "trained_models").glob(f"okay_glados_{run_id}-r*"):
             shutil.rmtree(d, ignore_errors=True)

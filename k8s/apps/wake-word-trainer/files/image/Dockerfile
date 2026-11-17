@@ -15,7 +15,7 @@
 # working tree also sends its venvs and datasets):
 #   docker buildx build --build-context pipeline=<git archive of micro-wake-word> .
 FROM scratch AS pipeline
-ADD https://github.com/teekennedy/micro-wake-word.git#1c73015da551c5152d163cc04dd6ba76a3803352 /
+ADD https://github.com/teekennedy/micro-wake-word.git#b7a8b75189f029decfd6a3cdc4e417185213e4e7 /
 
 FROM ghcr.io/astral-sh/uv:0.13.5-trixie-slim@sha256:95611d89b7324e0517fe7257bb00979cf1f68461e5fb2b2d027d039da054bc07 AS build
 

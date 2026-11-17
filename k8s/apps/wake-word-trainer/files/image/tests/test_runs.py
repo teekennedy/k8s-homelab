@@ -1,4 +1,7 @@
 import json
+import os
+import sys
+import time
 
 import pytest
 from conftest import upload, words
@@ -72,6 +75,148 @@ def test_abandoned_run_does_not_block_forever(client, app, settings):
     )
     assert start(client, forced=True)["run"] is not None
     assert app.state.store.run(run["id"])["status"] == "failed"
+
+
+def test_run_whose_job_died_is_closed_and_frees_the_gate(client, app, monkeypatch):
+    jobs = {"job-a": {"status": {"active": 1}}}
+    lookups = []
+
+    def get_job(ns, name):
+        lookups.append((ns, name))
+        return jobs.get(name)
+
+    monkeypatch.setattr(kube, "get_job", get_job)
+    r = client.post(
+        "/internal/runs", json={"forced": True, "job": "job-a"}, headers=INTERNAL
+    )
+    run = r.json()["run"]
+    assert run["job"] == "job-a"
+    # Still active: the gate holds.
+    assert "still running" in start(client, forced=True)["gate"]["reason"]
+    assert lookups == [("wake-word-trainer", "job-a")]
+    del jobs["job-a"]
+    assert start(client, forced=True)["run"] is not None
+    closed = app.state.store.run(run["id"])
+    assert closed["status"] == "failed"
+    assert "job-a was deleted" in closed["error"]
+
+
+@pytest.mark.parametrize(
+    "job,outcome",
+    [
+        (None, "was deleted"),
+        ({"status": {"active": 1}}, None),
+        (
+            {
+                "status": {
+                    "conditions": [
+                        {"type": "FailureTarget", "status": "True"},
+                        {
+                            "type": "Failed",
+                            "status": "True",
+                            "reason": "DeadlineExceeded",
+                            "message": "Job was active longer than specified deadline",
+                        },
+                    ]
+                }
+            },
+            "failed: Job was active longer than specified deadline",
+        ),
+        ({"status": {"conditions": [{"type": "Failed", "status": "False"}]}}, None),
+        (
+            {"status": {"conditions": [{"type": "Complete", "status": "True"}]}},
+            "completed",
+        ),
+    ],
+)
+def test_job_outcome(job, outcome):
+    assert kube.job_outcome(job) == outcome
+
+
+def test_reconcile_skips_unreachable_api_and_reported_runs(app, monkeypatch):
+    from wake_word_trainer.app import reconcile_runs
+
+    store = app.state.store
+    store.start_run(app.state.settings, True, 1.0, "job-a")
+
+    def broken(ns, name):
+        raise OSError("apiserver unreachable")
+
+    assert reconcile_runs(store, "ns", 2.0, broken) == []
+    assert store.one("SELECT status FROM runs")["status"] == "running"
+    assert len(reconcile_runs(store, "ns", 3.0, lambda ns, n: None)) == 1
+    # Already closed: nothing left to do.
+    assert reconcile_runs(store, "ns", 4.0, lambda ns, n: None) == []
+
+
+def test_sigterm_reports_the_run_failed(tmp_path, monkeypatch):
+    monkeypatch.setenv("OKAY_GLADOS_WORK_DIR", str(tmp_path / "work"))
+    monkeypatch.setenv("WWT_JOB_NAME", "nightly-1")
+    (tmp_path / "work").mkdir()
+    (tmp_path / "work" / ".seeded").touch()
+    calls = []
+
+    def api(cfg, method, path, body=None):
+        calls.append((method, path, body))
+        if path == "/internal/runs":
+            return {"gate": {"reason": "started by hand"}, "run": {"id": "r1"}}
+
+    def train_run(cfg, run_id):
+        trainer._raise_terminated(15, None)
+
+    monkeypatch.setattr(trainer, "api", api)
+    monkeypatch.setattr(trainer, "train_run", train_run)
+    previous = trainer.signal.getsignal(trainer.signal.SIGTERM)
+    try:
+        assert trainer.train(trainer.TrainerConfig()) == 143
+    finally:
+        trainer.signal.signal(trainer.signal.SIGTERM, previous)
+    assert calls[0][2] == {"forced": False, "job": "nightly-1"}
+    method, path, body = calls[-1]
+    assert path == "/internal/runs/r1/result"
+    assert body["status"] == "failed"
+    assert "SIGTERM" in body["error"]
+
+
+def test_run_step_stops_the_whole_process_group(tmp_path):
+    """An abort mid-step reaches the step's children too, not just the step."""
+    import threading
+
+    pipeline = tmp_path / "pipeline"
+    (pipeline / "okay_glados").mkdir(parents=True)
+    ready, stopped = tmp_path / "ready", tmp_path / "stopped"
+    child = (
+        "import signal, sys, time\n"
+        f"signal.signal(signal.SIGTERM, lambda *a: (open({str(stopped)!r}, 'w').close(), sys.exit(0)))\n"
+        f"open({str(ready)!r}, 'w').close()\n"
+        "time.sleep(60)\n"
+    )
+    (pipeline / "okay_glados" / "step.py").write_text(
+        "import subprocess, sys, time\n"
+        f"subprocess.Popen([sys.executable, '-c', {child!r}])\n"
+        "print('started', flush=True)\n"
+        "time.sleep(60)\n"
+    )
+    cfg = trainer.TrainerConfig(pipeline_dir=pipeline, python=sys.executable)
+
+    def interrupt():
+        while not ready.exists():
+            time.sleep(0.05)
+        os.kill(os.getpid(), trainer.signal.SIGUSR1)
+
+    previous = trainer.signal.signal(trainer.signal.SIGUSR1, trainer._raise_terminated)
+    threading.Thread(target=interrupt, daemon=True).start()
+    try:
+        with pytest.raises(trainer.Terminated):
+            trainer.run_step(cfg, "step.py", [], {}, tmp_path / "step.log")
+    finally:
+        trainer.signal.signal(trainer.signal.SIGUSR1, previous)
+    deadline = time.time() + 5
+    while not stopped.exists() and time.time() < deadline:
+        time.sleep(0.05)
+    assert stopped.exists(), "the step's child never got SIGTERM"
+    # The log is written as lines arrive, not only when the step ends.
+    assert "started" in (tmp_path / "step.log").read_text()
 
 
 def test_dataset_and_result_mark_clips_used(client, app, transcriber):

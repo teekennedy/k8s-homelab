@@ -1,9 +1,11 @@
-"""Start a training Job from the nightly CronJob, as `kubectl create job --from` does."""
+"""Training Jobs: start one from the nightly CronJob, as `kubectl create job
+--from` does, and look up how one ended."""
 
 import json
 import os
 import ssl
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -70,3 +72,29 @@ def create_training_job(namespace: str, cronjob_name: str) -> str:
     job = job_from_cronjob(cj, name, {"WWT_FORCE": "1"})
     _request("POST", f"/apis/batch/v1/namespaces/{namespace}/jobs", job)
     return name
+
+
+def job_outcome(job: dict | None) -> str | None:
+    """Why a Job is over, or None while it may still run. None for `job` means
+    it no longer exists."""
+    if job is None:
+        return "was deleted"
+    for cond in job.get("status", {}).get("conditions") or []:
+        if cond.get("status") != "True":
+            continue
+        if cond.get("type") == "Failed":
+            detail = cond.get("message") or cond.get("reason") or "no reason given"
+            return f"failed: {detail}"
+        if cond.get("type") == "Complete":
+            return "completed"
+    return None
+
+
+def get_job(namespace: str, name: str) -> dict | None:
+    """The Job, or None if it does not exist."""
+    try:
+        return _request("GET", f"/apis/batch/v1/namespaces/{namespace}/jobs/{name}")
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        raise

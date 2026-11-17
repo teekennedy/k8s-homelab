@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS runs (
     promoted INTEGER,
     published TEXT,
     result TEXT,
-    error TEXT
+    error TEXT,
+    -- the training Job, so a run whose Job died without reporting is closed
+    job TEXT
 );
 
 CREATE TABLE IF NOT EXISTS meta (
@@ -93,6 +95,10 @@ class Store:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA busy_timeout=5000")
         self._conn.executescript(SCHEMA)
+        # Columns added after the first release.
+        columns = {r[1] for r in self._conn.execute("PRAGMA table_info(runs)")}
+        if "job" not in columns:
+            self._conn.execute("ALTER TABLE runs ADD COLUMN job TEXT")
         self._lock = threading.RLock()
 
     @contextmanager
@@ -284,7 +290,9 @@ class Store:
         )
         return {r["label"]: r["n"] for r in rows}
 
-    def start_run(self, settings, forced: bool, now: float) -> tuple[dict | None, dict]:
+    def start_run(
+        self, settings, forced: bool, now: float, job: str | None = None
+    ) -> tuple[dict | None, dict]:
         """Run the gate and, if it passes, record a new running run.
 
         Returns (run or None, gate). The gate and the insert share one
@@ -341,10 +349,26 @@ class Store:
                 + uuid.uuid4().hex[:6]
             )
             c.execute(
-                "INSERT INTO runs (id, started_at, status, forced, gate) VALUES (?, ?, 'running', ?, ?)",
-                (run_id, now, int(forced), json.dumps(gate)),
+                "INSERT INTO runs (id, started_at, status, forced, gate, job)"
+                " VALUES (?, ?, 'running', ?, ?, ?)",
+                (run_id, now, int(forced), json.dumps(gate), job),
             )
         return self.run(run_id), gate
+
+    def running_runs_with_jobs(self) -> list[dict]:
+        return self.query(
+            "SELECT id, job FROM runs WHERE status = 'running' AND job IS NOT NULL"
+        )
+
+    def abandon_run(self, run_id: str, now: float, error: str) -> bool:
+        """Fail a run that is still running; False if it reported meanwhile."""
+        with self.tx() as c:
+            cur = c.execute(
+                "UPDATE runs SET status = 'failed', finished_at = ?, error = ?"
+                " WHERE id = ? AND status = 'running'",
+                (now, error, run_id),
+            )
+            return cur.rowcount == 1
 
     def run(self, run_id: str) -> dict | None:
         return self.one("SELECT * FROM runs WHERE id = ?", run_id)

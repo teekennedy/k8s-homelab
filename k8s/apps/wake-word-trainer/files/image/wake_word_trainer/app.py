@@ -10,6 +10,7 @@ Routes and who reaches them (oauth2-proxy owns the hostname):
 import hmac
 import logging
 import re
+import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -50,6 +51,29 @@ def _safe(value: str | None, default: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "_", value or "")[:64] or default
 
 
+def reconcile_runs(store: Store, namespace: str, now: float, get_job=None) -> list[str]:
+    """Fail every running run whose training Job is over or gone.
+
+    The trainer reports its own result, including on SIGTERM; this closes the
+    runs it could not report: killed, OOM, node lost. Returns the runs closed.
+    """
+    get_job = get_job or kube.get_job
+    closed = []
+    for run in store.running_runs_with_jobs():
+        try:
+            outcome = kube.job_outcome(get_job(namespace, run["job"]))
+        except Exception:
+            log.warning("could not look up Job %s", run["job"], exc_info=True)
+            continue
+        if outcome is None:
+            continue
+        error = f"aborted: the training Job {run['job']} {outcome} before the run reported a result"
+        if store.abandon_run(run["id"], now, error):
+            log.warning("run %s %s", run["id"], error)
+            closed.append(run["id"])
+    return closed
+
+
 def _check_token(given: str | None, expected: str):
     if not expected or not given or not hmac.compare_digest(given, expected):
         raise HTTPException(401, "bad or missing token")
@@ -67,12 +91,28 @@ def create_app(
             settings.whisper_model, settings.whisper_threads
         )
     processor = Processor(store, settings.clips_dir, transcriber)
+    stop_reconciler = threading.Event()
+
+    def reconcile():
+        if settings.namespace:
+            reconcile_runs(store, settings.namespace, time.time())
+
+    def reconcile_loop():
+        while not stop_reconciler.wait(settings.reconcile_interval_s):
+            try:
+                reconcile()
+            except Exception:
+                log.exception("run reconcile pass failed")
 
     @asynccontextmanager
     async def lifespan(_app):
         if start_processor:
             processor.start()
+            threading.Thread(
+                target=reconcile_loop, name="reconcile-runs", daemon=True
+            ).start()
         yield
+        stop_reconciler.set()
         processor.stop.set()
         processor.wake.set()
 
@@ -353,6 +393,7 @@ def create_app(
     def train_now(request: Request):
         if not (settings.namespace and settings.cronjob):
             raise HTTPException(503, "no CronJob configured")
+        reconcile()
         if store.one("SELECT id FROM runs WHERE status = 'running'"):
             raise HTTPException(409, "a run is already in progress")
         name = kube.create_training_job(settings.namespace, settings.cronjob)
@@ -378,7 +419,11 @@ def create_app(
     @app.post("/internal/runs")
     def internal_start(request: Request, payload: dict = Body(default={})):
         internal(request)
-        run, gate = store.start_run(settings, bool(payload.get("forced")), time.time())
+        # A run whose Job died must not hold the gate shut.
+        reconcile()
+        run, gate = store.start_run(
+            settings, bool(payload.get("forced")), time.time(), payload.get("job")
+        )
         return {"run": run, "gate": gate}
 
     @app.get("/internal/runs/{run_id}/dataset")
