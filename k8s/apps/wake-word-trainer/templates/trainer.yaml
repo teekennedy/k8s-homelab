@@ -25,6 +25,8 @@ spec:
       labels:
         {{- include "wake-word-trainer.labels" . | nindent 8 }}
         app.kubernetes.io/component: trainer
+        # Runs take over a day; activeDeadlineSeconds bounds them instead (also mutes KubeJobFailed).
+        excluded-from-alerts: "true"
     spec:
       # A failed run is reported to the collector and retried by the next
       # night's gate, not by the Job.

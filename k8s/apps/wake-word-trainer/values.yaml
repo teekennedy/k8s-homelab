@@ -54,11 +54,11 @@ trainer:
   # The gate runs nightly; a run only starts when it passes.
   schedule: "0 2 * * *"
   timeZone: America/Denver
-  # A full run took ~25 min on an M1 Max per repeat; give it most of a day.
-  activeDeadlineSeconds: 79200
+  # On CPU one repeat (30000 steps) takes ~23h, measured 2026-11-17.
+  activeDeadlineSeconds: 108000
   # Training runs are high-variance: train this many times and keep the best
   # by validation score.
-  repeats: 3
+  repeats: 1
   # Arguments to step4_train.py: v2g's recipe.
   trainArgs: >-
     --steps 18000 12000 --learning-rates 0.001 0.0003 --negative-class-weight 20 20
