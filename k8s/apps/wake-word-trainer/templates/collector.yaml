@@ -10,7 +10,8 @@ metadata:
     {{- include "wake-word-trainer.labels" . | nindent 4 }}
 automountServiceAccountToken: false
 ---
-# "Train now": read the nightly CronJob and create a Job from it. Nothing else.
+# "Train now": read the nightly CronJob and create a Job from it. Reading Jobs
+# closes runs whose Job ended without reporting.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -25,7 +26,7 @@ rules:
     verbs: ["get"]
   - apiGroups: ["batch"]
     resources: ["jobs"]
-    verbs: ["create"]
+    verbs: ["create", "get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

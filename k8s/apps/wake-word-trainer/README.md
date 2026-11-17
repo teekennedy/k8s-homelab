@@ -77,7 +77,15 @@ the last 20 hours. "Train now" on the overview page skips it.
 A run: `step3 --only recorded` with the device clips, `trainer.repeats` ×
 (`step4 --fresh`, `select_checkpoint --select all --apply`, convert), keep the
 repeat with the best validation score, `step5` on it, then `step5 --model` on
-the published model at its own cutoff, on the same test data.
+the published model at its own cutoff, on the same test data. The pipeline's
+output, including a progress line every 100 training steps, goes to the pod's
+log as well as to `runs/<id>/logs/`.
+
+A run that ends early is still recorded. On SIGTERM (Job deleted, past its
+deadline, node drained) the trainer stops the pipeline and reports the run
+failed. A Job that dies without reporting (OOM, node lost) is caught by the
+collector, which checks each running run's Job every minute and before the
+gate. To stop a run, delete its Job.
 
 It is **promoted** only if the new model holds ≤ `trainer.targetFaph` false
 accepts/h at its chosen cutoff **and** misses fewer held-out real clips than

@@ -40,6 +40,8 @@ spec:
             app.kubernetes.io/component: trainer
         spec:
           restartPolicy: Never
+          # Room to stop the pipeline and report the run on SIGTERM.
+          terminationGracePeriodSeconds: 60
           automountServiceAccountToken: false
           enableServiceLinks: false
           securityContext:
@@ -67,6 +69,10 @@ spec:
                   value: {{ $t.targetFaph | quote }}
                 - name: WWT_FORCE
                   value: "0"
+                - name: WWT_JOB_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.labels['batch.kubernetes.io/job-name']
               securityContext:
                 {{- include "wake-word-trainer.containerSecurityContext" . | nindent 16 }}
               resources:

@@ -54,11 +54,13 @@ trainer:
   # The gate runs nightly; a run only starts when it passes.
   schedule: "0 2 * * *"
   timeZone: America/Denver
-  # On CPU one repeat (30000 steps) takes ~23h, measured 2026-11-17.
-  activeDeadlineSeconds: 108000
+  # On 6 CPUs one repeat trains 30000 steps in ~40 min (16 steps/s, measured
+  # 2026-11-17), before checkpoint selection and conversion. Leaves ample room
+  # for three repeats and the evaluation.
+  activeDeadlineSeconds: 28800
   # Training runs are high-variance: train this many times and keep the best
   # by validation score.
-  repeats: 1
+  repeats: 3
   # Arguments to step4_train.py: v2g's recipe.
   trainArgs: >-
     --steps 18000 12000 --learning-rates 0.001 0.0003 --negative-class-weight 20 20
