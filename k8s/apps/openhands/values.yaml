@@ -258,7 +258,7 @@ appServer:
   # the locked dependencies in files/app-server/uv.lock. Its Python must match
   # files/app-server/.python-version: uv never downloads one.
   # renovate: datasource=docker depName=ghcr.io/astral-sh/uv
-  image: ghcr.io/astral-sh/uv:python3.15-alpine@sha256:8d2c75bbf0f4155bc2a4ae2297bcd33bea4e775fd68ca21d6c38c1220b720735
+  image: ghcr.io/astral-sh/uv:python3.15-alpine@sha256:61d5053f323bbdb706e3f02398aa7931d514ba1ef9bcf87c512d4549e98d8c1b
   port: 8080
   # Sandbox webhooks only. A port of its own so the NetworkPolicy can admit
   # sandbox pods to it and to nothing else on this server.
@@ -380,7 +380,7 @@ sandboxSpecs:
   # tag and adds kubectl, the dagger CLI, mcp-grafana and the Claude Code
   # adapter. Released by any conventional commit under files/sandbox; Renovate
   # bumps this tag.
-  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.25@sha256:643622efabe8f5a421ee254624fa4b7d194512c1002bd240c68f27b8a5934597
+  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.26@sha256:5b27db524b50a5960d4565ab95e0e9a9436ce0fddeadc2c667f672851b5262b7
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:
