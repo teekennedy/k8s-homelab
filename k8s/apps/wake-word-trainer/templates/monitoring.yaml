@@ -64,6 +64,17 @@ spec:
           annotations:
             summary: {{ "The last wake word training run failed" | quote }}
             description: {{ "See the run page at https://wake-word.msng.to/runs." | quote }}
+        - alert: WakeWordTrainerPublishPending
+          # The publisher checks every minute; a promotion still unpublished
+          # after an hour means its publish failed (retried every 15 minutes)
+          # or the publisher is not running.
+          expr: wake_word_trainer_publish_pending == 1
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: {{ "A promoted wake word model has not been published" | quote }}
+            description: {{ "See the run page at https://wake-word.msng.to/runs and the collector pod's publisher container." | quote }}
         - alert: WakeWordTrainerGateNotRunning
           # The CronJob runs the gate every night, whether or not it trains.
           expr: time() - wake_word_trainer_last_gate_timestamp_seconds > 2 * 86400

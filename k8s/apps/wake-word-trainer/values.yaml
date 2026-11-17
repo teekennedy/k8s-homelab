@@ -81,15 +81,18 @@ trainer:
   tolerations: []
   # Merged over the chart's preference for the node holding the work volume.
   affinity: {}
-  publish:
-    # Rehearse on a scratch copy of the live folder; set false to publish.
-    dryRun: true
-    resources:
-      requests:
-        cpu: 50m
-        memory: 64Mi
-      limits:
-        memory: 256Mi
+
+# --- Publisher ------------------------------------------------------------------
+# A container in the collector's pod that publishes the newest promoted run.
+publisher:
+  # Rehearse on a scratch copy of the live folder; set false to publish.
+  dryRun: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
 
 # --- Seed -----------------------------------------------------------------------
 # One-time: downloads ~35 GB of datasets, generates the TTS samples and builds

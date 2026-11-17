@@ -55,10 +55,6 @@ class TrainerConfig:
     published_dir: Path = field(
         default_factory=lambda: Path(_env("WWT_PUBLISHED_DIR", "/publish"))
     )
-    # Only for a pod that publishes in a second container after training.
-    handoff: Path | None = field(
-        default_factory=lambda: Path(h) if (h := _env("WWT_HANDOFF", "")) else None
-    )
     forced: bool = field(default_factory=lambda: _env("WWT_FORCE", "") in ("1", "true"))
     repeats: int = field(default_factory=lambda: int(_env("WWT_REPEATS", "3")))
     train_args: list[str] = field(
@@ -166,13 +162,6 @@ def decide(
     )
 
 
-def write_handoff(cfg: TrainerConfig, data: dict):
-    if cfg.handoff is None:
-        return
-    cfg.handoff.parent.mkdir(parents=True, exist_ok=True)
-    cfg.handoff.write_text(json.dumps(data))
-
-
 # --------------------------------------------------------------------- train
 
 
@@ -181,13 +170,11 @@ def train(cfg: TrainerConfig) -> int:
         # The seed Job is still building the datasets; the gate waits too, so
         # its "has not run" alert fires if seeding never finishes.
         print(f"{cfg.work_dir} is not seeded yet: no run", flush=True)
-        write_handoff(cfg, {"run_id": None, "promote": False})
         return 0
     started = api(cfg, "POST", "/internal/runs", {"forced": cfg.forced})
     gate, run = started["gate"], started["run"]
     print(f"gate: {gate['reason']}", flush=True)
     if run is None:
-        write_handoff(cfg, {"run_id": None, "promote": False})
         return 0
     run_id = run["id"]
     try:
@@ -201,7 +188,6 @@ def train(cfg: TrainerConfig) -> int:
             f"/internal/runs/{run_id}/result",
             {"status": "failed", "error": err[-4000:]},
         )
-        write_handoff(cfg, {"run_id": run_id, "promote": False})
         return 1
     finally:
         for d in (cfg.work_dir / "trained_models").glob(f"okay_glados_{run_id}-r*"):
@@ -211,14 +197,6 @@ def train(cfg: TrainerConfig) -> int:
         "POST",
         f"/internal/runs/{run_id}/result",
         {"status": "succeeded", "result": result, "clip_ids": clip_ids},
-    )
-    write_handoff(
-        cfg,
-        {
-            "run_id": run_id,
-            "promote": result["promote"],
-            "model_dir": str(cfg.runs_dir / run_id / "report"),
-        },
     )
     print(
         f"run {run_id}: {'promote' if result['promote'] else 'keep the published model'}"
@@ -461,20 +439,6 @@ def publish_run(cfg: TrainerConfig, run_id: str, dry_run: bool, live_dir: Path |
             "tree": tree,
         },
     )
-
-
-def publish(cfg: TrainerConfig, dry_run: bool, live_dir: Path | None) -> int:
-    """Once, from the trainer's hand-off file."""
-    if cfg.handoff is None or not cfg.handoff.exists():
-        print("no hand-off from the trainer: nothing to publish", flush=True)
-        return 0
-    handoff = json.loads(cfg.handoff.read_text())
-    run_id = handoff.get("run_id")
-    if not run_id or not handoff.get("promote"):
-        print(f"run {run_id or '-'}: nothing to publish", flush=True)
-        return 0
-    publish_run(cfg, run_id, dry_run, live_dir)
-    return 0
 
 
 def publish_pending(

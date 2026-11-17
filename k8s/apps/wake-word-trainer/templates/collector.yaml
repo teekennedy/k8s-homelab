@@ -183,6 +183,76 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+        # Publishes the newest promoted run, as the collector reports it.
+        # Copyparty's UID: the only writer of the public folder.
+        - name: publisher
+          image: {{ include "wake-word-trainer.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - publish
+            - --watch
+            - --heartbeat=/run/publisher/heartbeat
+            {{- if .Values.publisher.dryRun }}
+            - --dry-run
+            - --live-dir=/publish-live
+            {{- end }}
+          env:
+            - name: WWT_COLLECTOR_URL
+              value: http://localhost:{{ $c.port }}
+            - name: WWT_INTERNAL_TOKEN_FILE
+              value: /secrets/internal/token
+            - name: WWT_RUNS_DIR
+              value: /data/runs
+            - name: WWT_PUBLISHED_DIR
+              value: /publish
+          # The loop touches the heartbeat on every pass. Liveness restarts a
+          # loop stuck past a worst-case pass (collector retries included);
+          # readiness only says it started, so a slow publish never takes the
+          # collector out of its Service.
+          livenessProbe:
+            exec:
+              command:
+                - wake-word-trainer
+                - check-heartbeat
+                - /run/publisher/heartbeat
+                - --max-age=900
+            periodSeconds: 60
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - wake-word-trainer
+                - check-heartbeat
+                - /run/publisher/heartbeat
+            periodSeconds: 30
+            timeoutSeconds: 10
+          securityContext:
+            {{- include "wake-word-trainer.containerSecurityContext" . | nindent 12 }}
+            runAsUser: {{ .Values.publishUid }}
+            runAsGroup: {{ .Values.publishUid }}
+          resources:
+            {{- toYaml .Values.publisher.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data/runs
+              subPath: runs
+              readOnly: true
+            {{- if .Values.publisher.dryRun }}
+            # A scratch copy: the dry run never touches the public folder.
+            - name: publish-scratch
+              mountPath: /publish
+            - name: publish
+              mountPath: /publish-live
+              readOnly: true
+            {{- else }}
+            - name: publish
+              mountPath: /publish
+            {{- end }}
+            - name: internal-token
+              mountPath: /secrets/internal
+              readOnly: true
+            - name: publisher-run
+              mountPath: /run/publisher
       volumes:
         - name: state
           persistentVolumeClaim:
@@ -190,6 +260,14 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ $fullName }}-data
+        - name: publish
+          persistentVolumeClaim:
+            claimName: {{ $fullName }}-publish
+        {{- if .Values.publisher.dryRun }}
+        - name: publish-scratch
+          emptyDir:
+            sizeLimit: 64Mi
+        {{- end }}
         - name: capture-token
           secret:
             secretName: {{ $fullName }}-capture-token
@@ -199,6 +277,9 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 1Gi
+        - name: publisher-run
+          emptyDir:
+            sizeLimit: 1Mi
       {{- with $c.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

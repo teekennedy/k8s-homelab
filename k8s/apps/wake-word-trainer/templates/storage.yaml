@@ -48,8 +48,8 @@ spec:
 {{- else }}
 # The public copyparty folder the device's model is served from
 # (files.msng.to/share/public/glados_voice_assistant/), and nothing above it.
-# Owned 3923 (copyparty), so only the publisher container, running as that
-# UID, writes here; the trainer mounts it read-only.
+# Owned 3923 (copyparty), so only the publisher container (in the collector's
+# pod), running as that UID, writes here; the trainer mounts it read-only.
 {{- end }}
 apiVersion: v1
 kind: PersistentVolume

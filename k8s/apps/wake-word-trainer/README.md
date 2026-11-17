@@ -12,10 +12,11 @@ pipeline itself lives in `tkennedy/micro-wake-word` (`okay_glados/`).
 ```
 Voice PE ──HTTPS──▶ oauth2-proxy ──▶ collector (Deployment) ──▶ clips/ on NFS, SQLite on Longhorn
  POST /capture       (skips SSO        │  review UI, run history, /metrics
- + X-Capture-Token    for /capture)    ▼
-                                    processor thread: Whisper, trim, flag
-nightly CronJob ─ train (init) ──▶ runs/<id>/ on NFS ── publish ──▶ copyparty public/glados_voice_assistant
-                  gate, step3-5,                        (UID 3923)
+ + X-Capture-Token    for /capture)    ├─ processor thread: Whisper, trim, flag
+                                       └─ publisher container (UID 3923) ──▶ copyparty public/glados_voice_assistant
+                                              ▲ newest promoted run, every minute
+nightly CronJob ─ train ──▶ runs/<id>/ on NFS, result to the collector
+                  gate, step3-5,
                   N repeats, compare
 ```
 
@@ -23,8 +24,8 @@ nightly CronJob ─ train (init) ──▶ runs/<id>/ on NFS ── publish ─�
 
 | | What | Runs as |
 |---|---|---|
-| `wake-word-trainer-collector` | `wake-word-trainer serve`: capture API, review UI, run history, `/metrics`, the trainer's `/internal` API, and the processing thread | 2400 |
-| `wake-word-trainer-nightly` | CronJob at 02:00 (America/Denver). Init container `train` asks the collector's gate and, if it passes, runs a training run; container `publish` copies a promoted model to the public folder | 2400, then 3923 |
+| `wake-word-trainer-collector` | Container `collector` (`wake-word-trainer serve`): capture API, review UI, run history, `/metrics`, the trainer's `/internal` API, and the processing thread. Container `publisher` (`publish --watch`): publishes the newest promoted run that is not published yet | 2400; publisher 3923 |
+| `wake-word-trainer-nightly` | CronJob at 02:00 (America/Denver). `train` asks the collector's gate and, if it passes, runs a training run and reports its result | 2400 |
 | `wake-word-trainer-seed-<hash>` | One-time steps 1–3 of the pipeline (datasets, TTS, static features). Exits at once when `<work>/.seeded` exists | 2400 |
 
 All three use one image, built from `files/image` (the service package plus the
@@ -80,12 +81,15 @@ the published model at its own cutoff, on the same test data.
 
 It is **promoted** only if the new model holds ≤ `trainer.targetFaph` false
 accepts/h at its chosen cutoff **and** misses fewer held-out real clips than
-the published model. The publisher copies the outgoing pair to
+the published model. Publishing is a reconcile loop rather than a step after
+training: the publisher asks the collector for the newest promoted run that is
+not published, so an older promotion is never published after a newer one,
+and a failed publish is retried every 15 minutes. It copies the outgoing pair to
 `previous/<run-id>/`, then writes the `.tflite` and finally the `.json`, each
 through a temp file and rename. The device picks the model up at its next
 ESPHome build.
 
-`trainer.publish.dryRun` (default **true**) rehearses publishing on a scratch
+`publisher.dryRun` (default **true**) rehearses publishing on a scratch
 copy of the folder. Set it false once a dry run has been seen to work.
 
 ## Device
@@ -116,16 +120,17 @@ The firmware component and package are in micro-wake-word,
    runs, and set `phoneRecordings.enabled: true`.
 6. Fetch the capture token, flash the device, and watch `/clips` fill.
 7. After the first run, size `trainer.resources` from what it used, pin
-   `trainer.nodeSelector`, and turn off `trainer.publish.dryRun`.
+   `trainer.nodeSelector`, and turn off `publisher.dryRun`.
 
 ## Metrics and alerts
 
 `/metrics` (scraped by the ServiceMonitor): clip counts by label and review
 state, queue depth, processing errors, new usable clips toward the gate, last
-capture, last gate check, last run status and age, last promotion. The
-PrometheusRule alerts on a queue that does not drain, a dead processor thread,
-a failed last run, a gate that has not run for two days, and no captures for
-two days.
+capture, last gate check, last run status and age, last promotion, and
+whether a promotion is waiting to be published. The PrometheusRule alerts on a
+queue that does not drain, a dead processor thread, a failed last run, a
+promotion unpublished for an hour, a gate that has not run for two days, and
+no captures for two days.
 
 ## Access
 

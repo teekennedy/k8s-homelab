@@ -2,8 +2,9 @@
 ---
 # The collector trusts nothing about its callers but their route: people and
 # the device arrive through oauth2-proxy (which skips SSO only for POST
-# /capture, where the capture token is checked), the trainer and publisher
-# call the token-checked /internal API, and the scraper reads /metrics.
+# /capture, where the capture token is checked), the trainer calls the
+# token-checked /internal API, and the scraper reads /metrics. The publisher
+# shares the collector's pod and calls it on localhost.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

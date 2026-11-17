@@ -28,7 +28,9 @@ def main(argv=None) -> int:
     f.add_argument("--url", required=True)
     f.add_argument("--dest", type=Path, required=True)
     sub.add_parser("train", help="run the gate and, if it passes, a training run")
-    p = sub.add_parser("publish", help="publish the model the trainer promoted")
+    p = sub.add_parser(
+        "publish", help="publish the newest promoted run, if it is not published yet"
+    )
     p.add_argument("--dry-run", action="store_true")
     p.add_argument(
         "--live-dir",
@@ -39,7 +41,7 @@ def main(argv=None) -> int:
     p.add_argument(
         "--watch",
         action="store_true",
-        help="keep publishing the newest promoted run, as the collector reports it",
+        help="keep checking, instead of once",
     )
     p.add_argument("--interval", type=float, default=60, help="with --watch: seconds")
     p.add_argument(
@@ -106,7 +108,11 @@ def main(argv=None) -> int:
                 args.retry_after,
                 args.heartbeat,
             )
-        return trainer.publish(cfg, args.dry_run, args.live_dir)
+        published = trainer.publish_pending(
+            cfg, args.dry_run, args.live_dir, 0, time.time()
+        )
+        print(f"published run {published}" if published else "nothing to publish")
+        return 0
     if args.cmd == "seed":
         return trainer.seed(cfg, args.segment_python, args.whisper_url)
     return 2

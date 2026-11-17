@@ -195,15 +195,6 @@ def test_publish_refuses_an_incomplete_model(tmp_path):
     assert list((tmp_path / "t").iterdir()) == []
 
 
-def test_publish_without_promotion_does_nothing(tmp_path, monkeypatch):
-    handoff = tmp_path / "run.json"
-    handoff.write_text(json.dumps({"run_id": "r", "promote": False}))
-    monkeypatch.setenv("WWT_HANDOFF", str(handoff))
-    monkeypatch.setenv("WWT_PUBLISHED_DIR", str(tmp_path / "pub"))
-    assert trainer.publish(trainer.TrainerConfig(), dry_run=False, live_dir=None) == 0
-    assert not (tmp_path / "pub").exists()
-
-
 def test_job_from_cronjob_forces_every_container():
     cj = {
         "metadata": {"name": "nightly", "namespace": "ns", "uid": "u1"},
@@ -240,12 +231,10 @@ def test_job_from_cronjob_forces_every_container():
 
 def test_train_waits_for_the_seed(tmp_path, monkeypatch):
     monkeypatch.setenv("OKAY_GLADOS_WORK_DIR", str(tmp_path / "work"))
-    monkeypatch.setenv("WWT_HANDOFF", str(tmp_path / "run.json"))
     calls = []
     monkeypatch.setattr(trainer, "api", lambda *a, **k: calls.append(a))
     assert trainer.train(trainer.TrainerConfig()) == 0
     assert calls == []
-    assert json.loads((tmp_path / "run.json").read_text())["run_id"] is None
 
 
 def finish(client, run_id, promote):
@@ -312,14 +301,6 @@ def test_publish_pending_publishes_from_the_run_folder(tmp_path, monkeypatch):
 
     queue.append({"run": None})
     assert trainer.publish_pending(cfg, False, None, 900, now=2000) is None
-
-
-def test_train_without_a_handoff_writes_none(tmp_path, monkeypatch):
-    monkeypatch.setenv("OKAY_GLADOS_WORK_DIR", str(tmp_path / "work"))
-    monkeypatch.delenv("WWT_HANDOFF", raising=False)
-    monkeypatch.setattr(trainer, "api", lambda *a, **k: None)
-    assert trainer.train(trainer.TrainerConfig()) == 0
-    assert list(tmp_path.iterdir()) == []
 
 
 def test_watch_beats_even_when_a_pass_fails(tmp_path, monkeypatch):

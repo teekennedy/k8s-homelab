@@ -1,11 +1,10 @@
 {{- $fullName := include "wake-word-trainer.fullname" . -}}
 {{- $t := .Values.trainer -}}
 ---
-# Nightly: the gate, and a training run only when it passes. Two steps in one
-# pod: `train` (init container, the pipeline's UID) leaves a hand-off file,
-# and `publish` (copyparty's UID, the only writer of the public folder) acts
-# on it. The collector's "train now" button creates a Job from this template
-# with WWT_FORCE=1.
+# Nightly: the gate, and a training run only when it passes. The run's result
+# goes to the collector; the publisher in the collector's pod publishes a
+# promoted model from there. The collector's "train now" button creates a Job
+# from this template with WWT_FORCE=1.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -43,7 +42,7 @@ spec:
           enableServiceLinks: false
           securityContext:
             {{- include "wake-word-trainer.podSecurityContext" . | nindent 12 }}
-          initContainers:
+          containers:
             - name: train
               image: {{ include "wake-word-trainer.image" . }}
               imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -56,8 +55,6 @@ spec:
                   value: /secrets/internal/token
                 - name: WWT_PUBLISHED_DIR
                   value: /publish
-                - name: WWT_HANDOFF
-                  value: /handoff/run.json
                 - name: WWT_REPEATS
                   value: {{ $t.repeats | quote }}
                 - name: WWT_TRAIN_ARGS
@@ -86,8 +83,6 @@ spec:
                 - name: publish
                   mountPath: /publish
                   readOnly: true
-                - name: handoff
-                  mountPath: /handoff
                 - name: internal-token
                   mountPath: /secrets/internal
                   readOnly: true
@@ -95,53 +90,6 @@ spec:
                   mountPath: /tmp
                 - name: shm
                   mountPath: /dev/shm
-          containers:
-            - name: publish
-              image: {{ include "wake-word-trainer.image" . }}
-              imagePullPolicy: {{ .Values.image.pullPolicy }}
-              args:
-                - publish
-                {{- if $t.publish.dryRun }}
-                - --dry-run
-                - --live-dir=/publish-live
-                {{- end }}
-              env:
-                - name: WWT_COLLECTOR_URL
-                  value: {{ include "wake-word-trainer.collectorUrl" . }}
-                - name: WWT_INTERNAL_TOKEN_FILE
-                  value: /secrets/internal/token
-                - name: WWT_PUBLISHED_DIR
-                  value: /publish
-                - name: WWT_HANDOFF
-                  value: /handoff/run.json
-              securityContext:
-                {{- include "wake-word-trainer.containerSecurityContext" . | nindent 16 }}
-                runAsUser: {{ .Values.publishUid }}
-                runAsGroup: {{ .Values.publishUid }}
-              resources:
-                {{- toYaml $t.publish.resources | nindent 16 }}
-              volumeMounts:
-                - name: data
-                  mountPath: /data/runs
-                  subPath: runs
-                  readOnly: true
-                {{- if $t.publish.dryRun }}
-                # A scratch copy: the dry run never touches the public folder.
-                - name: publish-scratch
-                  mountPath: /publish
-                - name: publish
-                  mountPath: /publish-live
-                  readOnly: true
-                {{- else }}
-                - name: publish
-                  mountPath: /publish
-                {{- end }}
-                - name: handoff
-                  mountPath: /handoff
-                  readOnly: true
-                - name: internal-token
-                  mountPath: /secrets/internal
-                  readOnly: true
           volumes:
             - name: work
               persistentVolumeClaim:
@@ -152,14 +100,6 @@ spec:
             - name: publish
               persistentVolumeClaim:
                 claimName: {{ $fullName }}-publish
-            {{- if $t.publish.dryRun }}
-            - name: publish-scratch
-              emptyDir:
-                sizeLimit: 64Mi
-            {{- end }}
-            - name: handoff
-              emptyDir:
-                sizeLimit: 1Mi
             - name: internal-token
               secret:
                 secretName: {{ $fullName }}-internal-token
