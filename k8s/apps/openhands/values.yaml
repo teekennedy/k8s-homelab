@@ -472,31 +472,39 @@ automations:
 
       The ops/k8s-homelab repository, which defines the cluster, is checked
       out at main in the working directory. You can read the cluster with
-      kubectl (no Secrets, no writes), query metrics and logs through the
+      kubectl (read only, no Secrets), query metrics and logs through the
       Grafana MCP server (`ALERTS{alertstate="firing"}` in Prometheus is what
-      is firing now), and open pull requests on the forge following the
-      forgejo-iterate skill.
+      is firing now), and open pull requests on the forge using the
+      @scripts/create-pr.sh script.
 
       1. Investigate. Establish what is actually broken, since when, and
          why. Check whether the alerts are still firing; if they resolved on
          their own, find out what caused them anyway.
-      2. Fix the present problem where a change to the repository does it,
-         on a branch with a pull request. You cannot change the cluster
-         directly; when the fix is an action only a person can take (deleting
-         a stuck pod, replacing hardware), say exactly what to run.
-      3. Prevent a recurrence: a pull request that removes the cause, or a
-         better alert, limit or probe, when one is warranted. Do not open a
-         pull request just to have opened one, and never merge one.
+      2. Figure out a short term fix to resolve the symptom. This often
+         involves running one-off manual steps, like deleting a stuck job, but
+         may require changes to the repo, such as fixing a stale reference.
+      3. Figure out the long term fix that addresses the root cause, or adjust
+         the alert, limit, or probe that caused the alert if such an adjustment
+         is warranted.
+      4. Edit the repo to apply the repo-based fixes to the short and long term
+         problem, if applicable, commit to a feature branch, and make a PR. If
+         some changes have a hard dependency on others, create multiple PRs and
+         note the expected merge order in the PR descriptions.
+      5. Any manual steps that you identified to be run as part of the short or long term
+         fix should be formatted into instructions for the operator in your final
+         report. Include exact commands to copy/paste where possible.
 
-      Stop when you know the cause, or when you have learned what you can
-      without changing anything. Your final message is posted to Discord as
-      the report on this incident, so make it stand alone and keep it under
-      1500 characters, in this shape:
+      Your final message is posted to Discord as the report on this incident,
+      so make it stand alone and keep it under 1500 characters, in this shape:
 
-      **Cause:** one or two sentences, with how sure you are.
-      **State:** still firing or resolved; what is affected.
-      **Done:** pull requests opened, with links and one line each, or "none".
-      **Needs you:** manual steps, or "nothing".
+      **Summary:** One or two sentences, describing the cause of the alert. The
+      alerts will have already been posted to Discord so there's no need to
+      repeat them here.
+
+      **PRs:** Link to pull request(s) opened, with one line summary each, or
+      "none".
+
+      **Needs you:** Manual steps, or "nothing".
   # Exists to be dispatched by hand when checking that runs still work; the
   # schedule is once a year so that it costs nothing left alone.
   # A comment that mentions the agent, on an issue or a pull request, from the
