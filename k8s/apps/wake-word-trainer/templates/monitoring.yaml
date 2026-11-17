@@ -39,6 +39,9 @@ metadata:
 spec:
   groups:
     - name: wake-word-trainer
+      # Rules on persisted state aggregate away the pod, so a rescheduled
+      # collector keeps the same alert instead of resolving it and firing a
+      # new one.
       rules:
         - alert: WakeWordTrainerQueueStuck
           # The processor transcribes a clip in seconds; a queue that has not
@@ -58,7 +61,7 @@ spec:
             summary: {{ "The wake word clip processor thread has stopped" | quote }}
         - alert: WakeWordTrainerRunFailed
           # 3 is the failed status code; a running newest run does not match.
-          expr: wake_word_trainer_last_run_status == 3
+          expr: max by (namespace, job) (wake_word_trainer_last_run_status) == 3
           labels:
             severity: warning
           annotations:
@@ -68,7 +71,7 @@ spec:
           # The publisher checks every minute; a promotion still unpublished
           # after an hour means its publish failed (retried every 15 minutes)
           # or the publisher is not running.
-          expr: wake_word_trainer_publish_pending == 1
+          expr: max by (namespace, job) (wake_word_trainer_publish_pending) == 1
           for: 1h
           labels:
             severity: warning
@@ -77,14 +80,14 @@ spec:
             description: {{ "See the run page at https://wake-word.msng.to/runs and the collector pod's publisher container." | quote }}
         - alert: WakeWordTrainerGateNotRunning
           # The CronJob runs the gate every night, whether or not it trains.
-          expr: time() - wake_word_trainer_last_gate_timestamp_seconds > 2 * 86400
+          expr: time() - max by (namespace, job) (wake_word_trainer_last_gate_timestamp_seconds) > 2 * 86400
           labels:
             severity: warning
           annotations:
             summary: {{ "The nightly wake word training gate has not run for two days" | quote }}
         - alert: WakeWordTrainerNoCaptures
           # Ambient samples alone arrive several times a day.
-          expr: time() - wake_word_trainer_last_capture_timestamp_seconds > 2 * 86400
+          expr: time() - max by (namespace, job) (wake_word_trainer_last_capture_timestamp_seconds) > 2 * 86400
           labels:
             severity: info
           annotations:
