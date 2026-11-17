@@ -320,3 +320,34 @@ def test_train_without_a_handoff_writes_none(tmp_path, monkeypatch):
     monkeypatch.setattr(trainer, "api", lambda *a, **k: None)
     assert trainer.train(trainer.TrainerConfig()) == 0
     assert list(tmp_path.iterdir()) == []
+
+
+def test_watch_beats_even_when_a_pass_fails(tmp_path, monkeypatch):
+    beat = tmp_path / "heartbeat"
+
+    def broken(*a, **k):
+        raise OSError("collector down")
+
+    class Stop(Exception):
+        pass
+
+    def sleep(_):
+        raise Stop
+
+    monkeypatch.setattr(trainer, "publish_pending", broken)
+    monkeypatch.setattr(trainer.time, "sleep", sleep)
+    with pytest.raises(Stop):
+        trainer.watch(trainer.TrainerConfig(), False, None, 60, 900, beat)
+    assert beat.exists()
+
+
+def test_check_heartbeat(tmp_path):
+    from wake_word_trainer.__main__ import heartbeat_ok
+
+    beat = tmp_path / "heartbeat"
+    assert not heartbeat_ok(beat, 0, 1000)
+    beat.touch()
+    mtime = beat.stat().st_mtime
+    assert heartbeat_ok(beat, 0, mtime + 10**6)
+    assert heartbeat_ok(beat, 900, mtime + 899)
+    assert not heartbeat_ok(beat, 900, mtime + 901)

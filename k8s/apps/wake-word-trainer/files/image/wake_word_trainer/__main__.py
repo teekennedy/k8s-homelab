@@ -1,10 +1,19 @@
-"""wake-word-trainer serve | fetch-model | train | publish | seed"""
+"""wake-word-trainer serve | fetch-model | train | publish | check-heartbeat | seed"""
 
 import argparse
 import logging
 import os
 import sys
+import time
 from pathlib import Path
+
+
+def heartbeat_ok(path: Path, max_age: float, now: float) -> bool:
+    try:
+        age = now - path.stat().st_mtime
+    except FileNotFoundError:
+        return False
+    return not max_age or age <= max_age
 
 
 def main(argv=None) -> int:
@@ -39,6 +48,19 @@ def main(argv=None) -> int:
         default=900,
         help="with --watch: seconds before a failed publish is tried again",
     )
+    p.add_argument(
+        "--heartbeat",
+        type=Path,
+        default=None,
+        help="with --watch: a file touched on every pass, for check-heartbeat",
+    )
+    h = sub.add_parser(
+        "check-heartbeat", help="exit 0 if a --heartbeat file exists and is fresh"
+    )
+    h.add_argument("path", type=Path)
+    h.add_argument(
+        "--max-age", type=float, default=0, help="seconds; 0 checks existence only"
+    )
     sd = sub.add_parser(
         "seed", help="download datasets and build the static features (steps 1-3)"
     )
@@ -63,6 +85,9 @@ def main(argv=None) -> int:
         )
         return 0
 
+    if args.cmd == "check-heartbeat":
+        return 0 if heartbeat_ok(args.path, args.max_age, time.time()) else 1
+
     from . import trainer
 
     if args.cmd == "fetch-model":
@@ -74,7 +99,12 @@ def main(argv=None) -> int:
     if args.cmd == "publish":
         if args.watch:
             trainer.watch(
-                cfg, args.dry_run, args.live_dir, args.interval, args.retry_after
+                cfg,
+                args.dry_run,
+                args.live_dir,
+                args.interval,
+                args.retry_after,
+                args.heartbeat,
             )
         return trainer.publish(cfg, args.dry_run, args.live_dir)
     if args.cmd == "seed":

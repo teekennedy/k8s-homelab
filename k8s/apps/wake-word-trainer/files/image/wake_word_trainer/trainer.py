@@ -503,13 +503,20 @@ def watch(
     live_dir: Path | None,
     interval: float,
     retry_seconds: float,
+    heartbeat: Path | None = None,
 ):
-    """Publish promoted runs as they appear, for as long as the pod runs."""
+    """Publish promoted runs as they appear, for as long as the pod runs.
+    `heartbeat` is touched before the first pass and after every pass, failed
+    or not, for the container's probes."""
     while True:
+        if heartbeat is not None:
+            heartbeat.touch()
         try:
             publish_pending(cfg, dry_run, live_dir, retry_seconds, time.time())
         except Exception:
             log.exception("publish pass failed; retrying")
+        if heartbeat is not None:
+            heartbeat.touch()
         time.sleep(interval)
 
 
