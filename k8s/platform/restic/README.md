@@ -56,6 +56,22 @@ new host shows up without any config here.
 
 kured ignores all three.
 
+Each refresh also runs `restic stats --mode raw-data` for the repository's
+stored size, compression ratio, blob and snapshot counts (`restic_size_total`
+and friends). It walks every snapshot's trees, which come from the pod's
+cache after the first refresh, so a recreated exporter pod downloads the
+index and tree packs once, some of them from Glacier IR. That is an estimated
+tens of MB per repository, well under a cent in egress and retrieval fees, and
+less than the maintenance job's `restic check` already downloads daily into a
+fresh cache. `restic check` stays in the
+maintenance CronJob, so the exporter's `restic_check_success` (always 2,
+"not checked") is dropped at scrape time.
+
+The Restic dashboard is `k8s/platform/monitoring-system/dashboards/restic.json`.
+`restic_*` is on the VictoriaMetrics allowlist, so pick the VictoriaMetrics
+datasource for history beyond Prometheus' 7 days. restic-exporter's `*_total`
+metrics are gauges, not counters; `rate()` and `increase()` don't apply.
+
 The exporter's `TZ` must match the hosts' timezone: it converts snapshot times
 with the container's local zone and ignores the recorded offset.
 

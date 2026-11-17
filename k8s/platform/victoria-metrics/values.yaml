@@ -107,6 +107,9 @@ victoria-metrics-single:
             - qbittorrent_global_(alltime_downloaded_bytes|alltime_uploaded_bytes|ratio|torrents|free_space_on_disk_bytes)
             - cs_active_decisions
             - woodpecker_pipeline_count
+            # Backups: per-host snapshot stats and repository size. All gauges,
+            # including the *_total ones (see files/stream-aggr-config.yml).
+            - restic_.+
             # CI: Dagger function and check durations (mean and count). The
             # buckets would be ~10k series, so percentiles stay in Prometheus.
             - traces_span_metrics_duration_seconds_(sum|count)

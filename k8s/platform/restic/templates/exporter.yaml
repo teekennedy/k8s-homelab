@@ -38,11 +38,10 @@ spec:
               value: {{ $.Values.exporter.port | quote }}
             - name: REFRESH_INTERVAL
               value: {{ $.Values.exporter.refreshInterval | quote }}
-            # `restic check` belongs to the maintenance CronJob, and global
-            # stats read the whole repository index on every refresh.
+            # `restic check` belongs to the maintenance CronJob. Global stats
+            # (`restic stats --mode raw-data`) stay on: the index and trees
+            # come from the cache after the first refresh.
             - name: NO_CHECK
-              value: "true"
-            - name: NO_GLOBAL_STATS
               value: "true"
             # Only the first refresh honours this. A failed start (bad
             # credentials, or the NetworkPolicy not yet admitting the pod)
@@ -113,4 +112,10 @@ spec:
       relabelings:
         - targetLabel: repository
           replacement: {{ $repo }}
+      metricRelabelings:
+        # Always 2 ("not checked") with NO_CHECK; the maintenance CronJob runs
+        # `restic check` instead.
+        - sourceLabels: [__name__]
+          regex: restic_check_success
+          action: drop
 {{- end }}

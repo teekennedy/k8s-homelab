@@ -18,7 +18,7 @@ runs in vmsingle itself. Rules are in `files/stream-aggr-config.yml`:
 | Metrics | Outputs |
 |---|---|
 | `*_total`, `*_bucket`, `*_sum`, `*_count` (counters) | `total` |
-| everything else (gauges, summary quantiles) | `avg` |
+| everything else (gauges, summary quantiles), and `restic_*_total` (gauges despite the suffix) | `avg` |
 
 Aggregation is per-series (no `by`/`without`), so only resolution changes.
 One output per input series: `min`/`max` on the gauge rule would store three

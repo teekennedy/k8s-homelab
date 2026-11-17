@@ -1,4 +1,4 @@
-# Downsample everything to 5m per series. The four matches partition all
+# Downsample everything to 5m per series. The four rules partition all
 # metric names; anything unmatched is dropped (-streamAggr.dropInput).
 #
 # keep_metric_names stores the output under the input's name instead of
@@ -6,7 +6,8 @@
 # work unchanged. It requires exactly one output per rule.
 
 # `total` keeps counter-reset semantics so rate()/increase() still work.
-- match: '{__name__=~".+_total"}'
+# restic-exporter's *_total metrics are gauges, so they go to the gauge rule.
+- match: '{__name__=~".+_total", __name__!~"restic_.+"}'
   interval: 5m
   outputs: [total]
   keep_metric_names: true
@@ -24,7 +25,9 @@
 # Gauges: avg only. Adding min/max would store three series per input gauge,
 # which roughly doubles the long-term footprint for spike detail that
 # Prometheus' 7d raw window already covers.
-- match: '{__name__!~".+_(total|bucket|sum|count)"}'
+- match:
+    - '{__name__!~".+_(total|bucket|sum|count)"}'
+    - '{__name__=~"restic_.+_total"}'
   interval: 5m
   outputs: [avg]
   keep_metric_names: true
