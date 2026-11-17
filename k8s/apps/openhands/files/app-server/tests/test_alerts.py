@@ -2,6 +2,7 @@ import dataclasses
 import hashlib
 import hmac
 import json
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -204,10 +205,17 @@ def test_a_run_checks_out_its_repository_on_its_model(api, hooks, state, user):
     assert conv.json()[0]["selected_repository"] == "ops/k8s-homelab"
 
 
-def _finish(message: str) -> dict:
+def _ts(seconds: float = 0) -> str:
+    """An agent server event timestamp (naive UTC), `seconds` from now."""
+    return (
+        datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=seconds)
+    ).isoformat()
+
+
+def _finish(message: str, id_: str = "e2", timestamp: str | None = None) -> dict:
     return {
-        "id": "e2",
-        "timestamp": "2026-01-01T00:00:02",
+        "id": id_,
+        "timestamp": timestamp or _ts(2),
         "kind": "ActionEvent",
         "source": "agent",
         "tool_name": "finish",
@@ -245,7 +253,7 @@ def test_a_finished_run_is_reported_to_discord(api, hooks, state, discord_posts,
     events = [
         {
             "id": "e1",
-            "timestamp": "2026-01-01T00:00:01",
+            "timestamp": _ts(1),
             "kind": "MessageEvent",
             "source": "agent",
             "llm_message": {"content": [{"type": "text", "text": "Looking."}]},
@@ -284,6 +292,54 @@ def test_a_finished_run_is_reported_to_discord(api, hooks, state, discord_posts,
     embed = json.loads(failed.content)["embeds"][0]
     assert "could not clone" in embed["description"]
     assert embed["color"] == 0xE74C3C
+
+
+def test_a_continued_conversation_moves_to_each_runs_sandbox(
+    api, hooks, state, discord_posts, user, monkeypatch
+):
+    """`continue_conversation` gives every run the same conversation id, each
+    in a new sandbox; a run reports only what it said itself."""
+    _define(state, triage=TRIAGE)
+    clock = {"now": "2026-11-16T10:00:00+00:00"}
+    monkeypatch.setattr("app_server.conversations.now", lambda: clock["now"])
+    events: list[dict] = []
+
+    def agent(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/events/search"):
+            return httpx.Response(200, json={"items": events, "next_page_id": None})
+        return FakeAgentServer()(request)
+
+    state.conversations.http = httpx.AsyncClient(transport=httpx.MockTransport(agent))
+
+    def run(finish: dict | None) -> list[httpx.Request]:
+        sandbox = api.post("/api/v1/sandboxes", headers=user).json()
+        r = hooks.post(
+            f"/sandboxes/{sandbox['id']}/automation/conversations",
+            json={"automation": "triage", "conversation_id": CONV_ID},
+            headers={"X-Session-API-Key": sandbox["session_api_key"]},
+        )
+        assert r.status_code == 200 and r.json() == {"id": CONV_ID}
+        events[:] = [finish] if finish else []
+        discord_posts.clear()
+        _complete(hooks, sandbox, status="COMPLETED", conversation_id=CONV_ID)
+        conv = api.get(
+            "/api/v1/app-conversations", params={"ids": CONV_ID}, headers=user
+        ).json()[0]
+        assert conv["sandbox_id"] == sandbox["id"]
+        return discord_posts
+
+    (first,) = run(_finish("First cause.", "e1", "2026-11-16T10:00:05"))
+    assert json.loads(first.content)["embeds"][0]["description"] == "First cause."
+
+    clock["now"] = "2026-11-16T11:00:00+00:00"
+    (second,) = run(None)
+    embed = json.loads(second.content)["embeds"][0]
+    assert "First cause." not in embed["description"]
+
+    (third,) = run(_finish("Third cause.", "e3", "2026-11-16T11:00:05"))
+    assert json.loads(third.content)["embeds"][0]["description"] == "Third cause."
+    history = api.get(f"/api/v1/conversation/{CONV_ID}/events/search", headers=user)
+    assert [e["id"] for e in history.json()["items"]] == ["e1", "e3"]
 
 
 def test_a_run_without_notify_reports_nothing(api, hooks, state, discord_posts, user):

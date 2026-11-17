@@ -696,7 +696,8 @@ An alert storm becomes one run, through three layers:
    text). The run's script waits for the conversation to stay idle for a few
    polls before it ends, so a message that arrives just as a turn ends is
    still answered. An event that arrives after the run has ended starts the
-   next run.
+   next run, which continues the same conversation in a sandbox of its own;
+   its Discord report quotes only that run.
 
 Reports go to the alerts channel through the webhook Alertmanager uses,
 posted as "OpenHands" with its own picture (`notify.discord`). That Secret,

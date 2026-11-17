@@ -278,21 +278,27 @@ class ConversationService:
             on_status("PREPARING_REPOSITORY")
             await self._clone(sandbox, request)
         on_status("STARTING_CONVERSATION")
+        started_at = now()
         info = await self._start_on_sandbox(sandbox, request, agent_settings)
         self._insert_conversation(
-            info, sandbox["id"], request, agent_settings, created_by
+            info, sandbox["id"], request, agent_settings, created_by, started_at
         )
         log.info("conversation %s started on %s", info["id"], sandbox["id"])
         return conversation_id(info["id"])
 
     def final_message(self, conv_id: str) -> str | None:
         """What the agent said last: its finish message, or its last plain
-        message, from the copy of the history kept here."""
+        message, from the copy of the history kept here. Only since its latest
+        start: a continued conversation holds earlier runs' answers too."""
+        conv_id = conversation_id(conv_id)
+        row = self.row(conv_id)
+        started_at = json.loads(row["meta"]).get("started_at") if row else None
         rows = self.db.all(
             "SELECT body FROM events WHERE conversation_id = ?"
-            " AND kind IN ('ActionEvent', 'MessageEvent')"
+            " AND kind IN ('ActionEvent', 'MessageEvent') AND timestamp >= ?"
             " ORDER BY timestamp DESC, id DESC LIMIT 200",
-            conversation_id(conv_id),
+            conv_id,
+            _naive_utc(started_at) if started_at else "",
         )
         for row in rows:
             event = json.loads(row["body"])
@@ -361,6 +367,7 @@ class ConversationService:
         request: dict[str, Any],
         agent_settings: dict[str, Any],
         created_by: str,
+        started_at: str,
     ) -> None:
         acp = agent_settings.get("agent_kind") == "acp"
         meta = {
@@ -380,12 +387,32 @@ class ConversationService:
             "stats": info.get("stats"),
             "execution_status": info.get("execution_status"),
             "public": False,
+            "started_at": started_at,
         }
+        conv_id = conversation_id(info["id"])
         ts = now()
+        prior = self.db.one(
+            "SELECT meta, deleted_at FROM conversations WHERE id = ?", conv_id
+        )
+        if prior is not None:
+            # An automation that continues a conversation starts every run
+            # with the same id, each in a sandbox of its own: the conversation
+            # moves to the new sandbox and keeps its title and history.
+            if not prior["deleted_at"]:
+                meta["public"] = bool(json.loads(prior["meta"]).get("public"))
+            self.db.run(
+                "UPDATE conversations SET sandbox_id = ?, updated_at = ?, meta = ?,"
+                " deleted_at = NULL WHERE id = ?",
+                sandbox_id,
+                ts,
+                json.dumps(meta),
+                conv_id,
+            )
+            return
         self.db.run(
             "INSERT INTO conversations (id, sandbox_id, title, created_by, created_at,"
             " updated_at, meta) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            conversation_id(info["id"]),
+            conv_id,
             sandbox_id,
             _title_from(request),
             created_by,
