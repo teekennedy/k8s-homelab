@@ -38,6 +38,9 @@
   "name": "jellyfin-users"
 }
 {
+  "name": "hermes-admins"
+}
+{
   "name": "jellyfin-admins"
 }
 {

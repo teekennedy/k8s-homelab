@@ -33,6 +33,17 @@
       }
     ]
   },
+  "hermes-sandbox": {
+    "directory": "k8s/apps/hermes-agent/files/sandbox",
+    "config": "cliff.toml",
+    "artifacts": [
+      {
+        "prefix": "hermes-sandbox",
+        "title": "Hermes sandbox",
+        "description": "Non-root sshd that the Hermes agent's terminal backend runs its shell, file and code tools in."
+      }
+    ]
+  },
   "openhands-sandbox": {
     "directory": "k8s/apps/openhands/files/sandbox",
     "config": "cliff.toml",

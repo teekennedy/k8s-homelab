@@ -261,6 +261,13 @@ releases:
     needs:
       - cert-system/cert-system
 
+  - name: hermes-agent
+    inherit:
+      - template: apps
+    needs:
+      - auth-system/auth-system
+      - secret-system/secret-system
+
   - name: homepage
     inherit:
       - template: apps

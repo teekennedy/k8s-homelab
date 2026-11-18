@@ -1,0 +1,133 @@
+# Hermes Agent: one persistent assistant, reached over Signal, whose shell and
+# file tools run in a separate sandbox pod. See README.md.
+
+image:
+  repository: docker.io/nousresearch/hermes-agent
+  tag: v0.23.2@sha256:d6746a084e9341baada483e3d6210444d3c1aeb7c130f0915150065fb2851459
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+# The dashboard's hostname, on the internal gateway (LAN only).
+host: hermes.msng.to
+timezone: America/Denver
+
+# --- Model ----------------------------------------------------------------------
+# `provider` is a Hermes provider id; its API key is read from the environment
+# (OPENROUTER_API_KEY for openrouter), which is `envSecretName` below.
+model:
+  provider: openrouter
+  default: z-ai/glm-5.3
+  # Summarises context and judges command risk: many small calls.
+  auxiliary: deepseek/deepseek-v4.1-flash
+
+approvals:
+  # smart: the auxiliary model judges each command and asks in chat about the
+  # risky ones. manual asks about every flagged command; off never asks.
+  mode: smart
+
+# Merged over the chart's managed config.yaml, so anything here is pinned too.
+# Everything not pinned is owned by the dashboard and `hermes config set`.
+config: {}
+
+# Created by hand (README.md, "Secrets you create by hand"): the model API key
+# and the Signal account. Every key becomes an environment variable.
+envSecretName: hermes-agent-env
+
+# --- Gateway --------------------------------------------------------------------
+gateway:
+  # First boot syncs skills and installs dependencies before /health answers.
+  startupSeconds: 600
+  resources:
+    requests:
+      cpu: 100m
+      memory: 768Mi
+    limits:
+      memory: 3Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --- Signal ---------------------------------------------------------------------
+# signal-cli in the gateway's pod: Hermes speaks to its HTTP daemon. The
+# account is linked or registered once by hand (README.md, "Signal").
+signal:
+  enabled: true
+  image:
+    repository: registry.gitlab.com/packaging/signal-cli/signal-cli-native
+    tag: v0-14-10-1@sha256:38a86ea5cab0369e9f4af55c5021114e77ed786b0cd82f7b770b4ccf342f6afd
+    pullPolicy: IfNotPresent
+  port: 8080
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# --- Sandbox --------------------------------------------------------------------
+# The pod Hermes' terminal backend reaches over SSH. It holds no credentials.
+sandbox:
+  # Built from files/sandbox and released as hermes-sandbox-<version>.
+  # Renovate bumps the tag and pins its digest.
+  image: ghcr.io/teekennedy/k8s-homelab:hermes-sandbox-0.1.0
+  pullPolicy: IfNotPresent
+  port: 2222
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 2Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# --- Persistence ----------------------------------------------------------------
+persistence:
+  # HERMES_HOME: sessions, memories, skills, cron jobs. SQLite, so never NFS.
+  data:
+    storageClass: longhorn
+    size: 10Gi
+  # The Signal account's keys. Losing them means linking again.
+  signal:
+    storageClass: longhorn
+    size: 1Gi
+  # The sandbox's home directory: whatever the agent writes.
+  sandbox:
+    storageClass: longhorn
+    size: 10Gi
+
+# --- Dashboard sign-in ----------------------------------------------------------
+# Hermes' own OIDC client against Authelia. Hermes has no allowlist: who may
+# sign in is the Authelia client's authorization policy.
+oidc:
+  issuer: https://authelia.msng.to
+  # Must equal the Authelia client_id and the auth-system
+  # oidcClientSecrets.clients key.
+  clientId: hermes-agent
+
+# --- Exposure -------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 9119
+
+# LAN only: the internal gateway's websecure listener.
+httpRoute:
+  enabled: true
+  annotations: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecure
+
+# --- Network --------------------------------------------------------------------
+traefikNamespace: kube-system
+networkPolicy:
+  # Traefik's address as the dashboard sees it.
+  podCidr: "10.42.0.0/16"
+  # The gateway VIPs, where the OIDC issuer's hostname resolves.
+  lanCidr: "10.69.80.96/27"

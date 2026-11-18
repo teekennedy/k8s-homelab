@@ -80,6 +80,7 @@ oidcClientSecrets:
     oauth2-proxy-internal: syncthing/syncthing-oauth2-proxy-secrets
     copyparty: copyparty/copyparty-oauth2-proxy-secrets
     freshrss: freshrss/freshrss-oidc-authelia
+    hermes-agent: hermes-agent/hermes-agent-oidc
     romm: romm/romm-oidc-authelia
     seerr: seerr/seerr-oidc-authelia
     wake-word-trainer: wake-word-trainer/wake-word-trainer-oauth2-proxy-secrets
@@ -422,6 +423,16 @@ authelia:
                 subject: "group:full-admin"
               - policy: one_factor
                 subject: "group:wake-word-reviewers"
+          # Hermes Agent's dashboard (k8s/apps/hermes-agent). It edits the
+          # agent's config and credentials and opens a shell, and Hermes has
+          # no allowlist of its own: this policy is the access control.
+          hermes-agent:
+            default_policy: deny
+            rules:
+              - policy: two_factor
+                subject: "group:hermes-admins"
+              - policy: two_factor
+                subject: "group:full-admin"
           # Longhorn UI (k8s/foundation/longhorn-system). Can delete volumes,
           # replicas and backups, so admins only, always two_factor.
           longhorn:
@@ -494,6 +505,28 @@ authelia:
               - code
             redirect_uris:
               - https://wake-word.msng.to/oauth2/callback
+          # Hermes Agent's dashboard, which is its own OIDC client: no
+          # oauth2-proxy in front. It always sends PKCE (S256), and
+          # authenticates with HTTP Basic whenever the provider offers it.
+          - client_id: hermes-agent
+            client_name: Hermes Agent
+            consent_mode: implicit
+            client_secret:
+              path: /secrets/authelia-oidc-client-secrets/hermes-agent
+            token_endpoint_auth_method: client_secret_basic
+            authorization_policy: hermes-agent
+            require_pkce: true
+            pkce_challenge_method: S256
+            scopes:
+              - openid
+              - profile
+              - email
+            grant_types:
+              - authorization_code
+            response_types:
+              - code
+            redirect_uris:
+              - https://hermes.msng.to/auth/callback
           - client_id: argocd
             client_name: Argo CD
             consent_mode: implicit
@@ -825,6 +858,8 @@ authelia:
             path: forgejo
           - key: freshrss
             path: freshrss
+          - key: hermes-agent
+            path: hermes-agent
           - key: grafana
             path: grafana
           - key: jellyfin

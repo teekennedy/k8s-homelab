@@ -1,0 +1,18 @@
+---
+# The dashboard only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hermes-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes-agent.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: dashboard
+      protocol: TCP
+      name: dashboard
+  selector:
+    {{- include "hermes-agent.gatewaySelectorLabels" . | nindent 4 }}

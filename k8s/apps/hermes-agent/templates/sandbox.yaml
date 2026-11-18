@@ -1,0 +1,108 @@
+{{- $fullName := include "hermes-agent.fullname" . -}}
+---
+# Where the agent's terminal, file and code tools run: one long-lived pod and
+# its home volume, with a headless Service of the same name.
+apiVersion: agents.x-k8s.io/v1beta1
+kind: Sandbox
+metadata:
+  name: {{ include "hermes-agent.sandboxName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sandbox
+spec:
+  service: true
+  operatingMode: Running
+  podTemplate:
+    metadata:
+      labels:
+        {{- include "hermes-agent.sandboxSelectorLabels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: sshd
+          image: {{ .Values.sandbox.image | quote }}
+          imagePullPolicy: {{ .Values.sandbox.pullPolicy }}
+          ports:
+            - name: ssh
+              containerPort: {{ .Values.sandbox.port }}
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.sandbox.resources | nindent 12 }}
+          volumeMounts:
+            - name: home
+              mountPath: /home/agent
+            - name: tmp
+              mountPath: /tmp
+            - name: ssh-host
+              mountPath: /etc/ssh/host
+              readOnly: true
+            - name: ssh-authorized
+              mountPath: /etc/ssh/authorized
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: ssh-host
+          secret:
+            secretName: {{ $fullName }}-ssh-host
+            defaultMode: 0440
+            items:
+              - key: ssh-privatekey
+                path: ssh-privatekey
+        # Only the public half: the private key never enters the sandbox.
+        - name: ssh-authorized
+          secret:
+            secretName: {{ $fullName }}-ssh-client
+            defaultMode: 0440
+            items:
+              - key: ssh-publickey
+                path: ssh-publickey
+      {{- with .Values.sandbox.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sandbox.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sandbox.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: home
+        labels:
+          recurring-job.longhorn.io/source: "enabled"
+          recurring-job-group.longhorn.io/backup: "enabled"
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: {{ .Values.persistence.sandbox.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.sandbox.size }}

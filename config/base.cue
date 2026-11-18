@@ -53,6 +53,7 @@ _productionApps: {
 			"copyparty":         true
 			"freshrss":          true
 			"gauntlet":          true
+			"hermes-agent":      true
 			"homepage":          true
 			"jellyfin":          true
 			"joplin":            true

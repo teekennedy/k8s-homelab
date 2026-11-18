@@ -10,6 +10,7 @@ when:
         - devenv.yaml
         - devenv.lock
         - "k8s/platform/forgejo/files/forgejo-resources/**"
+        - "k8s/apps/hermes-agent/files/sandbox/**"
         - "k8s/apps/openhands/files/sandbox/**"
         - "k8s/apps/wake-word-trainer/files/image/**"
 

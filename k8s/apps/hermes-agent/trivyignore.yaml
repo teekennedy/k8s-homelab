@@ -1,0 +1,10 @@
+misconfigurations:
+  # The image's init (s6-overlay) must start as root: it takes ownership of
+  # the data volume, then runs every service as the hermes user (10000).
+  # Upstream has no rootless mode.
+  - id: HL-0009 # runs as root
+    paths: [StatefulSet/hermes-agent/hermes-agent.yaml]
+  # That init runs with ALL dropped and only these added back, each of them
+  # in the runtime's default set.
+  - id: KSV-0022 # capabilities added
+    paths: [StatefulSet/hermes-agent/hermes-agent.yaml]

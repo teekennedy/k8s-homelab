@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  name: hermes-agent
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: hermes-agent
+  project: default
+  ignoreDifferences:
+    - jsonPointers:
+        - /spec/volumeName
+        - /spec/storageClassName
+        # Longhorn reports the size in bytes, which ArgoCD reads as a diff.
+        - /spec/resources/requests/storage
+      kind: PersistentVolumeClaim
+    # Filled in-cluster by mittwald secret-generator; don't fight it.
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: hermes-agent-oidc
+      namespace: hermes-agent
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: hermes-agent-api-server
+      namespace: hermes-agent
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: hermes-agent-ssh-client
+      namespace: hermes-agent
+    - jsonPointers:
+        - /data
+      kind: Secret
+      name: hermes-agent-ssh-host
+      namespace: hermes-agent
+  source:
+    path: k8s/apps/hermes-agent
+    repoURL: https://git.msng.to/ops/k8s-homelab
+    targetRevision: main
+    # Render with `helmfile template` instead of ArgoCD's native Helm support.
+    plugin:
+      name: helmfile
+  syncPolicy:
+    # LAN only: the internal gateway, never wspublic.
+    managedNamespaceMetadata:
+      labels:
+        internal-gateway-access: "true"
+    automated:
+      prune: true
+    retry:
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 16m
+      limit: 10
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+      - ServerSideApply=true

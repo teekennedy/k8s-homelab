@@ -1,0 +1,26 @@
+# sshd as the unprivileged `agent` user: it can only ever log that user in.
+Port 2222
+PidFile none
+UsePAM no
+
+# Both mounted from Secrets by the chart.
+HostKey /etc/ssh/host/ssh-privatekey
+AuthorizedKeysFile /etc/ssh/authorized/ssh-publickey
+# The mounted key file is root-owned and group-readable, which StrictModes
+# rejects.
+StrictModes no
+
+AllowUsers agent
+PermitRootLogin no
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+
+AllowAgentForwarding no
+AllowTcpForwarding no
+X11Forwarding no
+PermitTunnel no
+PrintMotd no
+
+# scp speaks SFTP, and Hermes copies files with scp.
+Subsystem sftp internal-sftp

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: hermes-agent
+description: Hermes Agent — a persistent personal assistant reached over Signal, with its shell in a separate sandbox pod.
+icon: https://raw.githubusercontent.com/NousResearch/hermes-agent/main/website/static/img/favicon.ico
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the nousresearch/hermes-agent image tag deployed by this chart.
+appVersion: "0.23.2"

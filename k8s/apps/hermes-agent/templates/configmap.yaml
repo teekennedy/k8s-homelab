@@ -1,0 +1,13 @@
+---
+# Hermes' managed scope: each key in this config.yaml is pinned over the one
+# on the data volume, and Hermes refuses to change it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hermes-agent.fullname" . }}-managed
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes-agent.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    {{- include "hermes-agent.managedConfig" . | nindent 4 }}
