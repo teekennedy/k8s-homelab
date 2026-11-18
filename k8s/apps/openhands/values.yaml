@@ -7,7 +7,7 @@ image:
   repository: ghcr.io/openhands/agent-canvas
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "1.41.0@sha256:dcae97b63c9845fd1d4313857af6b10fb5888324a154238c4795ef86233d227c"
+  tag: "1.42.0@sha256:e2dc90908f08e51abf833cd3559bb0c4a61c53aab06210b6d92f867d281457ac"
 
 nameOverride: ""
 fullnameOverride: ""
