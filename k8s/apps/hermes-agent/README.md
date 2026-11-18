@@ -57,7 +57,8 @@ shadows the Secret's.
 ### Model
 
 `model` in `values.yaml`: a Hermes provider id, the main model and a cheap
-auxiliary model for context compression and command-risk checks. The default
+auxiliary model for context compression, command-risk checks and session
+titles. Other auxiliary tasks use the main model. The default
 is OpenRouter with `z-ai/glm-5.3` and `deepseek/deepseek-v4.1-flash`. Hermes
 needs tool calling and at least 64k of context from whatever replaces them.
 For another provider, set `model.provider` and put that provider's key
@@ -85,8 +86,18 @@ kubectl -n hermes-agent create secret generic hermes-agent-env \
 ```
 
 `SIGNAL_ACCOUNT` is the number the agent answers on, `SIGNAL_ALLOWED_USERS`
-the comma-separated numbers it answers to. Without the second, a stranger who
-messages the agent gets a pairing code rather than an answer. The Secret is
+the comma-separated senders it answers to. Without the second, a stranger who
+messages the agent gets a pairing code rather than an answer.
+
+A sender whose Signal account hides its phone number ("Who can see my
+number: Nobody") arrives as its account UUID, not its number, and is dropped
+until that UUID is in `SIGNAL_ALLOWED_USERS` too. The drop is logged to
+`/opt/data/logs/agent.log` (not the pod log) with the UUID to add:
+
+```sh
+kubectl -n hermes-agent exec hermes-agent-0 -c hermes -- \
+  grep 'Unauthorized user' /opt/data/logs/agent.log
+``` The Secret is
 optional to the pod, which starts without it and has no model; restart the
 pod after changing it.
 
@@ -223,11 +234,19 @@ recreate it, then restart both pods.
   wrap anything else that writes to `/opt/data` in
   `/command/s6-setuidgid hermes` (not on exec's PATH) so it leaves no
   root-owned files on the data volume.
-- **Startup warnings that are not faults.** `install out of sync (pnpm: ...)`:
-  the upstream runtime image ships no pnpm on purpose and uses a prebuilt TUI
-  bundle. `Auxiliary Nous client unavailable ... (run: hermes auth)`: the
-  vision-backend probe tries every provider, Nous Portal included; OpenRouter
-  answers, so no `hermes auth` is needed.
+- **Warnings that are not faults.** `install out of sync (pnpm: ...)` at
+  startup: the upstream runtime image ships no pnpm on purpose and uses a
+  prebuilt TUI bundle. `Auxiliary Nous client unavailable ... (run: hermes
+  auth)` at startup and on each turn: the vision-backend probe tries every
+  provider, Nous Portal included; OpenRouter answers, so no `hermes auth` is
+  needed.
+- **`/opt/data/logs/agent.log` has more than the pod log**: dropped senders,
+  model errors (a `402` from OpenRouter is an unfunded key) and per-turn
+  detail. Look there when a message gets no answer.
+- **`terminal.cwd` is `.`, not `/home/agent`.** For the SSH backend that
+  leaves the gateway's `TERMINAL_CWD` unset and the sandbox shell starts in
+  `~` (`/home/agent`). A literal path is also checked on the gateway's own
+  filesystem, where it does not exist, and logs a warning on every lookup.
 - **A 503 on `/auth/login` is the dashboard failing OIDC discovery**, shown
   as Traefik's standby page. `curl` the login URL inside the pod for the
   real error.

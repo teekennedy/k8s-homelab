@@ -85,7 +85,7 @@ config.yaml on the data volume. `config` is merged last.
 {{- $aux := dict "provider" .Values.model.provider "model" .Values.model.auxiliary -}}
 {{- $base := dict
   "model" (dict "provider" .Values.model.provider "default" .Values.model.default)
-  "auxiliary" (dict "compression" $aux "approval" $aux)
+  "auxiliary" (dict "compression" $aux "approval" $aux "title_generation" $aux)
   "timezone" .Values.timezone
   "approvals" (dict "mode" .Values.approvals.mode)
   "terminal" (dict
@@ -94,7 +94,7 @@ config.yaml on the data volume. `config` is merged last.
     "ssh_port" (int .Values.sandbox.port)
     "ssh_user" "agent"
     "ssh_key" "/opt/data/.ssh/id_rsa"
-    "cwd" "/home/agent"
+    "cwd" "."
     "persistent_shell" true)
   "dashboard" (dict
     "public_url" (printf "https://%s" .Values.host)
