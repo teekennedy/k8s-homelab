@@ -174,9 +174,9 @@ by default (`security.allow_private_urls`); leave that off.
 
 ## Sandbox image
 
-`files/sandbox/Dockerfile` is Debian with sshd, Python, git and a few CLI
-tools, running as `agent` (uid 10001). Hermes needs `bash`, `tar` and
-`python3` on the far side, and an SFTP subsystem for `scp`.
+`files/sandbox/Dockerfile` is Debian with sshd, Python (with numpy), Node,
+ffmpeg, git and a few CLI tools, running as `agent` (uid 10001). Hermes needs
+`bash`, `tar` and `python3` on the far side, and an SFTP subsystem for `scp`.
 
 It also carries Hermes' *Bot Desktop*: TigerVNC's `Xvnc`, the Xfce pieces and
 Debian's Chromium. With the `ssh` backend Hermes puts the desktop, and the
