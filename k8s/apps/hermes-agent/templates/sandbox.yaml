@@ -85,10 +85,22 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.sandbox.affinity }}
       affinity:
+        {{- with omit .Values.sandbox.affinity "podAffinity" }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
+        # Back onto the gateway's node when this pod alone is replaced: the
+        # gateway still holds the home volume there. Only preferred, so that
+        # with both pods gone the sandbox schedules first and the gateway,
+        # which requires it, follows.
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "hermes-agent.gatewaySelectorLabels" . | nindent 20 }}
       {{- with .Values.sandbox.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

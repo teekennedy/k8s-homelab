@@ -30,6 +30,9 @@ spec:
         # Both volumes belong to the hermes user, which signal-cli runs as too.
         fsGroup: 10000
         fsGroupChangePolicy: OnRootMismatch
+        # The sandbox's agent group: files it makes group-readable only.
+        supplementalGroups:
+          - 10001
         seccompProfile:
           type: RuntimeDefault
       initContainers:
@@ -92,7 +95,7 @@ spec:
               value: /etc/hermes-managed
             # The image confines file-tool writes to /opt/data, judged by path
             # alone even when the SSH backend performs them in the sandbox.
-            # /home/agent is the sandbox's home; nothing exists there locally.
+            # /home/agent is the sandbox's home, mounted read-only here.
             - name: HERMES_WRITE_SAFE_ROOT
               value: /opt/data:/home/agent
             - name: HERMES_DASHBOARD
@@ -175,6 +178,12 @@ spec:
             # Browser tools want more than the runtime's 64Mi.
             - name: shm
               mountPath: /dev/shm
+            # The sandbox's home at the sandbox's path: the gateway delivers
+            # MEDIA:/home/agent/... attachments and forwards images from its
+            # own filesystem.
+            - name: sandbox-home
+              mountPath: /home/agent
+              readOnly: true
         {{- if .Values.signal.enabled }}
         - name: signal-cli
           image: {{ printf "%s:%s" .Values.signal.image.repository .Values.signal.image.tag | quote }}
@@ -238,6 +247,11 @@ spec:
               mountPath: /tmp
         {{- end }}
       volumes:
+        # Read-only also keeps the kubelet from applying fsGroup to it.
+        - name: sandbox-home
+          persistentVolumeClaim:
+            claimName: home-{{ include "hermes-agent.sandboxName" . }}
+            readOnly: true
         - name: managed-config
           configMap:
             name: {{ $fullName }}-managed
@@ -268,10 +282,18 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.gateway.affinity }}
       affinity:
+        {{- with omit .Values.gateway.affinity "podAffinity" }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
+        # On the sandbox's node: its home volume is ReadWriteOnce, so both
+        # pods mount it only from one node.
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  {{- include "hermes-agent.sandboxSelectorLabels" . | nindent 18 }}
       {{- with .Values.gateway.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

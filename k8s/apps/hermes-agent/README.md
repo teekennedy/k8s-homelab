@@ -33,6 +33,16 @@ account and the agent's memory all stay in the gateway, so a command the model
 was talked into running cannot read them. Web tools still run in the gateway
 process; the browser runs in the sandbox (see "Sandbox image").
 
+**Files the agent makes reach the gateway through the sandbox's home volume**,
+which the gateway mounts read-only at the same path, `/home/agent`. Hermes
+sends a reply's `MEDIA:<path>` attachments, and hands images to vision and
+subagents, from the gateway's own filesystem; without the mount every sandbox
+path was "not found on this host" and dropped without a word to the user.
+Hermes' own fallback, fetching the file over the SSH backend, finds the
+connection already closed at the end of the turn. The volume is
+ReadWriteOnce, so the gateway is scheduled onto the sandbox's node (see
+"Known rough edges").
+
 A turn, end to end: a Signal message arrives over signal-cli's event stream;
 the gateway loads the session, calls the model, runs the tool calls it asks
 for (shell and files over SSH, the rest in-process), and repeats until the
@@ -57,8 +67,9 @@ shadows the Secret's.
 ### Model
 
 `model` in `values.yaml`: a Hermes provider id, the main model and a cheap
-auxiliary model for context compression, command-risk checks and session
-titles. Other auxiliary tasks use the main model. The default
+auxiliary model for context compression, command-risk checks, session
+titles and vision (`vision_analyze`, image inspection by subagents), so it
+must accept images. Other auxiliary tasks use the main model. The default
 is OpenRouter with `z-ai/glm-5.3` and `deepseek/deepseek-v4.1-flash`. Hermes
 needs tool calling and at least 64k of context from whatever replaces them.
 For another provider, set `model.provider` and put that provider's key
@@ -164,6 +175,9 @@ container starts as root, because the image's init (s6-overlay) fixes
 ownership of the data volume before dropping every service to uid 10000; its
 capabilities are cut to the ones that takes.
 
+The gateway reads the sandbox's home (read-only, with the sandbox's group as
+a supplementary group); nothing of the gateway's is visible to the sandbox.
+
 The sandbox's host key and the gateway's client key are generated Secrets.
 The gateway pins the host key in `known_hosts` at every start, and the sandbox
 mounts only the public half of the client key.
@@ -202,7 +216,7 @@ proposes the new tag for `sandbox.image`. Anything the agent installs outside
 | --- | --- | --- |
 | `data-hermes-agent-0` | Hermes' home: sessions, memories, skills, cron | yes |
 | `signal-hermes-agent-0` | the Signal account's keys | yes |
-| the Sandbox's `home` claim | `/home/agent`: the agent's working files | yes |
+| the Sandbox's `home` claim | `/home/agent`: the agent's working files; read-only in the gateway too | yes |
 
 ## Runbook
 
@@ -228,6 +242,15 @@ Rotating an SSH key pair: delete its Secret, let Argo CD and secret-generator
 recreate it, then restart both pods.
 
 ## Known rough edges
+
+- **The gateway follows the sandbox's node.** Both pods mount the sandbox's
+  ReadWriteOnce home, which attaches to one node. The gateway *requires* the
+  sandbox's node; the sandbox only *prefers* the gateway's, so that with both
+  pods gone (a drain, a fresh install) the sandbox schedules anywhere and the
+  gateway follows. If the sandbox is replaced alone and its preferred node is
+  full, it lands elsewhere and sticks in `ContainerCreating` on a multi-attach
+  error: delete the gateway pod and it follows. With no sandbox pod at all,
+  the gateway stays `Pending`.
 
 - **The `hermes` container's capability list** is the minimum the image's
   init (v0.23.2) needs to fix ownership and drop to uid 10000. If an image
@@ -258,7 +281,7 @@ recreate it, then restart both pods.
 - **`terminal.cwd` is `.`, not `/home/agent`.** For the SSH backend that
   leaves the gateway's `TERMINAL_CWD` unset and the sandbox shell starts in
   `~` (`/home/agent`). A literal path is also checked on the gateway's own
-  filesystem, where it does not exist, and logs a warning on every lookup.
+  filesystem, which sees the sandbox's home only read-only.
 - **`HERMES_WRITE_SAFE_ROOT` is `/opt/data:/home/agent`.** The image's
   default, `/opt/data`, is checked against the path alone, so with the SSH
   backend it refused every file-tool write into the sandbox ("is outside

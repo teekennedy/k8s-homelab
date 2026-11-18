@@ -47,6 +47,7 @@ gateway:
       memory: 3Gi
   nodeSelector: {}
   tolerations: []
+  # podAffinity is the chart's: it keeps the gateway on the sandbox's node.
   affinity: {}
 
 # --- Signal ---------------------------------------------------------------------
@@ -83,6 +84,7 @@ sandbox:
       memory: 4Gi
   nodeSelector: {}
   tolerations: []
+  # podAffinity is the chart's: it prefers the gateway's node.
   affinity: {}
 
 # --- Persistence ----------------------------------------------------------------
@@ -95,7 +97,8 @@ persistence:
   signal:
     storageClass: longhorn
     size: 1Gi
-  # The sandbox's home directory: whatever the agent writes.
+  # The sandbox's home directory: whatever the agent writes. The gateway
+  # mounts it read-only, so it must stay ReadWriteOnce on one node, not RWOP.
   sandbox:
     storageClass: longhorn
     size: 10Gi

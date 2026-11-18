@@ -85,7 +85,7 @@ config.yaml on the data volume. `config` is merged last.
 {{- $aux := dict "provider" .Values.model.provider "model" .Values.model.auxiliary -}}
 {{- $base := dict
   "model" (dict "provider" .Values.model.provider "default" .Values.model.default)
-  "auxiliary" (dict "compression" $aux "approval" $aux "title_generation" $aux)
+  "auxiliary" (dict "compression" $aux "approval" $aux "title_generation" $aux "vision" $aux)
   "timezone" .Values.timezone
   "approvals" (dict "mode" .Values.approvals.mode)
   "terminal" (dict
