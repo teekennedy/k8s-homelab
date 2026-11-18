@@ -188,17 +188,16 @@ proposes the new tag for `sandbox.image`. Anything the agent installs outside
 kubectl -n hermes-agent logs hermes-agent-0 -c hermes --tail=100
 kubectl -n hermes-agent logs hermes-agent-0 -c signal-cli --tail=50
 
-# The hermes CLI, as the hermes user (s6 runs the services as it).
-kubectl -n hermes-agent exec -it hermes-agent-0 -c hermes -- \
-  s6-setuidgid hermes hermes doctor
+# The hermes CLI. It drops from root to the hermes user by itself.
+kubectl -n hermes-agent exec -it hermes-agent-0 -c hermes -- hermes doctor
 
 # Approve a pairing code a new Signal contact was sent.
 kubectl -n hermes-agent exec -it hermes-agent-0 -c hermes -- \
-  s6-setuidgid hermes hermes pairing approve signal <CODE>
+  hermes pairing approve signal <CODE>
 
 # Can the gateway reach the sandbox?
-kubectl -n hermes-agent exec hermes-agent-0 -c hermes -- s6-setuidgid hermes \
-  ssh -p 2222 -i /opt/data/.ssh/id_rsa -o BatchMode=yes \
+kubectl -n hermes-agent exec hermes-agent-0 -c hermes -- \
+  /command/s6-setuidgid hermes ssh -p 2222 -i /opt/data/.ssh/id_rsa -o BatchMode=yes \
   agent@hermes-agent-sandbox.hermes-agent.svc.cluster.local id
 ```
 
@@ -207,21 +206,28 @@ recreate it, then restart both pods.
 
 ## Known rough edges
 
-- **Not yet run on the cluster.** Rendered, linted and audited; the sandbox
-  image is tested (key login, `scp`, the options Hermes' ssh backend uses).
-  The first things to check on a real start:
-  - the `hermes` container's capability list. It is derived from reading the
-    image's init scripts, not from a run. If init fails on a permission error,
-    add the capability it names, or drop the `capabilities` block to confirm.
-  - that signal-cli's daemon starts with no account on its volume. If it
-    exits instead, set `signal.enabled: false`, register from a one-off pod
-    with the `signal` claim mounted, and re-enable.
+- **The `hermes` container's capability list** is the minimum the image's
+  init (v0.23.2) needs to fix ownership and drop to uid 10000. If an image
+  bump makes init fail on a permission error, add the capability it names,
+  or drop the `capabilities` block to confirm.
+- **signal-cli's daemon runs with no account** on its volume, which is what
+  lets the account be registered or linked in the running pod.
 - **No metrics.** Hermes exposes no Prometheus endpoint; `/health` on the API
   port is what the probes use, and the pod's restarts are the only alert
   signal.
 - **Upstream moves fast**: roughly weekly releases with config migrations.
   The image is pinned by digest; read the release notes with each Renovate
   bump.
-- **`s6-setuidgid hermes`** is needed for any `kubectl exec` into the
-  `hermes` container, which otherwise runs as root and leaves root-owned files
-  on the data volume.
+- **`kubectl exec` runs as root** in the `hermes` container. The `hermes`
+  command on PATH is an upstream shim that drops to the hermes user itself;
+  wrap anything else that writes to `/opt/data` in
+  `/command/s6-setuidgid hermes` (not on exec's PATH) so it leaves no
+  root-owned files on the data volume.
+- **Startup warnings that are not faults.** `install out of sync (pnpm: ...)`:
+  the upstream runtime image ships no pnpm on purpose and uses a prebuilt TUI
+  bundle. `Auxiliary Nous client unavailable ... (run: hermes auth)`: the
+  vision-backend probe tries every provider, Nous Portal included; OpenRouter
+  answers, so no `hermes auth` is needed.
+- **A 503 on `/auth/login` is the dashboard failing OIDC discovery**, shown
+  as Traefik's standby page. `curl` the login URL inside the pod for the
+  real error.
