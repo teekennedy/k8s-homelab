@@ -30,8 +30,8 @@ file and code-execution tools run. Hermes has no Kubernetes backend, so it
 uses its `ssh` one against a `Sandbox` that runs nothing but a non-root sshd.
 The point of the split is what is *not* in that pod: the model key, the Signal
 account and the agent's memory all stay in the gateway, so a command the model
-was talked into running cannot read them. Web and browser tools still run in
-the gateway process.
+was talked into running cannot read them. Web tools still run in the gateway
+process; the browser runs in the sandbox (see "Sandbox image").
 
 A turn, end to end: a Signal message arrives over signal-cli's event stream;
 the gateway loads the session, calls the model, runs the tool calls it asks
@@ -177,6 +177,18 @@ by default (`security.allow_private_urls`); leave that off.
 `files/sandbox/Dockerfile` is Debian with sshd, Python, git and a few CLI
 tools, running as `agent` (uid 10001). Hermes needs `bash`, `tar` and
 `python3` on the far side, and an SFTP subsystem for `scp`.
+
+It also carries Hermes' *Bot Desktop*: TigerVNC's `Xvnc`, the Xfce pieces and
+Debian's Chromium. With the `ssh` backend Hermes puts the desktop, and the
+browser on it, in the sandbox (`bot_desktop.placement: auto`). Over SSH it
+starts everything as `agent`, copies its launcher into `/tmp` and relays CDP
+and VNC through `python3` on stdio, so sshd needs no forwarding. The package
+list mirrors upstream's `docker/sandbox-desktop.Dockerfile`, minus
+`cua-driver` (`computer_use`). Upstream's prebuilt
+`nousresearch/hermes-sandbox:desktop` would replace this image with a root
+default user, passwordless `sudo` and no sshd. Hermes only probes for a
+Playwright Chromium (`/opt/playwright/chromium-*/chrome-linux*/chrome`), so
+Debian's binary is symlinked there and gets Debian's security updates.
 
 A conventional commit on `main` that touches `files/sandbox/` is tagged
 `hermes-sandbox-<version>` and published as

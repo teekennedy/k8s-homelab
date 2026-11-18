@@ -21,6 +21,22 @@ RUN set -eux; \
     # account. '*' is no valid password, but not locked.
     usermod --password '*' agent
 
+# The desktop Hermes' browser tool runs a headed Chromium on, started over SSH
+# by the gateway: the binaries tools/bot_desktop/sandbox_host.py requires, as
+# in upstream's docker/sandbox-desktop.Dockerfile. python3-pil grabs the
+# dashboard's screen thumbnail.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      chromium dbus-bin dbus-x11 fonts-dejavu-core fonts-liberation \
+      python3-pil tigervnc-standalone-server x11-utils x11-xkb-utils \
+      x11-xserver-utils xauth xfce4-panel xfce4-settings xfce4-terminal \
+      xfdesktop4 xfwm4; \
+    rm -rf /var/lib/apt/lists/*; \
+    # Hermes only looks for a Playwright-style Chromium.
+    mkdir -p /opt/playwright/chromium-debian/chrome-linux; \
+    ln -s /usr/lib/chromium/chromium /opt/playwright/chromium-debian/chrome-linux/chrome
+
 COPY sshd_config /etc/ssh/sshd_config
 
 USER 10001

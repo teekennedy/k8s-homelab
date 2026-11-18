@@ -78,8 +78,9 @@ sandbox:
     requests:
       cpu: 50m
       memory: 256Mi
+    # Chromium and the Xfce desktop it runs on, beside the agent's own work.
     limits:
-      memory: 2Gi
+      memory: 4Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
