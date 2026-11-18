@@ -247,6 +247,11 @@ recreate it, then restart both pods.
   leaves the gateway's `TERMINAL_CWD` unset and the sandbox shell starts in
   `~` (`/home/agent`). A literal path is also checked on the gateway's own
   filesystem, where it does not exist, and logs a warning on every lookup.
+- **`HERMES_WRITE_SAFE_ROOT` is `/opt/data:/home/agent`.** The image's
+  default, `/opt/data`, is checked against the path alone, so with the SSH
+  backend it refused every file-tool write into the sandbox ("is outside
+  HERMES_WRITE_SAFE_ROOT"). Writes elsewhere in the sandbox, `/tmp` included,
+  are still refused; the agent can use the terminal for those.
 - **A 503 on `/auth/login` is the dashboard failing OIDC discovery**, shown
   as Traefik's standby page. `curl` the login URL inside the pod for the
   real error.

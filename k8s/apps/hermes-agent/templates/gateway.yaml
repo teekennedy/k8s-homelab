@@ -90,6 +90,11 @@ spec:
             # unpin what git pins.
             - name: HERMES_MANAGED_DIR
               value: /etc/hermes-managed
+            # The image confines file-tool writes to /opt/data, judged by path
+            # alone even when the SSH backend performs them in the sandbox.
+            # /home/agent is the sandbox's home; nothing exists there locally.
+            - name: HERMES_WRITE_SAFE_ROOT
+              value: /opt/data:/home/agent
             - name: HERMES_DASHBOARD
               value: "1"
             - name: HERMES_DASHBOARD_PORT
