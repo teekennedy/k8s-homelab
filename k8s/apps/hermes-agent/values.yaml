@@ -71,7 +71,7 @@ signal:
 sandbox:
   # Built from files/sandbox and released as hermes-sandbox-<version>.
   # Renovate bumps the tag and pins its digest.
-  image: ghcr.io/teekennedy/k8s-homelab:hermes-sandbox-0.1.0
+  image: ghcr.io/teekennedy/k8s-homelab:hermes-sandbox-0.1.0@sha256:386175c0f6b89f2dacab03d08b244c7c67d9fa3343182d3350d73e16fa7e420f
   pullPolicy: IfNotPresent
   port: 2222
   resources:
