@@ -1,19 +1,23 @@
 {{- $fullName := include "hermes-agent.fullname" . -}}
+{{- $sandboxName := include "hermes-agent.sandboxName" . -}}
 ---
 # Where the agent's terminal, file and code tools run: one long-lived pod and
-# its home volume, with a headless Service of the same name.
-apiVersion: agents.x-k8s.io/v1beta1
-kind: Sandbox
+# its home volume. A StatefulSet, so a template change replaces the pod.
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
-  name: {{ include "hermes-agent.sandboxName" . }}
+  name: {{ $sandboxName }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "hermes-agent.labels" . | nindent 4 }}
     app.kubernetes.io/component: sandbox
 spec:
-  service: true
-  operatingMode: Running
-  podTemplate:
+  replicas: 1
+  serviceName: {{ $sandboxName }}
+  selector:
+    matchLabels:
+      {{- include "hermes-agent.sandboxSelectorLabels" . | nindent 6 }}
+  template:
     metadata:
       labels:
         {{- include "hermes-agent.sandboxSelectorLabels" . | nindent 8 }}
@@ -118,3 +122,22 @@ spec:
         resources:
           requests:
             storage: {{ .Values.persistence.sandbox.size }}
+---
+# Headless: the gateway reaches the sandbox by this name.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $sandboxName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sandbox
+spec:
+  clusterIP: None
+  ports:
+    - name: ssh
+      port: {{ .Values.sandbox.port }}
+      targetPort: ssh
+      protocol: TCP
+  selector:
+    {{- include "hermes-agent.sandboxSelectorLabels" . | nindent 4 }}

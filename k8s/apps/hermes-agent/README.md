@@ -3,7 +3,7 @@
 [Hermes Agent][upstream] as a personal assistant: one persistent agent with its
 own memory, skills and schedules, talked to over Signal. It is separate from
 [`k8s/apps/openhands`](../openhands), which runs disposable coding sessions;
-the two share nothing but the agent-sandbox controller.
+the two share nothing.
 
 [upstream]: https://github.com/NousResearch/hermes-agent
 
@@ -14,7 +14,7 @@ the two share nothing but the agent-sandbox controller.
                       (same pod)                  │   agent loop, cron, memory, skills
   hermes.msng.to ──► Traefik ──► dashboard :9119 ─┤   signs in against Authelia itself
   (internal VIP)                                  │
-                                                  └─ ssh :2222 ──► Sandbox pod (agents.x-k8s.io)
+                                                  └─ ssh :2222 ──► sandbox pod (StatefulSet)
                                                                    sshd as `agent`, /home/agent volume
 ```
 
@@ -27,7 +27,11 @@ StatefulSet has one replica.
 
 **The sandbox pod** (`templates/sandbox.yaml`) is where the agent's terminal,
 file and code-execution tools run. Hermes has no Kubernetes backend, so it
-uses its `ssh` one against a `Sandbox` that runs nothing but a non-root sshd.
+uses its `ssh` one against a one-replica StatefulSet that runs nothing but a
+non-root sshd. It is not an agent-sandbox `Sandbox`: that controller never
+replaces a running pod when its template changes (upstream
+kubernetes-sigs/agent-sandbox#581), so an image bump would never reach this
+long-lived pod.
 The point of the split is what is *not* in that pod: the model key, the Signal
 account and the agent's memory all stay in the gateway, so a command the model
 was talked into running cannot read them. Web tools still run in the gateway
@@ -216,7 +220,7 @@ proposes the new tag for `sandbox.image`. Anything the agent installs outside
 | --- | --- | --- |
 | `data-hermes-agent-0` | Hermes' home: sessions, memories, skills, cron | yes |
 | `signal-hermes-agent-0` | the Signal account's keys | yes |
-| the Sandbox's `home` claim | `/home/agent`: the agent's working files; read-only in the gateway too | yes |
+| `home-hermes-agent-sandbox-0` | `/home/agent`: the agent's working files; read-only in the gateway too | yes |
 
 ## Runbook
 

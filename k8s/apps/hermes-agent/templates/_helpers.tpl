@@ -68,9 +68,14 @@ app.kubernetes.io/component: sandbox
 {{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}
 {{- end }}
 
-{{/* The Sandbox, and so its pod and headless Service. */}}
+{{/* The sandbox StatefulSet and its headless Service. */}}
 {{- define "hermes-agent.sandboxName" -}}
 {{ include "hermes-agent.fullname" . }}-sandbox
+{{- end }}
+
+{{/* The sandbox's home claim, from its StatefulSet's volumeClaimTemplates. */}}
+{{- define "hermes-agent.sandboxHomeClaim" -}}
+home-{{ include "hermes-agent.sandboxName" . }}-0
 {{- end }}
 
 {{- define "hermes-agent.sandboxHost" -}}

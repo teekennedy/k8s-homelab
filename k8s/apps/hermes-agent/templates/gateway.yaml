@@ -250,7 +250,7 @@ spec:
         # Read-only also keeps the kubelet from applying fsGroup to it.
         - name: sandbox-home
           persistentVolumeClaim:
-            claimName: home-{{ include "hermes-agent.sandboxName" . }}
+            claimName: {{ include "hermes-agent.sandboxHomeClaim" . }}
             readOnly: true
         - name: managed-config
           configMap:
