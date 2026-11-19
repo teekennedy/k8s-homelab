@@ -1,0 +1,181 @@
+{{- if .Values.relay.enabled }}
+{{- $name := include "hermes-agent.relayName" . -}}
+---
+# The Hermes iOS relay: pairing, auth, message jobs and the connector's
+# WebSocket. One replica: rate limits and connector sockets live in its
+# process, and its SQLite database has one writer.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  replicas: 1
+  serviceName: {{ $name }}
+  selector:
+    matchLabels:
+      {{- include "hermes-agent.relaySelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hermes-agent.relaySelectorLabels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10002
+        runAsGroup: 10002
+        fsGroup: 10002
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: relay
+          image: {{ .Values.relay.image | quote }}
+          imagePullPolicy: {{ .Values.relay.pullPolicy }}
+          env:
+            - name: RELAY_ENVIRONMENT
+              value: production
+            - name: HERMES_ADAPTER
+              value: connector
+            - name: PUBLIC_BASE_URL
+              value: {{ printf "https://%s/v1" .Values.relay.host | quote }}
+            - name: DATABASE_URL
+              value: sqlite:////data/relay.db
+            # Long-polls a phone's send until the connector picks the job up.
+            - name: CONNECTOR_SYNC_WAIT_SECONDS
+              value: "25"
+            # Trust Traefik's X-Forwarded-For, so pairing attempts are rate
+            # limited per phone rather than per Traefik pod.
+            - name: FORWARDED_ALLOW_IPS
+              value: {{ .Values.networkPolicy.podCidr | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ $name }}
+            # Optional extras, such as the APNs key (README.md, "iOS relay").
+            - secretRef:
+                name: {{ .Values.relay.envSecretName }}
+                optional: true
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /v1/health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /v1/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 4
+          readinessProbe:
+            httpGet:
+              path: /v1/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.relay.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+      {{- with .Values.relay.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.relay.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.relay.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+        # Losing it means pairing the connector and every phone again.
+        labels:
+          recurring-job.longhorn.io/source: "enabled"
+          recurring-job-group.longhorn.io/backup: "enabled"
+      spec:
+        accessModes:
+          - ReadWriteOncePod
+        storageClassName: {{ .Values.persistence.relay.storageClass }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.relay.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "hermes-agent.relaySelectorLabels" . | nindent 4 }}
+---
+# Public: the phone reaches the relay from anywhere. Only this route uses the
+# public listener; the dashboard's stays internal.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hermes-agent.labels" . | nindent 4 }}
+  annotations:
+    # external-dns' selector for public records; not read by the router.
+    traefik.ingress.kubernetes.io/router.entrypoints: wspublic
+spec:
+  parentRefs:
+    {{- toYaml .Values.relay.parentRefs | nindent 4 }}
+  hostnames:
+    - {{ .Values.relay.host | quote }}
+  rules:
+    # The app and the connector use /v1 only; /internal and /docs stay
+    # in-cluster. group, kind and weight are what the API server defaults them
+    # to, spelled out because server-side apply otherwise reports them as drift.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: {{ $name }}
+          port: 8000
+          weight: 1
+{{- end }}

@@ -87,6 +87,34 @@ sandbox:
   # podAffinity is the chart's: it prefers the gateway's node.
   affinity: {}
 
+# --- iOS relay -----------------------------------------------------------------
+# The Hermes iOS app's relay (README.md, "iOS relay"). Public, unlike the
+# dashboard: the phone reaches it from anywhere.
+relay:
+  enabled: true
+  # Built from files/relay and released as hermes-relay-<version>.
+  # Renovate bumps the tag and pins its digest.
+  image: ghcr.io/teekennedy/k8s-homelab:hermes-relay-0.1.0
+  pullPolicy: IfNotPresent
+  host: hermes-relay.msng.to
+  # Created by hand, optional: APNs keys and other relay settings.
+  envSecretName: hermes-agent-relay-env
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecurepublic
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
 # --- Persistence ----------------------------------------------------------------
 persistence:
   # HERMES_HOME: sessions, memories, skills, cron jobs. SQLite, so never NFS.
@@ -102,6 +130,10 @@ persistence:
   sandbox:
     storageClass: longhorn
     size: 10Gi
+  # The relay's SQLite database: paired devices, hosts, message jobs.
+  relay:
+    storageClass: longhorn
+    size: 1Gi
 
 # --- Dashboard sign-in ----------------------------------------------------------
 # Hermes' own OIDC client against Authelia. Hermes has no allowlist: who may

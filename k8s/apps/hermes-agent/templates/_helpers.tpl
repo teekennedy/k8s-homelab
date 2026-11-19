@@ -64,6 +64,16 @@ app.kubernetes.io/component: gateway
 app.kubernetes.io/component: sandbox
 {{- end }}
 
+{{- define "hermes-agent.relaySelectorLabels" -}}
+{{ include "hermes-agent.selectorLabels" . }}
+app.kubernetes.io/component: relay
+{{- end }}
+
+{{/* The iOS relay's StatefulSet, Service, Secret and route. */}}
+{{- define "hermes-agent.relayName" -}}
+{{ include "hermes-agent.fullname" . }}-relay
+{{- end }}
+
 {{- define "hermes-agent.image" -}}
 {{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}
 {{- end }}

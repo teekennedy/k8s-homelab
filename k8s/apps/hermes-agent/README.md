@@ -16,6 +16,9 @@ the two share nothing.
   (internal VIP)                                  │
                                                   └─ ssh :2222 ──► sandbox pod (StatefulSet)
                                                                    sshd as `agent`, /home/agent volume
+
+  iPhone app ──► hermes-relay.msng.to ──► relay pod ◄── WebSocket ── connector (next to Hermes)
+                 (public VIP, CrowdSec)   (StatefulSet, SQLite)
 ```
 
 **The gateway pod** (`templates/gateway.yaml`) is the agent. One `hermes
@@ -120,8 +123,8 @@ pod after changing it.
 
 All by mittwald secret-generator: `hermes-agent-oidc` (reflected to
 auth-system and hashed into Authelia by its PreSync job),
-`hermes-agent-api-server`, and the two SSH key pairs, `hermes-agent-ssh-client`
-and `hermes-agent-ssh-host`.
+`hermes-agent-api-server`, the two SSH key pairs, `hermes-agent-ssh-client`
+and `hermes-agent-ssh-host`, and the iOS relay's keys, `hermes-agent-relay`.
 
 ### Authelia
 
@@ -172,6 +175,7 @@ client's authorization policy (`hermes-admins` and `full-admin`, two factor).
 | --- | --- | --- |
 | gateway | dashboard port, from Traefik | internet (80/443), the sandbox's sshd, the gateway VIPs (OIDC issuer) |
 | sandbox | sshd, from the gateway | internet (80/443) |
+| relay | `/v1`, from Traefik's public entrypoint | internet (80/443): APNs |
 
 Neither pod has a ServiceAccount token. The sandbox runs as uid 10001 with a
 read-only root filesystem and no capabilities. The gateway's `hermes`
@@ -214,6 +218,48 @@ A conventional commit on `main` that touches `files/sandbox/` is tagged
 proposes the new tag for `sandbox.image`. Anything the agent installs outside
 `/home/agent` is gone at the next restart: add it to the image instead.
 
+## iOS relay
+
+The [Hermes iOS][hermes-ios] app talks to Hermes through two pieces: a
+*relay*, the one endpoint the phone and the connector both reach, and a
+*connector*, which runs next to Hermes, holds a WebSocket open to the relay
+and runs each message as a Hermes job. The relay runs nothing itself
+(`HERMES_ADAPTER=connector`). This chart runs the relay; the connector is set
+up on the Hermes side.
+
+[hermes-ios]: https://github.com/dylan-buck/Hermes-iOS
+
+The relay is public at `hermes-relay.msng.to`, on the public listener, with
+only `/v1` routed. That is what the namespace's `external-gateway-access`
+label is for; the dashboard's route stays on the internal listener. The relay's
+own auth guards it: a connector must present `CONNECTOR_SETUP_SECRET` to
+register, a phone pairs with a short-lived code the connector prints, and
+both then hold relay-issued tokens. The relay keeps its state in SQLite on its
+own volume, and is one replica: rate limits and connector sockets live in the
+process.
+
+**The image** is built from `files/relay/Dockerfile`, which fetches upstream's
+`relay/` at a pinned commit and installs it from upstream's `uv.lock`.
+Upstream publishes no image. Moving to a newer upstream commit is a hand edit
+of that `ADD` line; the commit releases `hermes-relay-<version>` like the
+sandbox image, and Renovate proposes the tag.
+
+**Connecting a connector**, with the setup secret:
+
+```sh
+kubectl -n hermes-agent get secret hermes-agent-relay \
+  -o jsonpath='{.data.CONNECTOR_SETUP_SECRET}' | base64 -d
+# On the connector's host:
+export HERMES_MOBILE_RELAY_URL=https://hermes-relay.msng.to/v1
+hermes-mobile setup        # paste the secret when asked
+hermes-mobile pair-phone   # then scan the code in the app
+```
+
+**Push notifications** are optional. To enable them, put the APNs settings
+(`APNS_KEY_CONTENTS`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`,
+`APNS_ENVIRONMENT`) in a `hermes-agent-relay-env` Secret and restart the
+relay. Every key in it becomes an environment variable.
+
 ## Storage
 
 | Volume | Holds | Backed up |
@@ -221,6 +267,7 @@ proposes the new tag for `sandbox.image`. Anything the agent installs outside
 | `data-hermes-agent-0` | Hermes' home: sessions, memories, skills, cron | yes |
 | `signal-hermes-agent-0` | the Signal account's keys | yes |
 | `home-hermes-agent-sandbox-0` | `/home/agent`: the agent's working files; read-only in the gateway too | yes |
+| `data-hermes-agent-relay-0` | the iOS relay's SQLite: paired phones and hosts, message jobs | yes |
 
 ## Runbook
 
@@ -246,6 +293,11 @@ Rotating an SSH key pair: delete its Secret, let Argo CD and secret-generator
 recreate it, then restart both pods.
 
 ## Known rough edges
+
+- **The namespace predates its `external-gateway-access` label**, and Argo CD
+  never labels a namespace it did not create. Until it is labeled by hand
+  (`kubectl label ns hermes-agent external-gateway-access=true`), the relay's
+  route is not admitted and `hermes-relay.msng.to` does not serve.
 
 - **The gateway follows the sandbox's node.** Both pods mount the sandbox's
   ReadWriteOnce home, which attaches to one node. The gateway *requires* the
