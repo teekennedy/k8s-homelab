@@ -56,7 +56,7 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ $name }}
-            # Optional extras, such as the APNs key (README.md, "iOS relay").
+            # Optional extras, such as the APNs key (README.md, "iOS app").
             - secretRef:
                 name: {{ .Values.relay.envSecretName }}
                 optional: true

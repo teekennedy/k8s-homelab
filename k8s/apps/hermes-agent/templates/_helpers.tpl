@@ -74,6 +74,11 @@ app.kubernetes.io/component: relay
 {{ include "hermes-agent.fullname" . }}-relay
 {{- end }}
 
+{{/* The iOS connector's state: its relay credential and the phone's sensors. */}}
+{{- define "hermes-agent.connectorHome" -}}
+/opt/data/hermes-mobile
+{{- end }}
+
 {{- define "hermes-agent.image" -}}
 {{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}
 {{- end }}
@@ -118,6 +123,12 @@ config.yaml on the data volume. `config` is merged last.
       "provider" "self-hosted"
       "self_hosted" (dict "issuer" .Values.oidc.issuer "client_id" .Values.oidc.clientId)))
 -}}
+{{- if .Values.connector.enabled }}
+{{- $_ := set $base "mcp_servers" (dict "hermes_mobile" (dict
+  "command" "/opt/hermes-mobile/connector/bin/hermes-mobile-mcp"
+  "args" (list)
+  "env" (dict "HERMES_MOBILE_CONNECTOR_HOME" (include "hermes-agent.connectorHome" .)))) }}
+{{- end }}
 {{- toYaml (mustMergeOverwrite $base (deepCopy .Values.config)) }}
 {{- end }}
 

@@ -107,7 +107,8 @@ spec:
                 secretKeyRef:
                   name: {{ $fullName }}-oidc
                   key: client-secret
-            # Enabled for /health; nothing is admitted to the port.
+            # /health for the probes and, over localhost, the iOS connector's
+            # jobs. Nothing outside the pod is admitted to the port.
             - name: API_SERVER_ENABLED
               value: "true"
             - name: API_SERVER_HOST
@@ -184,6 +185,106 @@ spec:
             - name: sandbox-home
               mountPath: /home/agent
               readOnly: true
+            {{- if .Values.connector.enabled }}
+            # hermes-mobile-mcp, the phone's sensor tools, which Hermes runs.
+            - name: hermes-mobile
+              mountPath: /opt/hermes-mobile
+              subPath: opt/hermes-mobile
+              readOnly: true
+            {{- end }}
+        {{- if .Values.connector.enabled }}
+        # The Hermes iOS connector: holds a WebSocket to the relay and runs the
+        # phone's messages as jobs on the API server above. On the Hermes image,
+        # because it shells out to the hermes CLI, with the connector itself
+        # mounted from the relay image.
+        - name: hermes-mobile
+          image: {{ include "hermes-agent.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -ec
+            - |
+              # Upstream's skill teaches Hermes when to use the phone's tools.
+              mkdir -p "$HERMES_HOME/skills"
+              rm -rf "$HERMES_HOME/skills/hermes-ios"
+              cp -R /opt/hermes-mobile/skills/hermes-ios "$HERMES_HOME/skills/"
+              # Registers with the relay once; the credential it gets back is
+              # kept in the connector's state. Retries rather than exiting,
+              # so a relay outage never takes the pod out of its Service.
+              until [ -f "$HERMES_MOBILE_CONNECTOR_HOME/state.json" ] ||
+                hermes-mobile setup --skip-mcp; do
+                sleep 30
+              done
+              exec hermes-mobile run
+          env:
+            - name: PATH
+              value: /opt/hermes-mobile/connector/bin:/opt/hermes/bin:/opt/hermes/.venv/bin:/usr/local/bin:/usr/bin:/bin
+            - name: HOME
+              value: /tmp
+            - name: HERMES_HOME
+              value: /opt/data
+            - name: HERMES_MOBILE_CONNECTOR_HOME
+              value: {{ include "hermes-agent.connectorHome" . }}
+            - name: HERMES_MOBILE_RELAY_URL
+              value: {{ printf "https://%s/v1" .Values.relay.host | quote }}
+            - name: CONNECTOR_SETUP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hermes-agent.relayName" . }}
+                  key: CONNECTOR_SETUP_SECRET
+            - name: HERMES_API_SERVER_URL
+              value: http://127.0.0.1:8642
+            - name: HERMES_API_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $fullName }}-api-server
+                  key: API_SERVER_KEY
+          # Ready once registered with the relay, not while connected to it:
+          # this container's readiness is the pod's, and the dashboard must
+          # not go with the relay.
+          readinessProbe:
+            exec:
+              command:
+                - test
+                - -f
+                - {{ printf "%s/state.json" (include "hermes-agent.connectorHome" .) }}
+            periodSeconds: 10
+          # The connector records last_error when the relay refuses or drops
+          # it and clears it on the next accepted connection. Ten minutes of
+          # failing to connect restarts it.
+          livenessProbe:
+            exec:
+              command:
+                - /opt/hermes-mobile/connector/bin/python
+                - -c
+                - |
+                  import json, pathlib, sys
+                  p = pathlib.Path("{{ include "hermes-agent.connectorHome" . }}/state.json")
+                  sys.exit(1 if p.exists() and json.loads(p.read_text()).get("last_error") else 0)
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 20
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.connector.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: hermes-mobile
+              mountPath: /opt/hermes-mobile
+              subPath: opt/hermes-mobile
+              readOnly: true
+            - name: connector-tmp
+              mountPath: /tmp
+        {{- end }}
         {{- if .Values.signal.enabled }}
         - name: signal-cli
           image: {{ printf "%s:%s" .Values.signal.image.repository .Values.signal.image.tag | quote }}
@@ -274,6 +375,17 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 1Gi
+        {{- if .Values.connector.enabled }}
+        # The relay image's /opt/hermes-mobile: the connector, its MCP server
+        # and their Python.
+        - name: hermes-mobile
+          image:
+            reference: {{ .Values.relay.image | quote }}
+            pullPolicy: {{ .Values.relay.pullPolicy }}
+        - name: connector-tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        {{- end }}
         {{- if .Values.signal.enabled }}
         - name: signal-tmp
           emptyDir: {}

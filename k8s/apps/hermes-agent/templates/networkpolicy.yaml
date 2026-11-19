@@ -37,8 +37,8 @@ spec:
       ports:
         - port: ssh
           protocol: TCP
-    # The OIDC issuer, on the public gateway VIP: Traefik's public HTTPS
-    # entrypoint once the VIP is DNAT'd, the VIP itself otherwise.
+    # The OIDC issuer and the iOS relay, on the public gateway VIP: Traefik's
+    # public HTTPS entrypoint once the VIP is DNAT'd, the VIP itself otherwise.
     - to:
         - namespaceSelector:
             matchLabels:

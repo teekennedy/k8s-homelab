@@ -88,7 +88,7 @@ sandbox:
   affinity: {}
 
 # --- iOS relay -----------------------------------------------------------------
-# The Hermes iOS app's relay (README.md, "iOS relay"). Public, unlike the
+# The Hermes iOS app's relay (README.md, "iOS app"). Public, unlike the
 # dashboard: the phone reaches it from anywhere.
 relay:
   enabled: true
@@ -114,6 +114,18 @@ relay:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+
+# --- iOS connector -------------------------------------------------------------
+# Bridges the relay to this Hermes: a sidecar in the gateway pod, run from the
+# relay image (README.md, "iOS app"). Needs relay.enabled.
+connector:
+  enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 96Mi
+    limits:
+      memory: 512Mi
 
 # --- Persistence ----------------------------------------------------------------
 persistence:

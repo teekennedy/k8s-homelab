@@ -17,8 +17,8 @@ the two share nothing.
                                                   └─ ssh :2222 ──► sandbox pod (StatefulSet)
                                                                    sshd as `agent`, /home/agent volume
 
-  iPhone app ──► hermes-relay.msng.to ──► relay pod ◄── WebSocket ── connector (next to Hermes)
-                 (public VIP, CrowdSec)   (StatefulSet, SQLite)
+  iPhone app ──► hermes-relay.msng.to ──► relay pod ◄── WebSocket ── connector sidecar
+                 (public VIP, CrowdSec)   (StatefulSet, SQLite)      in the gateway pod
 ```
 
 **The gateway pod** (`templates/gateway.yaml`) is the agent. One `hermes
@@ -173,7 +173,7 @@ client's authorization policy (`hermes-admins` and `full-admin`, two factor).
 
 | Pod | In | Out |
 | --- | --- | --- |
-| gateway | dashboard port, from Traefik | internet (80/443), the sandbox's sshd, the gateway VIPs (OIDC issuer) |
+| gateway | dashboard port, from Traefik | internet (80/443), the sandbox's sshd, the gateway VIPs (OIDC issuer; the iOS relay, by its public name) |
 | sandbox | sshd, from the gateway | internet (80/443) |
 | relay | `/v1`, from Traefik's public entrypoint | internet (80/443): APNs |
 
@@ -218,47 +218,86 @@ A conventional commit on `main` that touches `files/sandbox/` is tagged
 proposes the new tag for `sandbox.image`. Anything the agent installs outside
 `/home/agent` is gone at the next restart: add it to the image instead.
 
-## iOS relay
+## iOS app
 
-The [Hermes iOS][hermes-ios] app talks to Hermes through two pieces: a
-*relay*, the one endpoint the phone and the connector both reach, and a
-*connector*, which runs next to Hermes, holds a WebSocket open to the relay
-and runs each message as a Hermes job. The relay runs nothing itself
-(`HERMES_ADAPTER=connector`). This chart runs the relay; the connector is set
-up on the Hermes side.
+The [Hermes iOS][hermes-ios] app talks to Hermes through two pieces, both
+run by this chart. The *relay* is the one endpoint the phone and the
+connector both reach; it runs nothing itself (`HERMES_ADAPTER=connector`).
+The *connector* holds a WebSocket open to the relay and runs each message
+from the phone as a Hermes job.
 
 [hermes-ios]: https://github.com/dylan-buck/Hermes-iOS
 
-The relay is public at `hermes-relay.msng.to`, on the public listener, with
-only `/v1` routed. That is what the namespace's `external-gateway-access`
+```
+  iPhone ──► hermes-relay.msng.to ──► relay pod ◄── WebSocket ──┐ (out through Traefik)
+                                                                 │
+  gateway pod:  hermes-mobile ──► 127.0.0.1:8642 ──► hermes (API server: agent loop)
+                (connector)                            └─ spawns hermes-mobile-mcp
+                    └── /opt/data/hermes-mobile: credential, sensors.db ──┘
+```
+
+**The relay** is public at `hermes-relay.msng.to`, on the public listener,
+with only `/v1` routed. That is what the namespace's `external-gateway-access`
 label is for; the dashboard's route stays on the internal listener. The relay's
 own auth guards it: a connector must present `CONNECTOR_SETUP_SECRET` to
-register, a phone pairs with a short-lived code the connector prints, and
-both then hold relay-issued tokens. The relay keeps its state in SQLite on its
-own volume, and is one replica: rate limits and connector sockets live in the
+register, a phone pairs with a short-lived code the connector issues, and
+both then hold relay-issued tokens. It keeps its state in SQLite on its own
+volume, and is one replica: rate limits and connector sockets live in the
 process.
 
-**The image** is built from `files/relay/Dockerfile`, which fetches upstream's
-`relay/` at a pinned commit and installs it from upstream's `uv.lock`.
-Upstream publishes no image. Moving to a newer upstream commit is a hand edit
-of that `ADD` line; the commit releases `hermes-relay-<version>` like the
-sandbox image, and Renovate proposes the tag.
+**The connector** is the `hermes-mobile` container in the gateway pod. It
+cannot be a pod of its own: its setup refuses to register without a runnable
+`hermes` CLI, and the phone's location and health tools are an MCP server,
+`hermes-mobile-mcp`, that Hermes spawns as a subprocess and that reads the
+connector's `sensors.db`. So it runs on the Hermes image, as the hermes user,
+with the connector mounted read-only from the relay image (an image volume
+at `/opt/hermes-mobile`, mounted in the `hermes` container too). It keeps its
+state on the data volume at `/opt/data/hermes-mobile`; Hermes' agent can read
+it, as it can the rest of the gateway's secrets, and the sandbox cannot. On
+first start it registers with the relay using the setup secret, retrying
+until the relay answers. Jobs run on Hermes' API server over localhost, so
+the phone's conversations get the same memory, skills and model as Signal.
+The managed config pins the MCP server (`mcp_servers.hermes_mobile`), and each
+start copies upstream's `hermes-ios` skill into `/opt/data/skills`.
 
-**Connecting a connector**, with the setup secret:
+**The image** is built from `files/relay/Dockerfile`, which fetches upstream's
+`relay/`, `connector/` and `skills/` at a pinned commit and installs them from
+upstream's `uv.lock` files under `/opt/hermes-mobile`. Upstream publishes no
+image. Moving to a newer upstream commit is a hand edit of that `ADD` line;
+the commit releases `hermes-relay-<version>` like the sandbox image, and
+Renovate proposes the tag, which both the relay and the connector use.
+
+**Pairing a phone.** In the app, set the relay to
+`https://hermes-relay.msng.to/v1`, then:
 
 ```sh
-kubectl -n hermes-agent get secret hermes-agent-relay \
-  -o jsonpath='{.data.CONNECTOR_SETUP_SECRET}' | base64 -d
-# On the connector's host:
-export HERMES_MOBILE_RELAY_URL=https://hermes-relay.msng.to/v1
-hermes-mobile setup        # paste the secret when asked
-hermes-mobile pair-phone   # then scan the code in the app
+kubectl -n hermes-agent exec -it hermes-agent-0 -c hermes-mobile -- \
+  hermes-mobile pair-phone
+# Prints a QR code and a code like ABCD-EFGH, valid for 10 minutes.
+kubectl -n hermes-agent exec hermes-agent-0 -c hermes-mobile -- hermes-mobile status
+```
+
+**Voice mode** (OpenAI Realtime) is optional and keyed on the connector, not
+the app. It stores the key in the connector's state:
+
+```sh
+kubectl -n hermes-agent exec -it hermes-agent-0 -c hermes-mobile -- \
+  hermes-mobile configure-realtime
 ```
 
 **Push notifications** are optional. To enable them, put the APNs settings
 (`APNS_KEY_CONTENTS`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`,
 `APNS_ENVIRONMENT`) in a `hermes-agent-relay-env` Secret and restart the
 relay. Every key in it becomes an environment variable.
+
+**Starting over** (a new relay database, a rotated setup secret or API server
+key, all of which the connector's state records):
+
+```sh
+kubectl -n hermes-agent exec hermes-agent-0 -c hermes-mobile -- \
+  rm /opt/data/hermes-mobile/state.json
+kubectl -n hermes-agent delete pod hermes-agent-0   # registers again; re-pair phones
+```
 
 ## Storage
 
