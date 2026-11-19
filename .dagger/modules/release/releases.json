@@ -33,6 +33,17 @@
       }
     ]
   },
+  "hermes-relay": {
+    "directory": "k8s/apps/hermes-agent/files/relay",
+    "config": "cliff.toml",
+    "artifacts": [
+      {
+        "prefix": "hermes-relay",
+        "title": "Hermes iOS relay",
+        "description": "Hermes iOS relay: pairing, auth, jobs and the connector WebSocket for the Hermes iPhone app."
+      }
+    ]
+  },
   "hermes-sandbox": {
     "directory": "k8s/apps/hermes-agent/files/sandbox",
     "config": "cliff.toml",

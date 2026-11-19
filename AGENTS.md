@@ -28,6 +28,7 @@ In-cluster secrets, such OIDC client secrets or an admin password for an in-clus
 - Devenv uses root `cliff.toml`. One semver bump creates `devenv-ci-<version>` (ci) and `devenv-shell-<version>` (ci + interactive), skipping either whose image Nix store path matches its latest release (`scripts/release-plan.sh`). Only `devenv.nix`, `devenv.yaml`, and `devenv.lock` trigger devenv releases.
 - Forgejo resources uses `k8s/platform/forgejo/files/forgejo-resources/cliff.toml` and publishes `forgejo-resources-<version>`, starting at 1.0.0. The first release includes source history from before the directory rename.
 - The Hermes sandbox uses `k8s/apps/hermes-agent/files/sandbox/cliff.toml` and publishes `hermes-sandbox-<version>`, starting at 0.1.0.
+- The Hermes iOS relay uses `k8s/apps/hermes-agent/files/relay/cliff.toml` and publishes `hermes-relay-<version>`, starting at 0.1.0.
 - The OpenHands sandbox uses `k8s/apps/openhands/files/sandbox/cliff.toml` and publishes `openhands-sandbox-<version>`, starting at 0.2.0.
 - The wake word trainer uses `k8s/apps/wake-word-trainer/files/image/cliff.toml` and publishes `wake-word-trainer-<version>`, starting at 0.1.0.
 - Each release is also created on the GitHub mirror, with the Woodpecker secret `github_release_token` (mirrored from the hand-provisioned `github-release-token` Secret).
