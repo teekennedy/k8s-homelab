@@ -1,12 +1,12 @@
 apiVersion: v2
 name: kube-prometheus-stack
-version: 0.1.98
+version: 0.1.99
 dependencies:
   - name: kube-prometheus-stack
     version: 93.4.1
     repository: oci://ghcr.io/prometheus-community/charts
   - name: loki
-    version: 7.6.0
+    version: 7.7.0
     repository: oci://ghcr.io/grafana/helm-charts
     condition: loki.enabled
   - name: alloy
