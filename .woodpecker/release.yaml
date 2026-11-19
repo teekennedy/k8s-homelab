@@ -4,6 +4,7 @@ when:
       - refs/tags/devenv-ci-*
       - refs/tags/devenv-shell-*
       - refs/tags/forgejo-resources-*
+      - refs/tags/hermes-relay-*
       - refs/tags/hermes-sandbox-*
       - refs/tags/openhands-sandbox-*
       - refs/tags/wake-word-trainer-*

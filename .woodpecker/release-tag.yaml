@@ -6,10 +6,15 @@ when:
     branch: main
     path:
       include:
+        # A newly registered project releases its unreleased history at once;
+        # release.sh skips every project without unreleased commits.
+        - .dagger/modules/release/releases.json
+        - .woodpecker/release-tag.yaml
         - devenv.nix
         - devenv.yaml
         - devenv.lock
         - "k8s/platform/forgejo/files/forgejo-resources/**"
+        - "k8s/apps/hermes-agent/files/relay/**"
         - "k8s/apps/hermes-agent/files/sandbox/**"
         - "k8s/apps/openhands/files/sandbox/**"
         - "k8s/apps/wake-word-trainer/files/image/**"
