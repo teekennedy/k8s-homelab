@@ -267,15 +267,21 @@ image. Moving to a newer upstream commit is a hand edit of that `ADD` line;
 the commit releases `hermes-relay-<version>` like the sandbox image, and
 Renovate proposes the tag, which both the relay and the connector use.
 
-**Pairing a phone.** In the app, set the relay to
-`https://hermes-relay.msng.to/v1`, then:
+**Check server status**:
+
+```sh
+kubectl -n hermes-agent exec hermes-agent-0 -c hermes-mobile -- hermes-mobile status
+```
+
+**Pairing a phone.**:
 
 ```sh
 kubectl -n hermes-agent exec -it hermes-agent-0 -c hermes-mobile -- \
   hermes-mobile pair-phone
-# Prints a QR code and a code like ABCD-EFGH, valid for 10 minutes.
-kubectl -n hermes-agent exec hermes-agent-0 -c hermes-mobile -- hermes-mobile status
 ```
+
+This will print a QR code, valid for 10 minutes. Open the app and scan the QR
+code to pair.
 
 **Voice mode** (OpenAI Realtime) is optional and keyed on the connector, not
 the app. It stores the key in the connector's state:
