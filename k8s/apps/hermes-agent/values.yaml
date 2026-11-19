@@ -94,7 +94,7 @@ relay:
   enabled: true
   # Built from files/relay and released as hermes-relay-<version>.
   # Renovate bumps the tag and pins its digest.
-  image: ghcr.io/teekennedy/k8s-homelab:hermes-relay-0.1.0
+  image: ghcr.io/teekennedy/k8s-homelab:hermes-relay-0.1.0@sha256:ca5f4636ddf219786bfd7c6d7b049628188e4ad57ce8ea88c602f9ba3c9e3eaf
   pullPolicy: IfNotPresent
   host: hermes-relay.msng.to
   # Created by hand, optional: APNs keys and other relay settings.
