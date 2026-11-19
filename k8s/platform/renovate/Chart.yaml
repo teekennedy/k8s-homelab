@@ -1,7 +1,7 @@
 apiVersion: v2
 name: renovate
-version: 0.1.242
+version: 0.1.243
 dependencies:
   - name: renovate
-    version: 46.446.0
+    version: 46.447.0
     repository: oci://ghcr.io/renovatebot/charts
