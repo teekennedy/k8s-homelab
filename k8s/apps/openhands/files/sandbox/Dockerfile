@@ -5,7 +5,7 @@
 # a sandbox installs nothing at start. Released as
 # ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-<version> by any conventional
 # commit that touches this directory; see README.md, "Sandbox image".
-FROM ghcr.io/openhands/agent-server:1.63.0-python@sha256:43b07e9e2b25b370360940462bfc919eec0c2a459795e588cd7448e86b84c9e5
+FROM ghcr.io/openhands/agent-server:1.63.1-python@sha256:506c2e243dcc3f5092ad0909c5dff9fef621298faed9042b5d4b0375fac837a5
 
 
 # renovate: datasource=github-releases depName=kubernetes/kubernetes
