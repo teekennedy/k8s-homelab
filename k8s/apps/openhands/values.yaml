@@ -380,7 +380,7 @@ sandboxSpecs:
   # tag and adds kubectl, the dagger CLI, mcp-grafana and the Claude Code
   # adapter. Released by any conventional commit under files/sandbox; Renovate
   # bumps this tag.
-  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.33@sha256:9770d631ca152980505e1e8c0fb9ca08de4128136ffe4aa5317cc9c527b46727
+  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.34@sha256:60a1a1b19670698fd69fd51204611f56032fbb69291f5c48045fd0fad6f57a9a
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:
