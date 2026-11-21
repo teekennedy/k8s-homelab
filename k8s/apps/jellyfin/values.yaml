@@ -933,7 +933,6 @@ app-template:
         main:
           jellyfin:
             - path: /media
-              readOnly: true
               subPath: media
         arrs:
           media-folders:
