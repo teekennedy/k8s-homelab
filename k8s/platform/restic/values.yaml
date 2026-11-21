@@ -10,7 +10,7 @@ timeZone: America/Denver
 exporter:
   image:
     repository: docker.io/ngosang/restic-exporter
-    tag: 2.1.2@sha256:a8f9cfa3016237c7008aefa4d9c6639bc9b34d2582eed07ac58dcf56632e4170
+    tag: 2.2.0@sha256:0e256cee35c609d3ab345cc1bdf87709c8cf8e83555f87c68b85dc19137aec0b
   port: 8001
   # Each refresh lists snapshots and locks. Snapshot files are cached, so only
   # new ones are downloaded from S3.
