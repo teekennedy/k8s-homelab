@@ -1,7 +1,7 @@
 dependencies:
 - name: kube-prometheus-stack
   repository: oci://ghcr.io/prometheus-community/charts
-  version: 93.6.0
+  version: 93.6.1
 - name: loki
   repository: oci://ghcr.io/grafana/helm-charts
   version: 7.7.0
@@ -17,5 +17,5 @@ dependencies:
 - name: opentelemetry-collector
   repository: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
   version: 0.181.0
-digest: sha256:11296e89158c3fd6a755b653e1cc85565f73a1401de8b08376959707f301ceee
-generated: "2026-11-21T00:24:24.974327306Z"
+digest: sha256:2c4f7e0a7eb5012da2790c3776462891b830cbd830191707780e5b0b3a219db3
+generated: "2026-11-21T03:24:26.024482921Z"
