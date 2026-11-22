@@ -1,11 +1,13 @@
 """
 Unit tests for the borg-2 ZFS textfile exporter.
 
-Covers the pure functions: Prometheus line formatting, the vdev tree walk, and
-scrub-age parsing (the fiddliest part, since `zpool status -j` embeds a timezone
-abbreviation that strptime cannot read).
+Covers the pure functions: Prometheus line formatting, the vdev tree walks,
+scrub state, vdev-to-disk resolution, and scrub-age parsing (the fiddliest
+part, since `zpool status -j` embeds a timezone abbreviation that strptime
+cannot read).
 """
 
+import os
 from datetime import datetime, timedelta
 
 import pytest
@@ -114,3 +116,102 @@ class TestCollectVdevs:
         acc = self._empty_acc()
         zfs_exporter.collect_vdevs({"sda": {}}, "mypool", acc)
         assert acc["read"][0][0] == "mypool"
+
+
+class TestScrubInProgress:
+    def test_running_scrub(self):
+        scan = {"function": "SCRUB", "state": "SCANNING", "scrub_pause": "-"}
+        assert zfs_exporter.scrub_in_progress(scan) == 1
+
+    def test_paused_scrub_is_not_in_progress(self):
+        # A paused scrub stays SCANNING but issues no I/O.
+        scan = {
+            "function": "SCRUB",
+            "state": "SCANNING",
+            "scrub_pause": "Sun Nov  1 03:00:00 AM MST 2026",
+        }
+        assert zfs_exporter.scrub_in_progress(scan) == 0
+
+    def test_missing_pause_field_means_running(self):
+        scan = {"function": "SCRUB", "state": "SCANNING"}
+        assert zfs_exporter.scrub_in_progress(scan) == 1
+
+    @pytest.mark.parametrize("state", ["FINISHED", "CANCELED"])
+    def test_finished_or_canceled_scrub(self, state):
+        scan = {"function": "SCRUB", "state": state, "scrub_pause": "-"}
+        assert zfs_exporter.scrub_in_progress(scan) == 0
+
+
+@pytest.fixture
+def fake_devices(tmp_path):
+    """
+    Builds a /dev/disk/by-id and /sys/class/block layout like the kernel's:
+    sdb is a whole disk, sdb1 its partition (with a `partition` file and a
+    parent directory of sdb), and sdc a whole disk used without partitions.
+    """
+    dev = tmp_path / "dev"
+    by_id = dev / "disk" / "by-id"
+    by_id.mkdir(parents=True)
+    for name in ("sdb", "sdb1", "sdc"):
+        (dev / name).touch()
+    os.symlink("../../sdb1", by_id / "wwn-0xb-part1")
+    os.symlink("../../sdc", by_id / "wwn-0xc")
+
+    devices = tmp_path / "sys" / "devices" / "sdb"
+    (devices / "sdb1").mkdir(parents=True)
+    (devices / "sdb1" / "partition").write_text("1\n")
+    (tmp_path / "sys" / "devices" / "sdc").mkdir()
+
+    sys_block = tmp_path / "sys" / "class" / "block"
+    sys_block.mkdir(parents=True)
+    os.symlink(devices, sys_block / "sdb")
+    os.symlink(devices / "sdb1", sys_block / "sdb1")
+    os.symlink(tmp_path / "sys" / "devices" / "sdc", sys_block / "sdc")
+    return by_id, str(sys_block)
+
+
+class TestWholeDisk:
+    def test_partition_resolves_to_parent_disk(self, fake_devices):
+        by_id, sys_block = fake_devices
+        assert zfs_exporter.whole_disk(str(by_id / "wwn-0xb-part1"), sys_block) == "sdb"
+
+    def test_whole_disk_resolves_to_itself(self, fake_devices):
+        by_id, sys_block = fake_devices
+        assert zfs_exporter.whole_disk(str(by_id / "wwn-0xc"), sys_block) == "sdc"
+
+
+class TestCollectDisks:
+    def test_maps_leaf_disks_under_raidz(self, fake_devices):
+        by_id, sys_block = fake_devices
+        vdevs = {
+            "storage": {
+                "vdev_type": "root",
+                "vdevs": {
+                    "raidz2-0": {
+                        "vdev_type": "raidz",
+                        "vdevs": {
+                            "wwn-0xb-part1": {
+                                "vdev_type": "disk",
+                                "path": str(by_id / "wwn-0xb-part1"),
+                            },
+                            "wwn-0xc": {
+                                "vdev_type": "disk",
+                                "path": str(by_id / "wwn-0xc"),
+                            },
+                        },
+                    }
+                },
+            }
+        }
+        acc = []
+        zfs_exporter.collect_disks(vdevs, "storage", acc, sys_block)
+        assert acc == [
+            ("storage", "wwn-0xb-part1", "sdb"),
+            ("storage", "wwn-0xc", "sdc"),
+        ]
+
+    def test_skips_disks_without_a_path(self):
+        # A missing or removed disk is reported without a path.
+        acc = []
+        zfs_exporter.collect_disks({"sdz": {"vdev_type": "disk"}}, "tank", acc)
+        assert acc == []

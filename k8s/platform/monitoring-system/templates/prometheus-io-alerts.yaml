@@ -14,16 +14,22 @@ spec:
     interval: 60s
     rules:
 
-    # Alert on high node-level disk I/O utilization
+    # Alert on sustained high node-level disk I/O utilization. Short bursts,
+    # such as nightly media processing, are expected. A ZFS scrub saturates
+    # its pool's disks for hours by design, so those disks are excluded while
+    # one is running.
     - alert: HighDiskIOUtilization
-      expr: rate(node_disk_io_time_seconds_total[2m]) * on(instance, device) group_left node_disk_info{model!="VIRTUAL-DISK"} > 0.5
-      for: 5m
+      expr: |
+        rate(node_disk_io_time_seconds_total[2m]) * on(instance, device) group_left node_disk_info{model!="VIRTUAL-DISK"} > 0.5
+        unless on(instance, device)
+          (zpool_vdev_disk_info * on(instance, pool) group_left zpool_scrub_in_progress == 1)
+      for: 30m
       labels:
         severity: warning
         component: storage
       annotations:
         summary: {{ "High disk I/O on {{ $labels.instance }}" | quote }}
-        description: {{ "Disk {{ $labels.device }} on {{ $labels.instance }} has >50% I/O utilization for 5+ minutes (current: {{ $value | humanizePercentage }})" | quote }}
+        description: {{ "Disk {{ $labels.device }} on {{ $labels.instance }} has >50% I/O utilization for 30+ minutes (current: {{ $value | humanizePercentage }})" | quote }}
 
     # Alert on high container write I/O (per-workload)
     - alert: HighContainerWriteIO

@@ -8,6 +8,7 @@ from datetime import datetime
 ZPOOL = os.environ["ZPOOL_BIN"]
 TEXTFILE_DIR = os.environ["TEXTFILE_DIR"]
 OUTPUT = os.path.join(TEXTFILE_DIR, "zfs.prom")
+SYS_BLOCK = "/sys/class/block"
 
 errors = []
 
@@ -52,6 +53,30 @@ def collect_vdevs(vdev_dict, pool_name, acc):
             acc["slow"].append((pool_name, vdev_name, vdev["slow_ios"]))
         if "vdevs" in vdev:
             collect_vdevs(vdev["vdevs"], pool_name, acc)
+
+
+def scrub_in_progress(scan):
+    # A paused scrub stays in state SCANNING; scrub_pause is "-" unless paused.
+    return int(scan.get("state") == "SCANNING" and scan.get("scrub_pause", "-") == "-")
+
+
+def whole_disk(dev_path, sys_block=SYS_BLOCK):
+    # Resolves a vdev path such as /dev/disk/by-id/wwn-...-part1 to the kernel
+    # name of its whole disk ("sdb"), matching node_exporter's device label.
+    name = os.path.basename(os.path.realpath(dev_path))
+    entry = os.path.join(sys_block, name)
+    if os.path.exists(os.path.join(entry, "partition")):
+        return os.path.basename(os.path.realpath(os.path.join(entry, "..")))
+    return name
+
+
+def collect_disks(vdev_dict, pool_name, acc, sys_block=SYS_BLOCK):
+    for vdev_name, vdev in vdev_dict.items():
+        if vdev.get("vdev_type") == "disk" and vdev.get("path"):
+            disk = whole_disk(vdev["path"], sys_block)
+            acc.append((pool_name, vdev_name, disk))
+        if "vdevs" in vdev:
+            collect_disks(vdev["vdevs"], pool_name, acc, sys_block)
 
 
 def parse_scrub_age(end_time_str):
@@ -122,12 +147,20 @@ def main():
             lines.append(metric(mname, {"pool": n}, p[field]))
 
     if status_data:
-        scrub_age_lines, scrub_err_lines = [], []
+        scrub_age_lines, scrub_err_lines, scrub_run_lines = [], [], []
         acc = {"read": [], "write": [], "cksum": [], "slow": []}
+        disks = []
 
         for pool_name, pool in status_data.get("pools", {}).items():
             scan = pool.get("scan_stats", {})
             if scan and scan.get("function") == "SCRUB":
+                scrub_run_lines.append(
+                    metric(
+                        "zpool_scrub_in_progress",
+                        {"pool": pool_name},
+                        scrub_in_progress(scan),
+                    )
+                )
                 scrub_err_lines.append(
                     metric(
                         "zpool_scrub_errors",
@@ -146,6 +179,7 @@ def main():
                             )
                         )
             collect_vdevs(pool.get("vdevs", {}), pool_name, acc)
+            collect_disks(pool.get("vdevs", {}), pool_name, disks)
 
         if scrub_age_lines:
             lines += [
@@ -153,6 +187,27 @@ def main():
                 "# TYPE zpool_scrub_age_seconds gauge",
             ]
             lines += scrub_age_lines
+
+        if scrub_run_lines:
+            lines += [
+                "# HELP zpool_scrub_in_progress 1 while a scrub is running (not paused)",
+                "# TYPE zpool_scrub_in_progress gauge",
+            ]
+            lines += scrub_run_lines
+
+        if disks:
+            lines += [
+                "# HELP zpool_vdev_disk_info Whole disk backing each leaf vdev",
+                "# TYPE zpool_vdev_disk_info gauge",
+            ]
+            for pn, vn, dev in disks:
+                lines.append(
+                    metric(
+                        "zpool_vdev_disk_info",
+                        {"pool": pn, "vdev": vn, "device": dev},
+                        1,
+                    )
+                )
 
         if scrub_err_lines:
             lines += [
