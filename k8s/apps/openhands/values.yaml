@@ -7,7 +7,7 @@ image:
   repository: ghcr.io/openhands/agent-canvas
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "1.43.0@sha256:bcdbb3fb9610f14eda67f39fc609f162ad8c3c28697d6ff3f4adae55c15c3f1d"
+  tag: "1.44.0@sha256:59a675df7a798e8ed1c37690abb77459917f0a4b85ad65939d8963fd0bc53790"
 
 nameOverride: ""
 fullnameOverride: ""
@@ -380,7 +380,7 @@ sandboxSpecs:
   # tag and adds kubectl, the dagger CLI, mcp-grafana and the Claude Code
   # adapter. Released by any conventional commit under files/sandbox; Renovate
   # bumps this tag.
-  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.36@sha256:a1ac14d20ad4f7714c2ce57f631316884ac977f99d1fa57293184766c1988120
+  image: ghcr.io/teekennedy/k8s-homelab:openhands-sandbox-0.2.37@sha256:c88759287d656320f47a144f68b2c99ce905623464cc7f16414ca7912ea5ef67
   specs:
     # Work on ops/k8s-homelab: reaches the model and the forge, nothing else.
     repo:
