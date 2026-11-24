@@ -2,7 +2,7 @@
 # the handful of tools an assistant's scripts reach for. Released as
 # ghcr.io/teekennedy/k8s-homelab:hermes-sandbox-<version> by any conventional
 # commit that touches this directory; see README.md, "Sandbox image".
-FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
+FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0
 
 # bash, tar and python3 are what Hermes' ssh backend itself requires; the rest
 # is for the agent. Node, ffmpeg and numpy cover rendering and encoding media
