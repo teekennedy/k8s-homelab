@@ -1,12 +1,12 @@
 apiVersion: v2
 name: argocd
-version: 0.0.92
+version: 0.0.93
 dependencies:
   - name: argo-cd
     version: 10.19.0
     repository: oci://ghcr.io/argoproj/argo-helm
   - name: argocd-apps
-    version: 2.0.9
+    version: 2.0.10
     repository: oci://ghcr.io/argoproj/argo-helm
   - name: argo-events
     version: 2.4.28
