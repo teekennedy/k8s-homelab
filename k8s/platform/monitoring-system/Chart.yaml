@@ -1,9 +1,9 @@
 apiVersion: v2
 name: kube-prometheus-stack
-version: 0.1.112
+version: 0.1.113
 dependencies:
   - name: kube-prometheus-stack
-    version: 93.9.0
+    version: 93.10.0
     repository: oci://ghcr.io/prometheus-community/charts
   - name: loki
     version: 7.7.0
@@ -14,7 +14,7 @@ dependencies:
     repository: https://grafana.github.io/helm-charts
     condition: alloy.enabled
   - name: prometheus-blackbox-exporter
-    version: 11.22.0
+    version: 11.22.1
     repository: oci://ghcr.io/prometheus-community/charts
   - name: tempo
     version: 3.2.1
