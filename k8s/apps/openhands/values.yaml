@@ -7,7 +7,7 @@ image:
   repository: ghcr.io/openhands/agent-canvas
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "1.44.0@sha256:59a675df7a798e8ed1c37690abb77459917f0a4b85ad65939d8963fd0bc53790"
+  tag: "1.45.0@sha256:4eb6d6fec924573783d424ee7b911b01eb1bd620cd8bb6e69fbc6b215599083a"
 
 nameOverride: ""
 fullnameOverride: ""
@@ -153,7 +153,7 @@ remoteControl:
   # renovate: datasource=npm depName=@anthropic-ai/claude-code
   cliVersion: "2.1.273"
   # renovate: datasource=docker depName=node
-  nodeImage: node:26-slim@sha256:0c6375bcc1ee170c22bd04e11b7c1ff9afc3bb16a865a2629308ceb4b72380ff
+  nodeImage: node:26-slim@sha256:615a27817f7b9508f0de73eb1cc8fc8894ab122bee56c1a7a568b72cd1032067
   # HOME for the session, on the volume below: the checkout, the trust record
   # and the CLI's own state all live here, so a restart resumes rather than
   # starts over.
