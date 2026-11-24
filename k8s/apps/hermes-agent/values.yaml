@@ -72,7 +72,7 @@ signal:
 sandbox:
   # Built from files/sandbox and released as hermes-sandbox-<version>.
   # Renovate bumps the tag and pins its digest.
-  image: ghcr.io/teekennedy/k8s-homelab:hermes-sandbox-0.1.2@sha256:9a7e4a2adbee53b044223242c48ebb06360189958974cde09388740417f20ae4
+  image: ghcr.io/teekennedy/k8s-homelab:hermes-sandbox-0.1.3@sha256:49e61d25ba9dbf7e4473444f16b56959223187878638a0c1b6411f9b6812251c
   pullPolicy: IfNotPresent
   port: 2222
   resources:
@@ -94,7 +94,7 @@ relay:
   enabled: true
   # Built from files/relay and released as hermes-relay-<version>.
   # Renovate bumps the tag and pins its digest.
-  image: ghcr.io/teekennedy/k8s-homelab:hermes-relay-0.1.0@sha256:ca5f4636ddf219786bfd7c6d7b049628188e4ad57ce8ea88c602f9ba3c9e3eaf
+  image: ghcr.io/teekennedy/k8s-homelab:hermes-relay-0.1.1@sha256:ea13b05518ff7dd9d73553a66aa04d0b206c4c476dc28da53eb2680feffa6703
   pullPolicy: IfNotPresent
   host: hermes-relay.msng.to
   # Created by hand, optional: APNs keys and other relay settings.
