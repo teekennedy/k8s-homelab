@@ -153,7 +153,7 @@ remoteControl:
   # renovate: datasource=npm depName=@anthropic-ai/claude-code
   cliVersion: "2.1.273"
   # renovate: datasource=docker depName=node
-  nodeImage: node:26-slim@sha256:615a27817f7b9508f0de73eb1cc8fc8894ab122bee56c1a7a568b72cd1032067
+  nodeImage: node:26-slim@sha256:abe7e5a82b61a8ef67b315b85497c9e65173387ccf2f4a029248184b8e020be5
   # HOME for the session, on the volume below: the checkout, the trust record
   # and the CLI's own state all live here, so a restart resumes rather than
   # starts over.
