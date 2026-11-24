@@ -1,12 +1,12 @@
 dependencies:
 - name: argo-cd
   repository: oci://ghcr.io/argoproj/argo-helm
-  version: 10.18.3
+  version: 10.19.0
 - name: argocd-apps
   repository: oci://ghcr.io/argoproj/argo-helm
   version: 2.0.9
 - name: argo-events
   repository: oci://ghcr.io/argoproj/argo-helm
   version: 2.4.28
-digest: sha256:f24b7161d9b6ed5cef5c10e58dc86976c95d3a83555b2ac2465e00ee4793f571
-generated: "2026-11-24T12:24:23.199479356Z"
+digest: sha256:6a5cc9137fe0b96d6c51c4bd892a69773ea5a13482a6a6427611eb3a291287db
+generated: "2026-11-24T13:25:17.827286128Z"
