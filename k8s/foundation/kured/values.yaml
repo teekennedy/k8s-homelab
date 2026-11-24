@@ -42,7 +42,7 @@ webhook:
   image:
     # Python must match files/kured-webhook/.python-version.
     repository: ghcr.io/astral-sh/uv
-    tag: python3.15-alpine@sha256:61d5053f323bbdb706e3f02398aa7931d514ba1ef9bcf87c512d4549e98d8c1b
+    tag: python3.15-alpine@sha256:6de501ac125aa750217800807c65e68debd84eb14e421661b8972b119ec144bf
   # Headless service (one DNS A record per Alertmanager pod), not the
   # load-balanced ClusterIP Service. Alertmanager's gossip cluster only
   # replicates silences and the notification log, not the alert set itself,
