@@ -472,24 +472,48 @@ automations:
 
       The ops/k8s-homelab repository, which defines the cluster, is checked
       out at main in the working directory. You can read the cluster with
-      kubectl (read only, no Secrets), query metrics and logs through the
-      Grafana MCP server (`ALERTS{alertstate="firing"}` in Prometheus is what
-      is firing now), and open pull requests on the forge using the
-      @scripts/create-pr.sh script.
+      kubectl (read only, no Secrets), and open pull requests on the forge
+      using the @scripts/create-pr.sh script. You cannot log in to the hosts,
+      so the Grafana MCP server is your view of them. It has these
+      datasources:
+
+      - Prometheus: current metrics, about 3 days of history.
+        `ALERTS{alertstate="firing"}` is what is firing now.
+      - VictoriaMetrics: the same metrics, with weeks of history.
+      - Loki: logs from every pod (`{namespace="...", pod=~"..."}`), and the
+        systemd journal of every NixOS host (`{host="borg-2"}`). Applications
+        log their own scheduled jobs here, which kubectl cannot show once a
+        pod has restarted.
 
       1. Investigate. Establish what is actually broken, since when, and
          why. Check whether the alerts are still firing; if they resolved on
          their own, find out what caused them anyway.
+         - Look at least 3 days back to see whether the same thing happened
+           before, and at what times of day.
+         - If it started at or near a round time, such as 03:00, list what is
+           scheduled then: CronJobs, systemd timers
+           (`node_systemd_timer_last_trigger_seconds`), and applications'
+           own scheduled tasks in Loki.
+         - Find the specific process or workload responsible. A pattern
+           that matches a theory does not confirm it. Before you settle on a
+           cause, name the evidence that would prove it wrong and check that
+           evidence. If something contradicts your theory, such as a schedule
+           that does not fit, drop the theory. Do not explain the
+           contradiction away.
+         - If you cannot confirm the cause, say so, and say what you would
+           need to confirm it. Do not open a pull request for an unconfirmed
+           cause.
       2. Figure out a short term fix to resolve the symptom. This often
          involves running one-off manual steps, like deleting a stuck job, but
          may require changes to the repo, such as fixing a stale reference.
       3. Figure out the long term fix that addresses the root cause, or adjust
          the alert, limit, or probe that caused the alert if such an adjustment
          is warranted.
-      4. Edit the repo to apply the repo-based fixes to the short and long term
-         problem, if applicable, commit to a feature branch, and make a PR. If
-         some changes have a hard dependency on others, create multiple PRs and
-         note the expected merge order in the PR descriptions.
+      4. If and only if changes to the codebase are required for the short term
+         or long term fix, edit the repo in the current working directory to
+         apply the fixes, commit to a feature branch, and make a PR. If changes
+         must be rolled out in multiple phases, create one PR for each phase
+         and note the expected merge order in the PR descriptions.
       5. Any manual steps that you identified to be run as part of the short or long term
          fix should be formatted into instructions for the operator in your final
          report. Include exact commands to copy/paste where possible.
