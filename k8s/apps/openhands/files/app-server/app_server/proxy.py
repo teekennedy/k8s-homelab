@@ -31,6 +31,7 @@ from starlette.background import BackgroundTask
 
 from .auth import principal
 from .sandboxes import SandboxManager
+from .event_time import mark_utc_frame
 from .terminal_events import TerminalMirror
 
 log = logging.getLogger(__name__)
@@ -239,7 +240,7 @@ async def proxy_ws(ws: WebSocket, sandbox_id: str, path: str):
                 await ws.send_bytes(msg)
             else:
                 for frame in mirror.frames(msg):
-                    await ws.send_text(frame)
+                    await ws.send_text(mark_utc_frame(frame))
 
     tasks = [
         asyncio.create_task(client_to_upstream()),

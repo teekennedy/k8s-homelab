@@ -277,6 +277,22 @@ def test_history_is_kept_and_paged(api, hooks, user, agent):
     assert [e["id"] for e in window["items"]] == ["e1", "e2"]
 
 
+def test_history_timestamps_are_marked_utc(api, hooks, user, agent):
+    sandbox_id = _start(api, user)["sandbox_id"]
+    _post_events(hooks, api, user, sandbox_id, [_event(1), _event(2)])
+    path = f"/api/v1/conversation/{CONV_ID}/events/search"
+    items = api.get(path, headers=user).json()["items"]
+    assert [e["timestamp"] for e in items] == [
+        "2026-10-01T06:34:01.000000Z",
+        "2026-10-01T06:34:02.000000Z",
+    ]
+    # A served timestamp works as a filter bound on the stored naive form.
+    later = api.get(
+        path, params={"timestamp__gte": items[1]["timestamp"]}, headers=user
+    ).json()["items"]
+    assert [e["id"] for e in later] == ["e2"]
+
+
 def test_history_survives_the_sandbox(api, hooks, user, agent):
     sandbox_id = _start(api, user)["sandbox_id"]
     _post_events(hooks, api, user, sandbox_id, [_event(1)])

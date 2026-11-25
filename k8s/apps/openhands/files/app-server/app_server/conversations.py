@@ -20,6 +20,7 @@ import httpx
 
 from . import usage_limit
 from .db import Database, now
+from .event_time import mark_utc
 from .forge import Forge
 from .sandboxes import SandboxManager, Status
 from .secrets_store import SecretsStore
@@ -889,7 +890,7 @@ class ConversationService:
             offset,
         )
         return {
-            "items": [json.loads(r["body"]) for r in rows[:limit]],
+            "items": [mark_utc(json.loads(r["body"])) for r in rows[:limit]],
             "next_page_id": str(offset + limit) if len(rows) > limit else None,
         }
 
