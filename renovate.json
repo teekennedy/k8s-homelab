@@ -538,6 +538,75 @@
       "sourceUrl": "https://github.com/oauth2-proxy/manifests"
     },
     {
+      "description": "Same problem as oauth2-proxy: Renovate takes these OCI charts' source from the first `sources` entry in Chart.yaml, which is the app repo, but the chart has its own version numbers. Its release notes are in the chart repo, released as <chart>-<version>.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "ghcr.io/prometheus-community/charts/prometheus-blackbox-exporter"
+      ],
+      "sourceUrl": "https://github.com/prometheus-community/helm-charts"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "ghcr.io/argoproj/argo-helm/argo-cd",
+        "ghcr.io/argoproj/argo-helm/argo-events",
+        "ghcr.io/argoproj/argo-helm/argocd-apps"
+      ],
+      "sourceUrl": "https://github.com/argoproj/argo-helm"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "ghcr.io/cloudnative-pg/charts/plugin-barman-cloud"
+      ],
+      "sourceUrl": "https://github.com/cloudnative-pg/charts"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/kubereboot/charts/kured"],
+      "sourceUrl": "https://github.com/kubereboot/charts"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "ghcr.io/open-telemetry/opentelemetry-helm-charts/opentelemetry-collector"
+      ],
+      "sourceUrl": "https://github.com/open-telemetry/opentelemetry-helm-charts"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/renovatebot/charts/renovate"],
+      "sourceUrl": "https://github.com/renovatebot/helm-charts"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/grafana-community/helm-charts/tempo"],
+      "sourceUrl": "https://github.com/grafana-community/helm-charts"
+    },
+    {
+      "description": "The loki chart lives in the app repo and is released as helm-loki-<version>, a tag Renovate can't match. Point it at the chart's CHANGELOG.md instead.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/grafana/helm-charts/loki"],
+      "sourceUrl": "https://github.com/grafana/loki",
+      "sourceDirectory": "production/helm/loki"
+    },
+    {
+      "description": "These charts have no home or sources metadata, so Renovate finds no source repo for them at all.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/crowdsecurity/helm-charts/crowdsec"],
+      "sourceUrl": "https://github.com/crowdsecurity/helm-charts"
+    },
+    {
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["csi-driver-nfs"],
+      "sourceUrl": "https://github.com/kubernetes-csi/csi-driver-nfs"
+    },
+    {
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["csi-driver-smb"],
+      "sourceUrl": "https://github.com/kubernetes-csi/csi-driver-smb"
+    },
+    {
       "description": "Some charts parse image tags as version strings and would break if the tag value had an appended digest.",
       "matchDatasources": [
         "docker"
