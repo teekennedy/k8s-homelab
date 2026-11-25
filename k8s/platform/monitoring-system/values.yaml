@@ -13,7 +13,7 @@ kube-prometheus-stack:
     image:
       registry: docker.io
       repository: grafana/grafana
-      tag: "13.3.1-distroless@sha256:54e297ac67e2b72572f926892f4e06074dc4f79f2a56ed9a9ca9a88a46f28733"
+      tag: "13.3.2-distroless@sha256:d9425e704fa9dff189966b827fbc9b63befc5b443999c7b82193f1b1a73c74f7"
     defaultDashboardsEnabled: false
     deploymentStrategy:
       type: Recreate
@@ -190,7 +190,7 @@ kube-prometheus-stack:
         repository: prometheus/alertmanager
         # No digest: the chart copies the tag into the Alertmanager's
         # spec.version, which the operator parses as semver.
-        tag: v0.35.0
+        tag: v0.35.1
       replicas: 3
       secrets:
         - alertmanager-secrets
@@ -887,11 +887,11 @@ loki:
   memcached:
     image:
       repository: memcached
-      tag: "1.6.39-alpine@sha256:c8503d4491edd3110cc07d0465089d3a41cf1daf8645e71149e39a51835e92cd"
+      tag: "1.6.45-alpine@sha256:084fb554292d1447bc2c68b80c2331b98834514f56c866bc21a61be3c2ee376d"
   memcachedExporter:
     image:
       repository: prom/memcached-exporter
-      tag: "v0.15.4@sha256:b6763ecb3c47f2408e0398518851b7f8c5fc46232b2649f8c78a321130c54266"
+      tag: "v0.18.0@sha256:1458b31d4cae1a6618e85c8d31ecc49c4ebdcee3c8530be8d80d93e8792c4a58"
     resources:
       requests:
         cpu: 20m
@@ -944,7 +944,7 @@ alloy:
     image:
       registry: quay.io
       repository: prometheus-operator/prometheus-config-reloader
-      tag: "v0.94.2@sha256:a1897c67478bc23434534e91ad3855280771196b1daf17144db9dbcb655bef71"
+      tag: "v0.95.2@sha256:cc74ddedad4ab1c49446971f6d51302ad4303d8660a2018af925c7f62c114304"
     resources:
       requests:
         cpu: 10m
@@ -1203,7 +1203,7 @@ opentelemetry-collector:
   # The chart requires a distribution; k8s has every component used below.
   image:
     repository: otel/opentelemetry-collector-k8s
-    tag: "0.165.0@sha256:ce55d0a38923c83120e4ba613fbdf446786652d2ce9f29d1cd7879e5d869829f"
+    tag: "0.166.0@sha256:63bcccd12e33bc33eccd8b2d207463c983fd1b452c7c6f02d6cb9758c5d553b7"
   command:
     name: otelcol-k8s
   ports:
