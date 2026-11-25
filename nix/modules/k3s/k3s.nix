@@ -87,6 +87,10 @@ in {
           # Disable k3s built-in ServiceLB; MetalLB handles all load balancing
           "--disable"
           "servicelb"
+          # Disable the k3s-bundled Gateway API CRDs; managed by ArgoCD instead
+          # so their version isn't tied to the k3s release.
+          "--disable"
+          "gateway-api-crd"
           # Add the MetalLB API VIP to the API server TLS certificate
           "--tls-san"
           "10.69.80.101"
