@@ -260,6 +260,9 @@ argo-cd:
       limits:
         memory: 1Gi
   redis:
+    image:
+      repository: ecr-public.aws.com/docker/library/redis
+      tag: "8.6.4-alpine@sha256:2cc044fc5a07c9b701f8f1255a309ae9ad7856e694ac03513bf3648c01e40763"
     metrics:
       enabled: false
     livenessProbe:

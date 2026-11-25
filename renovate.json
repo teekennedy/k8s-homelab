@@ -69,19 +69,6 @@
       "depNameTemplate": "kubernetes-sigs/agent-sandbox"
     },
     {
-      "description": "Sync ArgoCD appVersion with GitHub releases",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "k8s/foundation/argocd/Chart.yaml"
-      ],
-      "matchStrings": [
-        "appVersion:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "argoproj/argo-cd",
-      "extractVersionTemplate": "^v(?<version>.*)$"
-    },
-    {
       "description": "Sync Jellyfin appVersion with GitHub releases",
       "customType": "regex",
       "managerFilePatterns": [
@@ -549,6 +536,22 @@
         "ghcr.io/oauth2-proxy/charts/oauth2-proxy"
       ],
       "sourceUrl": "https://github.com/oauth2-proxy/manifests"
+    },
+    {
+      "description": "Some charts parse image tags as version strings and would break if the tag value had an appended digest.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchFileNames": [
+        "k8s/platform/monitoring-system/values.yaml"
+      ],
+      "matchPackageNames": [
+        "quay.io/prometheus/prometheus",
+        "quay.io/prometheus/alertmanager",
+        "docker.io/grafana/alloy",
+        "grafana/alloy"
+      ],
+      "pinDigests": false
     },
     {
       "description": "Track smallstep/step-cli changelog from GitHub releases",

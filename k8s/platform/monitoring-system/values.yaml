@@ -10,6 +10,10 @@ kube-prometheus-stack:
       userKey: username
       passwordKey: password
     enabled: true
+    image:
+      registry: docker.io
+      repository: grafana/grafana
+      tag: "13.3.1-distroless@sha256:54e297ac67e2b72572f926892f4e06074dc4f79f2a56ed9a9ca9a88a46f28733"
     defaultDashboardsEnabled: false
     deploymentStrategy:
       type: Recreate
@@ -181,6 +185,12 @@ kube-prometheus-stack:
     enabled: true
 
     alertmanagerSpec:
+      image:
+        registry: quay.io
+        repository: prometheus/alertmanager
+        # No digest: the chart copies the tag into the Alertmanager's
+        # spec.version, which the operator parses as semver.
+        tag: v0.35.0
       replicas: 3
       secrets:
         - alertmanager-secrets
@@ -406,6 +416,10 @@ kube-prometheus-stack:
           - ALL
     admissionWebhooks:
       patch:
+        image:
+          registry: ghcr.io
+          repository: jkroepke/kube-webhook-certgen
+          tag: "1.11.1@sha256:8009b04f9873f7279b5adee37fdd03b6a9aa7b6751d4f69fde2683010e41cd1f"
         resources:
           requests:
             cpu: 20m
@@ -433,6 +447,13 @@ kube-prometheus-stack:
     ##
     prometheusSpec:
       externalUrl: https://prometheus.msng.to
+
+      image:
+        registry: quay.io
+        repository: prometheus/prometheus
+        # No digest: the chart copies the tag into the Prometheus'
+        # spec.version, which the operator parses as semver.
+        tag: v3.16.0-distroless
 
       # The operator only maintains an EndpointSlice for kubelet targets
       # (prometheusOperator.kubeletEndpointsEnabled is false), so discovery
@@ -494,6 +515,13 @@ kube-prometheus-stack:
                 storage: 220Gi
 
   prometheus-node-exporter:
+    # The chart appends -distroless after the tag, which would land after the
+    # digest, so the suffix is spelled out in the tag instead.
+    image:
+      registry: quay.io
+      repository: prometheus/node-exporter
+      tag: "v1.13.1-distroless@sha256:dbc46b5381ae47c5634a6ad16d7b4862191979b0ba4f4cfbdee85e5aa2fcd1e3"
+      distroless: false
     containerSecurityContext:
       readOnlyRootFilesystem: true
       allowPrivilegeEscalation: false
@@ -542,6 +570,10 @@ kube-prometheus-stack:
       limits:
         memory: 192Mi
   kube-state-metrics:
+    image:
+      registry: registry.k8s.io
+      repository: kube-state-metrics/kube-state-metrics
+      tag: "v2.20.0@sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b"
     resources:
       requests:
         cpu: 20m
@@ -641,6 +673,10 @@ kube-prometheus-stack:
 
 prometheus-blackbox-exporter:
   fullnameOverride: blackbox-exporter
+  image:
+    registry: quay.io
+    repository: prometheus/blackbox-exporter
+    tag: "v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13"
   securityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -847,7 +883,15 @@ loki:
         memory: 128Mi
       limits:
         memory: 192Mi
+  # Image for the chunks and results caches.
+  memcached:
+    image:
+      repository: memcached
+      tag: "1.6.39-alpine@sha256:c8503d4491edd3110cc07d0465089d3a41cf1daf8645e71149e39a51835e92cd"
   memcachedExporter:
+    image:
+      repository: prom/memcached-exporter
+      tag: "v0.15.4@sha256:b6763ecb3c47f2408e0398518851b7f8c5fc46232b2649f8c78a321130c54266"
     resources:
       requests:
         cpu: 20m
@@ -861,6 +905,12 @@ alloy:
   # The PodLogs CRD is unused.
   crds:
     create: false
+  image:
+    registry: docker.io
+    repository: grafana/alloy
+    # No digest: the chart copies the tag into the app.kubernetes.io/version
+    # label, where "@" is invalid.
+    tag: v1.22.0
   controller:
     tolerations:
       - key: node-role.kubernetes.io/control-plane
@@ -891,6 +941,10 @@ alloy:
             path: /var/lib/alloy
             type: DirectoryOrCreate
   configReloader:
+    image:
+      registry: quay.io
+      repository: prometheus-operator/prometheus-config-reloader
+      tag: "v0.94.2@sha256:a1897c67478bc23434534e91ad3855280771196b1daf17144db9dbcb655bef71"
     resources:
       requests:
         cpu: 10m
@@ -1091,6 +1145,10 @@ alloy:
 tempo:
   enabled: true
   tempo:
+    registry: docker.io
+    repository: grafana/tempo
+    # renovate: datasource=docker depName=grafana/tempo
+    tag: "3.1.1@sha256:64e2fbd56d9c2b3412a4b430a58ea59e91a670b1e75f920a0c702213ad145044"
     reportingEnabled: false
     # Applied by both the backend scheduler and worker.
     retention: 336h # 14 days
@@ -1145,6 +1203,7 @@ opentelemetry-collector:
   # The chart requires a distribution; k8s has every component used below.
   image:
     repository: otel/opentelemetry-collector-k8s
+    tag: "0.165.0@sha256:ce55d0a38923c83120e4ba613fbdf446786652d2ce9f29d1cd7879e5d869829f"
   command:
     name: otelcol-k8s
   ports:

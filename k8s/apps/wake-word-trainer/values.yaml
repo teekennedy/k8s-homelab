@@ -170,6 +170,10 @@ oauth2ProxyInstance:
   labelsTemplate: wake-word-trainer.labels
 
 oauth2-proxy:
+  image:
+    registry: quay.io
+    repository: oauth2-proxy/oauth2-proxy
+    tag: "v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048"
   fullnameOverride: wake-word-trainer-auth
   config:
     existingSecret: wake-word-trainer-oauth2-proxy-secrets

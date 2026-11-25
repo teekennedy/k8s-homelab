@@ -577,6 +577,10 @@ valkeyInstance:
             app.kubernetes.io/instance: openhands
 
 oauth2-proxy:
+  image:
+    registry: quay.io
+    repository: oauth2-proxy/oauth2-proxy
+    tag: "v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048"
   fullnameOverride: openhands-auth
   config:
     existingSecret: openhands-oauth2-proxy-secrets

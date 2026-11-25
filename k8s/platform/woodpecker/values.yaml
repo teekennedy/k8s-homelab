@@ -1,6 +1,10 @@
 # https://github.com/woodpecker-ci/helm/tree/main/charts/woodpecker
 woodpecker:
   server:
+    image:
+      registry: docker.io
+      repository: woodpeckerci/woodpecker-server
+      tag: "v3.20.1@sha256:0f31560e29d67ec4a06d6eeee4bac38d2a2697a6a741b8a0db3998180f3a3517"
     createAgentSecret: false
     securityContext:
       runAsUser: 1000
@@ -108,6 +112,10 @@ woodpecker:
         memory: 384Mi
 
   agent:
+    image:
+      registry: docker.io
+      repository: woodpeckerci/woodpecker-agent
+      tag: "v3.20.1@sha256:a7d7299a13add0b3936fa0ac9ed23507fe283a7fc7d9596c4289d7e8206541eb"
     replicaCount: 2
     securityContext:
       runAsUser: 1000
