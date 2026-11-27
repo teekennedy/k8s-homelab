@@ -1,9 +1,9 @@
 dependencies:
 - name: intel-device-plugins-operator
   repository: oci://ghcr.io/intel/helm-charts
-  version: 0.37.1
+  version: 0.37.2
 - name: intel-device-plugins-gpu
   repository: oci://ghcr.io/intel/helm-charts
-  version: 0.37.1
-digest: sha256:31ca678cce90c210239d86732c954ade03263a3121a74fef0396de3374fbdbec
-generated: "2026-10-21T12:22:46.991675-06:00"
+  version: 0.37.2
+digest: sha256:c6fc2b87a1ce5c766a08cae5f868c7742150d13d75fe4cdb10d661dc0e7408d3
+generated: "2026-11-27T12:24:30.44766072Z"
