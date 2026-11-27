@@ -65,6 +65,7 @@ _productionApps: {
 			"syncthing":         true
 			"terraria":          true
 			"wake-word-trainer": true
+			"wizarr":            true
 		}
 	}
 }

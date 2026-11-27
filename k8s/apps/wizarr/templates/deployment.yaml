@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wizarr.fullname" . }}
+  labels:
+    {{- include "wizarr.labels" . | nindent 4 }}
+spec:
+  # Single writer: SQLite on an RWO volume.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "wizarr.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wizarr.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "wizarr.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            - name: TZ
+              value: {{ .Values.timezone | quote }}
+            # oauth2-proxy is the login. The NetworkPolicy keeps every other
+            # caller away, because /login now admits anyone as admin.
+            - name: DISABLE_BUILTIN_AUTH
+              value: "true"
+            # Traefik, then oauth2-proxy: two hops append to X-Forwarded-For.
+            # The other X-Forwarded-* headers are set once, by Traefik.
+            - name: TRUST_PROXY_HEADERS
+              value: "true"
+            - name: PROXY_FIX_X_FOR
+              value: "2"
+            - name: PROXY_FIX_X_PREFIX
+              value: "0"
+            # The image runs as root and drops to PUID itself. Started as
+            # that user instead, it skips the drop, and the only writable
+            # paths are /data and /tmp. uv's cache and gunicorn's control
+            # socket live under $HOME.
+            - name: HOME
+              value: /tmp
+          startupProbe:
+            # Migrations run before gunicorn binds.
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          # /health answers 302 (to /setup) until the admin account exists,
+          # which counts as healthy.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # SQLite database, sessions and the generated Flask secret key,
+            # all under /data/database.
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "wizarr.fullname" . }}-data
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

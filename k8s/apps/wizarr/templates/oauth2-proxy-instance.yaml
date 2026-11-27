@@ -1,0 +1,6 @@
+{{/*
+The dedicated oauth2-proxy's Secret, from the oauth2-proxy-instance library
+chart. The proxy runs in reverse-proxy mode (it owns the HTTPRoute), so no
+forwardAuth middleware.
+*/}}
+{{- include "oauth2ProxyInstance.secret" . }}

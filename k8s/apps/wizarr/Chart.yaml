@@ -1,0 +1,18 @@
+apiVersion: v2
+name: wizarr
+description: Wizarr, the invitation and onboarding portal for the Jellyfin server.
+type: application
+# Bump on any change to the chart templates/values.
+version: 0.1.0
+# Tracks the ghcr.io/wizarrrr/wizarr image tag deployed by this chart.
+appVersion: "v2026.10.1"
+dependencies:
+  # Dedicated oauth2-proxy in reverse-proxy mode: it owns the hostname and
+  # forwards to Wizarr. See values.yaml.
+  - name: oauth2-proxy
+    version: 10.7.4
+    repository: oci://ghcr.io/oauth2-proxy/charts
+  # Shared glue: the Secret auth-system reflects to hash the client secret.
+  - name: oauth2-proxy-instance
+    version: 0.1.0
+    repository: file://../../charts/oauth2-proxy-instance

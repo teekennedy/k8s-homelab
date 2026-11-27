@@ -356,3 +356,10 @@ releases:
     needs:
       - auth-system/auth-system
       - secret-system/secret-system
+
+  - name: wizarr
+    inherit:
+      - template: apps
+    needs:
+      - auth-system/auth-system
+      - secret-system/secret-system

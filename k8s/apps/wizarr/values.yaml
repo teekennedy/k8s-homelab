@@ -1,0 +1,158 @@
+# Wizarr: invitation links that create Jellyfin accounts and walk new users
+# through setup. See README.md.
+
+image:
+  repository: ghcr.io/wizarrrr/wizarr
+  pullPolicy: IfNotPresent
+  tag: "v2026.10.1@sha256:08f2c6de534ec7d36d39a4f55b7c5c379021ca881dc519c702aad0ddafbdc67a"
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  # The app never talks to the Kubernetes API.
+  automount: false
+  annotations: {}
+  name: ""
+
+service:
+  port: 5690
+
+timezone: America/Denver
+
+podSecurityContext:
+  runAsNonRoot: true
+  # The image's own files belong to 1000:1000, the default PUID/PGID.
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+persistence:
+  # SQLite database: invitations, users and settings (including the Jellyfin
+  # API key). Backed up by Longhorn's recurring job.
+  data:
+    size: 1Gi
+    storageClass: longhorn
+    labels:
+      recurring-job.longhorn.io/source: "enabled"
+      recurring-job-group.longhorn.io/backup: "enabled"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# --- SSO front door -----------------------------------------------------------
+oauth2ProxyInstance:
+  # Must equal the Authelia client_id and the auth-system
+  # oidcClientSecrets.clients key.
+  clientId: wizarr
+  # Must equal oauth2-proxy.config.existingSecret.
+  secretName: wizarr-oauth2-proxy-secrets
+  labelsTemplate: wizarr.labels
+
+oauth2-proxy:
+  image:
+    registry: quay.io
+    repository: oauth2-proxy/oauth2-proxy
+    tag: "v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048"
+  fullnameOverride: wizarr-auth
+  config:
+    existingSecret: wizarr-oauth2-proxy-secrets
+    configFile: |-
+      provider = "oidc"
+      oidc_issuer_url = "https://authelia.msng.to"
+      redirect_url = "https://invites.msng.to/oauth2/callback"
+      cookie_domains = ["invites.msng.to"]
+      cookie_name = "_oauth2_proxy_wizarr"
+      cookie_expire = "168h"
+      cookie_secure = true
+      cookie_httponly = true
+      cookie_samesite = "lax"
+      whitelist_domains = ["invites.msng.to"]
+      email_domains = ["*"]
+      reverse_proxy = true
+      code_challenge_method = "S256"
+      scope = "openid profile email groups"
+      real_client_ip_header = "X-Real-Ip"
+      skip_provider_button = true
+      allowed_groups = ["wizarr-admins", "full-admin"]
+      # The invitee's side, which has no account yet: Wizarr's documented
+      # Authelia bypass list, minus /setup. /setup creates the first admin
+      # with no auth at all, so it stays behind SSO; once an admin exists it
+      # only redirects to the dashboard. Never add /login: with built-in auth
+      # disabled it signs in any visitor as admin.
+      skip_auth_routes = [
+        "^/j([/?].*)?$",
+        "^/join([/?].*)?$",
+        "^/invitation/process([/?].*)?$",
+        "^/plex/callback([/?].*)?$",
+        "^/wizard([/?].*)?$",
+        "^/reset/.+$",
+        "^/static/",
+        "^/image-proxy([/?].*)?$",
+        "^/cinema-posters([/?].*)?$",
+        "^/favicon\\.ico$",
+      ]
+      upstreams = ["http://wizarr.wizarr.svc.cluster.local:5690/"]
+      trusted_proxy_ips = ["10.42.0.0/16"]
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+  service:
+    portNumber: 80
+
+  ingress:
+    enabled: false
+  # group, kind and weight are what the API server defaults them to. Spelled
+  # out because server-side apply otherwise reports them as drift.
+  gatewayApi:
+    enabled: true
+    annotations:
+      # Selects the public entrypoint. Consumed by external-dns, not by the
+      # router.
+      traefik.ingress.kubernetes.io/router.entrypoints: wspublic
+    gatewayRef:
+      group: gateway.networking.k8s.io
+      kind: Gateway
+      name: traefik-gateway
+      namespace: kube-system
+      sectionName: websecurepublic
+    hostnames:
+      - invites.msng.to
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - group: ""
+            kind: Service
+            # oauth2-proxy.fullnameOverride and service.portNumber.
+            name: wizarr-auth
+            port: 80
+            weight: 1
