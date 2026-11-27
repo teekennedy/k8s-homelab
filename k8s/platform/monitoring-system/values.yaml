@@ -525,15 +525,16 @@ kube-prometheus-stack:
     containerSecurityContext:
       readOnlyRootFilesystem: true
       allowPrivilegeEscalation: false
-    # Replaces the chart default, so its filesystem excludes are repeated here.
-    # /cache/var/lib/kubelet and /run/k3s/containerd are impermanence and k3s
-    # paths that otherwise add a series per pod volume.
+    # Replaces the chart's filesystem excludes. /cache/var/lib/kubelet and
+    # /run/k3s/containerd are impermanence and k3s paths that otherwise add a
+    # series per pod volume.
+    defaultArgs:
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/credentials/.+|run/containerd/.+|run/k3s/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+|cache/var/lib/kubelet/.+)($|/)
+      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
     extraArgs:
       - --collector.systemd
       - --collector.zfs
       - --collector.textfile.directory=/var/node-exporter-textfiles
-      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/credentials/.+|run/containerd/.+|run/k3s/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+|cache/var/lib/kubelet/.+)($|/)
-      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
     prometheus:
       monitor:
         metricRelabelings:

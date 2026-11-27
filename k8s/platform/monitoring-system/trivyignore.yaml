@@ -1,10 +1,7 @@
 misconfigurations:
-  # The operator turns these into StatefulSets whose pods need their token:
   # Prometheus discovers its targets through the API.
   - id: KSV-0036 # mounts a service account token
-    paths:
-      - Alertmanager/monitoring-system/monitoring-system-kube-pro.yaml
-      - Prometheus/monitoring-system/monitoring-system-kube-pro.yaml
+    paths: [Prometheus/monitoring-system/monitoring-system-kube-pro.yaml]
   - id: KSV-0041 # manages Secrets cluster-wide
     paths:
       # Reads the credentials its components name, in any namespace.
