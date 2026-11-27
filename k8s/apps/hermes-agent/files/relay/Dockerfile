@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # Hermes iOS, server side: the relay, the public endpoint the iPhone app and
 # the connector both talk to, and the connector itself. Upstream publishes no
 # image, so this builds both from a pinned commit with upstream's lockfiles.
