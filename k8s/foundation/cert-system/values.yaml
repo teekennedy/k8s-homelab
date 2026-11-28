@@ -33,7 +33,7 @@ trust-manager:
 # webhook is not answering by the deadline.
 trustManagerStartupApiCheck:
   # renovate: datasource=docker depName=alpine/kubectl
-  image: alpine/kubectl:1.37.1@sha256:a5d0fbecab3f7b6c2ab7398f1daa73a3e0ed6ece18556d21698233e9e3759cc7
+  image: alpine/kubectl:1.37.2@sha256:06c6e028a77b54849182acb93e77f91f6312db02c6232e053212add91309349a
   timeoutSeconds: 120
 
 # OpenSSH user CA backing the deploybot login on the borg hosts.
@@ -43,7 +43,7 @@ deploybotSshCa:
   enabled: false
   # alpine/kubectl ships kubectl; openssh-keygen is apk-installed at runtime.
   # renovate: datasource=docker depName=alpine/kubectl
-  image: alpine/kubectl:1.37.1@sha256:a5d0fbecab3f7b6c2ab7398f1daa73a3e0ed6ece18556d21698233e9e3759cc7
+  image: alpine/kubectl:1.37.2@sha256:06c6e028a77b54849182acb93e77f91f6312db02c6232e053212add91309349a
   caSecretName: deploybot-ssh-ca
   certSecretName: deploybot-ssh-cert
   # Namespace the short-lived credential is published into. The RBAC allowing
